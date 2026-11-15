@@ -28,16 +28,17 @@ namespace ReplayKitHelper
         public static string FormatBytes(long bytes)
         {
             if (bytes < 0) return "";
+            var culture = Locales.Culture();
             double v = bytes;
-            if (v < 1024) return ((long)v).ToString(CultureInfo.InvariantCulture) + " B";
+            if (v < 1024) return ((long)v).ToString(culture) + " B";
             v /= 1024;
-            if (v < 1024) return Math.Round(v).ToString("0", CultureInfo.InvariantCulture) + " KB";
+            if (v < 1024) return Math.Round(v).ToString("0", culture) + " KB";
             v /= 1024;
-            if (v < 1024) return (v >= 100 ? Math.Round(v).ToString("0", CultureInfo.InvariantCulture) : v.ToString("0.#", CultureInfo.InvariantCulture)) + " MB";
+            if (v < 1024) return (v >= 100 ? Math.Round(v).ToString("0", culture) : v.ToString("0.#", culture)) + " MB";
             v /= 1024;
-            if (v < 1024) return v.ToString("0.#", CultureInfo.InvariantCulture) + " GB";
+            if (v < 1024) return v.ToString("0.#", culture) + " GB";
             v /= 1024;
-            return v.ToString("0.##", CultureInfo.InvariantCulture) + " TB";
+            return v.ToString("0.##", culture) + " TB";
         }
 
         // the leftovers the temporary files number counts: never a file touched a moment ago, since an atomic write in progress leaves its sidecar there for a few milliseconds
@@ -139,7 +140,7 @@ namespace ReplayKitHelper
                 ["state"] = overBytes > 0 ? "over" : low ? "low" : "ok",
                 ["fraction"] = fraction,
                 ["usedText"] = FormatBytes(clipBytes),
-                ["limitText"] = limitBytes > 0 ? "of " + FormatBytes(limitBytes) : Locales.Message("storage.noLimit"),
+                ["limitText"] = limitBytes > 0 ? Locales.Message("storage.ofSize", "size", FormatBytes(limitBytes)) : Locales.Message("storage.noLimit"),
                 ["freeText"] = FormatBytes(freeBytes),
                 ["tempText"] = FormatBytes(tempBytes),
                 ["thumbText"] = FormatBytes(thumbBytes),
@@ -361,7 +362,7 @@ namespace ReplayKitHelper
             string folder = Path.GetFullPath(AppConfig.GetClipDir());
             string ffprobe = Compression.GetToolPaths()["ffprobe"]?.Value<string>();
             if (string.IsNullOrEmpty(ffprobe) || !File.Exists(ffprobe))
-                throw new IOException("ffprobe is missing; clip eligibility cannot be checked.");
+                throw new IOException(Locales.Message("storage.ffprobeMissing"));
             long eligibleBytes = 0;
             var offered = new JArray();
             int scanned = 0, uncheckedClips = 0;
@@ -555,7 +556,7 @@ namespace ReplayKitHelper
             }
             if (started == null || started["ok"]?.Value<bool>() != true)
             {
-                lock (CompressGate) batch.Error = started?["message"]?.Value<string>() ?? "Could not start.";
+                lock (CompressGate) batch.Error = started?["message"]?.Value<string>() ?? Locales.Message("storage.compressionCouldNotStart");
                 return false;
             }
             string requestId = started["requestId"]?.Value<string>() ?? "";

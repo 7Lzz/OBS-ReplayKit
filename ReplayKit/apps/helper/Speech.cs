@@ -213,10 +213,10 @@ namespace ReplayKitHelper
                 {
                     var network = ex.InnerException as System.Net.WebException;
                     error = network != null && (network.Status == System.Net.WebExceptionStatus.SecureChannelFailure || network.Status == System.Net.WebExceptionStatus.TrustFailure)
-                        ? "The speech-model download could not establish a secure HTTPS connection."
-                        : "The speech-model download could not connect to the download server over HTTPS.";
+                        ? Locales.Message("editor.speechModelNoSecureConnection")
+                        : Locales.Message("editor.speechModelCouldNotConnect");
                 }
-                else if (ex is OperationCanceledException) error = "The speech-model download timed out before it finished.";
+                else if (ex is OperationCanceledException) error = Locales.Message("editor.speechModelTimedOut");
                 lock (Gate) InstallErrors[model.Id] = error;
                 Log.Write("Speech install of " + model.Name + " failed: " + ex.Message);
             }
@@ -238,7 +238,7 @@ namespace ReplayKitHelper
             using (var overall = new CancellationTokenSource(TimeSpan.FromMinutes(30)))
             using (var response = Http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, overall.Token).GetAwaiter().GetResult())
             {
-                if (!response.IsSuccessStatusCode) throw new InvalidDataException("The speech-model download server returned HTTP " + (int)response.StatusCode + ".");
+                if (!response.IsSuccessStatusCode) throw new InvalidDataException(Locales.Message("editor.speechModelServerHttp", "status", (int)response.StatusCode));
                 if (response.RequestMessage.RequestUri.Scheme != Uri.UriSchemeHttps) throw new InvalidDataException(Locales.Message("editor.theDownloadLeftHttps"));
                 if (response.Content.Headers.ContentLength > maxBytes) throw new InvalidDataException(Locales.Message("editor.theDownloadIsLargerThanExpected"));
                 using (var stream = response.Content.ReadAsStreamAsync().GetAwaiter().GetResult())
@@ -635,7 +635,7 @@ namespace ReplayKitHelper
                 if (proc.ExitCode != 0)
                 {
                     Log.Write("Speech engine exit " + proc.ExitCode + ": " + tail);
-                    throw new InvalidOperationException("The speech engine failed (exit " + proc.ExitCode + ").");
+                    throw new InvalidOperationException(Locales.Message("editor.speechEngineFailed", "code", proc.ExitCode));
                 }
                 return output;
             }

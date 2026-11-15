@@ -168,7 +168,7 @@ namespace ReplayKitHelper
             if (!Server.State.ReplaykitHotkeyCaptureActive) return new JObject { ["ok"] = true, ["warnings"] = new JArray(), ["applied"] = new JArray() };
             var restore = RestoreHotkeysFromSettings(settings);
             if (restore["ok"]?.Value<bool>() == true) return new JObject { ["ok"] = true, ["warnings"] = new JArray(), ["applied"] = new JArray("OBS hotkeys restored") };
-            return new JObject { ["ok"] = false, ["warnings"] = new JArray("OBS hotkeys could not be restored: " + restore["message"]), ["applied"] = new JArray() };
+            return new JObject { ["ok"] = false, ["warnings"] = new JArray(Locales.Message("settings.hotkeysNotRestoredError", "error", restore["message"]?.ToString())), ["applied"] = new JArray() };
         }
 
     }

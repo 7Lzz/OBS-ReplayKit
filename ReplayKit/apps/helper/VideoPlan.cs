@@ -76,13 +76,13 @@ namespace ReplayKitHelper
             var o = json as JObject;
             var pieces = o?["pieces"] as JArray;
             var window = o?["window"] as JObject;
-            if (pieces == null || window == null || pieces.Count > MaxPieces) { error = "Bad video edit"; return null; }
+            if (pieces == null || window == null || pieces.Count > MaxPieces) { error = Locales.Message("editor.videoEditCouldNotBeRead"); return null; }
             var plan = new VideoPlan
             {
                 Start = window.Value<double?>("start") ?? double.NaN,
                 End = window.Value<double?>("end") ?? double.NaN,
             };
-            if (!Finite(plan.Start) || !Finite(plan.End) || plan.Start < -86400 || plan.End > 86400 || plan.End - plan.Start < 0.5) { error = "Bad video edit"; return null; }
+            if (!Finite(plan.Start) || !Finite(plan.End) || plan.Start < -86400 || plan.End > 86400 || plan.End - plan.Start < 0.5) { error = Locales.Message("editor.videoEditCouldNotBeRead"); return null; }
             var durations = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
             foreach (var token in pieces)
             {
@@ -98,12 +98,12 @@ namespace ReplayKitHelper
                 if (refToken != null)
                 {
                     var clip = refToken.Type == JTokenType.String ? Clips.GetEditorSource(refToken.Value<string>()) : null;
-                    if (clip == null || !System.IO.File.Exists(clip.Full)) { error = refToken.Type == JTokenType.String && VideoImports.IsRef(refToken.Value<string>()) ? "A video added to the video in the editor was moved or changed. Add it again." : "A clip added to the video in the editor is no longer in the clip folder."; return null; }
+                    if (clip == null || !System.IO.File.Exists(clip.Full)) { error = refToken.Type == JTokenType.String && VideoImports.IsRef(refToken.Value<string>()) ? Locales.Message("editor.addedVideoToVideoMoved") : Locales.Message("editor.addedClipToVideoNotInFolder"); return null; }
                     if (!durations.TryGetValue(clip.Full, out length))
                     {
                         if (plan.OtherClips.Count >= MaxOtherClips) { error = Locales.Message("editor.theVideoCanTakePiecesOf", "count", MaxOtherClips); return null; }
                         var info = Trim.ProbeVideo(clip.Full);
-                        if (info == null) { error = "The video of a clip added in the editor could not be read."; return null; }
+                        if (info == null) { error = Locales.Message("editor.addedClipVideoUnreadable"); return null; }
                         length = info.Duration;
                         durations[clip.Full] = length;
                         plan.OtherClips.Add(clip.Full);
@@ -113,13 +113,13 @@ namespace ReplayKitHelper
                 bool valid = po != null && Finite(piece.At) && Finite(piece.SrcStart) && Finite(piece.SrcEnd)
                     && piece.At >= -86400 && piece.At <= 86400
                     && piece.SrcStart >= 0 && piece.SrcEnd - piece.SrcStart >= 0.01 && piece.SrcEnd <= length + 0.1;
-                if (!valid) { error = "Bad video edit"; return null; }
+                if (!valid) { error = Locales.Message("editor.videoEditCouldNotBeRead"); return null; }
                 var rate = po["speed"];
                 if (rate != null)
                 {
-                    if (rate.Type != JTokenType.Float && rate.Type != JTokenType.Integer) { error = "Bad video speed"; return null; }
+                    if (rate.Type != JTokenType.Float && rate.Type != JTokenType.Integer) { error = Locales.Message("editor.videoSpeedOutOfRange"); return null; }
                     double value = rate.Value<double>();
-                    if (!Finite(value) || value < 0.1 || value > 5) { error = "Bad video speed"; return null; }
+                    if (!Finite(value) || value < 0.1 || value > 5) { error = Locales.Message("editor.videoSpeedOutOfRange"); return null; }
                     piece.Speed = value;
                 }
                 var look = po["look"];
@@ -134,7 +134,7 @@ namespace ReplayKitHelper
             for (int i = 1; i < plan.Pieces.Count; i++)
             {
                 var before = plan.Pieces[i - 1];
-                if (plan.Pieces[i].At < before.At + before.Length(speed) - 0.005) { error = "Bad video edit"; return null; }
+                if (plan.Pieces[i].At < before.At + before.Length(speed) - 0.005) { error = Locales.Message("editor.videoEditCouldNotBeRead"); return null; }
             }
             return plan;
         }

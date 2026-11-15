@@ -62,13 +62,13 @@ namespace ReplayKitHelper
 
             if (stopAllOutputs)
             {
-                record = StopObsOutputIfActive("GetRecordStatus", "StopRecord", "recording");
-                replay = StopObsOutputIfActive("GetReplayBufferStatus", "StopReplayBuffer", "replay buffer");
-                vcam = StopObsOutputIfActive("GetVirtualCamStatus", "StopVirtualCam", "virtual camera");
+                record = StopObsOutputIfActive("GetRecordStatus", "StopRecord");
+                replay = StopObsOutputIfActive("GetReplayBufferStatus", "StopReplayBuffer");
+                vcam = StopObsOutputIfActive("GetVirtualCamStatus", "StopVirtualCam");
             }
             else if (applyReplayBufferOutput)
             {
-                replay = StopObsOutputIfActive("GetReplayBufferStatus", "StopReplayBuffer", "replay buffer");
+                replay = StopObsOutputIfActive("GetReplayBufferStatus", "StopReplayBuffer");
             }
 
             foreach (var state in new[] { record, replay, vcam })
@@ -130,7 +130,7 @@ namespace ReplayKitHelper
             foreach (var restart in outputs)
             {
                 var state = restart["state"] as JObject;
-                var r = StartObsOutputIfNeeded(state, restart["request"]?.Value<string>(), restart["label"]?.Value<string>());
+                var r = StartObsOutputIfNeeded(state, restart["request"]?.Value<string>());
                 string rWarning = r["warning"]?.Value<string>();
                 if (r["ok"]?.Value<bool>() != true && !string.IsNullOrEmpty(rWarning)) warnings.Add(rWarning);
                 else if (state["wasActive"]?.Value<bool>() == true) applied.Add(restart["label"] + " restarted");
@@ -204,7 +204,7 @@ namespace ReplayKitHelper
                 var actualAfter = GetInputMonitorTypeValue(inputName);
                 if (actualAfter["ok"]?.Value<bool>() == true && actualAfter["value"]?.Value<string>() == monitorType) { monitorReady = true; break; }
                 lastMonitorMessage = actualAfter["ok"]?.Value<bool>() == true
-                    ? "OBS reported '" + actualAfter["value"] + "' instead of '" + monitorType + "'."
+                    ? Locales.Message("settings.obsReportedValueInstead", "actual", actualAfter["value"]?.ToString(), "wanted", monitorType)
                     : actualAfter["message"]?.Value<string>();
             }
             if (!monitorReady) return new JObject { ["ok"] = false, ["applied"] = new JArray(applied), ["message"] = Locales.Message("settings.obsDidNotReportTheRequested", "error", lastMonitorMessage) };
@@ -257,7 +257,7 @@ namespace ReplayKitHelper
                 }
                 Thread.Sleep(Math.Min(1000, 150 * attempt));
                 if (TestInputMuteState(inputName, muted)) return new JObject { ["ok"] = true, ["message"] = "" };
-                lastMessage = "OBS did not report the requested mute state after setting it.";
+                lastMessage = Locales.Message("settings.obsDidNotReportMuteState");
             }
             return new JObject { ["ok"] = false, ["message"] = lastMessage };
         }

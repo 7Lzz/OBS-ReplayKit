@@ -82,7 +82,7 @@ namespace ReplayKitHelper
                 if (!Editors.ContainsKey(view)) Editors[view] = new Editor { Id = id };
                 if (!Editors.TryGetValue(view, out var editor) || editor.Id != id || revision <= editor.Revision)
                 {
-                    message = "The editor session changed. Reopen the editor.";
+                    message = Locales.Message("editor.editorSessionChanged");
                     return false;
                 }
                 // A cancelled load or page unload must win over an older request arriving late.
@@ -92,12 +92,12 @@ namespace ReplayKitHelper
                 {
                     if (editor.Paths.Concat(paths).Distinct(StringComparer.OrdinalIgnoreCase).Count() > 128)
                     {
-                        message = "Too many editor sources. Save your edits and reopen the editor.";
+                        message = Locales.Message("editor.tooManyEditorSources");
                         return false;
                     }
                     if (paths.Any(p => CompressionQueue.Contains(p) || Jobs.Values.Any(j => j.Paths.Contains(p, StringComparer.OrdinalIgnoreCase))))
                     {
-                        message = "A clip is processing or queued for compression. Open it after that finishes.";
+                        message = Locales.Message("clips.clipProcessingOpenAfter");
                         return false;
                     }
                     foreach (string path in paths) editor.Paths.Add(path);
@@ -125,12 +125,12 @@ namespace ReplayKitHelper
                 var selected = paths.ToArray();
                 if (selected.Any(p => Editors.Values.Any(e => e.Paths.Contains(p))))
                 {
-                    message = "A selected clip is open in the editor. Close the editor and review the clips again.";
+                    message = Locales.Message("clips.selectedClipOpenInEditor");
                     return false;
                 }
                 if (selected.Any(p => Jobs.Values.Any(j => j.Paths.Contains(p, StringComparer.OrdinalIgnoreCase))))
                 {
-                    message = "A selected clip is processing. Review the clips again after it finishes.";
+                    message = Locales.Message("clips.selectedClipProcessing");
                     return false;
                 }
                 CompressionQueue.UnionWith(selected);
@@ -166,23 +166,23 @@ namespace ReplayKitHelper
             {
                 if (kind.StartsWith("compress", StringComparison.Ordinal) && paths.Any(p => Editors.Values.Any(e => e.Paths.Contains(p))))
                 {
-                    message = "That clip is open in the editor. Close the editor before compressing it.";
+                    message = Locales.Message("clips.clipOpenCloseBeforeCompressing");
                     return null;
                 }
                 // an editor keeps its source protected when it renames it; other views cannot rename or delete that source
                 if (kind == "delete" && Editors.Values.Any(e => e.Paths.Contains(paths[0])))
                 {
-                    message = "That clip is open in the editor. Close the editor before deleting it.";
+                    message = Locales.Message("clips.clipOpenCloseBeforeDeleting");
                     return null;
                 }
                 if (kind == "rename" && Editors.Any(e => e.Key != editorView && e.Value.Paths.Contains(paths[0])))
                 {
-                    message = "That clip is open in the editor. Close the editor before renaming it.";
+                    message = Locales.Message("clips.clipOpenCloseBeforeRenaming");
                     return null;
                 }
                 if (Jobs.Values.Any(j => j.Paths.Any(p => paths.Contains(p, StringComparer.OrdinalIgnoreCase))))
                 {
-                    message = "That clip already has an operation running";
+                    message = Locales.Message("clips.clipHasOperationRunning");
                     return null;
                 }
                 // the cap is for the jobs that encode or copy for a while; a delete or a rename is over in a moment, and counting them refused every delete while two clips compressed or uploaded

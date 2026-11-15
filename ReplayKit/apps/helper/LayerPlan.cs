@@ -74,14 +74,14 @@ namespace ReplayKitHelper
                     if (kind == "clip")
                     {
                         var clip = Clips.GetEditorSource(reference);
-                        if (clip == null || !File.Exists(clip.Full)) { error = VideoImports.IsRef(reference) ? "A video added in the editor was moved or changed. Add it again." : "A clip added in the editor is no longer in the clip folder."; return null; }
+                        if (clip == null || !File.Exists(clip.Full)) { error = VideoImports.IsRef(reference) ? Locales.Message("editor.addedVideoMoved") : Locales.Message("editor.addedClipNotInFolder"); return null; }
                         layer.Path = clip.Full;
                         layer.Clip = true;
                     }
                     else if (kind == "media")
                     {
                         string media = MediaImports.PathFor(reference);
-                        if (media == null) { error = "A GIF, sticker or shape added in the editor is no longer available. Add it again."; return null; }
+                        if (media == null) { error = Locales.Message("editor.addedMediaNotAvailable"); return null; }
                         layer.Path = media;
                         layer.Gif = MediaImports.IsGif(media);
                     }

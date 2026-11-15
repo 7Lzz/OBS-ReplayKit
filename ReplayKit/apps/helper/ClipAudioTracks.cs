@@ -93,7 +93,7 @@ namespace ReplayKitHelper
         private static void Extract(string source, int first, int count, string dir, bool lowPriority)
         {
             string ffmpeg = Compression.GetToolPaths()["ffmpeg"]?.Value<string>();
-            if (string.IsNullOrWhiteSpace(ffmpeg) || !File.Exists(ffmpeg)) throw new InvalidOperationException("ffmpeg.exe was not found");
+            if (string.IsNullOrWhiteSpace(ffmpeg) || !File.Exists(ffmpeg)) throw new InvalidOperationException(Locales.Message("common.ffmpegWasNotFound"));
             ClipCache.Prune(dir);
             if (Directory.Exists(dir)) Directory.Delete(dir, true);
             Directory.CreateDirectory(dir);

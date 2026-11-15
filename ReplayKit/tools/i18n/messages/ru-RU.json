@@ -215,6 +215,10 @@
     "source": "c5a8b5ba1b077739",
     "text": "Нажмите, чтобы больше не запускать новые сжатия. Уже идущие сжатия будут завершены."
   },
+  "clips.clipAlreadyBeingSaved": {
+    "source": "cf1a6a119e58a540",
+    "text": "Клип уже сохраняется."
+  },
   "clips.clipDatabaseIsBusy": {
     "source": "688043321db26112",
     "text": "База данных клипов занята."
@@ -227,6 +231,10 @@
     "source": "2845e8f5619853b5",
     "text": "Фильтры клипа"
   },
+  "clips.clipHasOperationRunning": {
+    "source": "68b5973567f40a52",
+    "text": "Для этого клипа уже выполняется операция."
+  },
   "clips.clipIsTooBigForStreamable": {
     "source": "c608731b1962cd15",
     "text": "Клип слишком большой для Streamable"
@@ -234,6 +242,22 @@
   "clips.clipIsTooLongForStreamable": {
     "source": "1c9a94c6557e3962",
     "text": "Клип слишком длинный для Streamable"
+  },
+  "clips.clipOpenCloseBeforeCompressing": {
+    "source": "5e5ebaeaffc9b2e7",
+    "text": "Этот клип открыт в редакторе. Закройте редактор, прежде чем сжимать его."
+  },
+  "clips.clipOpenCloseBeforeDeleting": {
+    "source": "e8647db901a54b5f",
+    "text": "Этот клип открыт в редакторе. Закройте редактор, прежде чем удалять его."
+  },
+  "clips.clipOpenCloseBeforeRenaming": {
+    "source": "ed1294f8c7792e1c",
+    "text": "Этот клип открыт в редакторе. Закройте редактор, прежде чем переименовывать его."
+  },
+  "clips.clipProcessingOpenAfter": {
+    "source": "205c2c9e5de1a708",
+    "text": "Клип обрабатывается или ждёт сжатия. Откройте его, когда это закончится."
   },
   "clips.clipStateBodyIsRequired": {
     "source": "c88e1b7657972b38",
@@ -315,6 +339,14 @@
     "source": "edc44823c33436b8",
     "text": "Сжать…"
   },
+  "clips.compressEndedWithoutResult": {
+    "source": "e6c6b4d530338e11",
+    "text": "Сжатие завершилось без результата."
+  },
+  "clips.compressFailedError": {
+    "source": "6ae51ecbff197e2f",
+    "text": "Сжатие не удалось: {error}"
+  },
   "clips.compressSelected": {
     "source": "d102549e77c9439e",
     "text": "Сжать выбранные"
@@ -322,6 +354,10 @@
   "clips.compressSelectedClips": {
     "source": "5bd3e9651646f13a",
     "text": "Сжать выбранные клипы"
+  },
+  "clips.compressedFileStillTooBig": {
+    "source": "a3ef3cd249c2ddc0",
+    "text": "Сжатый файл всё ещё слишком большой: {size} МБ при лимите {limit} МБ."
   },
   "clips.compressingFast": {
     "source": "40a9d82c92a84230",
@@ -334,6 +370,10 @@
   "clips.compressingTempCopyForName": {
     "source": "27d12c5f874c1b12",
     "text": "Сжатие временной копии для {name}."
+  },
+  "clips.compressionStoppedTooManyErrors": {
+    "source": "c52fd8191e65c7c4",
+    "text": "Сжатие остановлено: кодировщик выдал слишком много ошибок."
   },
   "clips.confirmDeleteCount": {
     "source": "b321718dc7985dae",
@@ -678,6 +718,30 @@
   "clips.favoritesOnly": {
     "source": "d78924f9af57312b",
     "text": "Только избранное"
+  },
+  "clips.ffmpegFailedExitCode": {
+    "source": "232d1067f3d9489d",
+    "text": "Сбой ffmpeg (код выхода {code})."
+  },
+  "clips.ffmpegMissingClipNotSaved": {
+    "source": "9cdbc7ef35e4d5b0",
+    "text": "ffmpeg отсутствует, поэтому клип не удалось сохранить."
+  },
+  "clips.ffmpegNotFoundForUpload": {
+    "source": "c62817c123d9e6ad",
+    "text": "ffmpeg.exe не найден, поэтому клип не удалось подготовить к загрузке."
+  },
+  "clips.ffmpegNotFoundInClipFolder": {
+    "source": "38d3315459c003ba",
+    "text": "ffmpeg.exe не найден в папке клипов."
+  },
+  "clips.ffmpegProducedNoOutput": {
+    "source": "d7f13dcdc0586349",
+    "text": "ffmpeg не создал выходной файл."
+  },
+  "clips.fileInUseByAnotherProgram": {
+    "source": "0c398ceeed35adbb",
+    "text": "Файл используется другой программой. Закройте всё, что его воспроизводит, и попробуйте снова."
   },
   "clips.fileIsSizeMbWhichIs": {
     "source": "01c849979dab59bf",
@@ -1403,6 +1467,14 @@
     "source": "4e0abb13e6f3d472",
     "text": "Выбрать клип"
   },
+  "clips.selectedClipOpenInEditor": {
+    "source": "80c9484bef033af6",
+    "text": "Выбранный клип открыт в редакторе. Закройте редактор и снова проверьте клипы."
+  },
+  "clips.selectedClipProcessing": {
+    "source": "a36c19854c9c2f01",
+    "text": "Выбранный клип обрабатывается. Проверьте клипы снова, когда это закончится."
+  },
   "clips.selectedCount": {
     "source": "08e97b60a4dc6ce0",
     "text": {
@@ -1531,6 +1603,10 @@
   "clips.stopUploadsCount": {
     "source": "844d3d15da772cf7",
     "text": "Остановить загрузки ({count})"
+  },
+  "clips.streamableCheckTimedOut": {
+    "source": "73cbf2a9f94b12d4",
+    "text": "Проверка статуса на Streamable прервана по тайм-ауту через 30 минут."
   },
   "clips.thatCouldNotBeDone": {
     "source": "6eab7f00f3e45f30",
@@ -1796,6 +1872,10 @@
     "source": "3d7f936ee68aca2f",
     "text": "Не удалось загрузить: {error}"
   },
+  "clips.uploadFinishedWithoutResult": {
+    "source": "7c5cb1081380a274",
+    "text": "Загрузка завершилась без ответа от Streamable."
+  },
   "clips.uploadQueueIsFull": {
     "source": "c944c59610d2063e",
     "text": "Очередь загрузки заполнена"
@@ -1831,6 +1911,10 @@
   "clips.viewName": {
     "source": "f034209072b7c4a0",
     "text": "Открыть {name}"
+  },
+  "clips.waitingForAnotherCompression": {
+    "source": "e8d85c2dddf62739",
+    "text": "Ожидание завершения другого сжатия"
   },
   "clips.widthHeight": {
     "source": "b43d90bd13fd1a68",
@@ -2019,6 +2103,10 @@
   "common.fast": {
     "source": "6217537829ed8983",
     "text": "Быстро"
+  },
+  "common.ffmpegWasNotFound": {
+    "source": "426ca04201a4f150",
+    "text": "ffmpeg.exe не найден"
   },
   "common.file": {
     "source": "f57a547dfed3b554",
@@ -2688,6 +2776,30 @@
     "source": "01fcab0c292cd329",
     "text": "Добавить в избранное"
   },
+  "editor.addedClipNotInFolder": {
+    "source": "e70be0448e778b56",
+    "text": "Клипа, добавленного в редакторе, больше нет в папке клипов."
+  },
+  "editor.addedClipToVideoNotInFolder": {
+    "source": "e80fec30be50d301",
+    "text": "Клипа, добавленного к видео в редакторе, больше нет в папке клипов."
+  },
+  "editor.addedClipVideoUnreadable": {
+    "source": "30259f378ed91580",
+    "text": "Не удалось прочитать видео клипа, добавленного в редакторе."
+  },
+  "editor.addedMediaNotAvailable": {
+    "source": "d1c04ccca369d41b",
+    "text": "GIF, стикер или фигура, добавленные в редакторе, больше недоступны. Добавьте их снова."
+  },
+  "editor.addedVideoMoved": {
+    "source": "d977ff00b963828a",
+    "text": "Видео, добавленное в редакторе, было перемещено или изменено. Добавьте его снова."
+  },
+  "editor.addedVideoToVideoMoved": {
+    "source": "f61d1f8eca5fa78e",
+    "text": "Видео, добавленное к видео в редакторе, было перемещено или изменено. Добавьте его снова."
+  },
   "editor.addingAudio": {
     "source": "dbf4db2a5c980fd2",
     "text": "Добавление звука..."
@@ -2763,6 +2875,10 @@
   "editor.audioCouldNotBeAdded": {
     "source": "0e8768f969a56979",
     "text": "Не удалось добавить звук"
+  },
+  "editor.audioCouldNotBeImported": {
+    "source": "24fad77631fa733f",
+    "text": "Не удалось импортировать этот звук"
   },
   "editor.audioIsStillLoading": {
     "source": "d22c8458ab9393ec",
@@ -2952,6 +3068,10 @@
     "source": "09c2cb2ea7b1be3c",
     "text": "Выбрать {label}"
   },
+  "editor.clipLengthCouldNotBeRead": {
+    "source": "6b588bcfb96e7552",
+    "text": "Не удалось прочитать длительность клипа."
+  },
   "editor.closeThePanel": {
     "source": "1b70f85cf11ab8cc",
     "text": "Закрыть панель"
@@ -3115,6 +3235,10 @@
   "editor.editingIsLockedUntilThisIs": {
     "source": "ca86410ec9eb5964",
     "text": "Редактирование заблокировано до завершения этого действия."
+  },
+  "editor.editorSessionChanged": {
+    "source": "e26bf634ca2858b0",
+    "text": "Сеанс редактора изменился. Откройте редактор заново."
   },
   "editor.effectBloom": {
     "source": "6e76bbe87ccf50e2",
@@ -3596,9 +3720,29 @@
     "source": "cbd56454e0559997",
     "text": "FFmpeg недоступен."
   },
+  "editor.ffmpegOutputMissing": {
+    "source": "52950bb96762c1be",
+    "text": "ffmpeg сообщил об успехе, но выходной файл отсутствует или пуст."
+  },
   "editor.ffmpegTrimFailedExitCodeError": {
     "source": "86a78a51bee32398",
     "text": "Обрезка ffmpeg не удалась (код={code}): {error}"
+  },
+  "editor.fileCannotBeUsed": {
+    "source": "3a54cc59e87d9698",
+    "text": "Этот файл нельзя использовать"
+  },
+  "editor.fileCouldNotBeOpened": {
+    "source": "7b845eb1566a0763",
+    "text": "Не удалось открыть этот файл"
+  },
+  "editor.fileLargerThan50Mb": {
+    "source": "06d64110216c6f07",
+    "text": "Этот файл больше 50 МБ"
+  },
+  "editor.fileWasNotFound": {
+    "source": "4ff0c22de1eec40d",
+    "text": "Этот файл не найден"
   },
   "editor.fill": {
     "source": "86b5fee1c65415dc",
@@ -4228,6 +4372,10 @@
     "source": "aff9cd9bdbeb670f",
     "text": "Нет фильтров, подходящих под это."
   },
+  "editor.noFrameCouldBeRead": {
+    "source": "e2269f5b04601369",
+    "text": "Не удалось прочитать ни одного кадра из клипа."
+  },
   "editor.noPresetsYetNameKindBelow": {
     "source": "3033a47e1c9a365f",
     "text": "Пресетов пока нет. Назовите {kind} ниже и сохраните, чтобы использовать на любом клипе."
@@ -4259,6 +4407,14 @@
   "editor.oneMightBeMisheardItIs": {
     "source": "34dbb53ee44be41a",
     "text": "Одно из них, возможно, распознано неверно. Оно отмечено оранжевым; выберите его и откройте «Проверить» справа."
+  },
+  "editor.onlyGifPngJpeg": {
+    "source": "84dfe56eb0aa1664",
+    "text": "Можно добавить только файлы GIF, PNG и JPEG"
+  },
+  "editor.onlyMp4MovMkvWebm": {
+    "source": "d7d54053e12144de",
+    "text": "Можно добавить только видео MP4, MOV, MKV и WebM"
   },
   "editor.options": {
     "source": "0ac75dce3642ff67",
@@ -4691,6 +4847,26 @@
   "editor.speechBubble": {
     "source": "067047b66d89ecbf",
     "text": "Облачко с речью"
+  },
+  "editor.speechEngineFailed": {
+    "source": "194f0543c2d6312e",
+    "text": "Сбой речевого движка (код выхода {code})."
+  },
+  "editor.speechModelCouldNotConnect": {
+    "source": "206e65b64a6138e4",
+    "text": "При загрузке речевой модели не удалось подключиться к серверу по HTTPS."
+  },
+  "editor.speechModelNoSecureConnection": {
+    "source": "7477435b5178ef4b",
+    "text": "При загрузке речевой модели не удалось установить защищённое HTTPS-соединение."
+  },
+  "editor.speechModelServerHttp": {
+    "source": "128a25672b2be9c2",
+    "text": "Сервер загрузки речевой модели вернул HTTP {status}."
+  },
+  "editor.speechModelTimedOut": {
+    "source": "8d5293358ccdf256",
+    "text": "Загрузка речевой модели прервана по тайм-ауту."
   },
   "editor.speechWordTimingsCouldNotBe": {
     "source": "242a59cf32299e34",
@@ -5164,9 +5340,17 @@
     "source": "dca6c6c0185e2fea",
     "text": "Переключить полноэкранный режим"
   },
+  "editor.tooManyEditorSources": {
+    "source": "760a87be29fc35d8",
+    "text": "Слишком много источников в редакторе. Сохраните изменения и откройте редактор заново."
+  },
   "editor.tooManyExistingTrimOutputs": {
     "source": "83f35a6127f1f033",
     "text": "Слишком много существующих результатов обрезки"
+  },
+  "editor.tooManySubtitles": {
+    "source": "e4dec3dca173da94",
+    "text": "Слишком много субтитров"
   },
   "editor.top": {
     "source": "27644f0497fd9849",
@@ -5256,6 +5440,10 @@
     "source": "c261db78a6b1f179",
     "text": "Включить звук"
   },
+  "editor.unreliablePassagesSkipped": {
+    "source": "ca7395b28c3768a5",
+    "text": "Повторяющиеся или ненадёжные фрагменты пропущены. Проверьте субтитры."
+  },
   "editor.useText": {
     "source": "ec0b8864e32f57e0",
     "text": "Использовать текст"
@@ -5272,6 +5460,14 @@
     "source": "72bcb013ed85a48f",
     "text": "Видео"
   },
+  "editor.videoCouldNotBeRead": {
+    "source": "2656936821ec7b34",
+    "text": "Не удалось прочитать это видео"
+  },
+  "editor.videoEditCouldNotBeRead": {
+    "source": "b3a31611c809ce87",
+    "text": "Не удалось прочитать правку видео."
+  },
   "editor.videoGame": {
     "source": "1b92b6b09cad4377",
     "text": "Видеоигра"
@@ -5283,6 +5479,10 @@
   "editor.videoSpeed": {
     "source": "7fb0bbb0d57e488a",
     "text": "Скорость видео"
+  },
+  "editor.videoSpeedOutOfRange": {
+    "source": "3dbb7e93bf7a800f",
+    "text": "Скорость видео вне допустимого диапазона."
   },
   "editor.videoSpeedX": {
     "source": "b9c1c3bbe815f739",
@@ -5736,6 +5936,34 @@
     "source": "d2187d527809f532",
     "text": "Home"
   },
+  "lua.hotkeyUploadLatestClip": {
+    "source": "df8745d476ae558d",
+    "text": "Загрузить последний клип на Streamable"
+  },
+  "lua.scriptAbout": {
+    "source": "207194ba04314859",
+    "text": "Единственный скрипт ReplayKit, который видит OBS. Он запускает захват для клипов, держит мониторинг OBS выключенным, переключает источники захвата для полноэкранных игр, открывает и размещает проектор Discord, проигрывает звук сохранения клипа, управляет правами OBS, синхронизирует горячие клавиши записи и запускает помощник ReplayKit."
+  },
+  "lua.scriptLayout": {
+    "source": "78887b020556073a",
+    "text": "Код разделён на внутренние файлы по функциям, чтобы окно скриптов OBS оставалось аккуратным и всё не превращалось в один огромный файл."
+  },
+  "lua.toolsOpenClipFolder": {
+    "source": "6e4124d40abd2bef",
+    "text": "ReplayKit: Открыть папку клипов"
+  },
+  "lua.toolsOpenClips": {
+    "source": "b3552262df7ed3c5",
+    "text": "ReplayKit: Открыть клипы"
+  },
+  "lua.toolsSaveClip": {
+    "source": "ec84d1a2efa45f00",
+    "text": "ReplayKit: Сохранить клип"
+  },
+  "lua.toolsUploadLastClip": {
+    "source": "71374792db954b37",
+    "text": "ReplayKit: Загрузить последний клип"
+  },
   "notifications.couldNotLoadNotifications": {
     "source": "e378a1adb499bc84",
     "text": "Не удалось загрузить уведомления."
@@ -5991,6 +6219,10 @@
   "settings.addGame": {
     "source": "f0668e12a44dce74",
     "text": "Добавить игру"
+  },
+  "settings.adminPromptDeclined": {
+    "source": "d3671ed436cd9eb9",
+    "text": "Запрос прав администратора отклонён."
   },
   "settings.advanced": {
     "source": "f571cb2d06ae01ae",
@@ -6360,6 +6592,10 @@
     "source": "44a667adae6a1778",
     "text": "Файлы меньше, но клипы HEVC / H.265 могут не воспроизводиться у некоторых людей, на некоторых телефонах, в браузерах и приложениях."
   },
+  "settings.codecNotSupported": {
+    "source": "1c96fb4c0979a63e",
+    "text": "Запрошенный кодек '{codec}' не поддерживается обнаруженным GPU, поэтому ReplayKit выбрал {encoder}."
+  },
   "settings.colorAdd": {
     "source": "50b91095eea95aca",
     "text": "Цвет: добавление"
@@ -6423,6 +6659,10 @@
   "settings.couldNotAutoSaveTheCustom": {
     "source": "7083f5c53fba35f8",
     "text": "Не удалось автоматически сохранить пользовательскую тему: {error}"
+  },
+  "settings.couldNotCaptureScreenForPicker": {
+    "source": "132983192e266d0a",
+    "text": "Не удалось сделать снимок экрана для пипетки."
   },
   "settings.couldNotChangeBongoCatVisibility": {
     "source": "d88142e324dafafd",
@@ -6611,6 +6851,10 @@
   "settings.couldNotRepairDesktopAudioMonitoring": {
     "source": "0898f8598755106b",
     "text": "Не удалось восстановить состояние мониторинга звука рабочего стола: {error}"
+  },
+  "settings.couldNotReserveEscKey": {
+    "source": "13ab1eabd3e7733d",
+    "text": "Не удалось занять клавишу Esc для пипетки. Возможно, её использует другая программа."
   },
   "settings.couldNotResizeNameError": {
     "source": "b7342712822c2a08",
@@ -6908,6 +7152,10 @@
     "source": "cf3a919e3af54c8c",
     "text": "Поддержка демонстрации экрана Discord недоступна."
   },
+  "settings.displayCaptureNotUpdatedError": {
+    "source": "fa241fd1643530ae",
+    "text": "Дисплей сохранён, но захват экрана не удалось обновить: {error}"
+  },
   "settings.displayFollowsPrimary": {
     "source": "b1aa28bedaa84698",
     "text": "Следует за дисплеем, который Windows считает основным."
@@ -6991,6 +7239,10 @@
   "settings.enableSharePreviewBeforeShowingThe": {
     "source": "a19ddb144187a6f5",
     "text": "Включите предпросмотр для демонстрации перед показом проектора."
+  },
+  "settings.encoderDidNotLoad": {
+    "source": "4700fc8a8876b5ed",
+    "text": "{encoder} не загрузился в OBS (обычно из-за устаревшего графического драйвера), поэтому ReplayKit пока записывает с {fallback}."
   },
   "settings.encodingOnTheProcessorCanLower": {
     "source": "26811614318258bd",
@@ -7183,6 +7435,10 @@
   "settings.hidePopupsFromScreenshotsAndScreen": {
     "source": "543cd3ebd2cbb5ca",
     "text": "Скрывать всплывающие окна из снимков экрана и записей"
+  },
+  "settings.hotkeysNotRestoredError": {
+    "source": "0b7c48a831475ace",
+    "text": "Не удалось восстановить горячие клавиши OBS: {error}"
   },
   "settings.howFarTheLeftAndRight": {
     "source": "3641fd9c8ce562dc",
@@ -7488,6 +7744,34 @@
     "source": "9d9f262f0a79333d",
     "text": "Строка меню"
   },
+  "settings.micAccessBlocked": {
+    "source": "f8a998e854d5d772",
+    "text": "Windows блокирует доступ к микрофону для классических приложений (Параметры › Конфиденциальность › Микрофон)."
+  },
+  "settings.micDeviceError": {
+    "source": "a870ed172b0e4b84",
+    "text": "Аудиоустройство сообщило об ошибке {code}."
+  },
+  "settings.micDeviceExclusive": {
+    "source": "5e79d85118ff5acd",
+    "text": "Другое приложение использует это аудиоустройство монопольно."
+  },
+  "settings.micDeviceFormat": {
+    "source": "40ed584ffea4d17d",
+    "text": "Это аудиоустройство не поддерживает тестовый формат."
+  },
+  "settings.micDeviceNotFound": {
+    "source": "c843892eb217a4b0",
+    "text": "Аудиоустройство не найдено."
+  },
+  "settings.micDeviceUnplugged": {
+    "source": "31f09a8dece59b06",
+    "text": "Аудиоустройство было отключено или изменено."
+  },
+  "settings.micDidNotStartInTime": {
+    "source": "bc1b85eb2e785c9b",
+    "text": "Микрофон не запустился вовремя."
+  },
   "settings.micNotConnected": {
     "source": "70a16104625a4dff",
     "text": "не подключён"
@@ -7499,6 +7783,10 @@
   "settings.micTestStarting": {
     "source": "aa8a8e09f840395b",
     "text": "Запуск..."
+  },
+  "settings.micTestTimeLimit": {
+    "source": "73912ae776325822",
+    "text": "Проверка микрофона остановлена через {minutes} мин."
   },
   "settings.microphoneLevel": {
     "source": "fba79278f18f924b",
@@ -7800,6 +8088,10 @@
     "source": "e89d672825674649",
     "text": "OBS не принял Video.{update}: {error}"
   },
+  "settings.obsDidNotReportMuteState": {
+    "source": "d180d9693729c8be",
+    "text": "OBS не сообщил запрошенное состояние отключения звука после установки."
+  },
   "settings.obsDidNotReportTheRefreshed": {
     "source": "ced6192b88a7016c",
     "text": "OBS не сообщил обновлённое состояние мониторинга и отключения звука."
@@ -7856,6 +8148,10 @@
     "source": "6703aed64ec554b2",
     "text": "Настройки буфера повтора OBS сохранены, но применение в реальном времени не удалось: {error}"
   },
+  "settings.obsReportedValueInstead": {
+    "source": "b706534c9a77e614",
+    "text": "OBS сообщил '{actual}' вместо '{wanted}'."
+  },
   "settings.obsSceneCollectionFileWasNot": {
     "source": "03fa53c4e3b85e38",
     "text": "Файл коллекции сцен OBS не найден."
@@ -7879,6 +8175,10 @@
   "settings.obsStartsInTheSystemTray": {
     "source": "f20d594c5c35b559",
     "text": "OBS запускается в системном трее, а не открывает своё окно."
+  },
+  "settings.obsStillReportsMonitoringDevice": {
+    "source": "fbf08ec8489ae7d3",
+    "text": "OBS всё ещё сообщает об устройстве мониторинга '{name}' ({id})."
   },
   "settings.obsStudioItselfWillAlsoBe": {
     "source": "bb2ea21750848284",
@@ -7964,6 +8264,38 @@
     "source": "a4bfd53cf77e7b8b",
     "text": "Высота вывода в пикселях. Ширина следует за соотношением сторон холста."
   },
+  "settings.outputReadStateFailed": {
+    "source": "88cc058ed3821907",
+    "text": "Не удалось прочитать состояние вывода OBS ({output}): {error}"
+  },
+  "settings.outputRecording": {
+    "source": "b35872b56f1995a5",
+    "text": "Запись"
+  },
+  "settings.outputReplayBuffer": {
+    "source": "121b89726ca5d23a",
+    "text": "Буфер повтора"
+  },
+  "settings.outputRestartFailed": {
+    "source": "a50187ddfc57375b",
+    "text": "Не удалось перезапустить вывод OBS ({output}) после применения настроек: {error}"
+  },
+  "settings.outputStartTimedOut": {
+    "source": "c32890e6d18701d2",
+    "text": "Истекло время ожидания запуска вывода OBS ({output})."
+  },
+  "settings.outputStopFailed": {
+    "source": "4e66c688583d7d5a",
+    "text": "Не удалось остановить вывод OBS ({output}) перед применением настроек: {error}"
+  },
+  "settings.outputStopTimedOut": {
+    "source": "ac97c7f665274779",
+    "text": "Истекло время ожидания остановки вывода OBS ({output})."
+  },
+  "settings.outputVirtualCamera": {
+    "source": "111fd0852e756ee7",
+    "text": "Виртуальная камера"
+  },
   "settings.overlayApplyFailedError": {
     "source": "738255c1ef31bf55",
     "text": "Не удалось применить оверлей: {error}"
@@ -7983,6 +8315,14 @@
   "settings.overlayColorMultiplyHex": {
     "source": "a064fc0146e1c5ee",
     "text": "Оверлей: HEX умножения цвета"
+  },
+  "settings.overlayFlipPositionFailedError": {
+    "source": "25c95545ea0288ba",
+    "text": "Отражение оверлея сохранено, но текущую позицию {name} не удалось прочитать: {error}"
+  },
+  "settings.overlayFlipSceneLookupFailedError": {
+    "source": "99b338a8349ad503",
+    "text": "Отражение оверлея сохранено, но поиск сцены OBS не удался: {error}"
   },
   "settings.overlayHueShift": {
     "source": "d033b807793d4a52",
@@ -8008,6 +8348,14 @@
     "source": "c129339a890ed309",
     "text": "Ползунок поворота оверлея"
   },
+  "settings.overlaySceneItemsFailedError": {
+    "source": "b5b4ac45a7bbb1be",
+    "text": "Настройка оверлея сохранена, но элементы сцены OBS не удалось прочитать: {error}"
+  },
+  "settings.overlaySceneLookupFailedError": {
+    "source": "ecf72fdb82953fd7",
+    "text": "Настройка оверлея сохранена, но поиск сцены OBS не удался: {error}"
+  },
   "settings.overlaySettingWasSavedButThe": {
     "source": "94d8f258ed868945",
     "text": "Настройка оверлея сохранена, но файл сцены OBS не удалось подготовить к перезапуску: {error}"
@@ -8015,6 +8363,14 @@
   "settings.overlaySize": {
     "source": "a50962ddfe53b823",
     "text": "Размер оверлея"
+  },
+  "settings.overlaySizeSceneItemsFailedError": {
+    "source": "f8b400ff6c79c2f1",
+    "text": "Размер оверлея сохранён, но элементы сцены OBS не удалось прочитать: {error}"
+  },
+  "settings.overlaySizeSceneLookupFailedError": {
+    "source": "dd23826f43e78e66",
+    "text": "Размер оверлея сохранён, но поиск сцены OBS не удался: {error}"
   },
   "settings.overlaySizeSlider": {
     "source": "11cc91e490df3ccd",
@@ -8096,9 +8452,21 @@
     "source": "81373bf48730d960",
     "text": "Всплывающие окна"
   },
+  "settings.powercfgCouldNotStart": {
+    "source": "2ea1892470e0cac0",
+    "text": "Не удалось запустить powercfg."
+  },
+  "settings.powercfgDidNotFinish": {
+    "source": "a14ac53abac1da4d",
+    "text": "powercfg не завершился."
+  },
   "settings.powercfgExitedCode": {
     "source": "5768b4f92cc16692",
     "text": "powercfg завершился с кодом {code}."
+  },
+  "settings.powercfgTimedOut": {
+    "source": "24199fe22090eace",
+    "text": "Истекло время ожидания powercfg."
   },
   "settings.presetBalancedBlurb": {
     "source": "cf2fdb6b6603dd4e",
@@ -8380,9 +8748,17 @@
     "source": "6214ddc179841b51",
     "text": "Сохраните их перед выходом из настроек, или выйдите без сохранения и потеряйте их."
   },
+  "settings.savedGameWindow": {
+    "source": "b7bc0d9e3aae0541",
+    "text": "Сохранённое окно игры"
+  },
   "settings.savedSelection": {
     "source": "b7329a9a6ea64fa8",
     "text": "Сохранённый выбор"
+  },
+  "settings.savedThemeNoLongerExists": {
+    "source": "537bd5d1b1cded80",
+    "text": "Этой сохранённой темы больше нет."
   },
   "settings.savesPcAudioDiscordAndYour": {
     "source": "7176992f35453e0d",
@@ -8416,6 +8792,14 @@
     "source": "97a1c94589647387",
     "text": "Демонстрация экрана"
   },
+  "settings.screenshareSceneItemsFailedError": {
+    "source": "d392d3377118bec7",
+    "text": "Захват для демонстрации экрана сохранён, но элементы сцены OBS не удалось прочитать: {error}"
+  },
+  "settings.screenshareSceneLookupFailedError": {
+    "source": "b048c26bc1e0955d",
+    "text": "Захват для демонстрации экрана сохранён, но поиск сцены OBS не удался: {error}"
+  },
   "settings.screenshotHotkey": {
     "source": "2a49b87d3a27cbf7",
     "text": "Горячая клавиша для скриншота"
@@ -8435,6 +8819,10 @@
   "settings.settingsChanged": {
     "source": "735553f4b318a7bb",
     "text": "Настройки изменены"
+  },
+  "settings.settingsFileInvalidError": {
+    "source": "50c2872ab86af505",
+    "text": "Файл настроек ReplayKit повреждён: {error}"
   },
   "settings.settingsFileIsTooLarge": {
     "source": "4e2c616f863cdcb1",
@@ -8459,6 +8847,34 @@
   "settings.setupFile": {
     "source": "eb7a2cf26289ce88",
     "text": "Файл установки"
+  },
+  "settings.setupFileAlreadyInPlace": {
+    "source": "b1bf0b269307b96e",
+    "text": "Файл установки уже на месте."
+  },
+  "settings.setupFileDownloadFailedError": {
+    "source": "a7e3368539a46fa5",
+    "text": "Не удалось повторно загрузить файл установки ReplayKit: {error}"
+  },
+  "settings.setupFileGithubUnreachable": {
+    "source": "b451fc634d8f1585",
+    "text": "Не удалось повторно загрузить файл установки ReplayKit: GitHub недоступен ({error}). Проверьте подключение и попробуйте снова или один раз запустите последний OBSReplayKit.exe с GitHub."
+  },
+  "settings.setupFileInUse": {
+    "source": "7f92c4820276db62",
+    "text": "Файл установки используется. Закройте окно установки или удаления ReplayKit и попробуйте снова."
+  },
+  "settings.setupFileIncomplete": {
+    "source": "9b18375da4821c11",
+    "text": "Файл установки ReplayKit неполный ({size} МБ)."
+  },
+  "settings.setupFileMismatch": {
+    "source": "98d57d69baab1e4a",
+    "text": "Файл установки ReplayKit не совпадает с сохранённой копией, поэтому он не запускается."
+  },
+  "settings.setupFileStillNotUsable": {
+    "source": "3907b427dc44ccaa",
+    "text": "Файл установки по-прежнему непригоден даже после повторной загрузки."
   },
   "settings.sharePreviewAudio": {
     "source": "1b679b4a88a2c529",
@@ -8564,6 +8980,10 @@
     "source": "206cd798af33081f",
     "text": "Размер в ГБ."
   },
+  "settings.sleepNotAppliedError": {
+    "source": "266c3b5bb49ecfbe",
+    "text": "Настройка сна Windows сохранена, но не применена: {error}"
+  },
   "settings.smallerCanTakeMuchLongerWith": {
     "source": "3328b313fb9af73f",
     "text": "Режим «Меньше» может занимать гораздо больше времени для больших клипов или библиотек и использует больше ЦП во время работы."
@@ -8623,6 +9043,10 @@
   "settings.startup": {
     "source": "514d8946310015a5",
     "text": "Автозапуск"
+  },
+  "settings.startupRejectedError": {
+    "source": "fa11ada0a18e6545",
+    "text": "Автозапуск Windows сохранён, но Windows отклонила изменение: {error}"
   },
   "settings.stay": {
     "source": "8af0f271ec97d782",
@@ -8767,6 +9191,10 @@
   "settings.theme": {
     "source": "888560be416ca928",
     "text": "Тема"
+  },
+  "settings.themeLight": {
+    "source": "0b46afa96380156b",
+    "text": "Светлая"
   },
   "settings.thisClosesObsAndInstallsThe": {
     "source": "1c2632254e87b8a9",
@@ -9316,6 +9744,14 @@
     "source": "902083a6f13e798b",
     "text": "{message}  (журнал: {path})"
   },
+  "setup.noProcessHostForObs": {
+    "source": "d21a9a94574f4ff7",
+    "text": "Для OBS {version} нет общего хоста процессов. Сначала установите поддерживаемую версию OBS."
+  },
+  "setup.obsCouldNotBeInstalledAutomatically": {
+    "source": "b9ec5649ef71e37c",
+    "text": "Не удалось автоматически установить OBS Studio. Установите OBS с obsproject.com и снова запустите этот установщик."
+  },
   "setup.obsIsStartingBackUp": {
     "source": "13a7f357aa36308e",
     "text": "OBS запускается снова."
@@ -9359,6 +9795,14 @@
   "setup.obsThemePreparationTimedOut": {
     "source": "4ba35eba6805b4f7",
     "text": "Истекло время подготовки темы OBS."
+  },
+  "setup.obsVersionNeeded": {
+    "source": "7c539494daa8d5db",
+    "text": "ReplayKit нужна OBS {version}, а установленную OBS не удалось привести к этой версии. Установите OBS {version} с obsproject.com и снова запустите этот установщик."
+  },
+  "setup.originalObsFilesRequired": {
+    "source": "d1b83005942f04a8",
+    "text": "Перед установкой общего хоста процессов нужны исходные файлы OBS {version}. Восстановите OBS Studio и снова запустите установку ReplayKit."
   },
   "setup.pinObsTrayIcon": {
     "source": "06fa7012f9c04c08",
@@ -9700,6 +10144,10 @@
     "source": "56ee9fa066955950",
     "text": "Обновление сохраняет текущие настройки. Переустановка начинает всё заново с настройками по умолчанию, поэтому список автоматических игр, горячие клавиши и всё остальное, настроенное в ReplayKit, будет очищено."
   },
+  "setup.updateNeedsObsVersion": {
+    "source": "32d0de8a3dc8e7bf",
+    "text": "ReplayKit {version} нужна OBS {obs}, а OBS не удалось обновить до этой версии, поэтому ничего не изменено. Установите OBS {obs} с obsproject.com и запустите установщик ReplayKit."
+  },
   "setup.verifiesTheBongoCatFilesAnd": {
     "source": "093cb0e01af8c0a7",
     "text": "Проверяет файлы Bongo Cat и сохранённые источники."
@@ -9875,6 +10323,10 @@
   "shell.forwardAltRight": {
     "source": "56dc2397ec477e7f",
     "text": "Вперёд (Alt + Right)"
+  },
+  "shell.hotkeySaveClipDiskBuffer": {
+    "source": "52c0b4c9a41c8a7a",
+    "text": "ReplayKit: Сохранить клип (буфер на диске)"
   },
   "shell.ifThisStaysAntivirusMayHave": {
     "source": "d0750aedf2e81a9a",
@@ -10101,6 +10553,10 @@
     "source": "a9bf9bc04cf70776",
     "text": "Сжатие временной копии и загрузка"
   },
+  "storage.compressionCouldNotStart": {
+    "source": "8478c0b420964813",
+    "text": "Не удалось начать сжатие."
+  },
   "storage.compressionDidNotFinish": {
     "source": "6140e72447484749",
     "text": "Сжатие не завершено"
@@ -10221,6 +10677,10 @@
     "source": "52a8bb0e2e87a9dd",
     "text": "«Быстрое» использует видеокарту, если она поддерживает, чтобы завершить быстрее. Сжатие продолжится, если закрыть окно, и заменит каждый клип, только если результат меньше."
   },
+  "storage.ffprobeMissing": {
+    "source": "88e78b498d1b08a4",
+    "text": "ffprobe отсутствует, поэтому ReplayKit не может проверить, какие клипы можно сжать."
+  },
   "storage.freeFree": {
     "source": "0a51c9631ad66eb0",
     "text": "Свободно: **{free}**"
@@ -10316,6 +10776,10 @@
   "storage.nothingWorthCompressingRightNowYour": {
     "source": "3ecb4d1c955ecf47",
     "text": "Сейчас нечего сжимать. Ваши самые большие клипы уже малы или сжаты насколько возможно."
+  },
+  "storage.ofSize": {
+    "source": "a270678590b5e1db",
+    "text": "из {size}"
   },
   "storage.pickAtLeastOneClip": {
     "source": "57cdcc90df8e02e0",
@@ -10500,6 +10964,10 @@
   "update.anUpdateIsAlreadyBeingApplied": {
     "source": "68492aacb04923b3",
     "text": "Обновление уже применяется."
+  },
+  "update.autoUpdatesPaused": {
+    "source": "874109d4aea54cd7",
+    "text": "После неудачного обновления автообновления приостановлены на час. Обновить вручную по-прежнему можно."
   },
   "update.badVersion": {
     "source": "e815f01ff4a0aeb2",
@@ -10768,6 +11236,10 @@
   "update.updateTempFolderResolvedOutsideTemp": {
     "source": "b2e71cbc11ef5cdb",
     "text": "Временная папка обновления указывает за пределы %TEMP%\\ReplayKit."
+  },
+  "update.updateWindowAlreadyOpen": {
+    "source": "d6135bd41341e752",
+    "text": "Окно обновления уже открыто."
   },
   "update.updatingReplaykit": {
     "source": "e60bb0af8d3a028b",

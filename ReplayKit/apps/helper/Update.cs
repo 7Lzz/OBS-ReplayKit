@@ -436,7 +436,7 @@ namespace ReplayKitHelper
             try
             {
                 if (Native.WindowWithTitleExists("ReplayKit Update"))
-                    return "An update window is already open.";
+                    return Locales.Message("update.updateWindowAlreadyOpen");
             }
             catch (Exception ex) { WriteUpdateDebug("update window probe failed: " + ex.Message); }
 
@@ -450,7 +450,7 @@ namespace ReplayKitHelper
                     ? data.Value<DateTime>("finishedAt").ToUniversalTime()
                     : File.GetLastWriteTimeUtc(path);
                 if (DateTime.UtcNow - finishedAt >= FailureQuietPeriod) return null;
-                return "Automatic updates are paused for one hour after a failed update. You can still update manually.";
+                return Locales.Message("update.autoUpdatesPaused");
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is JsonException)
             {

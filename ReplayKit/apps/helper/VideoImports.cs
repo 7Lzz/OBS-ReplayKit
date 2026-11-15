@@ -61,14 +61,14 @@ namespace ReplayKitHelper
             if (name.Length == 0) name = Locales.Message("editor.video");
             try
             {
-                if (!Usable(path)) return Fail(name, "That file cannot be used");
+                if (!Usable(path)) return Fail(name, Locales.Message("editor.fileCannotBeUsed"));
                 var info = new FileInfo(Path.GetFullPath(path));
-                if (!info.Exists) return Fail(name, "That file was not found");
-                if ((info.Attributes & FileAttributes.ReparsePoint) != 0) return Fail(name, "That file cannot be used");
-                if (!Extensions.Contains(info.Extension.ToLowerInvariant())) return Fail(name, "Only MP4, MOV, MKV and WebM videos can be added");
+                if (!info.Exists) return Fail(name, Locales.Message("editor.fileWasNotFound"));
+                if ((info.Attributes & FileAttributes.ReparsePoint) != 0) return Fail(name, Locales.Message("editor.fileCannotBeUsed"));
+                if (!Extensions.Contains(info.Extension.ToLowerInvariant())) return Fail(name, Locales.Message("editor.onlyMp4MovMkvWebm"));
                 if (info.Length <= 0) return Fail(name, Locales.Message("editor.thatFileIsEmpty"));
                 var probe = Trim.ProbeVideo(info.FullName);
-                if (probe == null || probe.Duration <= 0 || probe.Width <= 0 || probe.Height <= 0) return Fail(name, "That video could not be read");
+                if (probe == null || probe.Duration <= 0 || probe.Width <= 0 || probe.Height <= 0) return Fail(name, Locales.Message("editor.videoCouldNotBeRead"));
                 string id;
                 using (var sha = SHA1.Create())
                 {
@@ -103,7 +103,7 @@ namespace ReplayKitHelper
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException || ex is NotSupportedException)
             {
                 Log.Write("VideoImports: " + name + ": " + ex.Message);
-                return Fail(name, "That file could not be opened");
+                return Fail(name, Locales.Message("editor.fileCouldNotBeOpened"));
             }
         }
     }

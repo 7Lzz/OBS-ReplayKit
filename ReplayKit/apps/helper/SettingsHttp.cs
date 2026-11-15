@@ -855,7 +855,7 @@ namespace ReplayKitHelper
                     var applied = new JArray();
                     var warned = new JArray();
                     if (startup["ok"]?.Value<bool>() == true) applied.Add("Windows startup");
-                    else warned.Add("Windows startup was saved, but Windows rejected the change: " + startup["message"]);
+                    else warned.Add(Locales.Message("settings.startupRejectedError", "error", startup["message"]?.ToString()));
                     return new JObject
                     {
                         ["ok"] = true, ["settings"] = settings,

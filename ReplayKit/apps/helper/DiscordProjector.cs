@@ -432,7 +432,7 @@ namespace ReplayKitHelper
             if (!PipeClient.OpenShareProjectorAndWait(5000))
             {
                 Log.Write("warn: the native plugin did not open the share projector");
-                return new OpenProjectorResult { Ok = false, Hwnd = 0, Opened = false, Message = Locales.Message("screenshare.openingObsWindowedProjectorFailedError", "error", "the native plugin did not answer") };
+                return new OpenProjectorResult { Ok = false, Hwnd = 0, Opened = false, Message = Locales.Message("screenshare.openingObsWindowedProjectorFailedError", "error", Locales.Message("helper.thePluginDidNotAnswerIn")) };
             }
 
             // 24x250ms=6s -- a slow pc that misses a shorter window would report "not found" while obs was still mid-create, leaving that projector un-renamed and un-hidden until some later cycle happened to trip over it. matching against baseline (not title text) so this works regardless of obss ui language -- a non-english install localizes the windows own title, but never localizes what obs process it belongs to or when it appeared, which is all this actually checks now.

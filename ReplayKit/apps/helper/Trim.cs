@@ -963,7 +963,7 @@ namespace ReplayKitHelper
                 return new TrimResult { Ok = false, Message = Locales.Message("editor.trimFailedError", "error", ex.Message) };
             }
 
-            if (!File.Exists(outPath) || new FileInfo(outPath).Length == 0) return new TrimResult { Ok = false, Message = "ffmpeg reported success but the output file is missing or empty" };
+            if (!File.Exists(outPath) || new FileInfo(outPath).Length == 0) return new TrimResult { Ok = false, Message = Locales.Message("editor.ffmpegOutputMissing") };
 
             // from here the file is put in place, which the editor shows as the last step
             UploadState.SetUploadState(requestId: requestId, phase: "finishing", percent: 98);

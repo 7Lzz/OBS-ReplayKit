@@ -226,8 +226,8 @@
 
   function formatBytes(n) {
     if (!(n > 0)) return "0 MB";
-    if (n < 1024 * 1024) return (n / 1024).toFixed(0) + " KB";
-    return (n / (1024 * 1024)).toFixed(n < 10 * 1024 * 1024 ? 1 : 0) + " MB";
+    if (n < 1024 * 1024) return RK_I18N.number(n / 1024, 0) + " KB";
+    return RK_I18N.number(n / (1024 * 1024), n < 10 * 1024 * 1024 ? 1 : 0) + " MB";
   }
 
   // download owns 0-70% of the bar, verify 70-80, install 80-100. real byte counts come from /update/progress.
@@ -239,7 +239,7 @@
         const p = await helperJson("update/progress?t=" + Date.now());
         if (p.stage === "download") {
           const pct = p.total > 0 ? (p.done / p.total) * 70 : -1;
-          const speed = p.bytesPerSecond > 0 ? (p.bytesPerSecond / (1024 * 1024)).toFixed(1) + " MB/s" : "";
+          const speed = p.bytesPerSecond > 0 ? RK_I18N.number(p.bytesPerSecond / (1024 * 1024), 1) + " MB/s" : "";
           const size = p.total > 0 ? RK_M("update.doneOfTotal", { done: formatBytes(p.done), total: formatBytes(p.total) }) : formatBytes(p.done);
           setStatus(RK_M("update.downloadingReplaykitUpdate"), speed ? RK_M("update.speedSize", { speed: speed, size: size }) : size, pct);
         } else if (p.stage === "verify") {
@@ -324,7 +324,7 @@
     setStatus(RK_M("update.preparingDownload"), "", 2);
     await wait(700);
     for (let done = 0; done <= total; done += total / 28) {
-      const speed = (7 + Math.random() * 4).toFixed(1) + " MB/s";
+      const speed = RK_I18N.number(7 + Math.random() * 4, 1) + " MB/s";
       setStatus(RK_M("update.downloadingReplaykitUpdate"), RK_M("update.speedSize", { speed: speed, size: RK_M("update.doneOfTotal", { done: formatBytes(done), total: formatBytes(total) }) }),
                 (done / total) * 70);
       await wait(110);

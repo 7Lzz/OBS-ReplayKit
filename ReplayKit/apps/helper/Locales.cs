@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
@@ -112,6 +113,13 @@ namespace ReplayKitHelper
             string running = PipeClient.ObsLocale;
             if (running == null) return Picked();
             return IsAvailable(running) ? running : English;
+        }
+
+        // the number format of the language replaykit shows, so a size reads 1,5 GB where the language writes it that way
+        public static CultureInfo Culture()
+        {
+            try { return CultureInfo.GetCultureInfo(Current()); }
+            catch (CultureNotFoundException) { return CultureInfo.InvariantCulture; }
         }
 
         // the language obs starts in next: the user.ini key, or the windows language when there is none

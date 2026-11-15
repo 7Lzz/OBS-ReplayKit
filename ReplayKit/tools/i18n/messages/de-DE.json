@@ -215,6 +215,10 @@
     "source": "c5a8b5ba1b077739",
     "text": "Klicke, um keine neuen Komprimierungen mehr zu starten. Bereits laufende Komprimierungen werden fertiggestellt."
   },
+  "clips.clipAlreadyBeingSaved": {
+    "source": "cf1a6a119e58a540",
+    "text": "Es wird bereits ein Clip gespeichert."
+  },
   "clips.clipDatabaseIsBusy": {
     "source": "688043321db26112",
     "text": "Clip-Datenbank ist beschäftigt."
@@ -227,6 +231,10 @@
     "source": "2845e8f5619853b5",
     "text": "Clip-Filter"
   },
+  "clips.clipHasOperationRunning": {
+    "source": "68b5973567f40a52",
+    "text": "Für diesen Clip läuft bereits ein Vorgang."
+  },
   "clips.clipIsTooBigForStreamable": {
     "source": "c608731b1962cd15",
     "text": "Clip ist zu groß für Streamable"
@@ -234,6 +242,22 @@
   "clips.clipIsTooLongForStreamable": {
     "source": "1c9a94c6557e3962",
     "text": "Clip ist zu lang für Streamable"
+  },
+  "clips.clipOpenCloseBeforeCompressing": {
+    "source": "5e5ebaeaffc9b2e7",
+    "text": "Dieser Clip ist im Editor geöffnet. Schließe den Editor, bevor du ihn komprimierst."
+  },
+  "clips.clipOpenCloseBeforeDeleting": {
+    "source": "e8647db901a54b5f",
+    "text": "Dieser Clip ist im Editor geöffnet. Schließe den Editor, bevor du ihn löschst."
+  },
+  "clips.clipOpenCloseBeforeRenaming": {
+    "source": "ed1294f8c7792e1c",
+    "text": "Dieser Clip ist im Editor geöffnet. Schließe den Editor, bevor du ihn umbenennst."
+  },
+  "clips.clipProcessingOpenAfter": {
+    "source": "205c2c9e5de1a708",
+    "text": "Ein Clip wird verarbeitet oder wartet auf die Komprimierung. Öffne ihn, wenn das fertig ist."
   },
   "clips.clipStateBodyIsRequired": {
     "source": "c88e1b7657972b38",
@@ -315,6 +339,14 @@
     "source": "edc44823c33436b8",
     "text": "Komprimieren…"
   },
+  "clips.compressEndedWithoutResult": {
+    "source": "e6c6b4d530338e11",
+    "text": "Die Komprimierung endete ohne Ergebnis."
+  },
+  "clips.compressFailedError": {
+    "source": "6ae51ecbff197e2f",
+    "text": "Komprimieren fehlgeschlagen: {error}"
+  },
   "clips.compressSelected": {
     "source": "d102549e77c9439e",
     "text": "Ausgewählte komprimieren"
@@ -322,6 +354,10 @@
   "clips.compressSelectedClips": {
     "source": "5bd3e9651646f13a",
     "text": "Ausgewählte Clips komprimieren"
+  },
+  "clips.compressedFileStillTooBig": {
+    "source": "a3ef3cd249c2ddc0",
+    "text": "Die komprimierte Datei ist immer noch zu groß: {size} MB bei einer Grenze von {limit} MB."
   },
   "clips.compressingFast": {
     "source": "40a9d82c92a84230",
@@ -334,6 +370,10 @@
   "clips.compressingTempCopyForName": {
     "source": "27d12c5f874c1b12",
     "text": "Temporäre Kopie für {name} wird komprimiert."
+  },
+  "clips.compressionStoppedTooManyErrors": {
+    "source": "c52fd8191e65c7c4",
+    "text": "Die Komprimierung wurde abgebrochen, weil der Encoder zu viele Fehler erzeugt hat."
   },
   "clips.confirmDeleteCount": {
     "source": "b321718dc7985dae",
@@ -678,6 +718,30 @@
   "clips.favoritesOnly": {
     "source": "d78924f9af57312b",
     "text": "Nur Favoriten"
+  },
+  "clips.ffmpegFailedExitCode": {
+    "source": "232d1067f3d9489d",
+    "text": "ffmpeg ist fehlgeschlagen (Exit {code})."
+  },
+  "clips.ffmpegMissingClipNotSaved": {
+    "source": "9cdbc7ef35e4d5b0",
+    "text": "ffmpeg fehlt, daher konnte der Clip nicht gespeichert werden."
+  },
+  "clips.ffmpegNotFoundForUpload": {
+    "source": "c62817c123d9e6ad",
+    "text": "ffmpeg.exe wurde nicht gefunden, daher konnte der Clip nicht für den Upload vorbereitet werden."
+  },
+  "clips.ffmpegNotFoundInClipFolder": {
+    "source": "38d3315459c003ba",
+    "text": "ffmpeg.exe wurde im Clip-Ordner nicht gefunden."
+  },
+  "clips.ffmpegProducedNoOutput": {
+    "source": "d7f13dcdc0586349",
+    "text": "ffmpeg hat keine Ausgabedatei erzeugt."
+  },
+  "clips.fileInUseByAnotherProgram": {
+    "source": "0c398ceeed35adbb",
+    "text": "Die Datei wird von einem anderen Programm verwendet. Schließe alles, was sie abspielt, und versuche es erneut."
   },
   "clips.fileIsSizeMbWhichIs": {
     "source": "01c849979dab59bf",
@@ -1403,6 +1467,14 @@
     "source": "4e0abb13e6f3d472",
     "text": "Clip auswählen"
   },
+  "clips.selectedClipOpenInEditor": {
+    "source": "80c9484bef033af6",
+    "text": "Ein ausgewählter Clip ist im Editor geöffnet. Schließe den Editor und prüfe die Clips erneut."
+  },
+  "clips.selectedClipProcessing": {
+    "source": "a36c19854c9c2f01",
+    "text": "Ein ausgewählter Clip wird verarbeitet. Prüfe die Clips erneut, wenn er fertig ist."
+  },
   "clips.selectedCount": {
     "source": "08e97b60a4dc6ce0",
     "text": {
@@ -1529,6 +1601,10 @@
   "clips.stopUploadsCount": {
     "source": "844d3d15da772cf7",
     "text": "Uploads stoppen ({count})"
+  },
+  "clips.streamableCheckTimedOut": {
+    "source": "73cbf2a9f94b12d4",
+    "text": "Die Statusprüfung bei Streamable hat nach 30 Minuten abgebrochen."
   },
   "clips.thatCouldNotBeDone": {
     "source": "6eab7f00f3e45f30",
@@ -1794,6 +1870,10 @@
     "source": "3d7f936ee68aca2f",
     "text": "Upload fehlgeschlagen: {error}"
   },
+  "clips.uploadFinishedWithoutResult": {
+    "source": "7c5cb1081380a274",
+    "text": "Der Upload wurde ohne Ergebnis von Streamable beendet."
+  },
   "clips.uploadQueueIsFull": {
     "source": "c944c59610d2063e",
     "text": "Die Upload-Warteschlange ist voll"
@@ -1829,6 +1909,10 @@
   "clips.viewName": {
     "source": "f034209072b7c4a0",
     "text": "{name} anzeigen"
+  },
+  "clips.waitingForAnotherCompression": {
+    "source": "e8d85c2dddf62739",
+    "text": "Wartet, bis eine andere Komprimierung fertig ist"
   },
   "clips.widthHeight": {
     "source": "b43d90bd13fd1a68",
@@ -2017,6 +2101,10 @@
   "common.fast": {
     "source": "6217537829ed8983",
     "text": "Schnell"
+  },
+  "common.ffmpegWasNotFound": {
+    "source": "426ca04201a4f150",
+    "text": "ffmpeg.exe wurde nicht gefunden"
   },
   "common.file": {
     "source": "f57a547dfed3b554",
@@ -2686,6 +2774,30 @@
     "source": "01fcab0c292cd329",
     "text": "Zu Favoriten hinzufügen"
   },
+  "editor.addedClipNotInFolder": {
+    "source": "e70be0448e778b56",
+    "text": "Ein im Editor hinzugefügter Clip ist nicht mehr im Clip-Ordner."
+  },
+  "editor.addedClipToVideoNotInFolder": {
+    "source": "e80fec30be50d301",
+    "text": "Ein im Editor zum Video hinzugefügter Clip ist nicht mehr im Clip-Ordner."
+  },
+  "editor.addedClipVideoUnreadable": {
+    "source": "30259f378ed91580",
+    "text": "Das Video eines im Editor hinzugefügten Clips konnte nicht gelesen werden."
+  },
+  "editor.addedMediaNotAvailable": {
+    "source": "d1c04ccca369d41b",
+    "text": "Ein im Editor hinzugefügtes GIF, ein Sticker oder eine Form ist nicht mehr verfügbar. Füge es erneut hinzu."
+  },
+  "editor.addedVideoMoved": {
+    "source": "d977ff00b963828a",
+    "text": "Ein im Editor hinzugefügtes Video wurde verschoben oder geändert. Füge es erneut hinzu."
+  },
+  "editor.addedVideoToVideoMoved": {
+    "source": "f61d1f8eca5fa78e",
+    "text": "Ein im Editor zum Video hinzugefügtes Video wurde verschoben oder geändert. Füge es erneut hinzu."
+  },
   "editor.addingAudio": {
     "source": "dbf4db2a5c980fd2",
     "text": "Audio wird hinzugefügt..."
@@ -2761,6 +2873,10 @@
   "editor.audioCouldNotBeAdded": {
     "source": "0e8768f969a56979",
     "text": "Audio konnte nicht hinzugefügt werden"
+  },
+  "editor.audioCouldNotBeImported": {
+    "source": "24fad77631fa733f",
+    "text": "Dieses Audio konnte nicht importiert werden"
   },
   "editor.audioIsStillLoading": {
     "source": "d22c8458ab9393ec",
@@ -2950,6 +3066,10 @@
     "source": "09c2cb2ea7b1be3c",
     "text": "{label} auswählen"
   },
+  "editor.clipLengthCouldNotBeRead": {
+    "source": "6b588bcfb96e7552",
+    "text": "Die Länge des Clips konnte nicht gelesen werden."
+  },
   "editor.closeThePanel": {
     "source": "1b70f85cf11ab8cc",
     "text": "Panel schließen"
@@ -3113,6 +3233,10 @@
   "editor.editingIsLockedUntilThisIs": {
     "source": "ca86410ec9eb5964",
     "text": "Bearbeiten ist gesperrt, bis dies abgeschlossen ist."
+  },
+  "editor.editorSessionChanged": {
+    "source": "e26bf634ca2858b0",
+    "text": "Die Editor-Sitzung hat sich geändert. Öffne den Editor erneut."
   },
   "editor.effectBloom": {
     "source": "6e76bbe87ccf50e2",
@@ -3594,9 +3718,29 @@
     "source": "cbd56454e0559997",
     "text": "FFmpeg ist nicht verfügbar."
   },
+  "editor.ffmpegOutputMissing": {
+    "source": "52950bb96762c1be",
+    "text": "ffmpeg hat Erfolg gemeldet, aber die Ausgabedatei fehlt oder ist leer."
+  },
   "editor.ffmpegTrimFailedExitCodeError": {
     "source": "86a78a51bee32398",
     "text": "Zuschneiden mit ffmpeg fehlgeschlagen (Exit={code}): {error}"
+  },
+  "editor.fileCannotBeUsed": {
+    "source": "3a54cc59e87d9698",
+    "text": "Diese Datei kann nicht verwendet werden"
+  },
+  "editor.fileCouldNotBeOpened": {
+    "source": "7b845eb1566a0763",
+    "text": "Diese Datei konnte nicht geöffnet werden"
+  },
+  "editor.fileLargerThan50Mb": {
+    "source": "06d64110216c6f07",
+    "text": "Diese Datei ist größer als 50 MB"
+  },
+  "editor.fileWasNotFound": {
+    "source": "4ff0c22de1eec40d",
+    "text": "Diese Datei wurde nicht gefunden"
   },
   "editor.fill": {
     "source": "86b5fee1c65415dc",
@@ -4226,6 +4370,10 @@
     "source": "aff9cd9bdbeb670f",
     "text": "Keine Filter entsprechen dem."
   },
+  "editor.noFrameCouldBeRead": {
+    "source": "e2269f5b04601369",
+    "text": "Aus dem Clip konnte kein Bild gelesen werden."
+  },
   "editor.noPresetsYetNameKindBelow": {
     "source": "3033a47e1c9a365f",
     "text": "Noch keine Vorlagen. {kind} unten benennen und speichern, um sie für jeden Clip zu verwenden."
@@ -4257,6 +4405,14 @@
   "editor.oneMightBeMisheardItIs": {
     "source": "34dbb53ee44be41a",
     "text": "Eines könnte falsch verstanden sein. Es ist orange markiert; auswählen und rechts Prüfen öffnen."
+  },
+  "editor.onlyGifPngJpeg": {
+    "source": "84dfe56eb0aa1664",
+    "text": "Nur GIF-, PNG- und JPEG-Dateien können hinzugefügt werden"
+  },
+  "editor.onlyMp4MovMkvWebm": {
+    "source": "d7d54053e12144de",
+    "text": "Nur MP4-, MOV-, MKV- und WebM-Videos können hinzugefügt werden"
   },
   "editor.options": {
     "source": "0ac75dce3642ff67",
@@ -4689,6 +4845,26 @@
   "editor.speechBubble": {
     "source": "067047b66d89ecbf",
     "text": "Sprechblase"
+  },
+  "editor.speechEngineFailed": {
+    "source": "194f0543c2d6312e",
+    "text": "Die Spracherkennung ist fehlgeschlagen (Exit {code})."
+  },
+  "editor.speechModelCouldNotConnect": {
+    "source": "206e65b64a6138e4",
+    "text": "Der Download des Sprachmodells konnte keine HTTPS-Verbindung zum Downloadserver herstellen."
+  },
+  "editor.speechModelNoSecureConnection": {
+    "source": "7477435b5178ef4b",
+    "text": "Für den Download des Sprachmodells konnte keine sichere HTTPS-Verbindung hergestellt werden."
+  },
+  "editor.speechModelServerHttp": {
+    "source": "128a25672b2be9c2",
+    "text": "Der Downloadserver des Sprachmodells hat HTTP {status} zurückgegeben."
+  },
+  "editor.speechModelTimedOut": {
+    "source": "8d5293358ccdf256",
+    "text": "Der Download des Sprachmodells hat vor dem Abschluss eine Zeitüberschreitung erreicht."
   },
   "editor.speechWordTimingsCouldNotBe": {
     "source": "242a59cf32299e34",
@@ -5162,9 +5338,17 @@
     "source": "dca6c6c0185e2fea",
     "text": "Vollbild umschalten"
   },
+  "editor.tooManyEditorSources": {
+    "source": "760a87be29fc35d8",
+    "text": "Zu viele Quellen im Editor. Speichere deine Änderungen und öffne den Editor erneut."
+  },
   "editor.tooManyExistingTrimOutputs": {
     "source": "83f35a6127f1f033",
     "text": "Zu viele vorhandene Zuschnittausgaben"
+  },
+  "editor.tooManySubtitles": {
+    "source": "e4dec3dca173da94",
+    "text": "Zu viele Untertitel"
   },
   "editor.top": {
     "source": "27644f0497fd9849",
@@ -5254,6 +5438,10 @@
     "source": "c261db78a6b1f179",
     "text": "Stummschaltung aufheben"
   },
+  "editor.unreliablePassagesSkipped": {
+    "source": "ca7395b28c3768a5",
+    "text": "Wiederholte oder unzuverlässige Stellen wurden übersprungen. Prüfe die Untertitel."
+  },
   "editor.useText": {
     "source": "ec0b8864e32f57e0",
     "text": "Text verwenden"
@@ -5270,6 +5458,14 @@
     "source": "72bcb013ed85a48f",
     "text": "Video"
   },
+  "editor.videoCouldNotBeRead": {
+    "source": "2656936821ec7b34",
+    "text": "Dieses Video konnte nicht gelesen werden"
+  },
+  "editor.videoEditCouldNotBeRead": {
+    "source": "b3a31611c809ce87",
+    "text": "Die Videobearbeitung konnte nicht gelesen werden."
+  },
   "editor.videoGame": {
     "source": "1b92b6b09cad4377",
     "text": "Videospiel"
@@ -5281,6 +5477,10 @@
   "editor.videoSpeed": {
     "source": "7fb0bbb0d57e488a",
     "text": "Videogeschwindigkeit"
+  },
+  "editor.videoSpeedOutOfRange": {
+    "source": "3dbb7e93bf7a800f",
+    "text": "Die Videogeschwindigkeit liegt außerhalb des gültigen Bereichs."
   },
   "editor.videoSpeedX": {
     "source": "b9c1c3bbe815f739",
@@ -5734,6 +5934,34 @@
     "source": "d2187d527809f532",
     "text": "Pos1"
   },
+  "lua.hotkeyUploadLatestClip": {
+    "source": "df8745d476ae558d",
+    "text": "Neuesten Clip auf Streamable hochladen"
+  },
+  "lua.scriptAbout": {
+    "source": "207194ba04314859",
+    "text": "Das einzige Skript, das OBS von ReplayKit sieht. Es startet die Aufnahme für Clips, hält das Monitoring von OBS aus, wechselt die Aufnahmequellen für Vollbildspiele, öffnet und parkt den Discord-Projektor, spielt den Ton beim Speichern eines Clips, kümmert sich um die Rechte von OBS, gleicht die Aufnahme-Tastenkürzel ab und startet den ReplayKit-Helfer."
+  },
+  "lua.scriptLayout": {
+    "source": "78887b020556073a",
+    "text": "Der Code bleibt in interne Dateien je Funktion aufgeteilt, damit das Skriptfenster von OBS übersichtlich bleibt, ohne dass alles in einer riesigen Datei landet."
+  },
+  "lua.toolsOpenClipFolder": {
+    "source": "6e4124d40abd2bef",
+    "text": "ReplayKit: Clip-Ordner öffnen"
+  },
+  "lua.toolsOpenClips": {
+    "source": "b3552262df7ed3c5",
+    "text": "ReplayKit: Clips öffnen"
+  },
+  "lua.toolsSaveClip": {
+    "source": "ec84d1a2efa45f00",
+    "text": "ReplayKit: Clip speichern"
+  },
+  "lua.toolsUploadLastClip": {
+    "source": "71374792db954b37",
+    "text": "ReplayKit: Letzten Clip hochladen"
+  },
   "notifications.couldNotLoadNotifications": {
     "source": "e378a1adb499bc84",
     "text": "Benachrichtigungen konnten nicht geladen werden."
@@ -5989,6 +6217,10 @@
   "settings.addGame": {
     "source": "f0668e12a44dce74",
     "text": "Spiel hinzufügen"
+  },
+  "settings.adminPromptDeclined": {
+    "source": "d3671ed436cd9eb9",
+    "text": "Die Administratoranfrage wurde abgelehnt."
   },
   "settings.advanced": {
     "source": "f571cb2d06ae01ae",
@@ -6358,6 +6590,10 @@
     "source": "44a667adae6a1778",
     "text": "Kleinere Dateien, aber HEVC- / H.265-Clips laufen bei manchen Leuten, auf manchen Handys, in manchen Browsern und Apps nicht."
   },
+  "settings.codecNotSupported": {
+    "source": "1c96fb4c0979a63e",
+    "text": "Der gewünschte Codec '{codec}' wird von der erkannten GPU nicht unterstützt, daher hat ReplayKit {encoder} gewählt."
+  },
   "settings.colorAdd": {
     "source": "50b91095eea95aca",
     "text": "Farbe addieren"
@@ -6421,6 +6657,10 @@
   "settings.couldNotAutoSaveTheCustom": {
     "source": "7083f5c53fba35f8",
     "text": "Das benutzerdefinierte Design konnte nicht automatisch gespeichert werden: {error}"
+  },
+  "settings.couldNotCaptureScreenForPicker": {
+    "source": "132983192e266d0a",
+    "text": "Der Bildschirm konnte für die Farbpipette nicht aufgenommen werden."
   },
   "settings.couldNotChangeBongoCatVisibility": {
     "source": "d88142e324dafafd",
@@ -6609,6 +6849,10 @@
   "settings.couldNotRepairDesktopAudioMonitoring": {
     "source": "0898f8598755106b",
     "text": "Der Überwachungsstatus von Desktop-Audio konnte nicht repariert werden: {error}"
+  },
+  "settings.couldNotReserveEscKey": {
+    "source": "13ab1eabd3e7733d",
+    "text": "Die Esc-Taste konnte für die Farbpipette nicht reserviert werden. Möglicherweise verwendet sie ein anderes Programm."
   },
   "settings.couldNotResizeNameError": {
     "source": "b7342712822c2a08",
@@ -6906,6 +7150,10 @@
     "source": "cf3a919e3af54c8c",
     "text": "Die Unterstützung für die Discord-Bildschirmfreigabe ist nicht verfügbar."
   },
+  "settings.displayCaptureNotUpdatedError": {
+    "source": "fa241fd1643530ae",
+    "text": "Die Anzeige wurde gespeichert, aber die Bildschirmaufnahme konnte nicht aktualisiert werden: {error}"
+  },
   "settings.displayFollowsPrimary": {
     "source": "b1aa28bedaa84698",
     "text": "Folgt der Anzeige, die Windows als primär festlegt."
@@ -6989,6 +7237,10 @@
   "settings.enableSharePreviewBeforeShowingThe": {
     "source": "a19ddb144187a6f5",
     "text": "Freigabevorschau aktivieren, bevor der Projektor angezeigt wird."
+  },
+  "settings.encoderDidNotLoad": {
+    "source": "4700fc8a8876b5ed",
+    "text": "{encoder} wurde in OBS nicht geladen (meist wegen eines veralteten Grafiktreibers), daher nimmt ReplayKit bis dahin mit {fallback} auf."
   },
   "settings.encodingOnTheProcessorCanLower": {
     "source": "26811614318258bd",
@@ -7181,6 +7433,10 @@
   "settings.hidePopupsFromScreenshotsAndScreen": {
     "source": "543cd3ebd2cbb5ca",
     "text": "Pop-ups in Screenshots und Bildschirmaufnahmen ausblenden"
+  },
+  "settings.hotkeysNotRestoredError": {
+    "source": "0b7c48a831475ace",
+    "text": "Die OBS-Tastenkürzel konnten nicht wiederhergestellt werden: {error}"
   },
   "settings.howFarTheLeftAndRight": {
     "source": "3641fd9c8ce562dc",
@@ -7486,6 +7742,34 @@
     "source": "9d9f262f0a79333d",
     "text": "Menüleiste"
   },
+  "settings.micAccessBlocked": {
+    "source": "f8a998e854d5d772",
+    "text": "Windows blockiert den Mikrofonzugriff für Desktop-Apps (Einstellungen › Datenschutz › Mikrofon)."
+  },
+  "settings.micDeviceError": {
+    "source": "a870ed172b0e4b84",
+    "text": "Das Audiogerät hat den Fehler {code} gemeldet."
+  },
+  "settings.micDeviceExclusive": {
+    "source": "5e79d85118ff5acd",
+    "text": "Eine andere App verwendet dieses Audiogerät exklusiv."
+  },
+  "settings.micDeviceFormat": {
+    "source": "40ed584ffea4d17d",
+    "text": "Dieses Audiogerät unterstützt das Testformat nicht."
+  },
+  "settings.micDeviceNotFound": {
+    "source": "c843892eb217a4b0",
+    "text": "Das Audiogerät wurde nicht gefunden."
+  },
+  "settings.micDeviceUnplugged": {
+    "source": "31f09a8dece59b06",
+    "text": "Das Audiogerät wurde getrennt oder geändert."
+  },
+  "settings.micDidNotStartInTime": {
+    "source": "bc1b85eb2e785c9b",
+    "text": "Das Mikrofon ist nicht rechtzeitig gestartet."
+  },
   "settings.micNotConnected": {
     "source": "70a16104625a4dff",
     "text": "nicht verbunden"
@@ -7497,6 +7781,10 @@
   "settings.micTestStarting": {
     "source": "aa8a8e09f840395b",
     "text": "Wird gestartet..."
+  },
+  "settings.micTestTimeLimit": {
+    "source": "73912ae776325822",
+    "text": "Der Mikrofontest wurde nach {minutes} Minuten beendet."
   },
   "settings.microphoneLevel": {
     "source": "fba79278f18f924b",
@@ -7798,6 +8086,10 @@
     "source": "e89d672825674649",
     "text": "OBS hat Video.{update} nicht akzeptiert: {error}"
   },
+  "settings.obsDidNotReportMuteState": {
+    "source": "d180d9693729c8be",
+    "text": "OBS hat den gewünschten Stummschaltungsstatus nach dem Setzen nicht gemeldet."
+  },
   "settings.obsDidNotReportTheRefreshed": {
     "source": "ced6192b88a7016c",
     "text": "OBS hat den aktualisierten Monitor- und Stummstatus nicht gemeldet."
@@ -7854,6 +8146,10 @@
     "source": "6703aed64ec554b2",
     "text": "Die Einstellungen des OBS-Replaypuffers wurden gespeichert, aber die Live-Anwendung ist fehlgeschlagen: {error}"
   },
+  "settings.obsReportedValueInstead": {
+    "source": "b706534c9a77e614",
+    "text": "OBS meldete '{actual}' statt '{wanted}'."
+  },
   "settings.obsSceneCollectionFileWasNot": {
     "source": "03fa53c4e3b85e38",
     "text": "Die Datei der OBS-Szenensammlung wurde nicht gefunden."
@@ -7877,6 +8173,10 @@
   "settings.obsStartsInTheSystemTray": {
     "source": "f20d594c5c35b559",
     "text": "OBS startet im Infobereich, statt sein Fenster zu öffnen."
+  },
+  "settings.obsStillReportsMonitoringDevice": {
+    "source": "fbf08ec8489ae7d3",
+    "text": "OBS meldet weiterhin das Monitoring-Gerät '{name}' ({id})."
   },
   "settings.obsStudioItselfWillAlsoBe": {
     "source": "bb2ea21750848284",
@@ -7962,6 +8262,38 @@
     "source": "a4bfd53cf77e7b8b",
     "text": "Ausgabehöhe in Pixel. Die Breite folgt dem Seitenverhältnis der Leinwand."
   },
+  "settings.outputReadStateFailed": {
+    "source": "88cc058ed3821907",
+    "text": "Der Status einer OBS-Ausgabe ({output}) konnte nicht gelesen werden: {error}"
+  },
+  "settings.outputRecording": {
+    "source": "b35872b56f1995a5",
+    "text": "Aufnahme"
+  },
+  "settings.outputReplayBuffer": {
+    "source": "121b89726ca5d23a",
+    "text": "Replay-Puffer"
+  },
+  "settings.outputRestartFailed": {
+    "source": "a50187ddfc57375b",
+    "text": "Eine OBS-Ausgabe ({output}) konnte nach dem Übernehmen der Einstellungen nicht neu gestartet werden: {error}"
+  },
+  "settings.outputStartTimedOut": {
+    "source": "c32890e6d18701d2",
+    "text": "Zeitüberschreitung beim Warten auf den Start einer OBS-Ausgabe ({output})."
+  },
+  "settings.outputStopFailed": {
+    "source": "4e66c688583d7d5a",
+    "text": "Eine OBS-Ausgabe ({output}) konnte vor dem Übernehmen der Einstellungen nicht gestoppt werden: {error}"
+  },
+  "settings.outputStopTimedOut": {
+    "source": "ac97c7f665274779",
+    "text": "Zeitüberschreitung beim Warten auf das Stoppen einer OBS-Ausgabe ({output})."
+  },
+  "settings.outputVirtualCamera": {
+    "source": "111fd0852e756ee7",
+    "text": "Virtuelle Kamera"
+  },
   "settings.overlayApplyFailedError": {
     "source": "738255c1ef31bf55",
     "text": "Anwenden des Overlays fehlgeschlagen: {error}"
@@ -7981,6 +8313,14 @@
   "settings.overlayColorMultiplyHex": {
     "source": "a064fc0146e1c5ee",
     "text": "Overlay-Farbe multiplizieren Hex"
+  },
+  "settings.overlayFlipPositionFailedError": {
+    "source": "25c95545ea0288ba",
+    "text": "Die Spiegelung des Overlays wurde gespeichert, aber die aktuelle Position von {name} konnte nicht gelesen werden: {error}"
+  },
+  "settings.overlayFlipSceneLookupFailedError": {
+    "source": "99b338a8349ad503",
+    "text": "Die Spiegelung des Overlays wurde gespeichert, aber die OBS-Szene konnte nicht gefunden werden: {error}"
   },
   "settings.overlayHueShift": {
     "source": "d033b807793d4a52",
@@ -8006,6 +8346,14 @@
     "source": "c129339a890ed309",
     "text": "Schieberegler für die Overlay-Drehung"
   },
+  "settings.overlaySceneItemsFailedError": {
+    "source": "b5b4ac45a7bbb1be",
+    "text": "Die Overlay-Einstellung wurde gespeichert, aber die Elemente der OBS-Szene konnten nicht gelesen werden: {error}"
+  },
+  "settings.overlaySceneLookupFailedError": {
+    "source": "ecf72fdb82953fd7",
+    "text": "Die Overlay-Einstellung wurde gespeichert, aber die OBS-Szene konnte nicht gefunden werden: {error}"
+  },
   "settings.overlaySettingWasSavedButThe": {
     "source": "94d8f258ed868945",
     "text": "Die Overlay-Einstellung wurde gespeichert, aber die OBS-Szenendatei konnte nicht für den Neustart vorbereitet werden: {error}"
@@ -8013,6 +8361,14 @@
   "settings.overlaySize": {
     "source": "a50962ddfe53b823",
     "text": "Overlay-Größe"
+  },
+  "settings.overlaySizeSceneItemsFailedError": {
+    "source": "f8b400ff6c79c2f1",
+    "text": "Die Overlay-Größe wurde gespeichert, aber die Elemente der OBS-Szene konnten nicht gelesen werden: {error}"
+  },
+  "settings.overlaySizeSceneLookupFailedError": {
+    "source": "dd23826f43e78e66",
+    "text": "Die Overlay-Größe wurde gespeichert, aber die OBS-Szene konnte nicht gefunden werden: {error}"
   },
   "settings.overlaySizeSlider": {
     "source": "11cc91e490df3ccd",
@@ -8094,9 +8450,21 @@
     "source": "81373bf48730d960",
     "text": "Pop-ups"
   },
+  "settings.powercfgCouldNotStart": {
+    "source": "2ea1892470e0cac0",
+    "text": "powercfg konnte nicht gestartet werden."
+  },
+  "settings.powercfgDidNotFinish": {
+    "source": "a14ac53abac1da4d",
+    "text": "powercfg wurde nicht abgeschlossen."
+  },
   "settings.powercfgExitedCode": {
     "source": "5768b4f92cc16692",
     "text": "powercfg wurde mit Code {code} beendet."
+  },
+  "settings.powercfgTimedOut": {
+    "source": "24199fe22090eace",
+    "text": "Zeitüberschreitung bei powercfg."
   },
   "settings.presetBalancedBlurb": {
     "source": "cf2fdb6b6603dd4e",
@@ -8378,9 +8746,17 @@
     "source": "6214ddc179841b51",
     "text": "Vor dem Verlassen der Einstellungen speichern, sonst gehen sie ohne Speichern verloren."
   },
+  "settings.savedGameWindow": {
+    "source": "b7bc0d9e3aae0541",
+    "text": "Gespeichertes Spielfenster"
+  },
   "settings.savedSelection": {
     "source": "b7329a9a6ea64fa8",
     "text": "Gespeicherte Auswahl"
+  },
+  "settings.savedThemeNoLongerExists": {
+    "source": "537bd5d1b1cded80",
+    "text": "Dieses gespeicherte Design gibt es nicht mehr."
   },
   "settings.savesPcAudioDiscordAndYour": {
     "source": "7176992f35453e0d",
@@ -8414,6 +8790,14 @@
     "source": "97a1c94589647387",
     "text": "Bildschirmfreigabe"
   },
+  "settings.screenshareSceneItemsFailedError": {
+    "source": "d392d3377118bec7",
+    "text": "Die Aufnahme für die Bildschirmfreigabe wurde gespeichert, aber die Elemente der OBS-Szene konnten nicht gelesen werden: {error}"
+  },
+  "settings.screenshareSceneLookupFailedError": {
+    "source": "b048c26bc1e0955d",
+    "text": "Die Aufnahme für die Bildschirmfreigabe wurde gespeichert, aber die OBS-Szene konnte nicht gefunden werden: {error}"
+  },
   "settings.screenshotHotkey": {
     "source": "2a49b87d3a27cbf7",
     "text": "Tastenkürzel für Screenshot aufnehmen"
@@ -8433,6 +8817,10 @@
   "settings.settingsChanged": {
     "source": "735553f4b318a7bb",
     "text": "Einstellungen geändert"
+  },
+  "settings.settingsFileInvalidError": {
+    "source": "50c2872ab86af505",
+    "text": "Die Einstellungsdatei von ReplayKit ist ungültig: {error}"
   },
   "settings.settingsFileIsTooLarge": {
     "source": "4e2c616f863cdcb1",
@@ -8457,6 +8845,34 @@
   "settings.setupFile": {
     "source": "eb7a2cf26289ce88",
     "text": "Setup-Datei"
+  },
+  "settings.setupFileAlreadyInPlace": {
+    "source": "b1bf0b269307b96e",
+    "text": "Die Setup-Datei ist bereits vorhanden."
+  },
+  "settings.setupFileDownloadFailedError": {
+    "source": "a7e3368539a46fa5",
+    "text": "Die Setup-Datei von ReplayKit konnte nicht erneut heruntergeladen werden: {error}"
+  },
+  "settings.setupFileGithubUnreachable": {
+    "source": "b451fc634d8f1585",
+    "text": "Die Setup-Datei von ReplayKit konnte nicht erneut heruntergeladen werden: GitHub war nicht erreichbar ({error}). Prüfe die Verbindung und versuche es erneut, oder führe einmal die neueste OBSReplayKit.exe von GitHub aus."
+  },
+  "settings.setupFileInUse": {
+    "source": "7f92c4820276db62",
+    "text": "Die Setup-Datei wird verwendet. Schließe das Setup- oder Deinstallationsfenster von ReplayKit und versuche es erneut."
+  },
+  "settings.setupFileIncomplete": {
+    "source": "9b18375da4821c11",
+    "text": "Die Setup-Datei von ReplayKit ist unvollständig ({size} MB)."
+  },
+  "settings.setupFileMismatch": {
+    "source": "98d57d69baab1e4a",
+    "text": "Die Setup-Datei von ReplayKit stimmt nicht mit der zwischengespeicherten Kopie überein und wird daher nicht ausgeführt."
+  },
+  "settings.setupFileStillNotUsable": {
+    "source": "3907b427dc44ccaa",
+    "text": "Die Setup-Datei ist auch nach dem erneuten Herunterladen nicht verwendbar."
   },
   "settings.sharePreviewAudio": {
     "source": "1b679b4a88a2c529",
@@ -8562,6 +8978,10 @@
     "source": "206cd798af33081f",
     "text": "Größe in GB."
   },
+  "settings.sleepNotAppliedError": {
+    "source": "266c3b5bb49ecfbe",
+    "text": "Die Windows-Energiespareinstellung wurde gespeichert, aber nicht angewendet: {error}"
+  },
   "settings.smallerCanTakeMuchLongerWith": {
     "source": "3328b313fb9af73f",
     "text": "Kleiner kann mit großen Clips oder Bibliotheken deutlich länger dauern und nutzt währenddessen mehr CPU."
@@ -8621,6 +9041,10 @@
   "settings.startup": {
     "source": "514d8946310015a5",
     "text": "Autostart"
+  },
+  "settings.startupRejectedError": {
+    "source": "fa11ada0a18e6545",
+    "text": "Der Windows-Autostart wurde gespeichert, aber Windows hat die Änderung abgelehnt: {error}"
   },
   "settings.stay": {
     "source": "8af0f271ec97d782",
@@ -8765,6 +9189,10 @@
   "settings.theme": {
     "source": "888560be416ca928",
     "text": "Design"
+  },
+  "settings.themeLight": {
+    "source": "0b46afa96380156b",
+    "text": "Hell"
   },
   "settings.thisClosesObsAndInstallsThe": {
     "source": "1c2632254e87b8a9",
@@ -9314,6 +9742,14 @@
     "source": "902083a6f13e798b",
     "text": "{message}  (Protokoll: {path})"
   },
+  "setup.noProcessHostForObs": {
+    "source": "d21a9a94574f4ff7",
+    "text": "Für OBS {version} ist kein gemeinsamer Prozess-Host enthalten. Installiere zuerst eine unterstützte OBS-Version."
+  },
+  "setup.obsCouldNotBeInstalledAutomatically": {
+    "source": "b9ec5649ef71e37c",
+    "text": "OBS Studio konnte nicht automatisch installiert werden. Installiere OBS von obsproject.com und führe dieses Installationsprogramm dann erneut aus."
+  },
   "setup.obsIsStartingBackUp": {
     "source": "13a7f357aa36308e",
     "text": "OBS wird wieder gestartet."
@@ -9357,6 +9793,14 @@
   "setup.obsThemePreparationTimedOut": {
     "source": "4ba35eba6805b4f7",
     "text": "Die Vorbereitung des OBS-Designs hat das Zeitlimit überschritten."
+  },
+  "setup.obsVersionNeeded": {
+    "source": "7c539494daa8d5db",
+    "text": "ReplayKit benötigt OBS {version}, und das installierte OBS konnte nicht auf diese Version gebracht werden. Installiere OBS {version} von obsproject.com und führe dieses Installationsprogramm dann erneut aus."
+  },
+  "setup.originalObsFilesRequired": {
+    "source": "d1b83005942f04a8",
+    "text": "Vor der Installation des gemeinsamen Prozess-Hosts werden die originalen Dateien von OBS {version} benötigt. Repariere OBS Studio und führe dann das Setup von ReplayKit erneut aus."
   },
   "setup.pinObsTrayIcon": {
     "source": "06fa7012f9c04c08",
@@ -9698,6 +10142,10 @@
     "source": "56ee9fa066955950",
     "text": "Beim Update bleiben deine Einstellungen erhalten. Bei einer Neuinstallation werden die Standardwerte wiederhergestellt. Deine automatische Spieleliste, Tastenkürzel und alle anderen ReplayKit-Einstellungen werden zurückgesetzt."
   },
+  "setup.updateNeedsObsVersion": {
+    "source": "32d0de8a3dc8e7bf",
+    "text": "ReplayKit {version} benötigt OBS {obs}, und OBS konnte nicht auf diese Version aktualisiert werden, daher wurde nichts geändert. Installiere OBS {obs} von obsproject.com und führe dann das Installationsprogramm von ReplayKit aus."
+  },
   "setup.verifiesTheBongoCatFilesAnd": {
     "source": "093cb0e01af8c0a7",
     "text": "Prüft die Bongo-Cat-Dateien und die gespeicherten Quellen."
@@ -9873,6 +10321,10 @@
   "shell.forwardAltRight": {
     "source": "56dc2397ec477e7f",
     "text": "Vor (Alt + Rechts)"
+  },
+  "shell.hotkeySaveClipDiskBuffer": {
+    "source": "52c0b4c9a41c8a7a",
+    "text": "ReplayKit: Clip speichern (Datenträger-Puffer)"
   },
   "shell.ifThisStaysAntivirusMayHave": {
     "source": "d0750aedf2e81a9a",
@@ -10089,6 +10541,10 @@
     "source": "a9bf9bc04cf70776",
     "text": "Temporäre Kopie wird komprimiert und hochgeladen"
   },
+  "storage.compressionCouldNotStart": {
+    "source": "8478c0b420964813",
+    "text": "Die Komprimierung konnte nicht gestartet werden."
+  },
   "storage.compressionDidNotFinish": {
     "source": "6140e72447484749",
     "text": "Komprimierung wurde nicht abgeschlossen"
@@ -10209,6 +10665,10 @@
     "source": "52a8bb0e2e87a9dd",
     "text": "Schnell nutzt die GPU, sofern unterstützt, um schneller fertig zu werden. Der Vorgang läuft weiter, wenn dieses Fenster geschlossen wird, und ersetzt jeden Clip nur, wenn das Ergebnis kleiner ist."
   },
+  "storage.ffprobeMissing": {
+    "source": "88e78b498d1b08a4",
+    "text": "ffprobe fehlt, daher kann ReplayKit nicht prüfen, welche Clips komprimiert werden können."
+  },
   "storage.freeFree": {
     "source": "0a51c9631ad66eb0",
     "text": "Frei: **{free}**"
@@ -10304,6 +10764,10 @@
   "storage.nothingWorthCompressingRightNowYour": {
     "source": "3ecb4d1c955ecf47",
     "text": "Gerade lohnt sich keine Komprimierung. Die größten Clips sind bereits klein oder so stark komprimiert wie möglich."
+  },
+  "storage.ofSize": {
+    "source": "a270678590b5e1db",
+    "text": "von {size}"
   },
   "storage.pickAtLeastOneClip": {
     "source": "57cdcc90df8e02e0",
@@ -10488,6 +10952,10 @@
   "update.anUpdateIsAlreadyBeingApplied": {
     "source": "68492aacb04923b3",
     "text": "Ein Update wird bereits angewendet."
+  },
+  "update.autoUpdatesPaused": {
+    "source": "874109d4aea54cd7",
+    "text": "Automatische Updates sind nach einem fehlgeschlagenen Update für eine Stunde pausiert. Du kannst trotzdem manuell aktualisieren."
   },
   "update.badVersion": {
     "source": "e815f01ff4a0aeb2",
@@ -10756,6 +11224,10 @@
   "update.updateTempFolderResolvedOutsideTemp": {
     "source": "b2e71cbc11ef5cdb",
     "text": "Der temporäre Update-Ordner liegt außerhalb von %TEMP%\\ReplayKit."
+  },
+  "update.updateWindowAlreadyOpen": {
+    "source": "d6135bd41341e752",
+    "text": "Ein Update-Fenster ist bereits geöffnet."
   },
   "update.updatingReplaykit": {
     "source": "e60bb0af8d3a028b",

@@ -92,7 +92,11 @@
 
   window.RK_M = M;
   window.RK_MH = H;
-  window.RK_I18N = { use: use, lang: function () { return lang; } };
+  // a number with the decimal mark of the language, for the sizes and speeds a page writes out; a value a script reads back from a field keeps toFixed
+  function number(value, digits) {
+    return new Intl.NumberFormat(lang, { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(value);
+  }
+  window.RK_I18N = { use: use, lang: function () { return lang; }, number: number };
   document.documentElement.lang = lang;
   watchMessages();
 })();

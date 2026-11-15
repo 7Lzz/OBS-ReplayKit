@@ -42,7 +42,7 @@ namespace ReplayKitHelper
                 string smallerEncoder = caps["smallerEncoder"]?.Value<string>();
                 string ffmpeg = caps["ffmpeg"]?.Value<string>();
                 if (string.IsNullOrWhiteSpace(ffmpeg) || !File.Exists(ffmpeg))
-                    return new JObject { ["ok"] = false, ["message"] = "ffmpeg.exe not found in clip folder" };
+                    return new JObject { ["ok"] = false, ["message"] = Locales.Message("clips.ffmpegNotFoundInClipFolder") };
                 if (string.IsNullOrEmpty(mode == "fast" ? fastEncoder : smallerEncoder))
                     return new JObject { ["ok"] = false, ["message"] = Locales.Message("storage.noCompatibleCompressionEncoderIsAvailable") };
                 string ffprobe = caps["ffprobe"]?.Value<string>();
@@ -106,7 +106,7 @@ namespace ReplayKitHelper
             {
                 string msg = !workerThrew && !string.IsNullOrEmpty(task.Result.Message)
                     ? task.Result.Message
-                    : workerThrew ? "Compress failed: " + workerThrewMessage : "Compress finished without success (worker exited)";
+                    : workerThrew ? Locales.Message("clips.compressFailedError", "error", workerThrewMessage) : Locales.Message("clips.compressEndedWithoutResult");
                 UploadState.SetUploadState(requestId: requestId, state: "error", active: false, error: msg, phase: "error", percent: 0);
             }
 

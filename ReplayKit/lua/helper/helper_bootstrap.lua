@@ -643,7 +643,7 @@ end
 function script_load(settings)
     hotkey_id = obs.obs_hotkey_register_frontend(
         "upload_clip_to_streamable",
-        "Upload Latest Clip to Streamable",
+        replaykit_message("lua.hotkeyUploadLatestClip"),
         on_hotkey
     )
     local arr = obs.obs_data_get_array(settings, "hotkey")
@@ -652,19 +652,19 @@ function script_load(settings)
 
     if obs.obs_frontend_add_tools_menu_item then
         obs.obs_frontend_add_tools_menu_item(
-            "ReplayKit: Save Clip",
+            replaykit_message("lua.toolsSaveClip"),
             on_save_replay_menu_clicked
         )
         obs.obs_frontend_add_tools_menu_item(
-            "ReplayKit: Upload Last Clip",
+            replaykit_message("lua.toolsUploadLastClip"),
             on_upload_menu_clicked
         )
         obs.obs_frontend_add_tools_menu_item(
-            "ReplayKit: Open Clips",
+            replaykit_message("lua.toolsOpenClips"),
             on_open_clips_menu_clicked
         )
         obs.obs_frontend_add_tools_menu_item(
-            "ReplayKit: Open Clip Folder",
+            replaykit_message("lua.toolsOpenClipFolder"),
             on_open_clip_folder_menu_clicked
         )
     end

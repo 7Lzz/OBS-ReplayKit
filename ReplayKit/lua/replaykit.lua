@@ -224,6 +224,28 @@ local function state_file(name)
     return current
 end
 
+-- the catalogs the pages and the plugin read, in the language obs runs in and in english behind it; obs reads the json, so the utf-8 path needs no wrapper
+local message_catalogs = nil
+
+local function load_message_catalogs()
+    message_catalogs = {}
+    local locale = type(obs.obs_get_locale) == "function" and obs.obs_get_locale() or "en-US"
+    local codes = (locale ~= "" and locale ~= "en-US") and { locale, "en-US" } or { "en-US" }
+    for _, code in ipairs(codes) do
+        local data = obs.obs_data_create_from_json_file(REPLAYKIT_ROOT .. "locale/messages/" .. code .. ".json")
+        if data then table.insert(message_catalogs, data) end
+    end
+end
+
+-- a message by its id, english when the language lacks it and the id when no catalog has it; the id is written out at every call so tools/i18n/messages.py can check it
+local function replaykit_message(id)
+    if not message_catalogs then load_message_catalogs() end
+    for _, data in ipairs(message_catalogs) do
+        if obs.obs_data_has_user_value(data, id) then return obs.obs_data_get_string(data, id) end
+    end
+    return id
+end
+
 local function load_chunk(path, env)
     if setfenv then
         local chunk, err = utf8_loadfile(path)
@@ -250,6 +272,7 @@ local function load_feature(spec)
         loadfile = utf8_loadfile,
         replaykit_wide = wide,
         replaykit_create_process = create_process,
+        replaykit_message = replaykit_message,
     }
     setmetatable(env, { __index = _G })
 
@@ -349,14 +372,7 @@ local function sync_obs_close_warning_setting()
 end
 
 function script_description()
-    return [[<b>OBS ReplayKit</b><br><br>
-Single OBS-facing script for the ReplayKit setup. It starts clipping
-capture, keeps OBS monitoring off, switches capture sources for fullscreen
-games, opens and parks the Discord projector, plays the clip-saved sound, handles
-OBS elevation, syncs recording hotkeys, and launches the ReplayKit
-helper.<br><br>
-The implementation stays split into internal feature files so the OBS
-Scripts panel stays clean without turning the codebase into one giant file.]]
+    return "<b>OBS ReplayKit</b><br><br>" .. replaykit_message("lua.scriptAbout") .. "<br><br>" .. replaykit_message("lua.scriptLayout")
 end
 
 function script_properties()
@@ -395,6 +411,8 @@ end
 function script_unload()
     obs.timer_remove(sync_obs_close_warning_setting)
     call_all_reverse("script_unload")
+    for _, data in ipairs(message_catalogs or {}) do obs.obs_data_release(data) end
+    message_catalogs = nil
 end
 
 function script_tick(seconds)

@@ -564,7 +564,10 @@ namespace ReplayKitSetup
             // obs is brought to the one supported version before any file is copied: the plugins and the process host of this release are made for it, so an obs that cannot get there leaves the old replaykit as it was
             ObsDownloader.EnsureObsVersion(log);
             if (!ObsVersions.IsInstalledSupported())
-                throw new IOException("ReplayKit " + VersionInfo.Version + " needs OBS " + ObsVersions.Install.Tested + " and OBS could not be updated to it, so nothing was changed. Install OBS " + ObsVersions.Install.Tested + " from obsproject.com, then run the ReplayKit installer.");
+            {
+                var reason = SetupLocale.Pair("setup.updateNeedsObsVersion", "version", VersionInfo.Version, "obs", ObsVersions.Install.Tested);
+                throw new IOException(reason.Shown).WithEnglish(reason);
+            }
 
             string transactionId = Guid.NewGuid().ToString("N");
             string transactionRoot = Path.Combine(TempLayout.Root, "runtime-update-" + transactionId);

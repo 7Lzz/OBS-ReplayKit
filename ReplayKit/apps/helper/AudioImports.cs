@@ -121,16 +121,16 @@ namespace ReplayKitHelper
             {
                 // the path comes from the dialog of this helper, and anything that is not a plain file on a drive or a share is turned away all the same
                 if (string.IsNullOrWhiteSpace(path) || !Path.IsPathRooted(path) || Path.GetPathRoot(path).Length < 3 || path.StartsWith(@"\\.\", StringComparison.Ordinal) || path.StartsWith(@"\\?\", StringComparison.Ordinal))
-                    return Skipped(name, "That file cannot be used");
+                    return Skipped(name, Locales.Message("editor.fileCannotBeUsed"));
                 var info = new FileInfo(path);
-                if (!info.Exists) return Skipped(name, "That file was not found");
+                if (!info.Exists) return Skipped(name, Locales.Message("editor.fileWasNotFound"));
                 if (info.Length <= 0) return Skipped(name, Locales.Message("editor.thatFileIsEmpty"));
                 return Begin(ClipCache.KeyFor(info.FullName, info, "import"), name, info.FullName, null);
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException || ex is NotSupportedException)
             {
                 Log.Write("AudioImports: " + name + ": " + ex.Message);
-                return Skipped(name, "That file could not be opened");
+                return Skipped(name, Locales.Message("editor.fileCouldNotBeOpened"));
             }
         }
 
@@ -213,7 +213,7 @@ namespace ReplayKitHelper
             // the end of a background task: whatever went wrong is kept as the answer for the page instead of being lost with the task
             catch (Exception ex)
             {
-                job.Error = ex is ImportException ? ex.Message : "That audio could not be imported";
+                job.Error = ex is ImportException ? ex.Message : Locales.Message("editor.audioCouldNotBeImported");
                 Log.Write("AudioImports: " + job.Name + ": " + ex.Message);
                 try { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
                 catch (Exception ex2) when (ex2 is IOException || ex2 is UnauthorizedAccessException) { }
@@ -229,7 +229,7 @@ namespace ReplayKitHelper
         private static void Extract(Job job, string source, string dir)
         {
             string ffmpeg = Compression.GetToolPaths()["ffmpeg"]?.Value<string>();
-            if (string.IsNullOrWhiteSpace(ffmpeg) || !File.Exists(ffmpeg)) throw new ImportException("ffmpeg.exe was not found");
+            if (string.IsNullOrWhiteSpace(ffmpeg) || !File.Exists(ffmpeg)) throw new ImportException(Locales.Message("common.ffmpegWasNotFound"));
             ClipCache.Prune(dir);
             if (Directory.Exists(dir)) Directory.Delete(dir, true);
             Directory.CreateDirectory(dir);

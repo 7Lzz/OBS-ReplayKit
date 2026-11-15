@@ -46,7 +46,7 @@ namespace ReplayKitSetup
         {
             var manifest = JObject.Parse(File.ReadAllText(PathAt(folder, "manifest.json")));
             var line = ObsVersions.Lines.SingleOrDefault(item => item.Tested.ToString(3) == version)
-                ?? throw new IOException("No shared process host is bundled for OBS " + version + ". Install a supported OBS version first.");
+                ?? throw new IOException(SetupLocale.Message("setup.noProcessHostForObs", "version", version)).WithEnglish(SetupLocale.Pair("setup.noProcessHostForObs", "version", version));
             string browser = line.ModernPlugins ? "core/obs-browser/" : "obs-plugins/64bit/";
             var paths = new[] { "bin/64bit/replaykit-host/obs64.exe", browser + "obs-browser.dll", browser + "obs-browser-role.dll" };
             if ((string)manifest["ObsVersion"] != version || !(manifest["Files"] is JArray files) || files.Count != paths.Length)
@@ -149,7 +149,7 @@ namespace ReplayKitSetup
                 else
                 {
                     if (current != original)
-                        throw new IOException("The original OBS " + version + " files are required before installing the shared process host. Repair OBS Studio, then run ReplayKit setup again.");
+                        throw new IOException(SetupLocale.Message("setup.originalObsFilesRequired", "version", version)).WithEnglish(SetupLocale.Pair("setup.originalObsFilesRequired", "version", version));
                     Copy(target, saved, original);
                 }
             }

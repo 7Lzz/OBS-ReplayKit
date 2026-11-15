@@ -141,7 +141,7 @@ namespace ReplayKitHelper
             }
         }
 
-        private const string BusyMessage = "A clip is already being saved.";
+        private static string BusyMessage => Locales.Message("clips.clipAlreadyBeingSaved");
 
         public static JObject SaveSegments(JObject body)
         {
@@ -199,7 +199,7 @@ namespace ReplayKitHelper
             if (string.IsNullOrWhiteSpace(clipDir) || !Directory.Exists(clipDir)) return Fail(Locales.Message("clips.theClipFolderClipdirWasNot", "clipDir", clipDir));
             string ffmpeg = Compression.FindCompressionFfmpeg();
             string ffprobe = Compression.FindCompressionFfprobe();
-            if (!File.Exists(ffmpeg) || !File.Exists(ffprobe)) return Fail("ffmpeg is missing, so the clip could not be saved.");
+            if (!File.Exists(ffmpeg) || !File.Exists(ffprobe)) return Fail(Locales.Message("clips.ffmpegMissingClipNotSaved"));
 
             if (!Monitor.TryEnter(SaveGate)) return Fail(BusyMessage);
             string list = null;

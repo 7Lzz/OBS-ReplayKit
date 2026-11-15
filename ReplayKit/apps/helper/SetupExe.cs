@@ -84,14 +84,14 @@ namespace ReplayKitHelper
             if (seen.Valid) return ExePath;
             if (!allowDownload) throw new SetupExeException("setup-missing", Describe(seen) + " Use Download again in Settings > Advanced, or run the latest OBSReplayKit.exe from GitHub once.");
             Repair();
-            if (!Inspect().Valid) throw new SetupExeException("setup-missing", "The setup file is still not usable after downloading it again.");
+            if (!Inspect().Valid) throw new SetupExeException("setup-missing", Locales.Message("settings.setupFileStillNotUsable"));
             return ExePath;
         }
 
         private static string Describe(Inspection seen) =>
             seen.State == "missing" ? Locales.Message("settings.replaykitSSetupFileIsMissing")
-            : seen.State == "incomplete" ? "ReplayKit's setup file is incomplete (" + (seen.Size / (1024 * 1024)) + " MB)."
-            : "ReplayKit's setup file does not match the copy that was cached, so it is not run.";
+            : seen.State == "incomplete" ? Locales.Message("settings.setupFileIncomplete", "size", seen.Size / (1024 * 1024))
+            : Locales.Message("settings.setupFileMismatch");
 
         // fetches the setup exe of the latest release into the cache. a second caller waits at the gate and then finds the file in place
         public static JObject Repair()
@@ -99,13 +99,13 @@ namespace ReplayKitHelper
             lock (RepairGate)
             {
                 var before = Inspect();
-                if (before.Valid) return Done("The setup file is already in place.");
+                if (before.Valid) return Done(Locales.Message("settings.setupFileAlreadyInPlace"));
 
                 Update.ReleaseInfo release;
                 try { release = Update.GetLatestRelease(true); }
                 catch (Exception ex)
                 {
-                    throw new SetupExeException("setup-download-failed", "ReplayKit's setup file could not be downloaded again: GitHub could not be reached (" + ex.Message + "). Check the connection and try again, or run the latest OBSReplayKit.exe from GitHub once.", ex);
+                    throw new SetupExeException("setup-download-failed", Locales.Message("settings.setupFileGithubUnreachable", "error", ex.Message), ex);
                 }
 
                 string tempDir = null;
@@ -120,7 +120,7 @@ namespace ReplayKitHelper
                 catch (Exception ex)
                 {
                     Log.Write("setup file repair failed: " + ex);
-                    throw new SetupExeException("setup-download-failed", "ReplayKit's setup file could not be downloaded again: " + ex.Message, ex);
+                    throw new SetupExeException("setup-download-failed", Locales.Message("settings.setupFileDownloadFailedError", "error", ex.Message), ex);
                 }
                 finally
                 {
@@ -184,7 +184,7 @@ namespace ReplayKitHelper
                 }
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
                 {
-                    if (attempt >= 20) throw new SetupExeException("setup-locked", "The setup file is in use. Close the ReplayKit setup or uninstall window and try again.", ex);
+                    if (attempt >= 20) throw new SetupExeException("setup-locked", Locales.Message("settings.setupFileInUse"), ex);
                     System.Threading.Thread.Sleep(250);
                 }
             }

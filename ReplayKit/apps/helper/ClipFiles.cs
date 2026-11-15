@@ -58,7 +58,7 @@ namespace ReplayKitHelper
 
         // a sharing or lock violation, and what the user is told about one
         internal static bool InUse(IOException ex) { int code = ex.HResult & 0xFFFF; return code == 32 || code == 33; }
-        internal const string InUseMessage = "The file is in use by another program. Close anything that is playing it and try again.";
+        internal static string InUseMessage => Locales.Message("clips.fileInUseByAnotherProgram");
 
         internal static string AvailableName(string requested, Func<string, bool> taken)
         {

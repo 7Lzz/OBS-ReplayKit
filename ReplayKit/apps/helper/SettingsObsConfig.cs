@@ -157,13 +157,13 @@ namespace ReplayKitHelper
                     CreateNoWindow = true,
                 };
                 using var process = Process.Start(psi);
-                if (process == null) return new JObject { ["ok"] = false, ["message"] = "powercfg could not start." };
+                if (process == null) return new JObject { ["ok"] = false, ["message"] = Locales.Message("settings.powercfgCouldNotStart") };
                 var stdout = process.StandardOutput.ReadToEndAsync();
                 var stderr = process.StandardError.ReadToEndAsync();
                 if (!process.WaitForExit(10000))
                 {
                     try { process.Kill(); } catch (InvalidOperationException) { } catch (Win32Exception) { }
-                    return new JObject { ["ok"] = false, ["message"] = "powercfg timed out." };
+                    return new JObject { ["ok"] = false, ["message"] = Locales.Message("settings.powercfgTimedOut") };
                 }
                 string output = (stdout.GetAwaiter().GetResult() + "\n" + stderr.GetAwaiter().GetResult()).Trim();
                 if (process.ExitCode != 0)
@@ -196,7 +196,7 @@ namespace ReplayKitHelper
             var result = SetSleepOverrideSetting(allowSleep);
             if (result["ok"]?.Value<bool>() != true) result = SetSleepOverrideElevated(allowSleep);
             if (result["ok"]?.Value<bool>() == true) return new JObject { ["applied"] = new JArray("Windows sleep"), ["warnings"] = new JArray() };
-            return new JObject { ["applied"] = new JArray(), ["warnings"] = new JArray("Windows sleep setting was saved, but it was not applied: " + result["message"]) };
+            return new JObject { ["applied"] = new JArray(), ["warnings"] = new JArray(Locales.Message("settings.sleepNotAppliedError", "error", result["message"]?.ToString())) };
         }
 
         internal static JObject SetSleepOverrideElevated(bool allowSleep)
@@ -207,13 +207,13 @@ namespace ReplayKitHelper
             {
                 var psi = new ProcessStartInfo { FileName = "powercfg.exe", Arguments = string.Join(" ", args), UseShellExecute = true, Verb = "runas", WindowStyle = ProcessWindowStyle.Hidden };
                 using var process = Process.Start(psi);
-                if (process == null) return new JObject { ["ok"] = false, ["message"] = "powercfg could not start." };
-                if (!process.WaitForExit(120000)) return new JObject { ["ok"] = false, ["message"] = "powercfg did not finish." };
+                if (process == null) return new JObject { ["ok"] = false, ["message"] = Locales.Message("settings.powercfgCouldNotStart") };
+                if (!process.WaitForExit(120000)) return new JObject { ["ok"] = false, ["message"] = Locales.Message("settings.powercfgDidNotFinish") };
                 return process.ExitCode == 0 ? new JObject { ["ok"] = true } : new JObject { ["ok"] = false, ["message"] = Locales.Message("settings.powercfgExitedCode", "code", process.ExitCode) };
             }
             catch (Win32Exception ex) when (ex.NativeErrorCode == 1223)
             {
-                return new JObject { ["ok"] = false, ["message"] = "the administrator prompt was declined." };
+                return new JObject { ["ok"] = false, ["message"] = Locales.Message("settings.adminPromptDeclined") };
             }
             catch (Exception ex) when (ex is Win32Exception || ex is InvalidOperationException)
             {
@@ -377,7 +377,7 @@ namespace ReplayKitHelper
 
                 string actualId = verifyId["ok"]?.Value<bool>() == true ? verifyId["value"]?.Value<string>() : verifyId["message"]?.Value<string>();
                 string actualName = verifyName["ok"]?.Value<bool>() == true ? verifyName["value"]?.Value<string>() : verifyName["message"]?.Value<string>();
-                lastMessage = "OBS still reports monitoring device '" + actualName + "' (" + actualId + ").";
+                lastMessage = Locales.Message("settings.obsStillReportsMonitoringDevice", "name", actualName, "id", actualId);
             }
 
             return new JObject { ["ok"] = false, ["applied"] = new JArray(), ["message"] = Locales.Message("settings.couldNotSetObsMonitoringDevice", "device", deviceName, "attempts", attempts, "error", lastMessage) };

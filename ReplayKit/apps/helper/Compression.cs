@@ -547,7 +547,7 @@ namespace ReplayKitHelper
                 string ffmpeg = caps["ffmpeg"]?.Value<string>();
                 if (string.IsNullOrWhiteSpace(ffmpeg))
                 {
-                    string msg = "ffmpeg.exe not found in your configured clip folder.";
+                    string msg = Locales.Message("clips.ffmpegNotFoundInClipFolder");
                     UploadState.SetUploadState(requestId: requestId, state: "error", active: false, clipName: selected.Name, error: msg);
                     return new JObject { ["ok"] = false, ["message"] = msg };
                 }

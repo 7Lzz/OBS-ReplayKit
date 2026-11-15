@@ -191,9 +191,9 @@ namespace ReplayKitHelper
             };
             string pref = (codecPreference ?? "").Trim().ToLowerInvariant();
             if (unloaded != null)
-                result["warning"] = unloaded + " did not load in OBS (usually an outdated graphics driver), so ReplayKit records with " + choice.Label + " until it does.";
+                result["warning"] = Locales.Message("settings.encoderDidNotLoad", "encoder", unloaded, "fallback", choice.Label);
             else if (pref != "" && choice.Codec != pref)
-                result["warning"] = "Requested codec '" + pref + "' is not supported by the detected GPU, so ReplayKit selected " + choice.Label + ".";
+                result["warning"] = Locales.Message("settings.codecNotSupported", "codec", pref, "encoder", choice.Label);
             return result;
         }
 
@@ -391,12 +391,12 @@ namespace ReplayKitHelper
             var warnings = new List<string>();
             var scene = GetSceneName();
             if (scene["ok"]?.Value<bool>() != true)
-                return new JObject { ["ok"] = false, ["warnings"] = new JArray("Overlay setting was saved, but OBS scene lookup failed: " + scene["message"]) };
+                return new JObject { ["ok"] = false, ["warnings"] = new JArray(Locales.Message("settings.overlaySceneLookupFailedError", "error", scene["message"]?.ToString())) };
 
             string sceneName = scene["name"]?.Value<string>();
             var itemsResult = GetSceneItems(sceneName);
             if (itemsResult["ok"]?.Value<bool>() != true)
-                return new JObject { ["ok"] = false, ["warnings"] = new JArray("Overlay setting was saved, but OBS scene items could not be read: " + itemsResult["message"]) };
+                return new JObject { ["ok"] = false, ["warnings"] = new JArray(Locales.Message("settings.overlaySceneItemsFailedError", "error", itemsResult["message"]?.ToString())) };
             var items = itemsResult["items"] as JArray;
             int opacity = OverlayOpacityValue(settings);
             string overlayStyle = settings["overlayStyle"]?.Value<string>() ?? "";

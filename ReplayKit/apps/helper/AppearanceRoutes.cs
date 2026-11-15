@@ -168,7 +168,7 @@ namespace ReplayKitHelper
                 foreach (var kv in Themes.PresetOrder)
                 {
                     var tk = Themes.Resolve(new JObject { ["theme"] = kv.Key });
-                    list.Add(new JObject { ["id"] = kv.Key, ["label"] = kv.Value, ["swatch"] = ThemeSwatch(tk), ["seed"] = tk.ToSeedJson() });
+                    list.Add(new JObject { ["id"] = kv.Key, ["label"] = Themes.ShownPresetLabel(kv), ["swatch"] = ThemeSwatch(tk), ["seed"] = tk.ToSeedJson() });
                 }
                 try
                 {
@@ -254,7 +254,7 @@ namespace ReplayKitHelper
                 string id;
                 try { id = Themes.SaveUserTheme(label, payload, existingId); }
                 catch (Exception ex) { Log.Write("/appearance/save-theme: " + ex.Message); id = null; }
-                if (id == null) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = string.IsNullOrEmpty(existingId) ? "Could not save theme." : "That saved theme no longer exists." }); return false; }
+                if (id == null) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = string.IsNullOrEmpty(existingId) ? Locales.Message("settings.couldNotSaveTheme") : Locales.Message("settings.savedThemeNoLongerExists") }); return false; }
                 HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["id"] = id });
                 return false;
             }

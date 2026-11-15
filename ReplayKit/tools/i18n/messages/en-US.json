@@ -215,6 +215,10 @@
     "context": "Tooltip of the Compress All button in the clips library while it is running.",
     "text": "Click to stop starting new compresses. Compresses that are already running will finish."
   },
+  "clips.clipAlreadyBeingSaved": {
+    "context": "Message the helper shows when an action fails or finishes in a ReplayKit window, sent by the background helper.",
+    "text": "A clip is already being saved."
+  },
   "clips.clipDatabaseIsBusy": {
     "context": "Error message in a ReplayKit window, sent by the background helper.",
     "text": "Clip database is busy."
@@ -227,6 +231,10 @@
     "context": "Screen reader label in the toolbar of the clips library.",
     "text": "Clip filters"
   },
+  "clips.clipHasOperationRunning": {
+    "context": "Error in the clips library, sent by the background helper.",
+    "text": "That clip already has an operation running."
+  },
   "clips.clipIsTooBigForStreamable": {
     "context": "Heading in a dialog of the clips library.",
     "text": "Clip is too big for Streamable"
@@ -234,6 +242,22 @@
   "clips.clipIsTooLongForStreamable": {
     "context": "Short notice that pops up in the clips library.",
     "text": "Clip is too long for Streamable"
+  },
+  "clips.clipOpenCloseBeforeCompressing": {
+    "context": "Error in the clips library, sent by the background helper.",
+    "text": "That clip is open in the editor. Close the editor before compressing it."
+  },
+  "clips.clipOpenCloseBeforeDeleting": {
+    "context": "Error in the clips library, sent by the background helper.",
+    "text": "That clip is open in the editor. Close the editor before deleting it."
+  },
+  "clips.clipOpenCloseBeforeRenaming": {
+    "context": "Error in the clips library, sent by the background helper.",
+    "text": "That clip is open in the editor. Close the editor before renaming it."
+  },
+  "clips.clipProcessingOpenAfter": {
+    "context": "Error in the clips library, sent by the background helper.",
+    "text": "A clip is processing or queued for compression. Open it after that finishes."
   },
   "clips.clipStateBodyIsRequired": {
     "context": "Error message in a ReplayKit window, sent by the background helper.",
@@ -315,6 +339,14 @@
     "context": "Item in the menu of a clip card in the clips library that opens the compression choices.",
     "text": "Compress…"
   },
+  "clips.compressEndedWithoutResult": {
+    "context": "Error in the clips library, sent by the background helper.",
+    "text": "Compression ended without a result."
+  },
+  "clips.compressFailedError": {
+    "context": "Error in the clips library, sent by the background helper. Keep {error} as written; it is the reason, often in English.",
+    "text": "Compress failed: {error}"
+  },
   "clips.compressSelected": {
     "context": "Text in the clips library.",
     "text": "Compress selected"
@@ -322,6 +354,10 @@
   "clips.compressSelectedClips": {
     "context": "Screen reader label in the toolbar of the clips library.",
     "text": "Compress selected clips"
+  },
+  "clips.compressedFileStillTooBig": {
+    "context": "Error in the clips library, sent by the background helper. Keep {size} and {limit} as written; they are sizes in MB.",
+    "text": "The compressed file is still too big: {size} MB of the {limit} MB limit."
   },
   "clips.compressingFast": {
     "context": "Text in the clips library.",
@@ -334,6 +370,10 @@
   "clips.compressingTempCopyForName": {
     "context": "Short notice that pops up in the clips library. Keep {name} as written.",
     "text": "Compressing temp copy for {name}."
+  },
+  "clips.compressionStoppedTooManyErrors": {
+    "context": "Error in the clips library, sent by the background helper.",
+    "text": "Compression stopped because the encoder produced too many errors."
   },
   "clips.confirmDeleteCount": {
     "context": "Tooltip in the clips library. Keep {count} as written.",
@@ -678,6 +718,30 @@
   "clips.favoritesOnly": {
     "context": "Tooltip in the game picker of the clips library.",
     "text": "Favorites only"
+  },
+  "clips.ffmpegFailedExitCode": {
+    "context": "Error in the clips library, sent by the background helper. Keep {code} as written.",
+    "text": "ffmpeg failed (exit {code})."
+  },
+  "clips.ffmpegMissingClipNotSaved": {
+    "context": "Message the helper shows when an action fails or finishes in a ReplayKit window, sent by the background helper.",
+    "text": "ffmpeg is missing, so the clip could not be saved."
+  },
+  "clips.ffmpegNotFoundForUpload": {
+    "context": "Error in the clips library, sent by the background helper.",
+    "text": "ffmpeg.exe was not found, so the clip could not be prepared for upload."
+  },
+  "clips.ffmpegNotFoundInClipFolder": {
+    "context": "Error in the clips library, sent by the background helper.",
+    "text": "ffmpeg.exe was not found in the clip folder."
+  },
+  "clips.ffmpegProducedNoOutput": {
+    "context": "Error in the clips library, sent by the background helper.",
+    "text": "ffmpeg produced no output file."
+  },
+  "clips.fileInUseByAnotherProgram": {
+    "context": "Message the helper shows when an action fails or finishes in a ReplayKit window, sent by the background helper.",
+    "text": "The file is in use by another program. Close anything that is playing it and try again."
   },
   "clips.fileIsSizeMbWhichIs": {
     "context": "Text in the clips library. Keep {cap}, {file}, {size} as written. Text between ** shows in bold; keep the ** marks around the matching words.",
@@ -1403,6 +1467,14 @@
     "context": "Tooltip in the clips library.",
     "text": "Select clip"
   },
+  "clips.selectedClipOpenInEditor": {
+    "context": "Error in the clips library, sent by the background helper.",
+    "text": "A selected clip is open in the editor. Close the editor and review the clips again."
+  },
+  "clips.selectedClipProcessing": {
+    "context": "Error in the clips library, sent by the background helper.",
+    "text": "A selected clip is processing. Review the clips again after it finishes."
+  },
   "clips.selectedCount": {
     "context": "Count of selected cards in the Clips bulk-action toolbar.",
     "text": {
@@ -1529,6 +1601,10 @@
   "clips.stopUploadsCount": {
     "context": "Text in the clips library. Keep {count} as written.",
     "text": "Stop uploads ({count})"
+  },
+  "clips.streamableCheckTimedOut": {
+    "context": "Error in the clips library, sent by the background helper.",
+    "text": "The Streamable status check timed out after 30 minutes."
   },
   "clips.thatCouldNotBeDone": {
     "context": "Error message in the deleted history of the clips library.",
@@ -1794,6 +1870,10 @@
     "context": "Short notice that pops up in the clips library. Keep {error} as written.",
     "text": "Upload failed: {error}"
   },
+  "clips.uploadFinishedWithoutResult": {
+    "context": "Error in the clips library, sent by the background helper.",
+    "text": "The upload finished without a Streamable result."
+  },
   "clips.uploadQueueIsFull": {
     "context": "Short notice that pops up in the clips library.",
     "text": "Upload queue is full"
@@ -1829,6 +1909,10 @@
   "clips.viewName": {
     "context": "Screen reader label in the screenshots and GIFs section of the clips library. Keep {name} as written.",
     "text": "View {name}"
+  },
+  "clips.waitingForAnotherCompression": {
+    "context": "Status of a clip card in the clips library while it waits to be compressed.",
+    "text": "Waiting for another compression to finish"
   },
   "clips.widthHeight": {
     "context": "Text in the clips library. Keep {height}, {width} as written.",
@@ -2018,6 +2102,10 @@
   "common.fast": {
     "context": "Heading in a dialog of the clips library. Also used in the Settings window, the Storage page, the tools panel of the clip editor (subtitles, elements, audio).",
     "text": "Fast"
+  },
+  "common.ffmpegWasNotFound": {
+    "context": "Error in the clip editor, sent by the background helper.",
+    "text": "ffmpeg.exe was not found"
   },
   "common.file": {
     "context": "Text in the timeline of the clip editor. Also used in the Settings window.",
@@ -2687,6 +2775,30 @@
     "context": "Tooltip in the look and effects panel of the clip editor.",
     "text": "Add to favorites"
   },
+  "editor.addedClipNotInFolder": {
+    "context": "Error in the clip editor, sent by the background helper.",
+    "text": "A clip added in the editor is no longer in the clip folder."
+  },
+  "editor.addedClipToVideoNotInFolder": {
+    "context": "Error in the clip editor, sent by the background helper.",
+    "text": "A clip added to the video in the editor is no longer in the clip folder."
+  },
+  "editor.addedClipVideoUnreadable": {
+    "context": "Error in the clip editor, sent by the background helper.",
+    "text": "The video of a clip added in the editor could not be read."
+  },
+  "editor.addedMediaNotAvailable": {
+    "context": "Error in the clip editor, sent by the background helper.",
+    "text": "A GIF, sticker or shape added in the editor is no longer available. Add it again."
+  },
+  "editor.addedVideoMoved": {
+    "context": "Error in the clip editor, sent by the background helper.",
+    "text": "A video added in the editor was moved or changed. Add it again."
+  },
+  "editor.addedVideoToVideoMoved": {
+    "context": "Error in the clip editor, sent by the background helper.",
+    "text": "A video added to the video in the editor was moved or changed. Add it again."
+  },
   "editor.addingAudio": {
     "context": "Status line in the tools panel of the clip editor (subtitles, elements, audio).",
     "text": "Adding audio..."
@@ -2762,6 +2874,10 @@
   "editor.audioCouldNotBeAdded": {
     "context": "Text in the timeline of the clip editor.",
     "text": "Audio could not be added"
+  },
+  "editor.audioCouldNotBeImported": {
+    "context": "Error in the clip editor, sent by the background helper.",
+    "text": "That audio could not be imported"
   },
   "editor.audioIsStillLoading": {
     "context": "Short notice that pops up in the clip editor.",
@@ -2951,6 +3067,10 @@
     "context": "Screen reader label in the tools panel of the clip editor (subtitles, elements, audio). Keep {label} as written.",
     "text": "Choose {label}"
   },
+  "editor.clipLengthCouldNotBeRead": {
+    "context": "Error in the clip editor, sent by the background helper.",
+    "text": "The length of the clip could not be read."
+  },
   "editor.closeThePanel": {
     "context": "Screen reader label in the tools panel of the clip editor (subtitles, elements, audio).",
     "text": "Close the panel"
@@ -3114,6 +3234,10 @@
   "editor.editingIsLockedUntilThisIs": {
     "context": "Explanatory text in the clip editor.",
     "text": "Editing is locked until this is done."
+  },
+  "editor.editorSessionChanged": {
+    "context": "Error in the clip editor, sent by the background helper.",
+    "text": "The editor session changed. Reopen the editor."
   },
   "editor.effectBloom": {
     "context": "Name of a video effect in the Effects tab of the clip editor.",
@@ -3595,9 +3719,29 @@
     "context": "Error message in a ReplayKit window, sent by the background helper.",
     "text": "FFmpeg is unavailable."
   },
+  "editor.ffmpegOutputMissing": {
+    "context": "Error in the clip editor, sent by the background helper.",
+    "text": "ffmpeg reported success, but the output file is missing or empty."
+  },
   "editor.ffmpegTrimFailedExitCodeError": {
     "context": "Message the helper shows when an action fails or finishes in a ReplayKit window, sent by the background helper. Keep {code}, {error} as written.",
     "text": "ffmpeg trim failed (exit={code}): {error}"
+  },
+  "editor.fileCannotBeUsed": {
+    "context": "Error in the clip editor, sent by the background helper.",
+    "text": "That file cannot be used"
+  },
+  "editor.fileCouldNotBeOpened": {
+    "context": "Error in the clip editor, sent by the background helper.",
+    "text": "That file could not be opened"
+  },
+  "editor.fileLargerThan50Mb": {
+    "context": "Error in the clip editor, sent by the background helper.",
+    "text": "That file is larger than 50 MB"
+  },
+  "editor.fileWasNotFound": {
+    "context": "Error in the clip editor, sent by the background helper.",
+    "text": "That file was not found"
   },
   "editor.fill": {
     "context": "Label in the subtitles tool of the clip editor.",
@@ -4227,6 +4371,10 @@
     "context": "Text in the look and effects panel of the clip editor.",
     "text": "No filters match that."
   },
+  "editor.noFrameCouldBeRead": {
+    "context": "Error in the clip editor, sent by the background helper.",
+    "text": "No frame could be read from the clip."
+  },
   "editor.noPresetsYetNameKindBelow": {
     "context": "Text in the look and effects panel of the clip editor. Keep {kind} as written.",
     "text": "No presets yet. Name {kind} below and save it to use it on any clip."
@@ -4258,6 +4406,14 @@
   "editor.oneMightBeMisheardItIs": {
     "context": "Text in the tools panel of the clip editor (subtitles, elements, audio).",
     "text": "One might be misheard. It is marked in orange; select it and open Check on the right."
+  },
+  "editor.onlyGifPngJpeg": {
+    "context": "Error in the clip editor, sent by the background helper.",
+    "text": "Only GIF, PNG and JPEG files can be added"
+  },
+  "editor.onlyMp4MovMkvWebm": {
+    "context": "Error in the clip editor, sent by the background helper.",
+    "text": "Only MP4, MOV, MKV and WebM videos can be added"
   },
   "editor.options": {
     "context": "Heading in the clip editor.",
@@ -4690,6 +4846,26 @@
   "editor.speechBubble": {
     "context": "Text in the tools panel of the clip editor (subtitles, elements, audio).",
     "text": "Speech bubble"
+  },
+  "editor.speechEngineFailed": {
+    "context": "Error in the clip editor, sent by the background helper. Keep {code} as written.",
+    "text": "The speech engine failed (exit {code})."
+  },
+  "editor.speechModelCouldNotConnect": {
+    "context": "Error in the clip editor, sent by the background helper.",
+    "text": "The speech-model download could not connect to the download server over HTTPS."
+  },
+  "editor.speechModelNoSecureConnection": {
+    "context": "Error in the clip editor, sent by the background helper.",
+    "text": "The speech-model download could not establish a secure HTTPS connection."
+  },
+  "editor.speechModelServerHttp": {
+    "context": "Error in the clip editor, sent by the background helper. Keep {status} as written; it is an HTTP status code.",
+    "text": "The speech-model download server returned HTTP {status}."
+  },
+  "editor.speechModelTimedOut": {
+    "context": "Error in the clip editor, sent by the background helper.",
+    "text": "The speech-model download timed out before it finished."
   },
   "editor.speechWordTimingsCouldNotBe": {
     "context": "Error message in a ReplayKit window, sent by the background helper.",
@@ -5163,9 +5339,17 @@
     "context": "Screen reader label in the clip editor.",
     "text": "Toggle fullscreen"
   },
+  "editor.tooManyEditorSources": {
+    "context": "Error in the clip editor, sent by the background helper.",
+    "text": "Too many editor sources. Save your edits and reopen the editor."
+  },
   "editor.tooManyExistingTrimOutputs": {
     "context": "Message the helper shows when an action fails or finishes in a ReplayKit window, sent by the background helper.",
     "text": "Too many existing trim outputs"
+  },
+  "editor.tooManySubtitles": {
+    "context": "Error in the clip editor, sent by the background helper.",
+    "text": "Too many subtitles"
   },
   "editor.top": {
     "context": "Label in the subtitles tool of the clip editor.",
@@ -5255,6 +5439,10 @@
     "context": "Label in the timeline of the clip editor.",
     "text": "Unmute"
   },
+  "editor.unreliablePassagesSkipped": {
+    "context": "Error in the clip editor, sent by the background helper.",
+    "text": "Repeated or unreliable passages were skipped. Review the subtitles."
+  },
   "editor.useText": {
     "context": "Text in the look and effects panel of the clip editor.",
     "text": "Use text"
@@ -5271,6 +5459,14 @@
     "context": "Text in a ReplayKit window, sent by the background helper. Also used in the timeline of the clip editor, the tools panel of the clip editor (subtitles, elements, audio).",
     "text": "Video"
   },
+  "editor.videoCouldNotBeRead": {
+    "context": "Error in the clip editor, sent by the background helper.",
+    "text": "That video could not be read"
+  },
+  "editor.videoEditCouldNotBeRead": {
+    "context": "Error in the clip editor, sent by the background helper.",
+    "text": "The video edit could not be read."
+  },
   "editor.videoGame": {
     "context": "Text in the tools panel of the clip editor (subtitles, elements, audio).",
     "text": "Video game"
@@ -5282,6 +5478,10 @@
   "editor.videoSpeed": {
     "context": "Short notice that pops up in the timeline of the clip editor.",
     "text": "Video speed"
+  },
+  "editor.videoSpeedOutOfRange": {
+    "context": "Error in the clip editor, sent by the background helper.",
+    "text": "The video speed is out of range."
   },
   "editor.videoSpeedX": {
     "context": "Text in the timeline of the clip editor. Keep {speed} as written.",
@@ -5735,6 +5935,34 @@
     "context": "Name of the Home key on the keyboard, as printed on the key, shown in hotkey fields.",
     "text": "Home"
   },
+  "lua.hotkeyUploadLatestClip": {
+    "context": "Name of a hotkey in the OBS Settings > Hotkeys list.",
+    "text": "Upload Latest Clip to Streamable"
+  },
+  "lua.scriptAbout": {
+    "context": "Description of the ReplayKit script in the OBS Tools > Scripts window.",
+    "text": "Single OBS-facing script for the ReplayKit setup. It starts clipping capture, keeps OBS monitoring off, switches capture sources for fullscreen games, opens and parks the Discord projector, plays the clip-saved sound, handles OBS elevation, syncs recording hotkeys, and launches the ReplayKit helper."
+  },
+  "lua.scriptLayout": {
+    "context": "Description of the ReplayKit script in the OBS Tools > Scripts window.",
+    "text": "The implementation stays split into internal feature files so the OBS Scripts panel stays clean without turning the codebase into one giant file."
+  },
+  "lua.toolsOpenClipFolder": {
+    "context": "Item in the OBS Tools menu.",
+    "text": "ReplayKit: Open Clip Folder"
+  },
+  "lua.toolsOpenClips": {
+    "context": "Item in the OBS Tools menu.",
+    "text": "ReplayKit: Open Clips"
+  },
+  "lua.toolsSaveClip": {
+    "context": "Item in the OBS Tools menu.",
+    "text": "ReplayKit: Save Clip"
+  },
+  "lua.toolsUploadLastClip": {
+    "context": "Item in the OBS Tools menu.",
+    "text": "ReplayKit: Upload Last Clip"
+  },
   "notifications.couldNotLoadNotifications": {
     "context": "Explanatory text in the notifications panel.",
     "text": "Could not load notifications."
@@ -5990,6 +6218,10 @@
   "settings.addGame": {
     "context": "Hover title in Settings > Screenshare > Discord Screenshare.",
     "text": "Add game"
+  },
+  "settings.adminPromptDeclined": {
+    "context": "Warning shown after settings are applied in a ReplayKit window, sent by the background helper.",
+    "text": "The administrator prompt was declined."
   },
   "settings.advanced": {
     "context": "Name of a tab in the sidebar in the Settings window.",
@@ -6359,6 +6591,10 @@
     "context": "Line under an option in a dropdown of the Settings window, sent by the background helper.",
     "text": "Smaller files, but HEVC / H.265 clips may not play for some people, on some phones, browsers and apps."
   },
+  "settings.codecNotSupported": {
+    "context": "Warning shown after settings are applied in a ReplayKit window, sent by the background helper. Keep {codec} and {encoder} as written; they are codec and encoder names.",
+    "text": "The requested codec '{codec}' is not supported by the detected GPU, so ReplayKit selected {encoder}."
+  },
   "settings.colorAdd": {
     "context": "Text in Settings > Overlay. Also used in the Settings window.",
     "text": "Color Add"
@@ -6422,6 +6658,10 @@
   "settings.couldNotAutoSaveTheCustom": {
     "context": "Status line in the Settings window. Keep {error} as written.",
     "text": "Could not auto-save the custom theme: {error}"
+  },
+  "settings.couldNotCaptureScreenForPicker": {
+    "context": "Message the helper shows when an action fails or finishes in a ReplayKit window, sent by the background helper.",
+    "text": "Could not capture the screen for the color picker."
   },
   "settings.couldNotChangeBongoCatVisibility": {
     "context": "Warning shown after settings are applied in a ReplayKit window, sent by the background helper. Keep {error} as written.",
@@ -6610,6 +6850,10 @@
   "settings.couldNotRepairDesktopAudioMonitoring": {
     "context": "Warning shown after settings are applied in a ReplayKit window, sent by the background helper. Keep {error} as written.",
     "text": "Could not repair Desktop Audio monitoring state: {error}"
+  },
+  "settings.couldNotReserveEscKey": {
+    "context": "Message the helper shows when an action fails or finishes in a ReplayKit window, sent by the background helper.",
+    "text": "Could not reserve the Esc key for the color picker. Another program may be using it."
   },
   "settings.couldNotResizeNameError": {
     "context": "Warning shown after settings are applied in a ReplayKit window, sent by the background helper. Keep {error}, {name} as written.",
@@ -6907,6 +7151,10 @@
     "context": "Text in the Settings window.",
     "text": "Discord screenshare support is not available."
   },
+  "settings.displayCaptureNotUpdatedError": {
+    "context": "Warning shown after settings are applied in a ReplayKit window, sent by the background helper. Keep {error} as written; it is the reason, often in English.",
+    "text": "The display was saved, but Display Capture could not be updated: {error}"
+  },
   "settings.displayFollowsPrimary": {
     "context": "Line under an option in a dropdown of the Settings window, sent by the background helper.",
     "text": "Follows the display Windows calls primary."
@@ -6990,6 +7238,10 @@
   "settings.enableSharePreviewBeforeShowingThe": {
     "context": "Text in the Settings window.",
     "text": "Enable Share Preview before showing the projector."
+  },
+  "settings.encoderDidNotLoad": {
+    "context": "Warning shown after settings are applied in a ReplayKit window, sent by the background helper. Keep {encoder} and {fallback} as written; they are encoder names.",
+    "text": "{encoder} did not load in OBS (usually an outdated graphics driver), so ReplayKit records with {fallback} until it does."
   },
   "settings.encodingOnTheProcessorCanLower": {
     "context": "Text in a ReplayKit window, sent by the background helper.",
@@ -7182,6 +7434,10 @@
   "settings.hidePopupsFromScreenshotsAndScreen": {
     "context": "Screen reader label in Settings > Notifications > Popups. Also used in the Settings window.",
     "text": "Hide popups from screenshots and screen recordings"
+  },
+  "settings.hotkeysNotRestoredError": {
+    "context": "Warning shown after settings are applied in a ReplayKit window, sent by the background helper. Keep {error} as written; it is the reason, often in English.",
+    "text": "The OBS hotkeys could not be restored: {error}"
   },
   "settings.howFarTheLeftAndRight": {
     "context": "Description under a setting in Settings > Video Editor > Playback.",
@@ -7487,6 +7743,34 @@
     "context": "Text in Settings > Advanced > OBS menu.",
     "text": "Menu bar"
   },
+  "settings.micAccessBlocked": {
+    "context": "Error of the Mic Test in Settings > Audio and the first-run setup wizard, sent by the background helper.",
+    "text": "Windows is blocking microphone access for desktop apps (Settings › Privacy › Microphone)."
+  },
+  "settings.micDeviceError": {
+    "context": "Error of the Mic Test in Settings > Audio and the first-run setup wizard, sent by the background helper. Keep {code} as written; it is a Windows error code.",
+    "text": "The audio device reported error {code}."
+  },
+  "settings.micDeviceExclusive": {
+    "context": "Error of the Mic Test in Settings > Audio and the first-run setup wizard, sent by the background helper.",
+    "text": "Another app is using this audio device exclusively."
+  },
+  "settings.micDeviceFormat": {
+    "context": "Error of the Mic Test in Settings > Audio and the first-run setup wizard, sent by the background helper.",
+    "text": "This audio device does not support the test format."
+  },
+  "settings.micDeviceNotFound": {
+    "context": "Error of the Mic Test in Settings > Audio and the first-run setup wizard, sent by the background helper.",
+    "text": "The audio device was not found."
+  },
+  "settings.micDeviceUnplugged": {
+    "context": "Error of the Mic Test in Settings > Audio and the first-run setup wizard, sent by the background helper.",
+    "text": "The audio device was unplugged or changed."
+  },
+  "settings.micDidNotStartInTime": {
+    "context": "Error of the Mic Test in Settings > Audio and the first-run setup wizard, sent by the background helper.",
+    "text": "The microphone did not start in time."
+  },
   "settings.micNotConnected": {
     "context": "Note beside a microphone in the device list that is saved in the settings but not plugged in now. Lowercase, it follows the device name.",
     "text": "not connected"
@@ -7498,6 +7782,10 @@
   "settings.micTestStarting": {
     "context": "Label of the Mic Test button while the microphone test is starting, in Settings > Audio and the first-run setup wizard.",
     "text": "Starting..."
+  },
+  "settings.micTestTimeLimit": {
+    "context": "Error of the Mic Test in Settings > Audio and the first-run setup wizard, sent by the background helper. Keep {minutes} as written.",
+    "text": "The microphone test stopped after {minutes} minutes."
   },
   "settings.microphoneLevel": {
     "context": "Screen reader label in the microphone settings.",
@@ -7799,6 +8087,10 @@
     "context": "Warning shown after settings are applied in a ReplayKit window, sent by the background helper. Keep {error}, {update} as written.",
     "text": "OBS did not accept Video.{update}: {error}"
   },
+  "settings.obsDidNotReportMuteState": {
+    "context": "Warning shown after settings are applied in a ReplayKit window, sent by the background helper.",
+    "text": "OBS did not report the requested mute state after setting it."
+  },
   "settings.obsDidNotReportTheRefreshed": {
     "context": "Message the helper shows when an action fails or finishes in a ReplayKit window, sent by the background helper.",
     "text": "OBS did not report the refreshed monitor and mute state."
@@ -7855,6 +8147,10 @@
     "context": "Warning shown after settings are applied in a ReplayKit window, sent by the background helper. Keep {error} as written.",
     "text": "OBS replay buffer settings were saved, but live apply failed: {error}"
   },
+  "settings.obsReportedValueInstead": {
+    "context": "Warning shown after settings are applied in a ReplayKit window, sent by the background helper. Keep {actual} and {wanted} as written; they are OBS values.",
+    "text": "OBS reported '{actual}' instead of '{wanted}'."
+  },
   "settings.obsSceneCollectionFileWasNot": {
     "context": "Message the helper shows when an action fails or finishes in a ReplayKit window, sent by the background helper.",
     "text": "OBS scene collection file was not found."
@@ -7878,6 +8174,10 @@
   "settings.obsStartsInTheSystemTray": {
     "context": "Description under a setting in Settings > Windows OS > Startup.",
     "text": "OBS starts in the system tray instead of opening its window."
+  },
+  "settings.obsStillReportsMonitoringDevice": {
+    "context": "Warning shown after settings are applied in a ReplayKit window, sent by the background helper. Keep {name} and {id} as written; they identify an audio device.",
+    "text": "OBS still reports the monitoring device '{name}' ({id})."
   },
   "settings.obsStudioItselfWillAlsoBe": {
     "context": "Text in Settings > Appearance > Interface.",
@@ -7963,6 +8263,38 @@
     "context": "Explanatory text in Settings > Output > Recording.",
     "text": "Output height in pixels. Width follows the canvas aspect ratio."
   },
+  "settings.outputReadStateFailed": {
+    "context": "Warning shown after settings are applied in a ReplayKit window, sent by the background helper. Keep {output} and {error} as written; {output} is the name of the output.",
+    "text": "Could not read the state of an OBS output ({output}): {error}"
+  },
+  "settings.outputRecording": {
+    "context": "Name of an OBS output inside a settings warning, shown in parentheses.",
+    "text": "Recording"
+  },
+  "settings.outputReplayBuffer": {
+    "context": "Name of an OBS output inside a settings warning, shown in parentheses.",
+    "text": "Replay buffer"
+  },
+  "settings.outputRestartFailed": {
+    "context": "Warning shown after settings are applied in a ReplayKit window, sent by the background helper. Keep {output} and {error} as written; {output} is the name of the output.",
+    "text": "Could not restart an OBS output ({output}) after applying the settings: {error}"
+  },
+  "settings.outputStartTimedOut": {
+    "context": "Warning shown after settings are applied in a ReplayKit window, sent by the background helper. Keep {output} as written; it is the name of the output.",
+    "text": "Timed out waiting for an OBS output ({output}) to start."
+  },
+  "settings.outputStopFailed": {
+    "context": "Warning shown after settings are applied in a ReplayKit window, sent by the background helper. Keep {output} and {error} as written; {output} is the name of the output.",
+    "text": "Could not stop an OBS output ({output}) before applying the settings: {error}"
+  },
+  "settings.outputStopTimedOut": {
+    "context": "Warning shown after settings are applied in a ReplayKit window, sent by the background helper. Keep {output} as written; it is the name of the output.",
+    "text": "Timed out waiting for an OBS output ({output}) to stop."
+  },
+  "settings.outputVirtualCamera": {
+    "context": "Name of an OBS output inside a settings warning, shown in parentheses.",
+    "text": "Virtual camera"
+  },
   "settings.overlayApplyFailedError": {
     "context": "Status line in the Settings window. Keep {error} as written.",
     "text": "Overlay apply failed: {error}"
@@ -7982,6 +8314,14 @@
   "settings.overlayColorMultiplyHex": {
     "context": "Screen reader label in Settings > Overlay. Also used in the Settings window.",
     "text": "Overlay color multiply hex"
+  },
+  "settings.overlayFlipPositionFailedError": {
+    "context": "Warning shown after settings are applied in a ReplayKit window, sent by the background helper. Keep {name} and {error} as written; {name} is the name of an OBS source.",
+    "text": "The overlay flip was saved, but the current position of {name} could not be read: {error}"
+  },
+  "settings.overlayFlipSceneLookupFailedError": {
+    "context": "Warning shown after settings are applied in a ReplayKit window, sent by the background helper. Keep {error} as written; it is the reason, often in English.",
+    "text": "The overlay flip was saved, but the OBS scene lookup failed: {error}"
   },
   "settings.overlayHueShift": {
     "context": "Screen reader label in Settings > Overlay. Also used in the Settings window.",
@@ -8007,6 +8347,14 @@
     "context": "Screen reader label in Settings > Overlay. Also used in the Settings window.",
     "text": "Overlay rotation slider"
   },
+  "settings.overlaySceneItemsFailedError": {
+    "context": "Warning shown after settings are applied in a ReplayKit window, sent by the background helper. Keep {error} as written; it is the reason, often in English.",
+    "text": "The overlay setting was saved, but the OBS scene items could not be read: {error}"
+  },
+  "settings.overlaySceneLookupFailedError": {
+    "context": "Warning shown after settings are applied in a ReplayKit window, sent by the background helper. Keep {error} as written; it is the reason, often in English.",
+    "text": "The overlay setting was saved, but the OBS scene lookup failed: {error}"
+  },
   "settings.overlaySettingWasSavedButThe": {
     "context": "Warning shown after settings are applied in a ReplayKit window, sent by the background helper. Keep {error} as written.",
     "text": "Overlay setting was saved, but the OBS scene file could not be prepared for restart: {error}"
@@ -8014,6 +8362,14 @@
   "settings.overlaySize": {
     "context": "Screen reader label in Settings > Overlay. Also used in the Settings window.",
     "text": "Overlay size"
+  },
+  "settings.overlaySizeSceneItemsFailedError": {
+    "context": "Warning shown after settings are applied in a ReplayKit window, sent by the background helper. Keep {error} as written; it is the reason, often in English.",
+    "text": "The overlay size was saved, but the OBS scene items could not be read: {error}"
+  },
+  "settings.overlaySizeSceneLookupFailedError": {
+    "context": "Warning shown after settings are applied in a ReplayKit window, sent by the background helper. Keep {error} as written; it is the reason, often in English.",
+    "text": "The overlay size was saved, but the OBS scene lookup failed: {error}"
   },
   "settings.overlaySizeSlider": {
     "context": "Screen reader label in Settings > Overlay. Also used in the Settings window.",
@@ -8095,9 +8451,21 @@
     "context": "Heading in Settings > Notifications.",
     "text": "Popups"
   },
+  "settings.powercfgCouldNotStart": {
+    "context": "Warning shown after settings are applied in a ReplayKit window, sent by the background helper.",
+    "text": "powercfg could not start."
+  },
+  "settings.powercfgDidNotFinish": {
+    "context": "Warning shown after settings are applied in a ReplayKit window, sent by the background helper.",
+    "text": "powercfg did not finish."
+  },
   "settings.powercfgExitedCode": {
     "context": "Message the helper shows when an action fails or finishes in a ReplayKit window, sent by the background helper. Keep {code} as written.",
     "text": "powercfg exited {code}."
+  },
+  "settings.powercfgTimedOut": {
+    "context": "Warning shown after settings are applied in a ReplayKit window, sent by the background helper.",
+    "text": "powercfg timed out."
   },
   "settings.presetBalancedBlurb": {
     "context": "Line under an option in a dropdown of the Settings window, sent by the background helper.",
@@ -8379,9 +8747,17 @@
     "context": "Text in Settings > Appearance > Interface.",
     "text": "Save them before you leave Settings, or leave without saving and lose them."
   },
+  "settings.savedGameWindow": {
+    "context": "Name of a game window in a dropdown in Settings when only its saved selection is known, sent by the background helper.",
+    "text": "Saved game window"
+  },
   "settings.savedSelection": {
     "context": "Line under an option in a dropdown of the Settings window, sent by the background helper.",
     "text": "Saved selection"
+  },
+  "settings.savedThemeNoLongerExists": {
+    "context": "Message the helper shows when an action fails or finishes in a ReplayKit window, sent by the background helper.",
+    "text": "That saved theme no longer exists."
   },
   "settings.savesPcAudioDiscordAndYour": {
     "context": "Description under a setting in Settings > Audio > Recording Audio.",
@@ -8415,6 +8791,14 @@
     "context": "Name of a tab in the sidebar in the Settings window.",
     "text": "Screenshare"
   },
+  "settings.screenshareSceneItemsFailedError": {
+    "context": "Warning shown after settings are applied in a ReplayKit window, sent by the background helper. Keep {error} as written; it is the reason, often in English.",
+    "text": "Screenshare capture was saved, but the OBS scene items could not be read: {error}"
+  },
+  "settings.screenshareSceneLookupFailedError": {
+    "context": "Warning shown after settings are applied in a ReplayKit window, sent by the background helper. Keep {error} as written; it is the reason, often in English.",
+    "text": "Screenshare capture was saved, but the OBS scene lookup failed: {error}"
+  },
   "settings.screenshotHotkey": {
     "context": "Screen reader label of a hotkey field in Settings > Hotkeys and the first-run setup wizard.",
     "text": "Take Screenshot hotkey"
@@ -8434,6 +8818,10 @@
   "settings.settingsChanged": {
     "context": "Status line in the Settings window.",
     "text": "Settings changed"
+  },
+  "settings.settingsFileInvalidError": {
+    "context": "Message the helper shows when an action fails or finishes in a ReplayKit window, sent by the background helper. Keep {error} as written; it is the reason, often in English.",
+    "text": "The ReplayKit settings file is invalid: {error}"
   },
   "settings.settingsFileIsTooLarge": {
     "context": "Error message in a ReplayKit window, sent by the background helper.",
@@ -8458,6 +8846,34 @@
   "settings.setupFile": {
     "context": "Name of a setting in Settings > Advanced > Uninstall.",
     "text": "Setup file"
+  },
+  "settings.setupFileAlreadyInPlace": {
+    "context": "Error in Settings when the setup file for Install and Uninstall is repaired, sent by the background helper.",
+    "text": "The setup file is already in place."
+  },
+  "settings.setupFileDownloadFailedError": {
+    "context": "Error in Settings when the setup file for Install and Uninstall is repaired, sent by the background helper. Keep {error} as written; it is the reason, often in English.",
+    "text": "The ReplayKit setup file could not be downloaded again: {error}"
+  },
+  "settings.setupFileGithubUnreachable": {
+    "context": "Error in Settings when the setup file for Install and Uninstall is repaired, sent by the background helper. Keep {error} as written; it is the reason, often in English.",
+    "text": "The ReplayKit setup file could not be downloaded again: GitHub could not be reached ({error}). Check the connection and try again, or run the latest OBSReplayKit.exe from GitHub once."
+  },
+  "settings.setupFileInUse": {
+    "context": "Error in Settings when the setup file for Install and Uninstall is repaired, sent by the background helper.",
+    "text": "The setup file is in use. Close the ReplayKit setup or uninstall window and try again."
+  },
+  "settings.setupFileIncomplete": {
+    "context": "Error in Settings when the setup file for Install and Uninstall is repaired, sent by the background helper. Keep {size} as written; it is a size in MB.",
+    "text": "The ReplayKit setup file is incomplete ({size} MB)."
+  },
+  "settings.setupFileMismatch": {
+    "context": "Error in Settings when the setup file for Install and Uninstall is repaired, sent by the background helper.",
+    "text": "The ReplayKit setup file does not match the copy that was cached, so it is not run."
+  },
+  "settings.setupFileStillNotUsable": {
+    "context": "Error in Settings when the setup file for Install and Uninstall is repaired, sent by the background helper.",
+    "text": "The setup file is still not usable after downloading it again."
   },
   "settings.sharePreviewAudio": {
     "context": "Heading in Settings > Screenshare.",
@@ -8563,6 +8979,10 @@
     "context": "Explanatory text in Settings > Storage > Storage.",
     "text": "Size in GB."
   },
+  "settings.sleepNotAppliedError": {
+    "context": "Warning shown after settings are applied in a ReplayKit window, sent by the background helper. Keep {error} as written; it is the reason, often in English.",
+    "text": "The Windows sleep setting was saved, but it was not applied: {error}"
+  },
   "settings.smallerCanTakeMuchLongerWith": {
     "context": "Text in Settings > Storage > Storage.",
     "text": "Smaller can take much longer with large clips or libraries and uses more CPU while it runs."
@@ -8622,6 +9042,10 @@
   "settings.startup": {
     "context": "Heading in Settings > Windows OS.",
     "text": "Startup"
+  },
+  "settings.startupRejectedError": {
+    "context": "Warning shown after settings are applied in a ReplayKit window, sent by the background helper. Keep {error} as written; it is the reason, often in English.",
+    "text": "Windows startup was saved, but Windows rejected the change: {error}"
   },
   "settings.stay": {
     "context": "Button label in Settings > Appearance > Interface.",
@@ -8766,6 +9190,10 @@
   "settings.theme": {
     "context": "Heading in Settings > Appearance. Also used in the Settings window.",
     "text": "Theme"
+  },
+  "settings.themeLight": {
+    "context": "Name of the light color theme in Settings > Appearance, sent by the background helper.",
+    "text": "Light"
   },
   "settings.thisClosesObsAndInstallsThe": {
     "context": "Text in the Settings window.",
@@ -9315,6 +9743,14 @@
     "context": "Text in the installer and uninstaller. Keep {message}, {path} as written.",
     "text": "{message}  (log: {path})"
   },
+  "setup.noProcessHostForObs": {
+    "context": "Reason a step of the installer stopped, shown in the installer window. Keep {version} as written; it is an OBS version.",
+    "text": "No shared process host is bundled for OBS {version}. Install a supported OBS version first."
+  },
+  "setup.obsCouldNotBeInstalledAutomatically": {
+    "context": "Reason a step of the installer stopped, shown in the installer window.",
+    "text": "OBS Studio could not be installed automatically. Install OBS from obsproject.com, then run this installer again."
+  },
   "setup.obsIsStartingBackUp": {
     "context": "Text in the installer window. Also used in the uninstall window.",
     "text": "OBS is starting back up."
@@ -9358,6 +9794,14 @@
   "setup.obsThemePreparationTimedOut": {
     "context": "Error message shown when an installer step fails in the installer and uninstaller.",
     "text": "OBS theme preparation timed out."
+  },
+  "setup.obsVersionNeeded": {
+    "context": "Reason a step of the installer stopped, shown in the installer window. Keep {version} as written; it is an OBS version.",
+    "text": "ReplayKit needs OBS {version} and the installed OBS could not be brought to it. Install OBS {version} from obsproject.com, then run this installer again."
+  },
+  "setup.originalObsFilesRequired": {
+    "context": "Reason a step of the installer stopped, shown in the installer window. Keep {version} as written; it is an OBS version.",
+    "text": "The original OBS {version} files are required before installing the shared process host. Repair OBS Studio, then run ReplayKit setup again."
   },
   "setup.pinObsTrayIcon": {
     "context": "Title or description of an installer step in the installer and uninstaller.",
@@ -9699,6 +10143,10 @@
     "context": "Text in the installer window.",
     "text": "Update keeps your current settings. Re-Install starts over with the default settings, so your Auto Game List, keybinds and everything else set in ReplayKit are cleared."
   },
+  "setup.updateNeedsObsVersion": {
+    "context": "Reason a step of the installer stopped, shown in the installer window. Keep {version} and {obs} as written; they are version numbers.",
+    "text": "ReplayKit {version} needs OBS {obs} and OBS could not be updated to it, so nothing was changed. Install OBS {obs} from obsproject.com, then run the ReplayKit installer."
+  },
   "setup.verifiesTheBongoCatFilesAnd": {
     "context": "Title or description of an installer step in the installer and uninstaller.",
     "text": "Verifies the Bongo Cat files and saved sources."
@@ -9874,6 +10322,10 @@
   "shell.forwardAltRight": {
     "context": "Text in the navigation buttons.",
     "text": "Forward (Alt + Right)"
+  },
+  "shell.hotkeySaveClipDiskBuffer": {
+    "context": "Name of a hotkey in the OBS Settings > Hotkeys list.",
+    "text": "ReplayKit: Save Clip (disk buffer)"
   },
   "shell.ifThisStaysAntivirusMayHave": {
     "context": "Text in the window title of a view.",
@@ -10090,6 +10542,10 @@
     "context": "Message the helper shows when an action fails or finishes in a ReplayKit window, sent by the background helper.",
     "text": "Compressing temp copy and uploading"
   },
+  "storage.compressionCouldNotStart": {
+    "context": "Error on the Storage page, sent by the background helper.",
+    "text": "The compression could not start."
+  },
   "storage.compressionDidNotFinish": {
     "context": "Text in a ReplayKit window, sent by the background helper.",
     "text": "Compression did not finish"
@@ -10210,6 +10666,10 @@
     "context": "Text in the Storage page.",
     "text": "Fast uses your GPU when supported to finish sooner. It continues if you close this window and replaces each clip only when the result is smaller."
   },
+  "storage.ffprobeMissing": {
+    "context": "Error on the Storage page, sent by the background helper.",
+    "text": "ffprobe is missing, so ReplayKit cannot check which clips can be compressed."
+  },
   "storage.freeFree": {
     "context": "Text in the Storage page. Keep {free} as written. Text between ** shows in bold; keep the ** marks around the matching words.",
     "text": "Free: **{free}**"
@@ -10305,6 +10765,10 @@
   "storage.nothingWorthCompressingRightNowYour": {
     "context": "Explanatory text in the Storage page.",
     "text": "Nothing worth compressing right now. Your biggest clips are small already or as compressed as they can get."
+  },
+  "storage.ofSize": {
+    "context": "Second line of the storage card in the OBS window, under the space the clips use. Keep {size} as written; it is the storage limit.",
+    "text": "of {size}"
   },
   "storage.pickAtLeastOneClip": {
     "context": "Message the helper shows when an action fails or finishes in a ReplayKit window, sent by the background helper.",
@@ -10489,6 +10953,10 @@
   "update.anUpdateIsAlreadyBeingApplied": {
     "context": "Message the helper shows when an action fails or finishes in a ReplayKit window, sent by the background helper.",
     "text": "An update is already being applied."
+  },
+  "update.autoUpdatesPaused": {
+    "context": "Message about updates in Settings, sent by the background helper.",
+    "text": "Automatic updates are paused for one hour after a failed update. You can still update manually."
   },
   "update.badVersion": {
     "context": "Message the helper shows when an action fails or finishes in a ReplayKit window, sent by the background helper.",
@@ -10757,6 +11225,10 @@
   "update.updateTempFolderResolvedOutsideTemp": {
     "context": "Error message in a ReplayKit window, sent by the background helper.",
     "text": "Update temp folder resolved outside %TEMP%\\ReplayKit."
+  },
+  "update.updateWindowAlreadyOpen": {
+    "context": "Message about updates in Settings, sent by the background helper.",
+    "text": "An update window is already open."
   },
   "update.updatingReplaykit": {
     "context": "Heading in the update prompt.",

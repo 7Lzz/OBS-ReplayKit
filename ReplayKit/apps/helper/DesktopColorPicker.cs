@@ -138,7 +138,7 @@ namespace ReplayKitHelper
                     try
                     {
                         if (!BitBlt(target, 0, 0, area.Width, area.Height, screen, area.Left, area.Top, SrcCopy | CaptureBlt))
-                            throw new Win32Exception(Marshal.GetLastWin32Error(), "Could not capture the screen for the color picker.");
+                            throw new Win32Exception(Marshal.GetLastWin32Error(), Locales.Message("settings.couldNotCaptureScreenForPicker"));
                     }
                     finally
                     {
@@ -315,7 +315,7 @@ namespace ReplayKitHelper
             {
                 IntPtr window = Handle;
                 if (!RegisterHotKey(window, EscapeHotkeyId, ModNoRepeat, VkEscape))
-                    throw new Win32Exception(Marshal.GetLastWin32Error(), "Could not reserve the Esc key for the color picker. Another program may be using it.");
+                    throw new Win32Exception(Marshal.GetLastWin32Error(), Locales.Message("settings.couldNotReserveEscKey"));
                 _hotkeyWindow = window;
             }
 

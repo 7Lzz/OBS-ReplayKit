@@ -19,6 +19,7 @@
 #include "core/async.hpp"
 #include "core/helper_client.hpp"
 #include "core/json_lite.hpp"
+#include "core/locale.hpp"
 #include "core/state.hpp"
 #include "core/state_files.hpp"
 #include "core/win32.hpp"
@@ -761,7 +762,7 @@ void ClipBufferInit()
 	signal_handler_add(obs_get_signal_handler(), "void replaykit_clip_saved(string path)");
 	proc_handler_add(obs_get_proc_handler(), "void replaykit_clip_start(out bool handled)", ClipStartProc, nullptr);
 	signal_handler_connect(obs_get_signal_handler(), "hotkey_bindings_changed", OnHotkeyBindingsChanged, nullptr);
-	g_saveHotkey = obs_hotkey_register_frontend("ReplayKit.SaveClip", "ReplayKit: Save Clip (disk buffer)", OnSaveHotkey, nullptr);
+	g_saveHotkey = obs_hotkey_register_frontend("ReplayKit.SaveClip", TrMessage("shell.hotkeySaveClipDiskBuffer").toUtf8().constData(), OnSaveHotkey, nullptr);
 	blog(LOG_INFO, "[replaykit] clip buffer mode at startup: %s", ModeName(g_mode));
 }
 

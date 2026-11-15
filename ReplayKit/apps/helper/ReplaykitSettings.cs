@@ -402,7 +402,7 @@ namespace ReplayKitHelper
             var set = ObsWebSocket.InvokeRequest("SetInputSettings", new JObject { ["inputName"] = "Display Capture", ["inputSettings"] = inputSettings, ["overlay"] = true }, 3000);
             if (set.Ok) return new JObject { ["applied"] = new JArray("Display Capture display"), ["warnings"] = new JArray() };
             if (set.Code == 600) return new JObject { ["applied"] = new JArray(), ["warnings"] = new JArray() };
-            return new JObject { ["applied"] = new JArray(), ["warnings"] = new JArray("The display was saved, but Display Capture could not be updated: " + set.Message) };
+            return new JObject { ["applied"] = new JArray(), ["warnings"] = new JArray(Locales.Message("settings.displayCaptureNotUpdatedError", "error", set.Message)) };
         }
 
         internal static JObject NormalizeExtraKeybind(JToken value, string settingName) =>
@@ -922,7 +922,7 @@ namespace ReplayKitHelper
             catch (Exception ex)
             {
                 Log.Write("Read-ReplayKitSettings failed: " + ex.Message);
-                throw new InvalidOperationException("ReplayKit settings file is invalid: " + ex.Message, ex);
+                throw new InvalidOperationException(Locales.Message("settings.settingsFileInvalidError", "error", ex.Message), ex);
             }
         }
 
@@ -1037,9 +1037,9 @@ namespace ReplayKitHelper
 
         public static string GetWindowLabelFromToken(string token)
         {
-            if (string.IsNullOrWhiteSpace(token)) return "Saved game window";
+            if (string.IsNullOrWhiteSpace(token)) return Locales.Message("settings.savedGameWindow");
             var parts = token.Split(new[] { ':' }, 3);
-            if (parts.Length < 3) return "Saved game window";
+            if (parts.Length < 3) return Locales.Message("settings.savedGameWindow");
             string title = ConvertFromObsWindowTokenPart(parts[0]);
             string exe = ConvertFromObsWindowTokenPart(parts[2]);
             return string.IsNullOrWhiteSpace(title) ? "[" + exe + "]" : "[" + exe + "]: " + title;
@@ -1103,19 +1103,25 @@ namespace ReplayKitHelper
             return Math.Max(32, Math.Ceiling(mbPerSecond * replaySeconds));
         }
 
-        internal static JObject StopObsOutputIfActive(string statusRequest, string stopRequest, string label)
+        internal static JObject StopObsOutputIfActive(string statusRequest, string stopRequest)
         {
             var status = ObsWebSocket.InvokeRequest(statusRequest, null, 3000);
-            if (!status.Ok) return new JObject { ["ok"] = true, ["wasActive"] = false, ["warning"] = "Could not read " + label + " state: " + status.Message };
+            if (!status.Ok) return new JObject { ["ok"] = true, ["wasActive"] = false, ["warning"] = Locales.Message("settings.outputReadStateFailed", "output", OutputName(statusRequest), "error", status.Message) };
             if (!(status.Data?["outputActive"]?.Value<bool>() ?? false)) return new JObject { ["ok"] = true, ["wasActive"] = false };
             var stop = ObsWebSocket.InvokeRequest(stopRequest, null, 8000);
-            if (!stop.Ok) return new JObject { ["ok"] = false, ["wasActive"] = true, ["warning"] = "Could not stop " + label + " before applying live settings: " + stop.Message };
-            var wait = WaitObsOutputState(statusRequest, false, label, 8000);
+            if (!stop.Ok) return new JObject { ["ok"] = false, ["wasActive"] = true, ["warning"] = Locales.Message("settings.outputStopFailed", "output", OutputName(statusRequest), "error", stop.Message) };
+            var wait = WaitObsOutputState(statusRequest, false, 8000);
             if (wait["ok"]?.Value<bool>() != true) return new JObject { ["ok"] = false, ["wasActive"] = true, ["warning"] = wait["warning"] };
             return new JObject { ["ok"] = true, ["wasActive"] = true };
         }
 
-        internal static JObject WaitObsOutputState(string statusRequest, bool desiredActive, string label, int timeoutMs)
+        // the name of an obs output as a warning shows it, read from the request that reads, stops or starts it
+        private static string OutputName(string request) =>
+            request.IndexOf("Record", StringComparison.Ordinal) >= 0 ? Locales.Message("settings.outputRecording")
+            : request.IndexOf("VirtualCam", StringComparison.Ordinal) >= 0 ? Locales.Message("settings.outputVirtualCamera")
+            : Locales.Message("settings.outputReplayBuffer");
+
+        internal static JObject WaitObsOutputState(string statusRequest, bool desiredActive, int timeoutMs)
         {
             DateTime deadline = DateTime.UtcNow.AddMilliseconds(Math.Max(1000, timeoutMs));
             do
@@ -1126,23 +1132,23 @@ namespace ReplayKitHelper
                 Thread.Sleep(50);
             } while (DateTime.UtcNow < deadline);
 
-            string want = desiredActive ? "start" : "stop";
-            return new JObject { ["ok"] = false, ["warning"] = "Timed out waiting for " + label + " to " + want + "." };
+            string output = OutputName(statusRequest);
+            return new JObject { ["ok"] = false, ["warning"] = desiredActive ? Locales.Message("settings.outputStartTimedOut", "output", output) : Locales.Message("settings.outputStopTimedOut", "output", output) };
         }
 
-        internal static JObject StartObsOutputIfNeeded(JObject state, string startRequest, string label)
+        internal static JObject StartObsOutputIfNeeded(JObject state, string startRequest)
         {
             if (state["wasActive"]?.Value<bool>() != true) return new JObject { ["ok"] = true };
             PipeClient.ReleaseObsOutputsAndWait(1500);
             var start = ObsWebSocket.InvokeRequest(startRequest, null, 8000);
-            if (!start.Ok) return new JObject { ["ok"] = false, ["warning"] = "Could not restart " + label + " after applying live settings: " + start.Message };
+            if (!start.Ok) return new JObject { ["ok"] = false, ["warning"] = Locales.Message("settings.outputRestartFailed", "output", OutputName(startRequest), "error", start.Message) };
             string statusRequest = startRequest == "StartRecord" ? "GetRecordStatus"
                 : startRequest == "StartReplayBuffer" ? "GetReplayBufferStatus"
                 : startRequest == "StartVirtualCam" ? "GetVirtualCamStatus"
                 : "";
             if (statusRequest != "")
             {
-                var wait = WaitObsOutputState(statusRequest, true, label, 8000);
+                var wait = WaitObsOutputState(statusRequest, true, 8000);
                 if (wait["ok"]?.Value<bool>() != true) return new JObject { ["ok"] = false, ["warning"] = wait["warning"] };
             }
             return new JObject { ["ok"] = true };

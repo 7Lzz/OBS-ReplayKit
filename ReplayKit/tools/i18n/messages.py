@@ -15,9 +15,9 @@ PLURALS = {
     "fr": {"one", "many", "other"}, "ja": {"other"}, "pt": {"one", "many", "other"},
     "ru": {"one", "few", "many", "other"}, "zh": {"other"},
 }
-CALL = re.compile(r'\b(RK_MH?|(?:Locales|SetupLocale)\.Message|SetupLocale\.Pair|TrMessage)\(\s*"([^"]+)"')
+CALL = re.compile(r'\b(RK_MH?|(?:Locales|SetupLocale)\.Message|SetupLocale\.Pair|TrMessage|replaykit_message)\(\s*"([^"]+)"')
 # an id the checker cannot read could name a message that does not exist, which would show the raw id as text
-COMPUTED_CALL = re.compile(r'(?<!QString )\b(?:RK_MH?|(?:Locales|SetupLocale)\.Message|SetupLocale\.Pair|TrMessage)\(\s*(?!")')
+COMPUTED_CALL = re.compile(r'(?<!QString )(?<!function )\b(?:RK_MH?|(?:Locales|SetupLocale)\.Message|SetupLocale\.Pair|TrMessage|replaykit_message)\(\s*(?!")')
 ATTRIBUTE = re.compile(r'\bdata-i18n(?:-title|-placeholder|-aria-label|-data-tooltip|-alt)?\s*=\s*(["\'])([^"\']+)\1')
 # the english-keyed lookups the messages replaced; one that comes back would show english text again
 LEGACY_CALL = re.compile(r'\b(?:RK_T|(?:Locales|SetupLocale)\.T|Tr)\(')
@@ -77,6 +77,7 @@ def references(catalog):
     paths = sorted((ROOT / "ui").glob("*.html")) + sorted((ROOT / "ui").glob("*.js"))
     paths += sorted((ROOT / "apps").glob("*/*.cs")) + sorted((ROOT / "apps/setup").glob("*.html"))
     paths += sorted((ROOT / "plugins/replaykit/src").rglob("*.cpp")) + sorted((ROOT / "plugins/replaykit/src").rglob("*.hpp"))
+    paths += sorted((ROOT / "lua").rglob("*.lua"))
     used = set()
     for path in paths:
         if path.name == "helper-endpoint.js":

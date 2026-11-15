@@ -76,9 +76,9 @@ namespace ReplayKitHelper
             var caps = Compression.GetToolPaths();
             string ffmpeg = caps["ffmpeg"]?.Value<string>();
             string ffprobe = caps["ffprobe"]?.Value<string>();
-            if (string.IsNullOrWhiteSpace(ffmpeg) || !File.Exists(ffmpeg)) throw new InvalidOperationException("ffmpeg.exe was not found");
+            if (string.IsNullOrWhiteSpace(ffmpeg) || !File.Exists(ffmpeg)) throw new InvalidOperationException(Locales.Message("common.ffmpegWasNotFound"));
             var meta = Compression.GetVideoMetadata(ffprobe, ffmpeg, source);
-            if (meta == null || !meta.Ok || !(meta.Duration > 0)) throw new InvalidOperationException("the length of the clip could not be read");
+            if (meta == null || !meta.Ok || !(meta.Duration > 0)) throw new InvalidOperationException(Locales.Message("editor.clipLengthCouldNotBeRead"));
             ClipCache.Prune(dir);
             if (Directory.Exists(dir)) Directory.Delete(dir, true);
             Directory.CreateDirectory(dir);
@@ -101,7 +101,7 @@ namespace ReplayKitHelper
                 try { made[i] = Compression.InvokeNativeCapture(ffmpeg, argv, CancellationToken.None, 60 * 1000, gentle).ExitCode == 0 && File.Exists(frame); }
                 catch (TimeoutException) { made[i] = false; }
             });
-            if (!made.Any(m => m)) throw new InvalidOperationException("no frame could be read from the clip");
+            if (!made.Any(m => m)) throw new InvalidOperationException(Locales.Message("editor.noFrameCouldBeRead"));
             // a frame that could not be read is the one next to it, so the strip never has a hole
             for (int i = 0; i < Frames; i++)
             {

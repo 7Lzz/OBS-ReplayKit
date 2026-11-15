@@ -168,7 +168,7 @@ namespace ReplayKitHelper
             session._thread.Start();
             bool ready = session._ready.WaitOne(4000);
             if (ready && session._startError == null) { error = null; return session; }
-            error = session._startError ?? "The microphone did not start in time.";
+            error = session._startError ?? Locales.Message("settings.micDidNotStartInTime");
             session._stop = true;
             return null;
         }
@@ -603,14 +603,16 @@ namespace ReplayKitHelper
             string reason;
             switch (unchecked((uint)hresult))
             {
-                case 0x80070005: reason = "Windows is blocking microphone access for desktop apps (Settings > Privacy > Microphone)."; break;
-                case 0x8889000A: reason = "another app is using this device exclusively."; break;
-                case 0x88890004: reason = "the audio device was unplugged or changed."; break;
-                case 0x88890008: reason = "this device does not support the test format."; break;
-                case 0x80070490: reason = "the device was not found."; break;
-                default: reason = "error 0x" + ((uint)hresult).ToString("X8") + "."; break;
+                case 0x80070005: reason = Locales.Message("settings.micAccessBlocked"); break;
+                case 0x8889000A: reason = Locales.Message("settings.micDeviceExclusive"); break;
+                case 0x88890004: reason = Locales.Message("settings.micDeviceUnplugged"); break;
+                case 0x88890008: reason = Locales.Message("settings.micDeviceFormat"); break;
+                case 0x80070490: reason = Locales.Message("settings.micDeviceNotFound"); break;
+                default: reason = Locales.Message("settings.micDeviceError", "code", "0x" + ((uint)hresult).ToString("X8")); break;
             }
-            throw new MicAudioException("Could not " + action + ": " + reason);
+            // the step that failed only helps the log, the reason is what the page shows
+            Log.Write("Mic audio: could not " + action + ", 0x" + ((uint)hresult).ToString("X8"));
+            throw new MicAudioException(reason);
         }
     }
 }

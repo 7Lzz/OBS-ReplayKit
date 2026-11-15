@@ -73,14 +73,14 @@ namespace ReplayKitHelper
                 var pass2 = new List<string> { "-y", "-hide_banner", "-i", inputPath, "-map", "0:v:0", "-map", "0:a:0?", "-c:v", "libx264", "-preset", "veryfast", "-b:v", videoKbps + "k", "-pass", "2", "-passlogfile", passLog, "-c:a", "aac", "-b:a", audioKbps + "k", "-movflags", "+faststart", tempPath };
                 RunFfmpegPass(ffmpeg, pass2, "compress pass 2", 50, 94, durationSec, requestId);
 
-                if (!File.Exists(tempPath)) throw new InvalidOperationException("ffmpeg did not create a compressed file");
+                if (!File.Exists(tempPath)) throw new InvalidOperationException(Locales.Message("clips.ffmpegProducedNoOutput"));
                 var fi = new FileInfo(tempPath);
                 if (fi.Length <= 0) throw new InvalidOperationException(Locales.Message("storage.compressedFileIsEmpty"));
                 if (capBytes > 0 && fi.Length > capBytes)
                 {
                     long mb = (long)Math.Ceiling(fi.Length / 1024.0 / 1024.0);
                     long capMb = capBytes / 1024 / 1024;
-                    throw new InvalidOperationException("Compressed file is still too big: " + mb + " MB / " + capMb + " MB limit");
+                    throw new InvalidOperationException(Locales.Message("clips.compressedFileStillTooBig", "size", mb, "limit", capMb));
                 }
 
                 Log.Write("Uploading compressed temp copy (" + Math.Round(fi.Length / 1024.0 / 1024.0, 2) + " MB)", "compress", requestId);

@@ -215,6 +215,10 @@
     "source": "c5a8b5ba1b077739",
     "text": "クリックすると新しい圧縮を開始しなくなります。実行中の圧縮は最後まで続きます。"
   },
+  "clips.clipAlreadyBeingSaved": {
+    "source": "cf1a6a119e58a540",
+    "text": "すでにクリップを保存中です。"
+  },
   "clips.clipDatabaseIsBusy": {
     "source": "688043321db26112",
     "text": "クリップデータベースが使用中です。"
@@ -227,6 +231,10 @@
     "source": "2845e8f5619853b5",
     "text": "クリップのフィルタ"
   },
+  "clips.clipHasOperationRunning": {
+    "source": "68b5973567f40a52",
+    "text": "そのクリップはすでに処理を実行中です。"
+  },
   "clips.clipIsTooBigForStreamable": {
     "source": "c608731b1962cd15",
     "text": "クリップが Streamable の上限を超えています"
@@ -234,6 +242,22 @@
   "clips.clipIsTooLongForStreamable": {
     "source": "1c9a94c6557e3962",
     "text": "クリップが Streamable の上限を超えるほど長いです"
+  },
+  "clips.clipOpenCloseBeforeCompressing": {
+    "source": "5e5ebaeaffc9b2e7",
+    "text": "そのクリップはエディターで開いています。圧縮する前にエディターを閉じてください。"
+  },
+  "clips.clipOpenCloseBeforeDeleting": {
+    "source": "e8647db901a54b5f",
+    "text": "そのクリップはエディターで開いています。削除する前にエディターを閉じてください。"
+  },
+  "clips.clipOpenCloseBeforeRenaming": {
+    "source": "ed1294f8c7792e1c",
+    "text": "そのクリップはエディターで開いています。名前を変更する前にエディターを閉じてください。"
+  },
+  "clips.clipProcessingOpenAfter": {
+    "source": "205c2c9e5de1a708",
+    "text": "クリップの処理中か、圧縮の待機中です。終わってから開いてください。"
   },
   "clips.clipStateBodyIsRequired": {
     "source": "c88e1b7657972b38",
@@ -315,6 +339,14 @@
     "source": "edc44823c33436b8",
     "text": "圧縮…"
   },
+  "clips.compressEndedWithoutResult": {
+    "source": "e6c6b4d530338e11",
+    "text": "圧縮は結果を出さずに終了しました。"
+  },
+  "clips.compressFailedError": {
+    "source": "6ae51ecbff197e2f",
+    "text": "圧縮に失敗しました: {error}"
+  },
   "clips.compressSelected": {
     "source": "d102549e77c9439e",
     "text": "選択項目を圧縮"
@@ -322,6 +354,10 @@
   "clips.compressSelectedClips": {
     "source": "5bd3e9651646f13a",
     "text": "選択したクリップを圧縮"
+  },
+  "clips.compressedFileStillTooBig": {
+    "source": "a3ef3cd249c2ddc0",
+    "text": "圧縮したファイルはまだ大きすぎます: {size} MB (上限 {limit} MB)。"
   },
   "clips.compressingFast": {
     "source": "40a9d82c92a84230",
@@ -334,6 +370,10 @@
   "clips.compressingTempCopyForName": {
     "source": "27d12c5f874c1b12",
     "text": "{name} の一時コピーを圧縮しています。"
+  },
+  "clips.compressionStoppedTooManyErrors": {
+    "source": "c52fd8191e65c7c4",
+    "text": "エンコーダーのエラーが多すぎたため、圧縮を停止しました。"
   },
   "clips.confirmDeleteCount": {
     "source": "b321718dc7985dae",
@@ -678,6 +718,30 @@
   "clips.favoritesOnly": {
     "source": "d78924f9af57312b",
     "text": "お気に入りのみ"
+  },
+  "clips.ffmpegFailedExitCode": {
+    "source": "232d1067f3d9489d",
+    "text": "ffmpeg が失敗しました (終了コード {code})。"
+  },
+  "clips.ffmpegMissingClipNotSaved": {
+    "source": "9cdbc7ef35e4d5b0",
+    "text": "ffmpeg が見つからないため、クリップを保存できませんでした。"
+  },
+  "clips.ffmpegNotFoundForUpload": {
+    "source": "c62817c123d9e6ad",
+    "text": "ffmpeg.exe が見つからないため、クリップをアップロード用に準備できませんでした。"
+  },
+  "clips.ffmpegNotFoundInClipFolder": {
+    "source": "38d3315459c003ba",
+    "text": "クリップフォルダーに ffmpeg.exe が見つかりません。"
+  },
+  "clips.ffmpegProducedNoOutput": {
+    "source": "d7f13dcdc0586349",
+    "text": "ffmpeg は出力ファイルを作成しませんでした。"
+  },
+  "clips.fileInUseByAnotherProgram": {
+    "source": "0c398ceeed35adbb",
+    "text": "ファイルは別のプログラムで使用中です。再生しているものを閉じてから、もう一度お試しください。"
   },
   "clips.fileIsSizeMbWhichIs": {
     "source": "01c849979dab59bf",
@@ -1403,6 +1467,14 @@
     "source": "4e0abb13e6f3d472",
     "text": "クリップを選択"
   },
+  "clips.selectedClipOpenInEditor": {
+    "source": "80c9484bef033af6",
+    "text": "選択したクリップがエディターで開いています。エディターを閉じてから、もう一度クリップを確認してください。"
+  },
+  "clips.selectedClipProcessing": {
+    "source": "a36c19854c9c2f01",
+    "text": "選択したクリップを処理中です。終わってから、もう一度クリップを確認してください。"
+  },
   "clips.selectedCount": {
     "source": "08e97b60a4dc6ce0",
     "text": {
@@ -1528,6 +1600,10 @@
   "clips.stopUploadsCount": {
     "source": "844d3d15da772cf7",
     "text": "アップロードを停止 ({count})"
+  },
+  "clips.streamableCheckTimedOut": {
+    "source": "73cbf2a9f94b12d4",
+    "text": "Streamable の状態確認が 30 分でタイムアウトしました。"
   },
   "clips.thatCouldNotBeDone": {
     "source": "6eab7f00f3e45f30",
@@ -1793,6 +1869,10 @@
     "source": "3d7f936ee68aca2f",
     "text": "アップロードに失敗しました: {error}"
   },
+  "clips.uploadFinishedWithoutResult": {
+    "source": "7c5cb1081380a274",
+    "text": "アップロードは Streamable からの結果なしで終了しました。"
+  },
   "clips.uploadQueueIsFull": {
     "source": "c944c59610d2063e",
     "text": "アップロードのキューがいっぱいです"
@@ -1828,6 +1908,10 @@
   "clips.viewName": {
     "source": "f034209072b7c4a0",
     "text": "{name} を表示"
+  },
+  "clips.waitingForAnotherCompression": {
+    "source": "e8d85c2dddf62739",
+    "text": "別の圧縮が終わるのを待っています"
   },
   "clips.widthHeight": {
     "source": "b43d90bd13fd1a68",
@@ -2016,6 +2100,10 @@
   "common.fast": {
     "source": "6217537829ed8983",
     "text": "速い"
+  },
+  "common.ffmpegWasNotFound": {
+    "source": "426ca04201a4f150",
+    "text": "ffmpeg.exe が見つかりません"
   },
   "common.file": {
     "source": "f57a547dfed3b554",
@@ -2685,6 +2773,30 @@
     "source": "01fcab0c292cd329",
     "text": "お気に入りに追加"
   },
+  "editor.addedClipNotInFolder": {
+    "source": "e70be0448e778b56",
+    "text": "エディターで追加したクリップがクリップフォルダーにありません。"
+  },
+  "editor.addedClipToVideoNotInFolder": {
+    "source": "e80fec30be50d301",
+    "text": "エディターで動画に追加したクリップがクリップフォルダーにありません。"
+  },
+  "editor.addedClipVideoUnreadable": {
+    "source": "30259f378ed91580",
+    "text": "エディターで追加したクリップの動画を読み取れませんでした。"
+  },
+  "editor.addedMediaNotAvailable": {
+    "source": "d1c04ccca369d41b",
+    "text": "エディターで追加した GIF、ステッカー、または図形が使えなくなりました。もう一度追加してください。"
+  },
+  "editor.addedVideoMoved": {
+    "source": "d977ff00b963828a",
+    "text": "エディターで追加した動画が移動または変更されました。もう一度追加してください。"
+  },
+  "editor.addedVideoToVideoMoved": {
+    "source": "f61d1f8eca5fa78e",
+    "text": "エディターで動画に追加した動画が移動または変更されました。もう一度追加してください。"
+  },
   "editor.addingAudio": {
     "source": "dbf4db2a5c980fd2",
     "text": "音声を追加中..."
@@ -2760,6 +2872,10 @@
   "editor.audioCouldNotBeAdded": {
     "source": "0e8768f969a56979",
     "text": "音声を追加できませんでした"
+  },
+  "editor.audioCouldNotBeImported": {
+    "source": "24fad77631fa733f",
+    "text": "その音声を読み込めませんでした"
   },
   "editor.audioIsStillLoading": {
     "source": "d22c8458ab9393ec",
@@ -2949,6 +3065,10 @@
     "source": "09c2cb2ea7b1be3c",
     "text": "{label} を選択"
   },
+  "editor.clipLengthCouldNotBeRead": {
+    "source": "6b588bcfb96e7552",
+    "text": "クリップの長さを読み取れませんでした。"
+  },
   "editor.closeThePanel": {
     "source": "1b70f85cf11ab8cc",
     "text": "パネルを閉じる"
@@ -3112,6 +3232,10 @@
   "editor.editingIsLockedUntilThisIs": {
     "source": "ca86410ec9eb5964",
     "text": "完了するまで編集はロックされます。"
+  },
+  "editor.editorSessionChanged": {
+    "source": "e26bf634ca2858b0",
+    "text": "エディターのセッションが変わりました。エディターを開き直してください。"
   },
   "editor.effectBloom": {
     "source": "6e76bbe87ccf50e2",
@@ -3593,9 +3717,29 @@
     "source": "cbd56454e0559997",
     "text": "FFmpeg は利用できません。"
   },
+  "editor.ffmpegOutputMissing": {
+    "source": "52950bb96762c1be",
+    "text": "ffmpeg は成功を報告しましたが、出力ファイルがないか空です。"
+  },
   "editor.ffmpegTrimFailedExitCodeError": {
     "source": "86a78a51bee32398",
     "text": "ffmpeg のトリミングに失敗しました (終了コード={code}): {error}"
+  },
+  "editor.fileCannotBeUsed": {
+    "source": "3a54cc59e87d9698",
+    "text": "そのファイルは使用できません"
+  },
+  "editor.fileCouldNotBeOpened": {
+    "source": "7b845eb1566a0763",
+    "text": "そのファイルを開けませんでした"
+  },
+  "editor.fileLargerThan50Mb": {
+    "source": "06d64110216c6f07",
+    "text": "そのファイルは 50 MB を超えています"
+  },
+  "editor.fileWasNotFound": {
+    "source": "4ff0c22de1eec40d",
+    "text": "そのファイルが見つかりません"
   },
   "editor.fill": {
     "source": "86b5fee1c65415dc",
@@ -4225,6 +4369,10 @@
     "source": "aff9cd9bdbeb670f",
     "text": "一致するフィルタがありません。"
   },
+  "editor.noFrameCouldBeRead": {
+    "source": "e2269f5b04601369",
+    "text": "クリップからフレームを読み取れませんでした。"
+  },
   "editor.noPresetsYetNameKindBelow": {
     "source": "3033a47e1c9a365f",
     "text": "プリセットはまだありません。下で {kind} に名前を付けて保存すると、どのクリップでも使えます。"
@@ -4256,6 +4404,14 @@
   "editor.oneMightBeMisheardItIs": {
     "source": "34dbb53ee44be41a",
     "text": "聞き間違えている可能性のあるものが 1 件あります。オレンジで示されています。選択して、右側の「確認」を開いてください。"
+  },
+  "editor.onlyGifPngJpeg": {
+    "source": "84dfe56eb0aa1664",
+    "text": "追加できるのは GIF、PNG、JPEG ファイルだけです"
+  },
+  "editor.onlyMp4MovMkvWebm": {
+    "source": "d7d54053e12144de",
+    "text": "追加できるのは MP4、MOV、MKV、WebM の動画だけです"
   },
   "editor.options": {
     "source": "0ac75dce3642ff67",
@@ -4688,6 +4844,26 @@
   "editor.speechBubble": {
     "source": "067047b66d89ecbf",
     "text": "吹き出し"
+  },
+  "editor.speechEngineFailed": {
+    "source": "194f0543c2d6312e",
+    "text": "音声エンジンが失敗しました (終了コード {code})。"
+  },
+  "editor.speechModelCouldNotConnect": {
+    "source": "206e65b64a6138e4",
+    "text": "音声モデルのダウンロードで、HTTPS 経由でダウンロードサーバーに接続できませんでした。"
+  },
+  "editor.speechModelNoSecureConnection": {
+    "source": "7477435b5178ef4b",
+    "text": "音声モデルのダウンロードで安全な HTTPS 接続を確立できませんでした。"
+  },
+  "editor.speechModelServerHttp": {
+    "source": "128a25672b2be9c2",
+    "text": "音声モデルのダウンロードサーバーが HTTP {status} を返しました。"
+  },
+  "editor.speechModelTimedOut": {
+    "source": "8d5293358ccdf256",
+    "text": "音声モデルのダウンロードが完了前にタイムアウトしました。"
   },
   "editor.speechWordTimingsCouldNotBe": {
     "source": "242a59cf32299e34",
@@ -5161,9 +5337,17 @@
     "source": "dca6c6c0185e2fea",
     "text": "全画面表示を切り替え"
   },
+  "editor.tooManyEditorSources": {
+    "source": "760a87be29fc35d8",
+    "text": "エディターのソースが多すぎます。編集を保存してからエディターを開き直してください。"
+  },
   "editor.tooManyExistingTrimOutputs": {
     "source": "83f35a6127f1f033",
     "text": "既存のトリム出力が多すぎます"
+  },
+  "editor.tooManySubtitles": {
+    "source": "e4dec3dca173da94",
+    "text": "字幕が多すぎます"
   },
   "editor.top": {
     "source": "27644f0497fd9849",
@@ -5253,6 +5437,10 @@
     "source": "c261db78a6b1f179",
     "text": "ミュート解除"
   },
+  "editor.unreliablePassagesSkipped": {
+    "source": "ca7395b28c3768a5",
+    "text": "繰り返しや信頼性の低い部分は省きました。字幕を確認してください。"
+  },
   "editor.useText": {
     "source": "ec0b8864e32f57e0",
     "text": "テキストを使用"
@@ -5269,6 +5457,14 @@
     "source": "72bcb013ed85a48f",
     "text": "映像"
   },
+  "editor.videoCouldNotBeRead": {
+    "source": "2656936821ec7b34",
+    "text": "その動画を読み取れませんでした"
+  },
+  "editor.videoEditCouldNotBeRead": {
+    "source": "b3a31611c809ce87",
+    "text": "動画の編集内容を読み取れませんでした。"
+  },
   "editor.videoGame": {
     "source": "1b92b6b09cad4377",
     "text": "ビデオゲーム"
@@ -5280,6 +5476,10 @@
   "editor.videoSpeed": {
     "source": "7fb0bbb0d57e488a",
     "text": "動画の速度"
+  },
+  "editor.videoSpeedOutOfRange": {
+    "source": "3dbb7e93bf7a800f",
+    "text": "動画の速度が範囲外です。"
   },
   "editor.videoSpeedX": {
     "source": "b9c1c3bbe815f739",
@@ -5733,6 +5933,34 @@
     "source": "d2187d527809f532",
     "text": "Home"
   },
+  "lua.hotkeyUploadLatestClip": {
+    "source": "df8745d476ae558d",
+    "text": "最新のクリップを Streamable にアップロード"
+  },
+  "lua.scriptAbout": {
+    "source": "207194ba04314859",
+    "text": "OBS から見える ReplayKit の唯一のスクリプトです。クリップ用のキャプチャを開始し、OBS のモニタリングをオフに保ち、全画面ゲーム用にキャプチャソースを切り替え、Discord プロジェクターを開いて配置し、クリップ保存音を鳴らし、OBS の権限を扱い、録画のホットキーを同期し、ReplayKit ヘルパーを起動します。"
+  },
+  "lua.scriptLayout": {
+    "source": "78887b020556073a",
+    "text": "実装は機能ごとの内部ファイルに分かれているため、すべてを 1 つの巨大なファイルにせずに OBS のスクリプト画面をすっきり保てます。"
+  },
+  "lua.toolsOpenClipFolder": {
+    "source": "6e4124d40abd2bef",
+    "text": "ReplayKit: クリップフォルダーを開く"
+  },
+  "lua.toolsOpenClips": {
+    "source": "b3552262df7ed3c5",
+    "text": "ReplayKit: クリップを開く"
+  },
+  "lua.toolsSaveClip": {
+    "source": "ec84d1a2efa45f00",
+    "text": "ReplayKit: クリップを保存"
+  },
+  "lua.toolsUploadLastClip": {
+    "source": "71374792db954b37",
+    "text": "ReplayKit: 最後のクリップをアップロード"
+  },
   "notifications.couldNotLoadNotifications": {
     "source": "e378a1adb499bc84",
     "text": "通知を読み込めませんでした。"
@@ -5988,6 +6216,10 @@
   "settings.addGame": {
     "source": "f0668e12a44dce74",
     "text": "ゲームを追加"
+  },
+  "settings.adminPromptDeclined": {
+    "source": "d3671ed436cd9eb9",
+    "text": "管理者の確認が拒否されました。"
   },
   "settings.advanced": {
     "source": "f571cb2d06ae01ae",
@@ -6357,6 +6589,10 @@
     "source": "44a667adae6a1778",
     "text": "ファイルは小さくなりますが、HEVC / H.265 のクリップは一部の人やスマホ、ブラウザ、アプリで再生できないことがあります。"
   },
+  "settings.codecNotSupported": {
+    "source": "1c96fb4c0979a63e",
+    "text": "要求したコーデック '{codec}' は検出された GPU で対応していないため、ReplayKit は {encoder} を選びました。"
+  },
   "settings.colorAdd": {
     "source": "50b91095eea95aca",
     "text": "加算"
@@ -6420,6 +6656,10 @@
   "settings.couldNotAutoSaveTheCustom": {
     "source": "7083f5c53fba35f8",
     "text": "カスタムテーマを自動保存できませんでした: {error}"
+  },
+  "settings.couldNotCaptureScreenForPicker": {
+    "source": "132983192e266d0a",
+    "text": "カラーピッカー用に画面をキャプチャできませんでした。"
   },
   "settings.couldNotChangeBongoCatVisibility": {
     "source": "d88142e324dafafd",
@@ -6608,6 +6848,10 @@
   "settings.couldNotRepairDesktopAudioMonitoring": {
     "source": "0898f8598755106b",
     "text": "Desktop Audio のモニター状態を修復できませんでした: {error}"
+  },
+  "settings.couldNotReserveEscKey": {
+    "source": "13ab1eabd3e7733d",
+    "text": "カラーピッカー用に Esc キーを確保できませんでした。別のプログラムが使用している可能性があります。"
   },
   "settings.couldNotResizeNameError": {
     "source": "b7342712822c2a08",
@@ -6905,6 +7149,10 @@
     "source": "cf3a919e3af54c8c",
     "text": "Discord 画面共有のサポートは利用できません。"
   },
+  "settings.displayCaptureNotUpdatedError": {
+    "source": "fa241fd1643530ae",
+    "text": "ディスプレイは保存されましたが、画面キャプチャを更新できませんでした: {error}"
+  },
   "settings.displayFollowsPrimary": {
     "source": "b1aa28bedaa84698",
     "text": "Windows がメインとするディスプレイに従います。"
@@ -6988,6 +7236,10 @@
   "settings.enableSharePreviewBeforeShowingThe": {
     "source": "a19ddb144187a6f5",
     "text": "プロジェクターを表示する前に共有プレビューを有効にしてください。"
+  },
+  "settings.encoderDidNotLoad": {
+    "source": "4700fc8a8876b5ed",
+    "text": "{encoder} が OBS で読み込まれませんでした (多くはグラフィックドライバーが古いため)。読み込まれるまで、ReplayKit は {fallback} で録画します。"
   },
   "settings.encodingOnTheProcessorCanLower": {
     "source": "26811614318258bd",
@@ -7180,6 +7432,10 @@
   "settings.hidePopupsFromScreenshotsAndScreen": {
     "source": "543cd3ebd2cbb5ca",
     "text": "スクリーンショットと画面録画からポップアップを隠す"
+  },
+  "settings.hotkeysNotRestoredError": {
+    "source": "0b7c48a831475ace",
+    "text": "OBS のホットキーを復元できませんでした: {error}"
   },
   "settings.howFarTheLeftAndRight": {
     "source": "3641fd9c8ce562dc",
@@ -7485,6 +7741,34 @@
     "source": "9d9f262f0a79333d",
     "text": "メニューバー"
   },
+  "settings.micAccessBlocked": {
+    "source": "f8a998e854d5d772",
+    "text": "Windows がデスクトップアプリのマイクへのアクセスをブロックしています (設定 › プライバシー › マイク)。"
+  },
+  "settings.micDeviceError": {
+    "source": "a870ed172b0e4b84",
+    "text": "オーディオデバイスがエラー {code} を報告しました。"
+  },
+  "settings.micDeviceExclusive": {
+    "source": "5e79d85118ff5acd",
+    "text": "別のアプリがこのオーディオデバイスを占有しています。"
+  },
+  "settings.micDeviceFormat": {
+    "source": "40ed584ffea4d17d",
+    "text": "このオーディオデバイスはテスト形式に対応していません。"
+  },
+  "settings.micDeviceNotFound": {
+    "source": "c843892eb217a4b0",
+    "text": "オーディオデバイスが見つかりません。"
+  },
+  "settings.micDeviceUnplugged": {
+    "source": "31f09a8dece59b06",
+    "text": "オーディオデバイスが取り外されたか、変更されました。"
+  },
+  "settings.micDidNotStartInTime": {
+    "source": "bc1b85eb2e785c9b",
+    "text": "マイクが時間内に開始しませんでした。"
+  },
   "settings.micNotConnected": {
     "source": "70a16104625a4dff",
     "text": "未接続"
@@ -7496,6 +7780,10 @@
   "settings.micTestStarting": {
     "source": "aa8a8e09f840395b",
     "text": "開始しています..."
+  },
+  "settings.micTestTimeLimit": {
+    "source": "73912ae776325822",
+    "text": "マイクテストは {minutes} 分で停止しました。"
   },
   "settings.microphoneLevel": {
     "source": "fba79278f18f924b",
@@ -7797,6 +8085,10 @@
     "source": "e89d672825674649",
     "text": "OBS が Video.{update} を受け付けませんでした: {error}"
   },
+  "settings.obsDidNotReportMuteState": {
+    "source": "d180d9693729c8be",
+    "text": "設定後、OBS は要求したミュート状態を報告しませんでした。"
+  },
   "settings.obsDidNotReportTheRefreshed": {
     "source": "ced6192b88a7016c",
     "text": "OBS から、更新後のモニターとミュートの状態が報告されませんでした。"
@@ -7853,6 +8145,10 @@
     "source": "6703aed64ec554b2",
     "text": "OBS のリプレイバッファの設定は保存されましたが、ライブで適用できませんでした: {error}"
   },
+  "settings.obsReportedValueInstead": {
+    "source": "b706534c9a77e614",
+    "text": "OBS は '{wanted}' ではなく '{actual}' を報告しました。"
+  },
   "settings.obsSceneCollectionFileWasNot": {
     "source": "03fa53c4e3b85e38",
     "text": "OBS のシーンコレクションのファイルが見つかりません。"
@@ -7876,6 +8172,10 @@
   "settings.obsStartsInTheSystemTray": {
     "source": "f20d594c5c35b559",
     "text": "OBS はウィンドウを開かず、システムトレイで起動します。"
+  },
+  "settings.obsStillReportsMonitoringDevice": {
+    "source": "fbf08ec8489ae7d3",
+    "text": "OBS はまだモニタリングデバイス '{name}' ({id}) を報告しています。"
   },
   "settings.obsStudioItselfWillAlsoBe": {
     "source": "bb2ea21750848284",
@@ -7961,6 +8261,38 @@
     "source": "a4bfd53cf77e7b8b",
     "text": "出力の高さ (ピクセル)。幅はキャンバスの縦横比に従います。"
   },
+  "settings.outputReadStateFailed": {
+    "source": "88cc058ed3821907",
+    "text": "OBS の出力 ({output}) の状態を読み取れませんでした: {error}"
+  },
+  "settings.outputRecording": {
+    "source": "b35872b56f1995a5",
+    "text": "録画"
+  },
+  "settings.outputReplayBuffer": {
+    "source": "121b89726ca5d23a",
+    "text": "リプレイバッファ"
+  },
+  "settings.outputRestartFailed": {
+    "source": "a50187ddfc57375b",
+    "text": "設定の適用後に OBS の出力 ({output}) を再開できませんでした: {error}"
+  },
+  "settings.outputStartTimedOut": {
+    "source": "c32890e6d18701d2",
+    "text": "OBS の出力 ({output}) の開始待ちがタイムアウトしました。"
+  },
+  "settings.outputStopFailed": {
+    "source": "4e66c688583d7d5a",
+    "text": "設定を適用する前に OBS の出力 ({output}) を停止できませんでした: {error}"
+  },
+  "settings.outputStopTimedOut": {
+    "source": "ac97c7f665274779",
+    "text": "OBS の出力 ({output}) の停止待ちがタイムアウトしました。"
+  },
+  "settings.outputVirtualCamera": {
+    "source": "111fd0852e756ee7",
+    "text": "仮想カメラ"
+  },
   "settings.overlayApplyFailedError": {
     "source": "738255c1ef31bf55",
     "text": "オーバーレイの適用に失敗しました: {error}"
@@ -7980,6 +8312,14 @@
   "settings.overlayColorMultiplyHex": {
     "source": "a064fc0146e1c5ee",
     "text": "オーバーレイの乗算の色 (16進数)"
+  },
+  "settings.overlayFlipPositionFailedError": {
+    "source": "25c95545ea0288ba",
+    "text": "オーバーレイの反転は保存されましたが、{name} の現在の位置を読み取れませんでした: {error}"
+  },
+  "settings.overlayFlipSceneLookupFailedError": {
+    "source": "99b338a8349ad503",
+    "text": "オーバーレイの反転は保存されましたが、OBS のシーンの検索に失敗しました: {error}"
   },
   "settings.overlayHueShift": {
     "source": "d033b807793d4a52",
@@ -8005,6 +8345,14 @@
     "source": "c129339a890ed309",
     "text": "オーバーレイの回転のスライダー"
   },
+  "settings.overlaySceneItemsFailedError": {
+    "source": "b5b4ac45a7bbb1be",
+    "text": "オーバーレイの設定は保存されましたが、OBS のシーンの項目を読み取れませんでした: {error}"
+  },
+  "settings.overlaySceneLookupFailedError": {
+    "source": "ecf72fdb82953fd7",
+    "text": "オーバーレイの設定は保存されましたが、OBS のシーンの検索に失敗しました: {error}"
+  },
   "settings.overlaySettingWasSavedButThe": {
     "source": "94d8f258ed868945",
     "text": "オーバーレイの設定は保存されましたが、再起動用の OBS シーンファイルを準備できませんでした: {error}"
@@ -8012,6 +8360,14 @@
   "settings.overlaySize": {
     "source": "a50962ddfe53b823",
     "text": "オーバーレイのサイズ"
+  },
+  "settings.overlaySizeSceneItemsFailedError": {
+    "source": "f8b400ff6c79c2f1",
+    "text": "オーバーレイのサイズは保存されましたが、OBS のシーンの項目を読み取れませんでした: {error}"
+  },
+  "settings.overlaySizeSceneLookupFailedError": {
+    "source": "dd23826f43e78e66",
+    "text": "オーバーレイのサイズは保存されましたが、OBS のシーンの検索に失敗しました: {error}"
   },
   "settings.overlaySizeSlider": {
     "source": "11cc91e490df3ccd",
@@ -8093,9 +8449,21 @@
     "source": "81373bf48730d960",
     "text": "ポップアップ"
   },
+  "settings.powercfgCouldNotStart": {
+    "source": "2ea1892470e0cac0",
+    "text": "powercfg を起動できませんでした。"
+  },
+  "settings.powercfgDidNotFinish": {
+    "source": "a14ac53abac1da4d",
+    "text": "powercfg が完了しませんでした。"
+  },
   "settings.powercfgExitedCode": {
     "source": "5768b4f92cc16692",
     "text": "powercfg がコード {code} で終了しました。"
+  },
+  "settings.powercfgTimedOut": {
+    "source": "24199fe22090eace",
+    "text": "powercfg がタイムアウトしました。"
   },
   "settings.presetBalancedBlurb": {
     "source": "cf2fdb6b6603dd4e",
@@ -8377,9 +8745,17 @@
     "source": "6214ddc179841b51",
     "text": "設定を離れる前に保存してください。保存せずに離れると失われます。"
   },
+  "settings.savedGameWindow": {
+    "source": "b7bc0d9e3aae0541",
+    "text": "保存したゲームウィンドウ"
+  },
   "settings.savedSelection": {
     "source": "b7329a9a6ea64fa8",
     "text": "保存した選択"
+  },
+  "settings.savedThemeNoLongerExists": {
+    "source": "537bd5d1b1cded80",
+    "text": "その保存済みテーマはもう存在しません。"
   },
   "settings.savesPcAudioDiscordAndYour": {
     "source": "7176992f35453e0d",
@@ -8413,6 +8789,14 @@
     "source": "97a1c94589647387",
     "text": "画面共有"
   },
+  "settings.screenshareSceneItemsFailedError": {
+    "source": "d392d3377118bec7",
+    "text": "画面共有のキャプチャは保存されましたが、OBS のシーンの項目を読み取れませんでした: {error}"
+  },
+  "settings.screenshareSceneLookupFailedError": {
+    "source": "b048c26bc1e0955d",
+    "text": "画面共有のキャプチャは保存されましたが、OBS のシーンの検索に失敗しました: {error}"
+  },
   "settings.screenshotHotkey": {
     "source": "2a49b87d3a27cbf7",
     "text": "スクリーンショットを撮るホットキー"
@@ -8432,6 +8816,10 @@
   "settings.settingsChanged": {
     "source": "735553f4b318a7bb",
     "text": "設定を変更しました"
+  },
+  "settings.settingsFileInvalidError": {
+    "source": "50c2872ab86af505",
+    "text": "ReplayKit の設定ファイルが無効です: {error}"
   },
   "settings.settingsFileIsTooLarge": {
     "source": "4e2c616f863cdcb1",
@@ -8456,6 +8844,34 @@
   "settings.setupFile": {
     "source": "eb7a2cf26289ce88",
     "text": "セットアップファイル"
+  },
+  "settings.setupFileAlreadyInPlace": {
+    "source": "b1bf0b269307b96e",
+    "text": "セットアップファイルはすでに配置されています。"
+  },
+  "settings.setupFileDownloadFailedError": {
+    "source": "a7e3368539a46fa5",
+    "text": "ReplayKit のセットアップファイルを再ダウンロードできませんでした: {error}"
+  },
+  "settings.setupFileGithubUnreachable": {
+    "source": "b451fc634d8f1585",
+    "text": "ReplayKit のセットアップファイルを再ダウンロードできませんでした: GitHub に接続できません ({error})。接続を確認してもう一度試すか、GitHub から最新の OBSReplayKit.exe を一度実行してください。"
+  },
+  "settings.setupFileInUse": {
+    "source": "7f92c4820276db62",
+    "text": "セットアップファイルは使用中です。ReplayKit のセットアップまたはアンインストールのウィンドウを閉じてから、もう一度お試しください。"
+  },
+  "settings.setupFileIncomplete": {
+    "source": "9b18375da4821c11",
+    "text": "ReplayKit のセットアップファイルが不完全です ({size} MB)。"
+  },
+  "settings.setupFileMismatch": {
+    "source": "98d57d69baab1e4a",
+    "text": "ReplayKit のセットアップファイルがキャッシュのコピーと一致しないため、実行しません。"
+  },
+  "settings.setupFileStillNotUsable": {
+    "source": "3907b427dc44ccaa",
+    "text": "セットアップファイルを再ダウンロードしても使用できません。"
   },
   "settings.sharePreviewAudio": {
     "source": "1b679b4a88a2c529",
@@ -8561,6 +8977,10 @@
     "source": "206cd798af33081f",
     "text": "サイズ(GB)。"
   },
+  "settings.sleepNotAppliedError": {
+    "source": "266c3b5bb49ecfbe",
+    "text": "Windows のスリープ設定は保存されましたが、適用されませんでした: {error}"
+  },
   "settings.smallerCanTakeMuchLongerWith": {
     "source": "3328b313fb9af73f",
     "text": "「小さく」は、大きなクリップやライブラリでは時間がかなり長くかかり、実行中の CPU の負荷も増えます。"
@@ -8620,6 +9040,10 @@
   "settings.startup": {
     "source": "514d8946310015a5",
     "text": "スタートアップ"
+  },
+  "settings.startupRejectedError": {
+    "source": "fa11ada0a18e6545",
+    "text": "Windows の自動起動は保存されましたが、Windows が変更を拒否しました: {error}"
   },
   "settings.stay": {
     "source": "8af0f271ec97d782",
@@ -8764,6 +9188,10 @@
   "settings.theme": {
     "source": "888560be416ca928",
     "text": "テーマ"
+  },
+  "settings.themeLight": {
+    "source": "0b46afa96380156b",
+    "text": "ライト"
   },
   "settings.thisClosesObsAndInstallsThe": {
     "source": "1c2632254e87b8a9",
@@ -9313,6 +9741,14 @@
     "source": "902083a6f13e798b",
     "text": "{message}  (ログ: {path})"
   },
+  "setup.noProcessHostForObs": {
+    "source": "d21a9a94574f4ff7",
+    "text": "OBS {version} 用の共有プロセスホストは同梱されていません。先に対応している OBS のバージョンをインストールしてください。"
+  },
+  "setup.obsCouldNotBeInstalledAutomatically": {
+    "source": "b9ec5649ef71e37c",
+    "text": "OBS Studio を自動でインストールできませんでした。obsproject.com から OBS をインストールしてから、このインストーラーをもう一度実行してください。"
+  },
   "setup.obsIsStartingBackUp": {
     "source": "13a7f357aa36308e",
     "text": "OBS を起動し直しています。"
@@ -9356,6 +9792,14 @@
   "setup.obsThemePreparationTimedOut": {
     "source": "4ba35eba6805b4f7",
     "text": "OBS のテーマの準備がタイムアウトしました。"
+  },
+  "setup.obsVersionNeeded": {
+    "source": "7c539494daa8d5db",
+    "text": "ReplayKit には OBS {version} が必要ですが、インストール済みの OBS をこのバージョンにできませんでした。obsproject.com から OBS {version} をインストールしてから、このインストーラーをもう一度実行してください。"
+  },
+  "setup.originalObsFilesRequired": {
+    "source": "d1b83005942f04a8",
+    "text": "共有プロセスホストをインストールする前に、OBS {version} の元のファイルが必要です。OBS Studio を修復してから、ReplayKit のセットアップをもう一度実行してください。"
   },
   "setup.pinObsTrayIcon": {
     "source": "06fa7012f9c04c08",
@@ -9697,6 +10141,10 @@
     "source": "56ee9fa066955950",
     "text": "更新では現在の設定が保持されます。再インストールは既定の設定から始め直すため、自動ゲームリスト、キーバインド、ReplayKit で設定したすべての項目が消去されます。"
   },
+  "setup.updateNeedsObsVersion": {
+    "source": "32d0de8a3dc8e7bf",
+    "text": "ReplayKit {version} には OBS {obs} が必要ですが、OBS をこのバージョンに更新できなかったため、何も変更していません。obsproject.com から OBS {obs} をインストールしてから、ReplayKit のインストーラーを実行してください。"
+  },
   "setup.verifiesTheBongoCatFilesAnd": {
     "source": "093cb0e01af8c0a7",
     "text": "Bongo Cat のファイルと保存済みのソースを検証します。"
@@ -9872,6 +10320,10 @@
   "shell.forwardAltRight": {
     "source": "56dc2397ec477e7f",
     "text": "進む (Alt + Right)"
+  },
+  "shell.hotkeySaveClipDiskBuffer": {
+    "source": "52c0b4c9a41c8a7a",
+    "text": "ReplayKit: クリップを保存 (ディスクバッファ)"
   },
   "shell.ifThisStaysAntivirusMayHave": {
     "source": "d0750aedf2e81a9a",
@@ -10083,6 +10535,10 @@
     "source": "a9bf9bc04cf70776",
     "text": "一時コピーを圧縮してアップロード中"
   },
+  "storage.compressionCouldNotStart": {
+    "source": "8478c0b420964813",
+    "text": "圧縮を開始できませんでした。"
+  },
   "storage.compressionDidNotFinish": {
     "source": "6140e72447484749",
     "text": "圧縮が完了しませんでした"
@@ -10203,6 +10659,10 @@
     "source": "52a8bb0e2e87a9dd",
     "text": "高速は、対応している場合 GPU を使って早く完了します。このウィンドウを閉じても処理は続き、結果が小さくなった場合にのみ各クリップを置き換えます。"
   },
+  "storage.ffprobeMissing": {
+    "source": "88e78b498d1b08a4",
+    "text": "ffprobe が見つからないため、ReplayKit はどのクリップを圧縮できるか確認できません。"
+  },
   "storage.freeFree": {
     "source": "0a51c9631ad66eb0",
     "text": "空き: **{free}**"
@@ -10298,6 +10758,10 @@
   "storage.nothingWorthCompressingRightNowYour": {
     "source": "3ecb4d1c955ecf47",
     "text": "今は圧縮する価値のあるものがありません。最も大きいクリップはすでに小さいか、これ以上圧縮できない状態です。"
+  },
+  "storage.ofSize": {
+    "source": "a270678590b5e1db",
+    "text": "{size} 中"
   },
   "storage.pickAtLeastOneClip": {
     "source": "57cdcc90df8e02e0",
@@ -10482,6 +10946,10 @@
   "update.anUpdateIsAlreadyBeingApplied": {
     "source": "68492aacb04923b3",
     "text": "更新は既に適用中です。"
+  },
+  "update.autoUpdatesPaused": {
+    "source": "874109d4aea54cd7",
+    "text": "更新に失敗したため、自動更新を 1 時間停止しています。手動での更新は引き続き可能です。"
   },
   "update.badVersion": {
     "source": "e815f01ff4a0aeb2",
@@ -10750,6 +11218,10 @@
   "update.updateTempFolderResolvedOutsideTemp": {
     "source": "b2e71cbc11ef5cdb",
     "text": "更新用の一時フォルダーが %TEMP%\\ReplayKit の外に解決されました。"
+  },
+  "update.updateWindowAlreadyOpen": {
+    "source": "d6135bd41341e752",
+    "text": "更新ウィンドウはすでに開いています。"
   },
   "update.updatingReplaykit": {
     "source": "e60bb0af8d3a028b",

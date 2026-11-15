@@ -135,7 +135,7 @@ namespace ReplayKitHelper
         private static string EndMessage(string reason)
         {
             if (string.IsNullOrEmpty(reason) || reason == "stopped" || reason == "idle" || reason == "ended") return "";
-            if (reason == "time limit") return "The microphone test stopped after " + MicLoopback.MaxRunMinutes + " minutes.";
+            if (reason == "time limit") return Locales.Message("settings.micTestTimeLimit", "minutes", MicLoopback.MaxRunMinutes);
             return reason;
         }
     }

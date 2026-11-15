@@ -286,7 +286,7 @@
     if (secs < 86400) return RK_M("notifications.countHAgo", { count: Math.floor(secs / 3600) });
     const d = Math.floor(secs / 86400);
     if (d < 30) return RK_M("notifications.countDAgo", { count: d });
-    return new Date(then).toLocaleDateString();
+    return new Date(then).toLocaleDateString(RK_I18N.lang());
   }
 
   function rowFor(id) { return listEl.querySelector('.item[data-id="' + CSS.escape(id) + '"]'); }

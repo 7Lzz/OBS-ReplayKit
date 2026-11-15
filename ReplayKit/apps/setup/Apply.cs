@@ -46,7 +46,7 @@ namespace ReplayKitSetup
             catch (Exception ex)
             {
                 progress.AddIssue(new SetupLocale.Text(SetupLocale.Message("setup.stepFailedError", "step", title.Shown, "error", ex.Message),
-                    SetupLocale.Pair("setup.stepFailedError", "step", title.English, "error", SetupLocale.ToEnglish(ex.Message)).English));
+                    SetupLocale.Pair("setup.stepFailedError", "step", title.English, "error", SetupLocale.EnglishOf(ex)).English));
                 progress.Render(index - 1, title, detail, "failed");
                 throw;
             }
@@ -86,12 +86,16 @@ namespace ReplayKitSetup
             {
                 ObsDownloader.EnsureObsVersion(progress);
                 if (Obs.FindObsExe() == null)
-                    throw new InvalidOperationException(
-                        "OBS Studio could not be installed automatically. Install OBS from obsproject.com, then run this installer again.");
+                {
+                    var reason = SetupLocale.Pair("setup.obsCouldNotBeInstalledAutomatically");
+                    throw new InvalidOperationException(reason.Shown).WithEnglish(reason);
+                }
                 // every plugin and the process host are made for the one supported version, so nothing is installed into another
                 if (!ObsVersions.IsInstalledSupported())
-                    throw new InvalidOperationException(
-                        "ReplayKit needs OBS " + ObsVersions.Install.Tested + " and the installed OBS could not be brought to it. Install OBS " + ObsVersions.Install.Tested + " from obsproject.com, then run this installer again.");
+                {
+                    var reason = SetupLocale.Pair("setup.obsVersionNeeded", "version", ObsVersions.Install.Tested);
+                    throw new InvalidOperationException(reason.Shown).WithEnglish(reason);
+                }
                 ProcessHost.Validate();
                 return (object)true;
             });

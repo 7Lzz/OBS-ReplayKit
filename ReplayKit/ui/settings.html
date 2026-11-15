@@ -2528,9 +2528,9 @@
   // the examples are today written each way, in the same formats the cards use
   const cardDateSample = new Date();
   fillCombo(els.cardDateFormat, [
-    { value:"date", label:RK_M("settings.date"), blurb:RK_M("settings.likeDate", { date: cardDateSample.toLocaleDateString(undefined, { month:"short", day:"numeric", year:"numeric" }) }) },
-    { value:"datetime", label:RK_M("settings.dateAndTime"), blurb:RK_M("settings.likeDate", { date: cardDateSample.toLocaleString(undefined, { month:"short", day:"numeric", year:"numeric", hour:"numeric", minute:"2-digit" }) }) },
-    { value:"short", label:RK_M("settings.shortDate"), blurb:RK_M("settings.likeDate", { date: cardDateSample.toLocaleDateString() }) },
+    { value:"date", label:RK_M("settings.date"), blurb:RK_M("settings.likeDate", { date: cardDateSample.toLocaleDateString(RK_I18N.lang(), { month:"short", day:"numeric", year:"numeric" }) }) },
+    { value:"datetime", label:RK_M("settings.dateAndTime"), blurb:RK_M("settings.likeDate", { date: cardDateSample.toLocaleString(RK_I18N.lang(), { month:"short", day:"numeric", year:"numeric", hour:"numeric", minute:"2-digit" }) }) },
+    { value:"short", label:RK_M("settings.shortDate"), blurb:RK_M("settings.likeDate", { date: cardDateSample.toLocaleDateString(RK_I18N.lang()) }) },
     { value:"relative", label:RK_M("settings.timeAgo"), blurb:RK_M("settings.like3DaysAgo") }
   ]);
   // the same fonts the subtitles of the editor offer, from the helper, each shown in its own letters
@@ -2638,7 +2638,7 @@
       try {
         const p = await helperJson("update/progress?t=" + Date.now());
         if (p.stage === "download" && p.total > 0 && p.done < p.total) {
-          show(RK_M("settings.downloadingTheSetupFileDoneOf", { done: (p.done / 1048576).toFixed(1), total: (p.total / 1048576).toFixed(1) }));
+          show(RK_M("settings.downloadingTheSetupFileDoneOf", { done: RK_I18N.number(p.done / 1048576, 1), total: RK_I18N.number(p.total / 1048576, 1) }));
         }
       } catch (e) {}
     }, 400);
@@ -5980,7 +5980,7 @@
     const units = ["B", "KB", "MB", "GB", "TB"];
     let unit = 0;
     while (bytes >= 1024 && unit < units.length - 1) { bytes /= 1024; unit++; }
-    return bytes.toLocaleString(undefined, { maximumFractionDigits:1 }) + " " + units[unit];
+    return bytes.toLocaleString(RK_I18N.lang(), { maximumFractionDigits:1 }) + " " + units[unit];
   }
   function renderAuth(busyText) {
     document.getElementById("streamableDetails").hidden = !!busyText;

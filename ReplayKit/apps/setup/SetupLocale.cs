@@ -34,6 +34,15 @@ namespace ReplayKitSetup
             public Text(string shown, string english) { Shown = shown; English = english; }
         }
 
+        // a reason an exception carries in the language of the installer, with its english kept beside it so the setup log stays english
+        internal static T WithEnglish<T>(this T ex, Text text) where T : Exception
+        {
+            ex.Data["english"] = text.English;
+            return ex;
+        }
+
+        internal static string EnglishOf(Exception ex) => ex.Data["english"] as string ?? ToEnglish(ex.Message);
+
         internal static string Message(string id, params object[] pairs)
         {
             Ensure();

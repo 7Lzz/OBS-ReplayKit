@@ -186,7 +186,7 @@ namespace ReplayKitHelper
                 if (Mp4Tracks.CountAudio(clipPath) > 1)
                 {
                     string ffmpeg = Compression.GetToolPaths()["ffmpeg"]?.Value<string>();
-                    if (string.IsNullOrWhiteSpace(ffmpeg) || !File.Exists(ffmpeg)) throw new InvalidOperationException("ffmpeg.exe was not found, so the clip could not be prepared for upload.");
+                    if (string.IsNullOrWhiteSpace(ffmpeg) || !File.Exists(ffmpeg)) throw new InvalidOperationException(Locales.Message("clips.ffmpegNotFoundForUpload"));
                     // the copy keeps the name of the clip, in a folder of its own, since the name of the file is what the site receives
                     mixOnlyDir = tempPrefix + ".mix";
                     Directory.CreateDirectory(mixOnlyDir);

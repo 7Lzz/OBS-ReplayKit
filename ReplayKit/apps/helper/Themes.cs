@@ -629,9 +629,12 @@ namespace ReplayKitHelper
 
         // -- helpers --
 
+        // the presets named after an app keep that name, the plain one is named in the language of obs
+        public static string ShownPresetLabel(KeyValuePair<string, string> preset) => preset.Key == "light" ? Locales.Message("settings.themeLight") : preset.Value;
+
         public static string PresetLabel(string id)
         {
-            foreach (var kv in PresetOrder) if (kv.Key == id) return kv.Value;
+            foreach (var kv in PresetOrder) if (kv.Key == id) return ShownPresetLabel(kv);
             if (id != null && id.StartsWith("user/", StringComparison.Ordinal))
                 return UserThemeLabel(Path.GetFileNameWithoutExtension(id.Substring(5)) + ".json");
             return id ?? "";

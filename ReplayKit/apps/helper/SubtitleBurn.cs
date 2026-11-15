@@ -97,7 +97,7 @@ namespace ReplayKitHelper
                 double cell = Number(r["cell"]);
                 if (style == null || double.IsNaN(cell) || cell < 0.5 || cell > 3) { error = "Bad subtitles"; return null; }
                 cueCount += cues.Count;
-                if (cueCount > MaxCues) { error = "Too many subtitles"; return null; }
+                if (cueCount > MaxCues) { error = Locales.Message("editor.tooManySubtitles"); return null; }
                 var row = new Row { Index = burn._rows.Count, Style = style, Cell = cell };
                 foreach (var token in cues)
                 {
@@ -124,7 +124,7 @@ namespace ReplayKitHelper
                     {
                         if (!(c["words"] is JArray list) || list.Count > MaxTextLength) { error = "Bad subtitles"; return null; }
                         wordCount += list.Count;
-                        if (wordCount > MaxWords) { error = "Too many subtitles"; return null; }
+                        if (wordCount > MaxWords) { error = Locales.Message("editor.tooManySubtitles"); return null; }
                         words = new List<double>(list.Count);
                         ends = new List<double>(list.Count);
                         foreach (var w in list)

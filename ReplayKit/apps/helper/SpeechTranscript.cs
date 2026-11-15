@@ -161,7 +161,7 @@ namespace ReplayKitHelper
             }
             result.Unsure = unsure;
             if (rejected > 0 && words.Count == 0) throw new InvalidDataException(Locales.Message("editor.theSpeechEngineReturnedRepeatedText"));
-            if (rejected > 0) result.Warning = "Repeated or unreliable passages were skipped; review the subtitles.";
+            if (rejected > 0) result.Warning = Locales.Message("editor.unreliablePassagesSkipped");
             return result;
         }
     }

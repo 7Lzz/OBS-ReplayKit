@@ -66,12 +66,12 @@ namespace ReplayKitHelper
             {
                 // the path comes from the dialog of this helper, and anything that is not a plain file on a drive or a share is turned away all the same
                 if (string.IsNullOrWhiteSpace(path) || !Path.IsPathRooted(path) || Path.GetPathRoot(path).Length < 3 || path.StartsWith(@"\\.\", StringComparison.Ordinal) || path.StartsWith(@"\\?\", StringComparison.Ordinal))
-                    return Fail(name, "That file cannot be used");
-                if (!File.Exists(path)) return Fail(name, "That file was not found");
+                    return Fail(name, Locales.Message("editor.fileCannotBeUsed"));
+                if (!File.Exists(path)) return Fail(name, Locales.Message("editor.fileWasNotFound"));
                 using (var input = File.OpenRead(path))
                 {
                     if (input.Length <= 0) return Fail(name, Locales.Message("editor.thatFileIsEmpty"));
-                    if (input.Length > MaxBytes) return Fail(name, "That file is larger than 50 MB");
+                    if (input.Length > MaxBytes) return Fail(name, Locales.Message("editor.fileLargerThan50Mb"));
                     return Receive(name, (output, hash) =>
                     {
                         var buffer = new byte[65536];
@@ -88,7 +88,7 @@ namespace ReplayKitHelper
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException || ex is NotSupportedException)
             {
                 Log.Write("MediaImports: " + name + ": " + ex.Message);
-                return Fail(name, "That file could not be opened");
+                return Fail(name, Locales.Message("editor.fileCouldNotBeOpened"));
             }
         }
 
@@ -97,7 +97,7 @@ namespace ReplayKitHelper
             status = 200;
             string name = NameFrom(fileName);
             if (req.UploadReader == null || req.UploadLength <= 0) { status = 400; return Fail(name, Locales.Message("editor.thatFileIsEmpty")); }
-            if (req.UploadLength > MaxBytes) { status = 413; return Fail(name, "That file is larger than 50 MB"); }
+            if (req.UploadLength > MaxBytes) { status = 413; return Fail(name, Locales.Message("editor.fileLargerThan50Mb")); }
             try
             {
                 var made = Receive(name, (output, hash) => Connection.CopyUploadBody(req, output, hash));
@@ -126,7 +126,7 @@ namespace ReplayKitHelper
                     file.Position = 0;
                     var head = new byte[8];
                     ext = Sniff(head, file.Read(head, 0, head.Length));
-                    if (ext == null) return Fail(name, "Only GIF, PNG and JPEG files can be added");
+                    if (ext == null) return Fail(name, Locales.Message("editor.onlyGifPngJpeg"));
                     id = string.Concat(hash.Hash.Take(8).Select(b => b.ToString("x2")));
                 }
                 return Store(temp, id, ext, name);

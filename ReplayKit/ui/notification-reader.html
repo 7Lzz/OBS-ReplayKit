@@ -140,7 +140,7 @@
     }
     els.title.textContent = item.title || "";
     const when = Date.parse(item.createdUtc);
-    els.when.textContent = Number.isFinite(when) ? new Date(when).toLocaleString(document.documentElement.lang) : "";
+    els.when.textContent = Number.isFinite(when) ? new Date(when).toLocaleString(RK_I18N.lang()) : "";
     if (window.RKMarkdown) els.body.innerHTML = RKMarkdown.render(item.body || "");
     else els.body.textContent = item.body || "";
     els.body.scrollTop = 0;

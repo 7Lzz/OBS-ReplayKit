@@ -391,11 +391,11 @@ namespace ReplayKitHelper
 
             var scene = GetSceneName();
             if (scene["ok"]?.Value<bool>() != true)
-                return new JObject { ["ok"] = false, ["applied"] = new JArray(applied), ["warnings"] = new JArray("Screenshare capture was saved, but OBS scene lookup failed: " + scene["message"]) };
+                return new JObject { ["ok"] = false, ["applied"] = new JArray(applied), ["warnings"] = new JArray(Locales.Message("settings.screenshareSceneLookupFailedError", "error", scene["message"]?.ToString())) };
             string sceneName = scene["name"]?.Value<string>();
             var itemsResult = GetSceneItems(sceneName);
             if (itemsResult["ok"]?.Value<bool>() != true)
-                return new JObject { ["ok"] = false, ["applied"] = new JArray(applied), ["warnings"] = new JArray("Screenshare capture was saved, but OBS scene items could not be read: " + itemsResult["message"]) };
+                return new JObject { ["ok"] = false, ["applied"] = new JArray(applied), ["warnings"] = new JArray(Locales.Message("settings.screenshareSceneItemsFailedError", "error", itemsResult["message"]?.ToString())) };
             var items = itemsResult["items"] as JArray;
 
             var gameInputSettings = GetGameCaptureInputSettings(settings);
@@ -912,11 +912,11 @@ namespace ReplayKitHelper
 
             var scene = GetSceneName();
             if (scene["ok"]?.Value<bool>() != true)
-                return new JObject { ["ok"] = false, ["applied"] = new JArray(applied), ["warnings"] = new JArray("Overlay size was saved, but OBS scene lookup failed: " + scene["message"]) };
+                return new JObject { ["ok"] = false, ["applied"] = new JArray(applied), ["warnings"] = new JArray(Locales.Message("settings.overlaySizeSceneLookupFailedError", "error", scene["message"]?.ToString())) };
             string sceneName = scene["name"]?.Value<string>();
             var itemsResult = GetSceneItems(sceneName);
             if (itemsResult["ok"]?.Value<bool>() != true)
-                return new JObject { ["ok"] = false, ["applied"] = new JArray(applied), ["warnings"] = new JArray("Overlay size was saved, but OBS scene items could not be read: " + itemsResult["message"]) };
+                return new JObject { ["ok"] = false, ["applied"] = new JArray(applied), ["warnings"] = new JArray(Locales.Message("settings.overlaySizeSceneItemsFailedError", "error", itemsResult["message"]?.ToString())) };
 
             var preset = GetPresetSpec(settings["recordingPreset"]?.Value<string>() ?? "", settings);
             double scaleRatio = nextScale / previousScale;
@@ -978,7 +978,7 @@ namespace ReplayKitHelper
 
             var scene = GetSceneName();
             if (scene["ok"]?.Value<bool>() != true)
-                return new JObject { ["ok"] = false, ["applied"] = new JArray(applied), ["warnings"] = new JArray("Overlay flip was saved, but OBS scene lookup failed: " + scene["message"]) };
+                return new JObject { ["ok"] = false, ["applied"] = new JArray(applied), ["warnings"] = new JArray(Locales.Message("settings.overlayFlipSceneLookupFailedError", "error", scene["message"]?.ToString())) };
             string sceneName = scene["name"]?.Value<string>();
             var items = GetSceneItems(sceneName)["items"] as JArray;
             string style = settings["overlayStyle"]?.Value<string>() ?? "";
@@ -989,7 +989,7 @@ namespace ReplayKitHelper
 
             var cur = GetSceneItemTransformLive(sceneName, item);
             if (cur["ok"]?.Value<bool>() != true || cur["transform"] == null || cur["transform"].Type == JTokenType.Null)
-                return new JObject { ["ok"] = false, ["applied"] = new JArray(applied), ["warnings"] = new JArray("Overlay flip was saved, but " + itemName + "'s current position could not be read: " + cur["message"]) };
+                return new JObject { ["ok"] = false, ["applied"] = new JArray(applied), ["warnings"] = new JArray(Locales.Message("settings.overlayFlipPositionFailedError", "name", itemName, "error", cur["message"]?.ToString())) };
             var r = SetSceneItemTransform(sceneName, item, MirrorTransformInPlace(cur["transform"] as JObject, style, settings));
             if (r["ok"]?.Value<bool>() == true) applied.Add(itemName + " flip");
             else warnings.Add(Locales.Message("settings.couldNotFlipItemnameError", "itemName", itemName, "error", r["message"]));

@@ -1503,9 +1503,9 @@ const CLIP_HOVER_PROFILES = {
 
   function formatSize(bytes) {
     if (bytes < 1024) return bytes + " B";
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
-    if (bytes < 1024 * 1024 * 1024) return (bytes / 1024 / 1024).toFixed(1) + " MB";
-    return (bytes / 1024 / 1024 / 1024).toFixed(2) + " GB";
+    if (bytes < 1024 * 1024) return RK_I18N.number(bytes / 1024, 1) + " KB";
+    if (bytes < 1024 * 1024 * 1024) return RK_I18N.number(bytes / 1024 / 1024, 1) + " MB";
+    return RK_I18N.number(bytes / 1024 / 1024 / 1024, 2) + " GB";
   }
 
   function formatTimeAgo(unixSec) {
@@ -1525,9 +1525,9 @@ const CLIP_HOVER_PROFILES = {
     const format = replayKitSettings.cardDateFormat;
     if (format === "relative" || !(unixSec > 0)) return formatTimeAgo(unixSec);
     const date = new Date(unixSec * 1000);
-    if (format === "short") return date.toLocaleDateString();
-    if (format === "datetime") return date.toLocaleString(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
-    return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+    if (format === "short") return date.toLocaleDateString(RK_I18N.lang());
+    if (format === "datetime") return date.toLocaleString(RK_I18N.lang(), { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
+    return date.toLocaleDateString(RK_I18N.lang(), { month: "short", day: "numeric", year: "numeric" });
   }
 
   function refreshCardDates() {

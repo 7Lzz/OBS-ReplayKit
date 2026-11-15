@@ -145,7 +145,7 @@ namespace ReplayKitHelper
                     entry["transcode_percent"] = percent;
                     entry["ready"] = status == 2;
                     entry["failed"] = status == 3;
-                    if (status == 4) entry["transcode_error"] = "Streamable status check timed out after 30 minutes.";
+                    if (status == 4) entry["transcode_error"] = Locales.Message("clips.streamableCheckTimedOut");
                     else entry.Remove("transcode_error");
                     changed = true;
                 }

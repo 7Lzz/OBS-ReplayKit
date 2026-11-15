@@ -40,7 +40,7 @@ namespace ReplayKitHelper
             var slot = CompressionProfile.Software(pickedEncoder) ? SoftwareSlot : HardwareSlot;
             if (!slot.Wait(0))
             {
-                UploadState.SetUploadState(requestId: requestId, state: "compressing", phase: "queued", percent: 0, message: "Waiting for another compression to finish");
+                UploadState.SetUploadState(requestId: requestId, state: "compressing", phase: "queued", percent: 0, message: Locales.Message("clips.waitingForAnotherCompression"));
                 slot.Wait(token);
             }
             try
@@ -154,14 +154,14 @@ namespace ReplayKitHelper
             if (proc.ExitCode != 0 || diagnostics.Exceeded)
             {
                 try { if (File.Exists(tempPath)) File.Delete(tempPath); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
-                string msg = diagnostics.Exceeded ? "Compression stopped because the encoder produced too many errors." : "ffmpeg failed (exit=" + proc.ExitCode + ")";
+                string msg = diagnostics.Exceeded ? Locales.Message("clips.compressionStoppedTooManyErrors") : Locales.Message("clips.ffmpegFailedExitCode", "code", proc.ExitCode);
                 UploadState.SetUploadState(requestId: requestId, state: "error", phase: "error", percent: 0, error: msg);
                 return new CompressOverwriteResult { Ok = false, Message = msg };
             }
             if (!File.Exists(tempPath))
             {
-                UploadState.SetUploadState(requestId: requestId, state: "error", phase: "error", percent: 0, error: "ffmpeg produced no output file");
-                return new CompressOverwriteResult { Ok = false, Message = "ffmpeg produced no output file" };
+                UploadState.SetUploadState(requestId: requestId, state: "error", phase: "error", percent: 0, error: Locales.Message("clips.ffmpegProducedNoOutput"));
+                return new CompressOverwriteResult { Ok = false, Message = Locales.Message("clips.ffmpegProducedNoOutput") };
             }
 
             // size guard. compression is supposed to shrink files; if it didnt, dont replace the original. this catches very short clips (mp4 header + first idr + aac priming overhead can exceed whatever the encode saved), sources already encoded more aggressively than the target, and any encoder misconfiguration -- the clip stays untouched, the marker is not written, and the next /clips poll shows the file in its original state.

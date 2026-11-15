@@ -164,7 +164,7 @@ namespace ReplayKitHelper
             var outcome = task.Result;
             if (!outcome.Ok || string.IsNullOrEmpty(outcome.Url))
             {
-                string msg = !string.IsNullOrEmpty(outcome.Message) ? outcome.Message : "Upload finished without a Streamable result";
+                string msg = !string.IsNullOrEmpty(outcome.Message) ? outcome.Message : Locales.Message("clips.uploadFinishedWithoutResult");
                 UploadState.SetUploadState(requestId: requestId, state: "error", active: false, error: msg, phase: "error");
                 return;
             }
