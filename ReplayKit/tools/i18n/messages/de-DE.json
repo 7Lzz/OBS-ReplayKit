@@ -66,6 +66,14 @@
     "source": "2bbc70e8c4a90ae9",
     "text": "Aufnahmeordner auswählen"
   },
+  "presence.clipping": {
+    "source": "03113672ebfe5115",
+    "text": "Clippt mit ReplayKit"
+  },
+  "presence.getReplayKit": {
+    "source": "fd7229458a54c23e",
+    "text": "ReplayKit holen"
+  },
   "projector.lock": {
     "source": "241399e11d93bd7b",
     "text": "Fixieren"
@@ -74,9 +82,25 @@
     "source": "3cf0b3a0f9456702",
     "text": "Fixiert"
   },
+  "settings.discordRichPresence": {
+    "source": "6257e038f7a60bdc",
+    "text": "Discord Rich Presence"
+  },
+  "settings.discordRichPresenceNote": {
+    "source": "4e760cbd412f470a",
+    "text": "Zeigt das Spiel, das du spielst, in deinem Discord-Profil, mit einem Link zu ReplayKit. „Spiele in Clips erkennen“ unter „Erweitert“ muss an sein."
+  },
   "settings.languageNotSaved": {
     "source": "ee2e9c210d1cb5b2",
     "text": "Die Sprache wurde nicht geändert, weil OBS nicht geantwortet hat. Versuche es erneut."
+  },
+  "settings.privacyTab": {
+    "source": "84c5b0bf684d7bb8",
+    "text": "Datenschutz & Sicherheit"
+  },
+  "settings.privacyVisibility": {
+    "source": "76d1d9370fb77aee",
+    "text": "Datenschutz & Sichtbarkeit"
   },
   "setup.uninstallTitle": {
     "source": "6610dbeda8014a0b",

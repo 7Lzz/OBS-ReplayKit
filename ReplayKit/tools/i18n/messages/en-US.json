@@ -67,6 +67,14 @@
     "context": "Windows folder picker title.",
     "text": "Choose the recordings folder"
   },
+  "presence.clipping": {
+    "context": "Second line of the Discord activity card friends see while the user plays a game.",
+    "text": "Clipping with ReplayKit"
+  },
+  "presence.getReplayKit": {
+    "context": "Button on the Discord activity card that opens the ReplayKit download page. At most 32 characters.",
+    "text": "Get ReplayKit"
+  },
   "projector.lock": {
     "context": "Projector bar toggle while the preview is unlocked. A verb: pressing it locks the preview so the scene cannot be moved.",
     "text": "Lock"
@@ -75,9 +83,25 @@
     "context": "Projector bar toggle while the preview is locked. Describes the state.",
     "text": "Locked"
   },
+  "settings.discordRichPresence": {
+    "context": "Switch label in Settings. Rich Presence is Discord's name for the activity card on a profile.",
+    "text": "Discord Rich Presence"
+  },
+  "settings.discordRichPresenceNote": {
+    "context": "Note under the Discord Rich Presence switch. Recognize games in clips is the label of a switch on the Advanced tab.",
+    "text": "Shows the game you're playing on your Discord profile, with a link to get ReplayKit. Needs Recognize games in clips in Advanced to be on."
+  },
   "settings.languageNotSaved": {
     "context": "Settings warning when OBS did not confirm the picked language, so nothing was changed.",
     "text": "The language was not changed because OBS did not answer. Try again."
+  },
+  "settings.privacyTab": {
+    "context": "Settings sidebar tab under User settings.",
+    "text": "Privacy & Security"
+  },
+  "settings.privacyVisibility": {
+    "context": "Heading of the box on the Privacy & Security settings tab.",
+    "text": "Privacy & Visibility"
   },
   "setup.uninstallTitle": {
     "context": "Windows uninstaller caption.",

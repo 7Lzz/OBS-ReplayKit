@@ -43,6 +43,7 @@ namespace ReplayKitHelper
             Register("update.obs-badge", "shows the grey obs update button of the title bar for args.version (99.0.0 when left out) as if the obs check had found it, or takes it away with args.clear; the next obs check puts the real state back", args => ObsUpdate.PreviewBadge(args["clear"]?.Value<bool>() == true ? "" : args["version"]?.ToString() ?? "99.0.0"));
             Register("helper.info", "version, process id, uptime and the switches that matter of the helper", HelperInfo);
             Register("capture.state", "reports accepted native capture evidence without exposing process paths", args => ClipGames.Status());
+            Register("presence.state", "the discord rich presence: whether it is on and set up, the game it follows, whether discord is connected, the activity it shows and the last error", args => DiscordPresence.State());
             Register("roblox.state", "the roblox experience the roblox logs say is open now, and how many experiences have a name and icon", args => RobloxExperiences.State());
             Register("settings.get", "the settings, or only the keys named in args.keys", SettingsGet);
             Register("settings.set", "saves the settings in args.values the way the settings page does", SettingsSet);

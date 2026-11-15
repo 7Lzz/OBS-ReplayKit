@@ -21,7 +21,8 @@ namespace ReplayKitHelper
         private const string InstallerAsset = "OBSReplayKit.exe";
         // sha256sum-style sidecar for the installer, one "<hash>  OBSReplayKit.exe" line. named after the file it covers, which is the only other asset on a release.
         private const string ChecksumsAsset = "OBSReplayKit.exe.sha256";
-        private const string ReleasePage = "https://github.com/7Lzz/OBS-ReplayKit/releases/latest";
+        internal const string RepoPage = "https://github.com/" + Owner + "/" + Repo;
+        private const string ReleasePage = RepoPage + "/releases/latest";
 
         // floor to reject a broken release before it closes obs -- a framework-dependent slip or a payload-less exe lands far under this. mirrors the same guard build.bat applies at the producing end.
         private const long MinInstallerBytes = 10L * 1024 * 1024;

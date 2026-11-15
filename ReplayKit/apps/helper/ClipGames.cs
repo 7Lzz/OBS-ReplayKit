@@ -81,6 +81,7 @@ namespace ReplayKitHelper
                 }
                 // a display capture of anything but a known game is the desktop; an app nobody knows that fills its display may be a game the catalog is missing, so it stays unassigned
                 string state = game != null ? "game" : kind == "display" && (path.Length == 0 || DesktopApps.Contains(Path.GetFileName(path)) || !fullscreen) ? "desktop" : "unknown";
+                DiscordPresence.Seen(game, path);
                 // the plugin says why a sample shows no capture; a capture of a program this catalog does not know is not recognised
                 string reason = raw["reason"]?.Type == JTokenType.String ? raw["reason"].Value<string>() : "";
                 string why = state != "unknown" ? "" : kind == "unknown" ? reason : "not-recognised";

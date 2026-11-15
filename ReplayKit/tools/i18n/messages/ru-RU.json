@@ -68,6 +68,14 @@
     "source": "2bbc70e8c4a90ae9",
     "text": "Выберите папку записей"
   },
+  "presence.clipping": {
+    "source": "03113672ebfe5115",
+    "text": "Записывает клипы с ReplayKit"
+  },
+  "presence.getReplayKit": {
+    "source": "fd7229458a54c23e",
+    "text": "Скачать ReplayKit"
+  },
   "projector.lock": {
     "source": "241399e11d93bd7b",
     "text": "Заблокировать"
@@ -76,9 +84,25 @@
     "source": "3cf0b3a0f9456702",
     "text": "Заблокировано"
   },
+  "settings.discordRichPresence": {
+    "source": "6257e038f7a60bdc",
+    "text": "Rich Presence в Discord"
+  },
+  "settings.discordRichPresenceNote": {
+    "source": "4e760cbd412f470a",
+    "text": "Показывает игру, в которую вы играете, в профиле Discord со ссылкой на ReplayKit. Требует включённого параметра «Распознавать игры в клипах» в разделе «Расширенный»."
+  },
   "settings.languageNotSaved": {
     "source": "ee2e9c210d1cb5b2",
     "text": "Язык не изменён, потому что OBS не ответил. Попробуйте ещё раз."
+  },
+  "settings.privacyTab": {
+    "source": "84c5b0bf684d7bb8",
+    "text": "Конфиденциальность и безопасность"
+  },
+  "settings.privacyVisibility": {
+    "source": "76d1d9370fb77aee",
+    "text": "Конфиденциальность и видимость"
   },
   "setup.uninstallTitle": {
     "source": "6610dbeda8014a0b",

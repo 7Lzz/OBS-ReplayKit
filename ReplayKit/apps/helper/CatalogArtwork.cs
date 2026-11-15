@@ -63,12 +63,28 @@ namespace ReplayKitHelper
             if (bytes == null && source.IconHash != null)
             {
                 contentType = "image/png";
-                string url = "https://cdn.discordapp.com/app-icons/" + Uri.EscapeDataString(source.Id) + "/" +
-                    source.IconHash + ".png?size=64";
+                string url = DiscordIconUrl(source.Id, source.IconHash, 64);
                 bytes = Artwork("discord-" + source.Id + "-" + source.IconHash + ".png", contentType,
                     () => Fetch(url, "image/png", Discord));
             }
             return bytes;
+        }
+
+        private static string DiscordIconUrl(string id, string hash, int size) =>
+            "https://cdn.discordapp.com/app-icons/" + Uri.EscapeDataString(id) + "/" + Uri.EscapeDataString(hash) + ".png?size=" + size;
+
+        private static string SteamIconUrl(uint appId, string hash) =>
+            "https://shared.fastly.steamstatic.com/community_assets/images/apps/" + appId.ToString(System.Globalization.CultureInfo.InvariantCulture) + "/" + hash + ".jpg";
+
+        // where the art of a game can be seen on the web, for the discord presence, which shows images by address only: the icon discord keeps for a catalog game, else the steam icon when the catalog knows its hash; null when the art exists only on this pc
+        internal static string PublicUrl(GameCatalog.Game game)
+        {
+            if (game == null) return null;
+            if (game.IconHash != null) return DiscordIconUrl(game.Id, game.IconHash, 512);
+            uint steam = game.SteamAppId;
+            if (steam == 0 && game.Id.StartsWith("steam-", StringComparison.Ordinal)) uint.TryParse(game.Id.Substring(6), out steam);
+            var source = steam != 0 ? GameCatalog.BySteamId(steam) ?? game : game;
+            return steam != 0 && source.SteamIconHash != null ? SteamIconUrl(steam, source.SteamIconHash) : null;
         }
 
         private static byte[] Artwork(string name, string type, Func<byte[]> download)
@@ -186,8 +202,7 @@ namespace ReplayKitHelper
                 }
             }
             if (hash == null) return null;
-            return Fetch("https://shared.fastly.steamstatic.com/community_assets/images/apps/" + id + "/" +
-                hash + ".jpg", "image/jpeg", Steam);
+            return Fetch(SteamIconUrl(appId, hash), "image/jpeg", Steam);
         }
 
         private static byte[] Fetch(string url, string type, Provider provider, int prefixBytes = 0)

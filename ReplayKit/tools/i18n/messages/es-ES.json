@@ -67,6 +67,14 @@
     "source": "2bbc70e8c4a90ae9",
     "text": "Elija la carpeta de grabaciones"
   },
+  "presence.clipping": {
+    "source": "03113672ebfe5115",
+    "text": "Grabando clips con ReplayKit"
+  },
+  "presence.getReplayKit": {
+    "source": "fd7229458a54c23e",
+    "text": "Consigue ReplayKit"
+  },
   "projector.lock": {
     "source": "241399e11d93bd7b",
     "text": "Bloquear"
@@ -75,9 +83,25 @@
     "source": "3cf0b3a0f9456702",
     "text": "Bloqueado"
   },
+  "settings.discordRichPresence": {
+    "source": "6257e038f7a60bdc",
+    "text": "Presencia enriquecida de Discord"
+  },
+  "settings.discordRichPresenceNote": {
+    "source": "4e760cbd412f470a",
+    "text": "Muestra el juego al que juegas en tu perfil de Discord, con un enlace para conseguir ReplayKit. Necesita «Reconocer juegos en los clips» activado en Avanzado."
+  },
   "settings.languageNotSaved": {
     "source": "ee2e9c210d1cb5b2",
     "text": "No se cambió el idioma porque OBS no respondió. Inténtalo de nuevo."
+  },
+  "settings.privacyTab": {
+    "source": "84c5b0bf684d7bb8",
+    "text": "Privacidad y seguridad"
+  },
+  "settings.privacyVisibility": {
+    "source": "76d1d9370fb77aee",
+    "text": "Privacidad y visibilidad"
   },
   "setup.uninstallTitle": {
     "source": "6610dbeda8014a0b",

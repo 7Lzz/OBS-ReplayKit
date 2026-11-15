@@ -65,6 +65,14 @@
     "source": "2bbc70e8c4a90ae9",
     "text": "选择录像文件夹"
   },
+  "presence.clipping": {
+    "source": "03113672ebfe5115",
+    "text": "正在用 ReplayKit 录制剪辑"
+  },
+  "presence.getReplayKit": {
+    "source": "fd7229458a54c23e",
+    "text": "获取 ReplayKit"
+  },
   "projector.lock": {
     "source": "241399e11d93bd7b",
     "text": "锁定"
@@ -73,9 +81,25 @@
     "source": "3cf0b3a0f9456702",
     "text": "已锁定"
   },
+  "settings.discordRichPresence": {
+    "source": "6257e038f7a60bdc",
+    "text": "Discord 丰富状态"
+  },
+  "settings.discordRichPresenceNote": {
+    "source": "4e760cbd412f470a",
+    "text": "在你的 Discord 个人资料上显示你正在玩的游戏，并附上获取 ReplayKit 的链接。需要在“高级”中开启“识别剪辑中的游戏”。"
+  },
   "settings.languageNotSaved": {
     "source": "ee2e9c210d1cb5b2",
     "text": "由于 OBS 没有响应，语言未更改。请重试。"
+  },
+  "settings.privacyTab": {
+    "source": "84c5b0bf684d7bb8",
+    "text": "隐私与安全"
+  },
+  "settings.privacyVisibility": {
+    "source": "76d1d9370fb77aee",
+    "text": "隐私与可见性"
   },
   "setup.uninstallTitle": {
     "source": "6610dbeda8014a0b",

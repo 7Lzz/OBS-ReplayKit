@@ -423,6 +423,26 @@ namespace ReplayKitHelper
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is Newtonsoft.Json.JsonException) { Log.Write("Roblox icons not pinned: " + ex.GetType().Name); }
         }
 
+        internal sealed class Experience
+        {
+            internal string Universe, Name, ImageUrl;
+        }
+
+        // the experience the logs say is open now with what is known of it, for the discord presence; null when roblox shows its menu or is closed, and one not known yet is looked up
+        internal static Experience Playing()
+        {
+            var now = DateTime.UtcNow;
+            var visit = During(now, now);
+            if (visit == null) return null;
+            Load();
+            lock (Gate)
+            {
+                Cache.TryGetValue(visit.Universe, out var known);
+                if (known?.Name == null) Want(visit.Universe, false);
+                return new Experience { Universe = visit.Universe, Name = known?.Name, ImageUrl = known?.Url };
+            }
+        }
+
         // what the sdk shows: the experience the logs say is open now, what is known, and whether lookups are waiting on roblox
         internal static JObject State()
         {

@@ -145,6 +145,8 @@ namespace ReplayKitHelper
                 ["showCodecTags"] = false,
                 // whether the game on screen is looked up for new clips and screenshots; clips that already have a game keep it either way
                 ["gameRecognition"] = true,
+                // shows the recognised game being played on the discord profile, like medal does; needs gameRecognition
+                ["discordRichPresence"] = true,
                 // how the date line of the clip and screenshot cards reads: the time ago, the date, the date and time, or the short date of the region
                 ["cardDateFormat"] = "date",
                 // the font every page and the native chrome draw their text in, one of Fonts.Families
@@ -624,6 +626,7 @@ namespace ReplayKitHelper
                 ["trimGpuEncode"] = GetBoolSetting(data, "trimGpuEncode", defaults["trimGpuEncode"].Value<bool>()),
                 ["showCodecTags"] = GetBoolSetting(data, "showCodecTags", defaults["showCodecTags"].Value<bool>()),
                 ["gameRecognition"] = GetBoolSetting(data, "gameRecognition", defaults["gameRecognition"].Value<bool>()),
+                ["discordRichPresence"] = GetBoolSetting(data, "discordRichPresence", defaults["discordRichPresence"].Value<bool>()),
                 ["cardDateFormat"] = GetEnumSetting(data, "cardDateFormat", defaults["cardDateFormat"].Value<string>(), new[] { "relative", "date", "datetime", "short" }),
                 ["uiFont"] = GetEnumSetting(data, "uiFont", defaults["uiFont"].Value<string>(), Fonts.Families),
                 ["editorAutoplay"] = GetBoolSetting(data, "editorAutoplay", defaults["editorAutoplay"].Value<bool>()),
@@ -1006,6 +1009,7 @@ namespace ReplayKitHelper
                 AppConfig.WriteUtf8(path, settings.ToString(Formatting.Indented));
                 SyncClipDirToRuntimeConfig(settings);
                 ClipGames.SetRecognition(settings["gameRecognition"]?.Type != JTokenType.Boolean || settings["gameRecognition"].Value<bool>());
+                DiscordPresence.SetEnabled(settings["discordRichPresence"]?.Type == JTokenType.Boolean && settings["discordRichPresence"].Value<bool>());
                 ObsUpdate.SetEnabled(DevelopmentFlag(settings, "checkObsUpdates"));
             }
         }

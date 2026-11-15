@@ -1987,6 +1987,15 @@
  "Discord audio volume slider": [
   "settings.html"
  ],
+ "Discord closed the pipe.": [
+  "apps/helper/DiscordPresence.cs"
+ ],
+ "Discord did not answer.": [
+  "apps/helper/DiscordPresence.cs"
+ ],
+ "Discord did not take the update.": [
+  "apps/helper/DiscordPresence.cs"
+ ],
  "Discord output mode was saved, but legacy virtual camera could not be started: {error}": [
   "apps/helper/SettingsLiveApply.cs"
  ],
@@ -3977,7 +3986,8 @@
   "update_prompt.html"
  ],
  "OBS is closing.": [
-  "apps/helper/AppRoutes.cs"
+  "apps/helper/AppRoutes.cs",
+  "apps/helper/ObsWebSocket.cs"
  ],
  "OBS is restarting.": [
   "apps/helper/AppRoutes.cs"
