@@ -89,6 +89,7 @@ namespace ReplayKitHelper
                 case 413: return "Payload Too Large";
                 case 416: return "Range Not Satisfiable";
                 case 500: return "Internal Server Error";
+                case 502: return "Bad Gateway";
                 case 503: return "Service Unavailable";
                 default: return "OK";
             }

@@ -383,6 +383,10 @@
     "source": "ba654163a6dd9fca",
     "text": "确认移到回收站 ({count})"
   },
+  "clips.confirmStreamableDelete": {
+    "source": "474106522234058b",
+    "text": "再次点击即可从 Streamable 永久删除"
+  },
   "clips.containsGames": {
     "source": "e704b140b41ce861",
     "text": "包含 {games}"
@@ -527,6 +531,10 @@
     "source": "9e6d8f9b4b3d673c",
     "text": "永久删除"
   },
+  "clips.deleteFromStreamable": {
+    "source": "814603f774347773",
+    "text": "从 Streamable 删除"
+  },
   "clips.deleteGif": {
     "source": "a3e08b9cd13492d2",
     "text": "删除 GIF"
@@ -550,6 +558,10 @@
   "clips.deletedForGoodSoon": {
     "source": "06feb61b74dcd214",
     "text": "即将永久删除"
+  },
+  "clips.deletedFromStreamable": {
+    "source": "241594a07144433d",
+    "text": "已从 Streamable 删除上传的视频"
   },
   "clips.deletedHistoryCount": {
     "source": "0347ad9acabf6ba3",
@@ -1604,6 +1616,18 @@
   "clips.streamableCheckTimedOut": {
     "source": "73cbf2a9f94b12d4",
     "text": "Streamable 状态检查在 30 分钟后超时。"
+  },
+  "clips.streamableDeleteFailed": {
+    "source": "60a24d0a0f5989bf",
+    "text": "无法删除上传的视频。请确认该视频属于当前登录的 Streamable 账号。"
+  },
+  "clips.streamableDeletedLinkRemains": {
+    "source": "708eb10ac780b0b1",
+    "text": "Streamable 已删除视频，但 ReplayKit 无法清除其链接。"
+  },
+  "clips.streamableLinkChanged": {
+    "source": "48be168a85ec73c7",
+    "text": "Streamable 链接已更改或已不可用。"
   },
   "clips.thatCouldNotBeDone": {
     "source": "6eab7f00f3e45f30",
@@ -6289,30 +6313,6 @@
     "source": "417cf9c08b0b8d6c",
     "text": "应用"
   },
-  "settings.applyFailedError": {
-    "source": "9749057463b8fad4",
-    "text": "应用失败：{error}"
-  },
-  "settings.applyOrCancelSettingsChangesBefore": {
-    "source": "cafd4e725ba3d52d",
-    "text": "卸载前请先应用或取消设置更改。"
-  },
-  "settings.applyOrCancelSettingsChangesFirst": {
-    "source": "24c5292e2868f6aa",
-    "text": "请先应用或取消设置更改。"
-  },
-  "settings.applyRestart": {
-    "source": "62988a30203f965e",
-    "text": "应用并重启"
-  },
-  "settings.applyingSettings": {
-    "source": "c877ec9b6a085339",
-    "text": "正在应用设置..."
-  },
-  "settings.applyingSettingsAndRestartingObs": {
-    "source": "d82f0742406d836b",
-    "text": "正在应用设置并重启 OBS..."
-  },
   "settings.arrowKeySkip": {
     "source": "6137822ccd053c1e",
     "text": "方向键跳转"
@@ -6665,10 +6665,6 @@
     "source": "d88142e324dafafd",
     "text": "无法更改 Bongo Cat 的可见性：{error}"
   },
-  "settings.couldNotChangeName": {
-    "source": "69f79c7a72505e7d",
-    "text": "无法更改 {name}。"
-  },
   "settings.couldNotChangeNoiseSuppressionError": {
     "source": "fbf6531683d5f5da",
     "text": "无法更改降噪：{error}"
@@ -6876,6 +6872,10 @@
   "settings.couldNotRotateOverlayError": {
     "source": "061072c2f3c67ae8",
     "text": "无法旋转叠加层：{error}"
+  },
+  "settings.couldNotSaveTheSettingsError": {
+    "source": "f381ed59bdef13ac",
+    "text": "无法保存设置：{error}"
   },
   "settings.couldNotSaveTheme": {
     "source": "740913bd6cd7b7ac",
@@ -7205,9 +7205,9 @@
     "source": "135ce9d090fd8748",
     "text": "缩小到"
   },
-  "settings.dragToMoveUseTheCorners": {
-    "source": "bc8d85be8af34e72",
-    "text": "拖动可移动，拖动角可调整大小，拖动圆形手柄可旋转。旋转在接近 90 度角时会自动吸附。按住 Shift 可禁用吸附。按 Ctrl+Z 可撤销移动、调整大小或旋转。点击“应用”后更改才会生效。"
+  "settings.dragToMoveUseTheCornersToResize": {
+    "source": "f731afc293d36ad8",
+    "text": "拖动可移动，拖动角可调整大小，拖动圆形手柄可旋转。旋转在接近 90 度角时会自动吸附。按住 Shift 可禁用吸附。按 Ctrl+Z 可撤销移动、调整大小或旋转。"
   },
   "settings.dragToPosition": {
     "source": "43ddd66cdc6eb3f4",
@@ -7885,9 +7885,9 @@
     "source": "4f3628452e51e173",
     "text": "静音 Discord 音频"
   },
-  "settings.mutesOrUnmutesThisSoundIn": {
-    "source": "d0dac12fce8c2c18",
-    "text": "在 OBS 中静音或取消静音此声音。更改将在点击“应用”或“确定”后生效。"
+  "settings.mutesOrUnmutesThisSoundInObs": {
+    "source": "4ccb5ac674e1f766",
+    "text": "在 OBS 中静音或取消静音此声音。"
   },
   "settings.n10FpsSmallest": {
     "source": "6690b124bcd6762b",
@@ -8013,10 +8013,6 @@
     "source": "21163f9d9c6e3bc0",
     "text": "没有可用的 OBS 场景。"
   },
-  "settings.noSettingsChanged": {
-    "source": "583a5150efd3478e",
-    "text": "没有更改任何设置"
-  },
   "settings.noSignInIsNeededTo": {
     "source": "9a607cb83d8e7a97",
     "text": "上传片段和创建分享链接无需登录。匿名上传使用下方的限制。登录后，新上传的内容将保存在你的账号中。"
@@ -8032,6 +8028,10 @@
   "settings.none": {
     "source": "f2953d2931e36d0c",
     "text": "无"
+  },
+  "settings.notAffiliatedWithStreamable": {
+    "source": "647bde456f398520",
+    "text": "ReplayKit 与 Streamable 没有关联。上传遵循 Streamable 的套餐和限制，Streamable 可能会更改这些内容。"
   },
   "settings.num": {
     "source": "c483792012d1aecb",
@@ -8293,10 +8293,6 @@
     "source": "111fd0852e756ee7",
     "text": "虚拟摄像机"
   },
-  "settings.overlayApplyFailedError": {
-    "source": "738255c1ef31bf55",
-    "text": "叠加层应用失败：{error}"
-  },
   "settings.overlayColorAdd": {
     "source": "60fe2f0560fa3a05",
     "text": "叠加层颜色相加"
@@ -8477,13 +8473,13 @@
     "source": "7cc1cbde1dd4c94c",
     "text": "面向高端电脑的更高画质。"
   },
-  "settings.presetSavedApplyToUseIt": {
-    "source": "282c7f89ab3a78db",
-    "text": "预设已保存。应用后即可在 OBS 中使用。"
+  "settings.presetSaved": {
+    "source": "5754d4021b95d016",
+    "text": "预设已保存。"
   },
-  "settings.presetUpdatedApplyToUpdateObs": {
-    "source": "3004816539b8da5b",
-    "text": "预设已更新。应用后即可更新 OBS。"
+  "settings.presetUpdated": {
+    "source": "d64e9dc0662e2c1b",
+    "text": "预设已更新。"
   },
   "settings.pressAKey": {
     "source": "d5fa95d1806530dd",
@@ -8693,9 +8689,9 @@
     "source": "1f00b398df5fb06f",
     "text": "ReplayKit 已是最新版本（{version}）"
   },
-  "settings.replaykitNeedsRepairApplyOrCancel": {
-    "source": "62719d1405529b14",
-    "text": "ReplayKit 需要修复。请先应用或取消设置更改。"
+  "settings.replaykitNeedsRepairRestartOrUndo": {
+    "source": "f1826db758cef701",
+    "text": "ReplayKit 需要修复。部分设置更改尚未保存，请先重启 OBS 或撤销这些更改。"
   },
   "settings.replaykitNeedsRepairUseTheUpdate": {
     "source": "9848b48c05d56b89",
@@ -8808,10 +8804,6 @@
   "settings.setShortcutsForSavingClipsRecording": {
     "source": "5cdbf8597c6ecc58",
     "text": "设置保存剪辑、录制和打开剪辑库的快捷键。"
-  },
-  "settings.settingsApplied": {
-    "source": "ff9b0fd84a03a831",
-    "text": "设置已应用"
   },
   "settings.settingsChanged": {
     "source": "735553f4b318a7bb",
@@ -8997,6 +8989,14 @@
     "source": "38942d2b60f4ad2a",
     "text": "快速平滑锯齿边缘。细节可能会显得稍软。"
   },
+  "settings.someChangesTakeEffectAfterObsRestarts": {
+    "source": "e90960b323eb8b66",
+    "text": "部分更改将在 OBS 重启后生效。"
+  },
+  "settings.someSettingsChangesAreNotSavedYet": {
+    "source": "84a4b2684df78edc",
+    "text": "部分设置更改尚未保存。请先重启 OBS 或撤销这些更改。"
+  },
   "settings.sounds": {
     "source": "92375472db9662ea",
     "text": "声音"
@@ -9056,6 +9056,10 @@
   "settings.storageCompressionType": {
     "source": "2b18fed600f92087",
     "text": "存储压缩类型"
+  },
+  "settings.streamableUploadDeletion": {
+    "source": "079d533a30adf902",
+    "text": "你可以通过片段菜单删除已上传到你的 Streamable 账号的片段。"
   },
   "settings.switchSpeed": {
     "source": "66caae8c2c48a6a8",
@@ -9265,10 +9269,6 @@
     "source": "b16d021e8f3130c8",
     "text": "不限"
   },
-  "settings.updateAvailableLatestApplyOrCancel": {
-    "source": "93fac0decc666ec0",
-    "text": "有可用更新：{latest}。请先应用或取消设置更改。"
-  },
   "settings.updateAvailableLatestInstalledInstalled": {
     "source": "05c45daac5ecbde8",
     "text": "有可用更新：{latest}（已安装 {installed}）"
@@ -9276,6 +9276,10 @@
   "settings.updateAvailableLatestInstalledInstalledUse": {
     "source": "f3dde09189373d88",
     "text": "有可用更新：{latest}（已安装 {installed}）。请使用顶部的更新按钮进行安装。"
+  },
+  "settings.updateAvailableLatestRestartOrUndo": {
+    "source": "3aacb2b2c5882cd1",
+    "text": "有可用更新：{latest}。部分设置更改尚未保存，请先重启 OBS 或撤销这些更改。"
   },
   "settings.updateCheckFailedError": {
     "source": "a3bc85869fe0a75a",
@@ -9304,10 +9308,6 @@
   "settings.uploadSize": {
     "source": "197f08bfbafc075b",
     "text": "上传大小"
-  },
-  "settings.uploadingAnonymously": {
-    "source": "91310b0ae2cbdb6e",
-    "text": "正在匿名上传"
   },
   "settings.useAGradientForBackground": {
     "source": "f6b35c44145b756e",

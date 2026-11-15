@@ -97,7 +97,8 @@ namespace ReplayKitHelper
             if (Regex.IsMatch(plan, "^(premium|pro|enterprise|business)")) { size = 0; ret = 365; }
             else if (Regex.IsMatch(plan, "^(plus)")) { size = 5L * 1024 * 1024 * 1024; ret = 365; }
             else if (Regex.IsMatch(plan, "^(basic|paid)")) { size = 2L * 1024 * 1024 * 1024; ret = 365; }
-            else { size = Constants.ANON_SIZE_CAP; ret = Constants.SIGNED_IN_DEFAULT_RETENTION; }
+            // a free account, or a plan not recognised above, uploads up to the same 1 GB ceiling as an anonymous upload
+            else { size = Constants.HARD_UPLOAD_CAP; ret = Constants.SIGNED_IN_DEFAULT_RETENTION; }
             return (size, ret, plan);
         }
 
@@ -117,6 +118,12 @@ namespace ReplayKitHelper
             }
             lock (Server.State.AuthLock)
             {
+                // publish the session only after its cookie jar is ready for readers of the same lock.
+                if (!string.IsNullOrEmpty(cookieFile))
+                {
+                    Directory.CreateDirectory(Constants.AUTH_DIR);
+                    File.WriteAllText(GetAuthCookieJarPath(), cookieFile, Encoding.ASCII);
+                }
                 Server.State.Auth = new AuthState
                 {
                     SignedIn = user != null,
@@ -125,12 +132,6 @@ namespace ReplayKitHelper
                     SizeCap = limits.SizeCap,
                     RetentionDays = limits.RetentionDays,
                 };
-            }
-            // write the plaintext cookie jar to disk for the in-process upload orchestration.
-            if (!string.IsNullOrEmpty(cookieFile))
-            {
-                Directory.CreateDirectory(Constants.AUTH_DIR);
-                File.WriteAllText(GetAuthCookieJarPath(), cookieFile, Encoding.ASCII);
             }
         }
 
@@ -143,7 +144,7 @@ namespace ReplayKitHelper
                     SignedIn = false,
                     Username = "",
                     Plan = "",
-                    SizeCap = Constants.ANON_SIZE_CAP,
+                    SizeCap = 0,
                     RetentionDays = Constants.ANON_RETENTION_DAYS,
                 };
                 return ClearAuthBlob();

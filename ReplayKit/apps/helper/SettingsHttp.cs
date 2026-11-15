@@ -125,6 +125,7 @@ namespace ReplayKitHelper
                 {
                     ["ok"] = true,
                     ["settings"] = settings,
+                    ["restartKeys"] = RestartSettingKeysForPage(),
                     ["menuColors"] = ActiveMenuColors(settings),
                     // a shipped font the native chrome adds to qt before it draws with the family of uiFont
                     ["uiFontFile"] = Fonts.NativePath(settings["uiFont"]?.Value<string>()),
@@ -198,19 +199,36 @@ namespace ReplayKitHelper
             }
         }
 
+        // the settings obs takes only as it starts, so saving a change to one restarts obs
+        private static readonly string[] RestartSettingKeys =
+        {
+            "recordingPreset", "compressionMode", "codecPreference", "fpsNumerator", "fpsDenominator", "recordingSeparateAudioTracks",
+            // recordingScaleMode + downscaleHeight apply live (stop outputs -> SetVideoSettings -> restart outputs, see ApplyRuntimeOutputsLive). downscaleFilter still needs a restart -- obs only re-reads Video/ScaleType from the profile ini on load, SetVideoSettings has no scale-type parameter.
+            "downscaleFilter",
+            // theme: obs only reads user.ini [Appearance] Theme= at startup, so a theme change needs a restart to reach obs (the dock + replaykit windows re-theme live on the fresh load). the Appearance tab shows a live preview meanwhile, the restart is what applies it
+            "theme",
+            // a page takes the font of the interface when it is served, so the font reaches every page at once through the restart that loads them all again
+            "uiFont",
+            // the clean layout is a frameless window with its own title bar, which the native plugin can only set up before obs shows its window
+            "interfaceLayout",
+        };
+
+        // what the settings page holds back until it is told to restart obs: the list above, the palette of a custom or saved theme, and the language, which SaveSettingsFromRequest checks against the one obs runs in
+        private static JArray RestartSettingKeysForPage()
+        {
+            var keys = new JArray();
+            foreach (var key in RestartSettingKeys) keys.Add(key);
+            keys.Add("themeCustom");
+            keys.Add("language");
+            return keys;
+        }
+
         internal static bool TestRestartRequired(JObject previous, JObject settings)
         {
-            // recordingScaleMode + downscaleHeight apply live (stop outputs -> SetVideoSettings -> restart outputs, see ApplyRuntimeOutputsLive). downscaleFilter still needs a restart -- obs only re-reads Video/ScaleType from the profile ini on load, SetVideoSettings has no scale-type parameter.
-            foreach (var key in new[] { "recordingPreset", "compressionMode", "codecPreference", "fpsNumerator", "fpsDenominator", "downscaleFilter", "recordingSeparateAudioTracks" })
+            foreach (var key in RestartSettingKeys)
             {
                 if (previous[key]?.ToString() != settings[key]?.ToString()) return true;
             }
-            // theme: obs only reads user.ini [Appearance] Theme= at startup, so a theme change needs a restart to reach obs (the dock + replaykit windows re-theme live on the fresh load). the Appearance tab shows a live preview meanwhile, the restart is what applies it
-            if (previous["theme"]?.ToString() != settings["theme"]?.ToString()) return true;
-            // a page takes the font of the interface when it is served, so the font reaches every page at once through the restart that loads them all again
-            if (previous["uiFont"]?.ToString() != settings["uiFont"]?.ToString()) return true;
-            // the clean layout is a frameless window with its own title bar, which the native plugin can only set up before obs shows its window
-            if (previous["interfaceLayout"]?.ToString() != settings["interfaceLayout"]?.ToString()) return true;
             string theme = settings["theme"]?.ToString() ?? "default";
             // the overlay style used to restart obs for the opengl bongo plugin, which could not be created and removed while obs ran; every overlay now switches live through ApplyOverlayLive
             return (theme == "custom" || theme.StartsWith("user/", StringComparison.Ordinal)) && !JToken.DeepEquals(previous["themeCustom"], settings["themeCustom"]);
@@ -346,9 +364,10 @@ namespace ReplayKitHelper
                 {
                     string clipDir;
                     try { clipDir = Normalize(ReadSettings())["clipDir"]?.Value<string>(); }
-                    catch { clipDir = null; }
+                    catch (InvalidOperationException ex) { Log.Write("EnsureObsRecordingFolder settings: " + ex.Message); clipDir = null; }
                     string resolved = string.IsNullOrWhiteSpace(clipDir) ? AppConfig.GetDefaultClipDir() : clipDir;
-                    try { resolved = Path.GetFullPath(resolved); } catch { }
+                    try { resolved = Path.GetFullPath(resolved); }
+                    catch (Exception ex) when (ex is ArgumentException || ex is NotSupportedException || ex is PathTooLongException || ex is System.Security.SecurityException) { Log.Write("EnsureObsRecordingFolder path: " + ex.Message); }
                     // heals installs whose helper_config predates the folder being settable in Settings, so the clip listing stops walking the default folder
                     SyncClipDirToRuntimeConfig(new JObject { ["clipDir"] = resolved });
                     try { Directory.CreateDirectory(resolved); } catch (Exception ex) { Log.Write("EnsureObsRecordingFolder mkdir: " + ex.Message); }

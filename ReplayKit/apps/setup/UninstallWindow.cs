@@ -127,7 +127,7 @@ namespace ReplayKitSetup
             catch (Exception ex)
             {
                 WriteErrorLog(ex);
-                InstallerApp.ShowFatalError(SetupLocale.Message("setup.theUninstallWindowCouldNotStart", "error", ex), null);
+                InstallerApp.ShowFatalError(SetupLocale.Message("setup.theUninstallWindowCouldNotStart", "error", ex.Message), null);
                 Native.DestroyWindow(_hwnd);
             }
         }

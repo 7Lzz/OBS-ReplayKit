@@ -31,6 +31,7 @@ namespace ReplayKitHelper
             if (path == "/status")
             {
                 var status = UploadState.GetUploadStatusSnapshot();
+                status["streamableSignedIn"] = Server.State.Auth.SignedIn;
                 status["clipSave"] = ClipBuffer.SaveStatus();
                 status["clipFolders"] = ClipFolderWorker.Status();
                 HttpResponse.SendJson(stream, 200, status);

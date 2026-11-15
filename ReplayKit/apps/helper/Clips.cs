@@ -463,20 +463,24 @@ namespace ReplayKitHelper
             }, Path.GetDirectoryName(sourcePath));
         }
 
-        // drop the streamable link + its transcode state from a clips_db entry (the "remove link" action on a failed / unwanted upload). keeps the cmp_* compress-history fields; removes the whole entry if nothing else was on it. returns false when there was no entry to touch.
-        public static bool RemoveLink(string name)
+        public static string GetLink(string name, string folder) =>
+            ClipStore.ReadFolder(AppConfig.GetDbPath(), LibraryRoot(folder), db => (db[name] as JObject)?.Value<string>("url"));
+
+        // keep the clip's other metadata and leave a replacement link intact.
+        public static bool RemoveLink(string name, string expectedUrl = null, string folder = null)
         {
             if (string.IsNullOrWhiteSpace(name)) return false;
             return UpdateDb(db =>
             {
                 if (!(db[name] is JObject entry)) return false;
+                if (expectedUrl != null && !string.Equals(entry.Value<string>("url"), expectedUrl, StringComparison.Ordinal)) return false;
                 foreach (var k in new[] { "url", "uploaded_at", "retention_days", "shortcode", "ready", "transcode_status", "transcode_percent", "failed", "transcode_error" })
                     entry.Remove(k);
                 if (entry.Count > 0) db[name] = entry;
                 else db.Remove(name);
 
                 return true;
-            });
+            }, folder);
         }
 
         // copy a clip file to "<name> (copy).<ext>" (or " (copy 2)", " (copy 3)" ...) in the same folder, keeping the source mtime so it sorts right next to the original. the copy starts fresh -- no clips_db entry is carried over, so it has no link / favorite / compress marker.

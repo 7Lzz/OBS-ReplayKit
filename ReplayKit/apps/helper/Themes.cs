@@ -623,7 +623,7 @@ namespace ReplayKitHelper
                 string l = j["label"]?.Value<string>();
                 if (!string.IsNullOrWhiteSpace(l)) return l;
             }
-            catch { }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is Newtonsoft.Json.JsonException || ex is InvalidCastException || ex is ArgumentException) { Log.Write("Themes.UserThemeLabel: " + ex.Message); }
             return Path.GetFileNameWithoutExtension(fileName);
         }
 
@@ -704,7 +704,7 @@ namespace ReplayKitHelper
             }
             finally
             {
-                try { if (File.Exists(temp)) File.Delete(temp); } catch { }
+                try { if (File.Exists(temp)) File.Delete(temp); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { Log.Write("Themes temp cleanup: " + ex.Message); }
             }
         }
 

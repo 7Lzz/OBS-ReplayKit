@@ -383,6 +383,10 @@
     "source": "ba654163a6dd9fca",
     "text": "Подтвердить перемещение в корзину ({count})"
   },
+  "clips.confirmStreamableDelete": {
+    "source": "474106522234058b",
+    "text": "Нажмите ещё раз, чтобы навсегда удалить видео из Streamable"
+  },
   "clips.containsGames": {
     "source": "e704b140b41ce861",
     "text": "Содержит {games}"
@@ -527,6 +531,10 @@
     "source": "9e6d8f9b4b3d673c",
     "text": "Удалить навсегда"
   },
+  "clips.deleteFromStreamable": {
+    "source": "814603f774347773",
+    "text": "Удалить из Streamable"
+  },
   "clips.deleteGif": {
     "source": "a3e08b9cd13492d2",
     "text": "Удалить GIF"
@@ -550,6 +558,10 @@
   "clips.deletedForGoodSoon": {
     "source": "06feb61b74dcd214",
     "text": "Скоро будет удалено навсегда"
+  },
+  "clips.deletedFromStreamable": {
+    "source": "241594a07144433d",
+    "text": "Видео удалено из Streamable"
   },
   "clips.deletedHistoryCount": {
     "source": "0347ad9acabf6ba3",
@@ -1607,6 +1619,18 @@
   "clips.streamableCheckTimedOut": {
     "source": "73cbf2a9f94b12d4",
     "text": "Проверка статуса на Streamable прервана по тайм-ауту через 30 минут."
+  },
+  "clips.streamableDeleteFailed": {
+    "source": "60a24d0a0f5989bf",
+    "text": "Не удалось удалить видео. Проверьте, что оно принадлежит аккаунту Streamable, в который вы вошли."
+  },
+  "clips.streamableDeletedLinkRemains": {
+    "source": "708eb10ac780b0b1",
+    "text": "Streamable удалил видео, но ReplayKit не удалось убрать ссылку."
+  },
+  "clips.streamableLinkChanged": {
+    "source": "48be168a85ec73c7",
+    "text": "Ссылка Streamable изменилась или больше недоступна."
   },
   "clips.thatCouldNotBeDone": {
     "source": "6eab7f00f3e45f30",
@@ -6292,30 +6316,6 @@
     "source": "417cf9c08b0b8d6c",
     "text": "Применить"
   },
-  "settings.applyFailedError": {
-    "source": "9749057463b8fad4",
-    "text": "Не удалось применить: {error}"
-  },
-  "settings.applyOrCancelSettingsChangesBefore": {
-    "source": "cafd4e725ba3d52d",
-    "text": "Примените или отмените изменения настроек перед удалением."
-  },
-  "settings.applyOrCancelSettingsChangesFirst": {
-    "source": "24c5292e2868f6aa",
-    "text": "Сначала примените или отмените изменения настроек."
-  },
-  "settings.applyRestart": {
-    "source": "62988a30203f965e",
-    "text": "Применить и перезапустить"
-  },
-  "settings.applyingSettings": {
-    "source": "c877ec9b6a085339",
-    "text": "Применение настроек..."
-  },
-  "settings.applyingSettingsAndRestartingObs": {
-    "source": "d82f0742406d836b",
-    "text": "Применение настроек и перезапуск OBS..."
-  },
   "settings.arrowKeySkip": {
     "source": "6137822ccd053c1e",
     "text": "Шаг перемотки стрелками"
@@ -6668,10 +6668,6 @@
     "source": "d88142e324dafafd",
     "text": "Не удалось изменить видимость Bongo Cat: {error}"
   },
-  "settings.couldNotChangeName": {
-    "source": "69f79c7a72505e7d",
-    "text": "Не удалось изменить {name}."
-  },
   "settings.couldNotChangeNoiseSuppressionError": {
     "source": "fbf6531683d5f5da",
     "text": "Не удалось изменить подавление шума: {error}"
@@ -6879,6 +6875,10 @@
   "settings.couldNotRotateOverlayError": {
     "source": "061072c2f3c67ae8",
     "text": "Не удалось повернуть оверлей: {error}"
+  },
+  "settings.couldNotSaveTheSettingsError": {
+    "source": "f381ed59bdef13ac",
+    "text": "Не удалось сохранить настройки: {error}"
   },
   "settings.couldNotSaveTheme": {
     "source": "740913bd6cd7b7ac",
@@ -7208,9 +7208,9 @@
     "source": "135ce9d090fd8748",
     "text": "Уменьшить до"
   },
-  "settings.dragToMoveUseTheCorners": {
-    "source": "bc8d85be8af34e72",
-    "text": "Перетащите, чтобы переместить, за углы измените размер, а за круглый маркер поверните. Поворот прилипает к углам 90 градусов. Удерживайте Shift, чтобы отключить прилипание. Нажмите Ctrl+Z, чтобы отменить перемещение, изменение размера или поворот. Изменения применяются при нажатии «Применить»."
+  "settings.dragToMoveUseTheCornersToResize": {
+    "source": "f731afc293d36ad8",
+    "text": "Перетащите, чтобы переместить, за углы измените размер, а за круглый маркер поверните. Поворот прилипает к углам 90 градусов. Удерживайте Shift, чтобы отключить прилипание. Нажмите Ctrl+Z, чтобы отменить перемещение, изменение размера или поворот."
   },
   "settings.dragToPosition": {
     "source": "43ddd66cdc6eb3f4",
@@ -7888,9 +7888,9 @@
     "source": "4f3628452e51e173",
     "text": "Отключить звук Discord"
   },
-  "settings.mutesOrUnmutesThisSoundIn": {
-    "source": "d0dac12fce8c2c18",
-    "text": "Выключает или включает этот звук в OBS. Изменение применяется при нажатии «Применить» или «ОК»."
+  "settings.mutesOrUnmutesThisSoundInObs": {
+    "source": "4ccb5ac674e1f766",
+    "text": "Выключает или включает этот звук в OBS."
   },
   "settings.n10FpsSmallest": {
     "source": "6690b124bcd6762b",
@@ -8016,10 +8016,6 @@
     "source": "21163f9d9c6e3bc0",
     "text": "Нет доступной сцены OBS."
   },
-  "settings.noSettingsChanged": {
-    "source": "583a5150efd3478e",
-    "text": "Настройки не изменились"
-  },
   "settings.noSignInIsNeededTo": {
     "source": "9a607cb83d8e7a97",
     "text": "Вход не нужен, чтобы загружать клипы и создавать ссылки для общего доступа. Анонимные загрузки используют лимиты ниже. Войдите, чтобы новые загрузки сохранялись в вашей учётной записи."
@@ -8035,6 +8031,10 @@
   "settings.none": {
     "source": "f2953d2931e36d0c",
     "text": "Нет"
+  },
+  "settings.notAffiliatedWithStreamable": {
+    "source": "647bde456f398520",
+    "text": "ReplayKit не связан со Streamable. Загрузки подчиняются тарифам и ограничениям Streamable, которые Streamable может изменить."
   },
   "settings.num": {
     "source": "c483792012d1aecb",
@@ -8296,10 +8296,6 @@
     "source": "111fd0852e756ee7",
     "text": "Виртуальная камера"
   },
-  "settings.overlayApplyFailedError": {
-    "source": "738255c1ef31bf55",
-    "text": "Не удалось применить оверлей: {error}"
-  },
   "settings.overlayColorAdd": {
     "source": "60fe2f0560fa3a05",
     "text": "Оверлей: добавление цвета"
@@ -8480,13 +8476,13 @@
     "source": "7cc1cbde1dd4c94c",
     "text": "Более высокое качество для мощных ПК."
   },
-  "settings.presetSavedApplyToUseIt": {
-    "source": "282c7f89ab3a78db",
-    "text": "Пресет сохранён. Примените его, чтобы использовать в OBS."
+  "settings.presetSaved": {
+    "source": "5754d4021b95d016",
+    "text": "Пресет сохранён."
   },
-  "settings.presetUpdatedApplyToUpdateObs": {
-    "source": "3004816539b8da5b",
-    "text": "Пресет обновлён. Примените его, чтобы обновить OBS."
+  "settings.presetUpdated": {
+    "source": "d64e9dc0662e2c1b",
+    "text": "Пресет обновлён."
   },
   "settings.pressAKey": {
     "source": "d5fa95d1806530dd",
@@ -8696,9 +8692,9 @@
     "source": "1f00b398df5fb06f",
     "text": "ReplayKit обновлён ({version})"
   },
-  "settings.replaykitNeedsRepairApplyOrCancel": {
-    "source": "62719d1405529b14",
-    "text": "ReplayKit нужно восстановить. Сначала примените или отмените изменения настроек."
+  "settings.replaykitNeedsRepairRestartOrUndo": {
+    "source": "f1826db758cef701",
+    "text": "ReplayKit нужно восстановить. Некоторые изменения настроек ещё не сохранены, поэтому сначала перезапустите OBS или отмените их."
   },
   "settings.replaykitNeedsRepairUseTheUpdate": {
     "source": "9848b48c05d56b89",
@@ -8811,10 +8807,6 @@
   "settings.setShortcutsForSavingClipsRecording": {
     "source": "5cdbf8597c6ecc58",
     "text": "Задайте горячие клавиши для сохранения клипов, записи и открытия библиотеки."
-  },
-  "settings.settingsApplied": {
-    "source": "ff9b0fd84a03a831",
-    "text": "Настройки применены"
   },
   "settings.settingsChanged": {
     "source": "735553f4b318a7bb",
@@ -9000,6 +8992,14 @@
     "source": "38942d2b60f4ad2a",
     "text": "Быстро сглаживает зубчатые края. Мелкие детали могут выглядеть мягче."
   },
+  "settings.someChangesTakeEffectAfterObsRestarts": {
+    "source": "e90960b323eb8b66",
+    "text": "Некоторые изменения вступят в силу после перезапуска OBS."
+  },
+  "settings.someSettingsChangesAreNotSavedYet": {
+    "source": "84a4b2684df78edc",
+    "text": "Некоторые изменения настроек ещё не сохранены. Сначала перезапустите OBS или отмените их."
+  },
   "settings.sounds": {
     "source": "92375472db9662ea",
     "text": "Звуки"
@@ -9059,6 +9059,10 @@
   "settings.storageCompressionType": {
     "source": "2b18fed600f92087",
     "text": "Тип сжатия хранилища"
+  },
+  "settings.streamableUploadDeletion": {
+    "source": "079d533a30adf902",
+    "text": "Через меню клипа можно удалить клипы, загруженные в ваш аккаунт Streamable."
   },
   "settings.switchSpeed": {
     "source": "66caae8c2c48a6a8",
@@ -9268,10 +9272,6 @@
     "source": "b16d021e8f3130c8",
     "text": "Без ограничений"
   },
-  "settings.updateAvailableLatestApplyOrCancel": {
-    "source": "93fac0decc666ec0",
-    "text": "Доступно обновление: {latest}. Сначала примените или отмените изменения настроек."
-  },
   "settings.updateAvailableLatestInstalledInstalled": {
     "source": "05c45daac5ecbde8",
     "text": "Доступно обновление: {latest} (установлено {installed})"
@@ -9279,6 +9279,10 @@
   "settings.updateAvailableLatestInstalledInstalledUse": {
     "source": "f3dde09189373d88",
     "text": "Доступно обновление: {latest} (установлено {installed}). Установите его кнопкой обновления вверху."
+  },
+  "settings.updateAvailableLatestRestartOrUndo": {
+    "source": "3aacb2b2c5882cd1",
+    "text": "Доступно обновление: {latest}. Некоторые изменения настроек ещё не сохранены, поэтому сначала перезапустите OBS или отмените их."
   },
   "settings.updateCheckFailedError": {
     "source": "a3bc85869fe0a75a",
@@ -9307,10 +9311,6 @@
   "settings.uploadSize": {
     "source": "197f08bfbafc075b",
     "text": "Размер загрузки"
-  },
-  "settings.uploadingAnonymously": {
-    "source": "91310b0ae2cbdb6e",
-    "text": "Загрузка анонимно"
   },
   "settings.useAGradientForBackground": {
     "source": "f6b35c44145b756e",

@@ -49,7 +49,7 @@
 <div class="ovp-wrap">
   <div class="ovp-hint">
     <span class="ovp-hint-text" data-i18n="settings.dragToPosition"></span>
-    <span class="control-note" data-i18n="settings.dragToMoveUseTheCorners"></span>
+    <span class="control-note" data-i18n="settings.dragToMoveUseTheCornersToResize"></span>
   </div>
   <div class="ovp-screen" id="ovpScreen">
     <div class="ovp-off" id="ovpOff" hidden data-i18n="settings.inputOverlayIsOff"></div>
@@ -306,7 +306,7 @@
     if (live) {
       bx = live.x * CANVAS_W; by = live.y * CANVAS_H;
       bw = live.w * CANVAS_W; bh = live.h * CANVAS_H;
-      // an unapplied size edit grows the real box, anchored the way the helper ScaleAnchor does at Apply: an edge on the canvas edge stays there, else an item in an outer third keeps to that side, else the center holds
+      // an unapplied size edit grows the real box, anchored the way the helper ScaleAnchor does on save: an edge on the canvas edge stays there, else an item in an outer third keeps to that side, else the center holds
       var f = clampNum(curScalePct(), 50, 200, 100) / (live.scalePct || 100);
       if (Math.abs(f - 1) > 0.0005) {
         var nw = bw * f, nh = bh * f;
@@ -418,7 +418,7 @@
   }
 
   // ---- corner resize ----
-  // the box grows or shrinks by how far the corner moved from where it was grabbed, measured on both axes and averaged so a diagonal pull feels even; the new size goes through the size slider, which is what obs and Apply read
+  // the box grows or shrinks by how far the corner moved from where it was grabbed, measured on both axes and averaged so a diagonal pull feels even; the new size goes through the size slider, which is what obs and the save read
   var resize = null;
   function onGripDown(ev) {
     if (!running || mode === "off" || ev.button !== 0 || !stageRect || !onScale) return;
@@ -703,7 +703,7 @@
       if (changed) applyMode();
       else layout();
     },
-    // selecting an overlay clears its saved drag override. Keep the preview on the hard-coded transform until Apply updates OBS; otherwise the first poll can briefly replace it with the old live scene-item rectangle.
+    // selecting an overlay clears its saved drag override. Keep the preview on the hard-coded transform until the save updates OBS; otherwise the first poll can briefly replace it with the old live scene-item rectangle.
     resetPosition: function () {
       liveRect = null;
       posOverride = null;

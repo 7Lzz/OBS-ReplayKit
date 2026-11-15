@@ -194,7 +194,7 @@ namespace ReplayKitHelper
                 string p = ReplaykitSettings.EffectiveReplayKitIconPath();
                 if (!string.IsNullOrEmpty(p) && File.Exists(p)) return p;
             }
-            catch { }
+            catch (Exception ex) { Log.Write("ResolveToastIconPath: " + ex.Message); }
             foreach (var cand in new[]
             {
                 Constants.OBS_ICON_PATH,

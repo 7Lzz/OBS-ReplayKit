@@ -500,101 +500,6 @@
   /* "browse…" button next to a path text field -- opens a native file/folder picker */
   .field-wrap:has(> .field-browse) > .text-input { width:auto; flex:1 1 0; min-width:0; }
   .field-browse { flex:none; }
-  /* Appearance tab app-icon picker */
-  .icon-grid { display:flex; flex-wrap:wrap; gap:8px; }
-  .icon-tile {
-    position:relative;
-    display:flex; flex-direction:column; align-items:center; gap:6px;
-    width:78px; padding:9px 4px 7px;
-    background:var(--field-dark); border:1px solid var(--line); border-radius:7px;
-    color:var(--text); cursor:pointer; font-size:11px; line-height:1;
-    transition:background var(--anim_press) var(--ease_pop), border-color var(--anim_press) var(--ease_pop);
-  }
-  .icon-tile:hover { background:var(--button-hover); }
-  .icon-tile.is-selected { border-color:var(--selected2); background:var(--selected); color:var(--on-accent); }
-  .icon-tile img, .icon-tile .icon-tile-swatch { width:40px; height:40px; }
-  .icon-tile img { object-fit:contain; image-rendering:auto; }
-  .icon-tile .icon-tile-swatch {
-    display:flex; align-items:center; justify-content:center;
-    background:var(--field); border-radius:6px; color:var(--muted); font-size:9px; text-align:center;
-  }
-  /* line-height 1.4 (not the tile's inherited 1) so descenders -- g j y p -- arent clipped by overflow:hidden */
-  .icon-tile-label { max-width:70px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; line-height:1.4; }
-  .icon-tile-del {
-    position:absolute; top:3px; right:3px;
-    display:flex; align-items:center; justify-content:center;
-    width:16px; height:16px; padding:0; border:0; border-radius:4px;
-    background:var(--field); color:var(--muted); cursor:pointer; opacity:0;
-    transition:opacity var(--anim_press) var(--ease_pop), color 80ms ease-out, background 80ms ease-out;
-  }
-  .icon-tile:hover .icon-tile-del, .icon-tile-del:focus-visible { opacity:1; }
-  .icon-tile-del:hover { background:var(--field-dark); color:var(--danger); }
-  .icon-tile-edit {
-    position:absolute; top:3px; left:3px;
-    display:flex; align-items:center; justify-content:center;
-    width:18px; height:18px; padding:0; border:0; border-radius:4px;
-    background:var(--field); color:var(--muted); cursor:pointer; opacity:0;
-    transition:opacity var(--anim_press) var(--ease_pop), color 80ms ease-out, background 80ms ease-out;
-  }
-  .icon-tile:hover .icon-tile-edit, .icon-tile-edit:focus-visible { opacity:1; }
-  .icon-tile-edit:hover { background:var(--field-dark); color:var(--text); }
-  .icon-tile-edit svg { width:10px; height:10px; fill:currentColor; }
-  .icon-tile-del svg { width:8px; height:8px; fill:currentColor; }
-  /* theme tile swatch */
-  .theme-sw { width:40px; height:40px; border-radius:6px; overflow:hidden; position:relative; border:1px solid var(--line); }
-  .theme-sw i { position:absolute; left:0; right:0; bottom:0; height:42%; display:block; }
-  .theme-sw b { position:absolute; top:5px; right:5px; width:9px; height:9px; border-radius:50%; box-shadow:0 0 0 1.5px rgba(0,0,0,.25); }
-  .theme-section { width:100%; padding:10px; border:1px solid var(--line); border-radius:6px; background:transparent; }
-  .theme-section + .theme-section { margin-top:9px; }
-  .theme-section-title { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px; font-size:12px; font-weight:600; }
-  .theme-section-hint { color:var(--muted); font-size:10px; font-weight:400; }
-  .theme-editor { display:flex; flex-wrap:wrap; gap:8px; }
-  .theme-preview-row { margin-top:8px; }
-  .theme-preview-row .btn { height:26px; padding:0 10px; font-size:12px; }
-  .theme-pick { display:flex; flex-direction:column; align-items:center; gap:4px; font-size:10px; color:var(--muted); cursor:pointer; }
-  .theme-pick .color-picker { width:38px; height:30px; border-color:var(--line); border-radius:6px; }
-  .gradient-editor { width:100%; margin-top:9px; }
-  .gradient-editor[hidden] { display:none; }
-  .gradient-top { display:grid; grid-template-columns:130px 1fr; gap:8px; align-items:center; }
-  .gradient-preview { height:34px; border:1px solid var(--line2); border-radius:5px; background:var(--gradient-preview,var(--field)); }
-  .gradient-control { display:grid; grid-template-columns:88px minmax(120px,1fr) 58px; align-items:center; gap:8px; margin-top:8px; }
-  .gradient-control .label { font-size:11px; }
-  .gradient-number { width:58px; text-align:right; }
-  .gradient-stops-head { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:10px; }
-  .gradient-stop-list { display:flex; flex-direction:column; gap:6px; margin-top:6px; }
-  .gradient-stop-row { display:grid; grid-template-columns:42px minmax(120px,1fr) 58px 28px; align-items:center; gap:7px; }
-  .gradient-stop-remove { min-width:28px; width:28px; padding:0; }
-  .gradient-stop-remove svg { width:10px; height:10px; fill:currentColor; }
-  .grad-targets { display:flex; gap:4px; flex-wrap:wrap; }
-  .grad-target {
-    display:inline-flex; align-items:center; gap:6px; height:26px; padding:0 10px; cursor:pointer;
-    border:1px solid var(--line); border-radius:4px; background:var(--field); color:var(--text);
-    font:inherit; font-size:12px;
-  }
-  .grad-target:hover { background:var(--line2); }
-  .grad-target.is-active { border-color:var(--selected2); background:var(--selected); color:var(--on-accent,#fff); }
-  /* filled only while that surface actually has a gradient, so the row doubles as an at-a-glance summary */
-  .grad-target-dot { width:7px; height:7px; border-radius:50%; background:transparent; box-shadow:inset 0 0 0 1px currentColor; }
-  .grad-target.has-gradient .grad-target-dot { background:currentColor; }
-
-  /* gradient stop ramp -- stops are dragged directly on the ramp that shows them, rather than edited as a list of number fields. --ramp is the left-to-right colour run, set from js. */
-  .grad-ramp {
-    position:relative; height:38px; margin:2px 0 0; border:1px solid var(--line2); border-radius:5px;
-    background-image:var(--ramp,none); background-color:var(--field-dark); cursor:copy;
-  }
-  /* handles borrow the trim bar's endcap language from clips.html -- same 12px full-height cap, 5px radius and
-     shadow. the white body becomes an inset ring instead, so the stop's colour reads through the middle; the
-     trim grip stroke is dropped rather than layered under the colour, where it would only show on pale stops. */
-  .grad-ramp-handle {
-    position:absolute; top:-1px; bottom:-1px; left:0; width:12px; margin-left:-6px; padding:0;
-    border:0; border-radius:5px; cursor:grab; background:var(--color,#000);
-    box-shadow:inset 0 0 0 2px var(--text), 0 0 0 1px rgba(0,0,0,.35), 0 1px 6px rgba(0,0,0,.45);
-  }
-  .grad-ramp-handle.is-selected { box-shadow:inset 0 0 0 2px var(--text), 0 0 0 2px var(--selected2), 0 1px 6px rgba(0,0,0,.45); z-index:2; }
-  .grad-ramp-handle.is-dragging { cursor:grabbing; }
-  .grad-ramp-foot { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:7px; }
-  .grad-ramp-foot .btn { flex:none; height:26px; padding:0 10px; font-size:12px; }
-
   /* the floating colour picker lives in the shared _color-picker partial now */
 
   .inline-status {
@@ -605,6 +510,8 @@
   }
   .inline-status.good { color:var(--success); }
   .inline-status.bad { color:var(--danger); }
+  .update-label { display:flex; align-items:baseline; gap:12px; }
+  .update-label .inline-status { min-height:0; font-weight:400; overflow-wrap:anywhere; }
   .release-link { color:var(--link); font-size:12px; text-decoration:none; }
   .release-link:hover { text-decoration:underline; }
   .release-link[hidden] { display:none; }
@@ -619,6 +526,8 @@
   .settings-history { display:flex; gap:4px; margin-right:auto; }
   .settings-history .btn { display:grid; place-items:center; min-width:32px; width:32px; padding:0; }
   .settings-history svg { width:17px; height:17px; fill:currentColor; }
+  .footer-note { min-width:0; color:var(--muted); font-size:12px; line-height:1.35; text-align:right; }
+  .footer-note.bad { color:var(--danger); }
   .btn {
     min-width:52px;
     height:30px;
@@ -753,7 +662,7 @@
   }
   .page .form-row.setting-wide > :is(.check-row, .action-row) > span { flex:1; }
   .page .form-row.setting-wide > :is(.field-wrap, .inline-status) { grid-column:1; }
-  .page .form-row:has(.inline-status):not(:has(.inline-status:not(:empty), .release-link:not([hidden]))) { display:none; }
+  .page .form-row:not(:has(> .label)):has(.inline-status, .release-link):not(:has(.inline-status:not(:empty), .release-link:not([hidden]))) { display:none; }
   .page .field-wrap > .text-input, .page .field-wrap > .spin { min-width:0; }
   .page .hint { margin-left:0; line-height:1.5; }
   .page .volume-control { grid-template-columns:60px minmax(0,1fr); min-width:0; }
@@ -1126,7 +1035,7 @@
 
 </div>
         </div>
-        <!-- the two mutes of the list: the switches in the rows are the other way round of these, and these carry the queue that waits for Apply -->
+        <!-- the two mutes of the list: the switches in the rows are the other way round of these, and these are the ones that act on obs -->
         <input type="checkbox" id="liveMuteMic" disabled hidden>
         <input type="checkbox" id="liveMuteDesktop" disabled hidden>
         <!-- the pc audio volume is the slider of the PC Audio row and of the Game Audio section; this row only carries the control the page reads and writes -->
@@ -1152,7 +1061,7 @@
           <div></div>
           <div class="check-row">
 <input aria-label="Mute Discord audio" disabled="" id="liveMuteDiscord" type="checkbox" data-i18n-aria-label="settings.muteDiscordAudio"/>
-<span><span data-i18n="settings.muteDiscordAudio"></span><span class="control-note" data-i18n="settings.mutesOrUnmutesThisSoundIn"></span></span>
+<span><span data-i18n="settings.muteDiscordAudio"></span><span class="control-note" data-i18n="settings.mutesOrUnmutesThisSoundInObs"></span></span>
 
 </div>
         </div>
@@ -1767,8 +1676,11 @@
             <div class="profile-picture-error" id="profilePictureError" role="alert" hidden></div>
           </div>
         </div>
-        <div class="form-row" data-search="streamable account anonymous uploads connection">
-          <div class="label"><span data-i18n="settings.connection"></span><span class="setting-description" id="streamableHelp" data-i18n="settings.youCanUploadClipsAndCreate"></span></div>
+        <div class="form-row" data-search="streamable account anonymous uploads connection delete">
+          <div class="label">
+            <span data-i18n="settings.connection"></span>
+            <span class="setting-description"><span id="streamableHelp" data-i18n="settings.youCanUploadClipsAndCreate"></span> <span data-i18n="settings.streamableUploadDeletion"></span></span>
+          </div>
           <div class="field-wrap is-stacked">
           <div class="account-status" id="streamableStatus" role="status" aria-live="polite" data-i18n="settings.checkingConnection"></div>
           <div class="account-actions">
@@ -1785,7 +1697,7 @@
         <div class="form-row"><div class="label"><span class="account-label"><svg data-i="nav/tab-storage" viewBox="0 0 16 16" aria-hidden="true"></svg><span data-i18n="settings.uploadSize"></span></span><span class="setting-description" data-i18n="settings.maximumFileSizePerVideo"></span></div><div class="field-wrap"><span class="account-value" id="streamableSize"></span></div></div>
         <div class="form-row"><div class="label"><span class="account-label"><svg data-i="nav/tab-editor" viewBox="0 0 16 16" aria-hidden="true"></svg><span data-i18n="settings.videoLength"></span></span><span class="setting-description" data-i18n="settings.maximumLengthPerVideo"></span></div><div class="field-wrap"><span class="account-value" id="streamableDuration"></span></div></div>
         <div class="form-row"><div class="label"><span class="account-label"><svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:settings-3}}</svg><span data-i18n="settings.clipRetention"></span></span><span class="setting-description" data-i18n="settings.howLongNewUploadsRemainAvailable"></span></div><div class="field-wrap"><span class="account-value" id="streamableRetention"></span></div></div>
-        <p class="upload-details-note" data-i18n="settings.limitsApplyToNewUploadsExisting"></p>
+        <p class="upload-details-note"><span data-i18n="settings.limitsApplyToNewUploadsExisting"></span> <span data-i18n="settings.notAffiliatedWithStreamable"></span></p>
       </div>
     </section>
 
@@ -1826,7 +1738,10 @@
       <div class="box">
         <div class="box-title" data-i18n="settings.updates"></div>
         <div class="form-row">
-          <div class="label" data-i18n="common.replaykit"></div>
+          <div class="label update-label">
+            <span data-i18n="common.replaykit"></span>
+            <span class="inline-status" id="updateStatusLine" role="status"></span>
+          </div>
           <div class="field-wrap">
             <button class="btn" type="button" id="checkUpdateBtn" data-i18n="settings.checkForUpdates"></button>
           </div>
@@ -1834,7 +1749,6 @@
         <div class="form-row tight">
           <div></div>
           <div>
-            <div class="inline-status" id="updateStatusLine"></div>
             <a class="release-link" id="updateReleaseLink" href="https://github.com/7Lzz/OBS-ReplayKit/releases/latest" target="_blank" rel="noopener noreferrer" hidden data-i18n="settings.downloadManuallyFromGithub"></a>
           </div>
         </div>
@@ -1950,91 +1864,7 @@
     </section>
 
     <section class="page" id="page-appearance">
-      <div class="box">
-        <div class="box-title" data-i18n="settings.theme"></div>
-        <div class="form-row">
-          <div class="label" data-i18n="settings.theme"></div>
-          <div class="field-wrap is-stacked">
-            <div class="icon-grid" id="themeGrid"></div>
-          </div>
-        </div>
-        <div class="form-row" id="themeCustomRow" hidden>
-          <div class="label" data-i18n="settings.customTheme"></div>
-          <div class="field-wrap is-stacked">
-            <div class="theme-section">
-              <div class="theme-section-title"><span><span data-i18n="settings.baseColors"></span> <span class="control-note" data-i18n="settings.clickAColorSquareToChange"></span></span></div>
-              <div class="theme-editor" id="themeEditor">
-                <div class="theme-pick"><button class="color-picker" type="button" data-k="bg" aria-label="Background color" data-i18n-aria-label="common.backgroundColor"></button><span data-i18n="settings.background"></span></div>
-                <div class="theme-pick"><button class="color-picker" type="button" data-k="panel" aria-label="Panel color" data-i18n-aria-label="settings.panelColor"></button><span data-i18n="settings.panel"></span></div>
-                <div class="theme-pick"><button class="color-picker" type="button" data-k="field" aria-label="Field color" data-i18n-aria-label="settings.fieldColor"></button><span data-i18n="settings.field"></span></div>
-                <div class="theme-pick"><button class="color-picker" type="button" data-k="text" aria-label="Text color" data-i18n-aria-label="common.textColor"></button><span data-i18n="common.text"></span></div>
-                <div class="theme-pick"><button class="color-picker" type="button" data-k="accent" aria-label="Accent color" data-i18n-aria-label="settings.accentColor"></button><span data-i18n="settings.accent"></span></div>
-                <div class="theme-pick"><button class="color-picker" type="button" data-k="border" aria-label="Border color" data-i18n-aria-label="common.borderColor"></button><span data-i18n="settings.border"></span></div>
-                <div class="theme-pick"><button class="color-picker" type="button" data-k="danger" aria-label="Danger color" data-i18n-aria-label="settings.dangerColor"></button><span data-i18n="settings.danger"></span></div>
-                <div class="theme-pick" data-tooltip="Title bar and sidebar" data-i18n-data-tooltip="settings.titleBarAndSidebar"><button class="color-picker" type="button" data-k="bar" aria-label="Title bar and sidebar color" data-i18n-aria-label="settings.titleBarAndSidebarColor"></button><span data-i18n="settings.bars"></span></div>
-              </div>
-            </div>
-            <div class="theme-section">
-              <div class="theme-section-title"><span><span data-i18n="settings.gradients"></span> <span class="control-note" data-i18n="settings.letsAnAreaFadeBetweenColors"></span></span></div>
-              <div class="grad-targets" id="themeGradientTargets" role="tablist" aria-label="Which surface to give a gradient" data-i18n-aria-label="settings.whichSurfaceToGiveAGradient"></div>
-              <div class="check-row" style="margin-top:8px"><input type="checkbox" id="themeGradientEnabled" aria-labelledby="themeGradientEnabledLabel"><span id="themeGradientEnabledLabel" data-i18n="settings.useAGradientForBackground"></span></div>
-              <div class="gradient-editor" id="themeGradientEditor" hidden>
-                <div class="gradient-top">
-                  <div class="combo" id="themeGradientType" tabindex="0" role="combobox" aria-expanded="false" aria-label="Gradient type" data-i18n-aria-label="settings.gradientType"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button><div class="combo-menu" role="listbox"></div></div>
-                  <div class="gradient-preview" id="themeGradientPreview"></div>
-                </div>
-                <div id="themeGradientLinearControls">
-                  <div class="gradient-control"><div class="label" data-i18n="settings.angle"></div><input class="volume-slider rk-range" id="themeGradientAngle" type="range" min="0" max="359" step="1" aria-label="Gradient angle" data-i18n-aria-label="settings.gradientAngle"><input class="text-input gradient-number" id="themeGradientAngleValue" type="text" inputmode="numeric" maxlength="3" aria-label="Gradient angle value" data-i18n-aria-label="settings.gradientAngleValue"></div>
-                </div>
-                <div id="themeGradientRadialControls" hidden>
-                  <div class="gradient-control"><div class="label" data-i18n="settings.centerX"></div><input class="volume-slider rk-range" id="themeGradientCenterX" type="range" min="0" max="100" step="1" aria-label="Gradient center X" data-i18n-aria-label="settings.gradientCenterX"><input class="text-input gradient-number" id="themeGradientCenterXValue" type="text" inputmode="numeric" maxlength="3" aria-label="Gradient center X value" data-i18n-aria-label="settings.gradientCenterXValue"></div>
-                  <div class="gradient-control"><div class="label" data-i18n="settings.centerY"></div><input class="volume-slider rk-range" id="themeGradientCenterY" type="range" min="0" max="100" step="1" aria-label="Gradient center Y" data-i18n-aria-label="settings.gradientCenterY"><input class="text-input gradient-number" id="themeGradientCenterYValue" type="text" inputmode="numeric" maxlength="3" aria-label="Gradient center Y value" data-i18n-aria-label="settings.gradientCenterYValue"></div>
-                </div>
-                <div class="grad-ramp" id="themeGradientRamp" role="group" aria-label="Gradient stops" data-i18n-aria-label="settings.gradientStops"></div>
-                <div class="grad-ramp-foot">
-                  <span class="theme-section-hint" data-i18n="settings.clickTheRampToAddA"></span>
-                  <button class="btn" type="button" id="removeGradientStopBtn" disabled data-i18n="settings.removeStop"></button>
-                </div>
-              </div>
-            </div>
-            <div class="theme-section">
-              <div class="theme-section-title"><span data-i18n="settings.windowBehavior"></span></div>
-              <div class="check-row"><input aria-label="Use dark icons, menus and native controls" id="themeCustomDark" type="checkbox" data-i18n-aria-label="settings.useDarkIconsMenusAndNative"/><span><span data-i18n="settings.useDarkIconsMenusAndNative"></span><span class="control-note" data-i18n="settings.turnThisOffIfYourTheme"></span></span></div>
-            </div>
-            <div class="form-row" style="grid-template-columns:1fr auto auto; gap:6px; margin-top:8px; padding:0">
-              <input class="text-input" id="themeName" type="text" spellcheck="false" placeholder="Name this theme" maxlength="40" data-i18n-placeholder="settings.nameThisTheme">
-              <button class="btn" type="button" id="cancelThemeEditBtn" hidden data-i18n="settings.cancelEdit"></button>
-              <button class="btn" type="button" id="saveThemeBtn" data-i18n="settings.saveAsPreset"></button>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="box">
-        <div class="box-title" data-i18n="settings.appIcon"></div>
-        <div class="form-row">
-          <div class="label" data-i18n="settings.icon"></div>
-          <div class="field-wrap is-stacked">
-            <div class="icon-grid" id="appIconGrid"></div>
-          </div>
-        </div>
-        <div class="form-row" id="appIconCustomRow" hidden>
-          <div class="label" data-i18n="settings.customFile"></div>
-          <div class="field-wrap">
-            <input class="text-input" id="appIconCustomPath" type="text" spellcheck="false" placeholder="C:\path\to\icon.ico  (.ico, .png, .jpg, .bmp)" data-i18n-placeholder="settings.cPathToIconIcoIco">
-            <button class="icon-btn field-browse" type="button" id="browseAppIcon" title="Choose image" data-i18n-title="settings.chooseImage">
-              <svg data-i="action/folder" viewBox="0 0 16 16" aria-hidden="true"></svg>
-            </button>
-          </div>
-        </div>
-        <div class="form-row tight">
-          <div></div>
-          <div class="check-row">
-<input aria-label="Show recording dot" id="appIconRecordingDot" type="checkbox" data-i18n-aria-label="settings.showRecordingDot"/>
-<span><span data-i18n="settings.showRecordingDot"></span><span class="control-note" data-i18n="settings.putsARedDotOnThe"></span></span>
-
-</div>
-        </div>
-      </div>
+      <!--#include appearance-panel-->
       <div class="box">
         <div class="box-title" data-i18n="settings.interface"></div>
         <div class="form-row" data-search="date format time ago days ago clip cards screenshots">
@@ -2058,9 +1888,8 @@
       <button class="btn" type="button" id="undoSettingsBtn" aria-label="Undo settings change" data-tooltip="Undo (Ctrl+Z)" disabled data-i18n-aria-label="settings.undoSettingsChange" data-i18n-data-tooltip="common.undoCtrlZ"><svg data-i="editor/undo" viewBox="0 0 24 24" aria-hidden="true"></svg></button>
       <button class="btn" type="button" id="redoSettingsBtn" aria-label="Redo settings change" data-tooltip="Redo (Ctrl+Shift+Z)" disabled data-i18n-aria-label="settings.redoSettingsChange" data-i18n-data-tooltip="common.redoCtrlShiftZ"><svg data-i="editor/redo" viewBox="0 0 24 24" aria-hidden="true"></svg></button>
     </div>
-    <button class="btn" type="button" id="okBtn" data-i18n="common.ok"></button>
-    <button class="btn" type="button" id="cancelBtn" data-i18n="common.cancel"></button>
-    <button class="btn" type="button" id="applyBtn" disabled data-i18n="settings.apply"></button>
+    <span class="footer-note" id="saveNote" role="status" aria-live="polite"></span>
+    <button class="btn is-primary" type="button" id="restartObsBtn" hidden data-i18n="common.restartObs"></button>
   </footer>
   <div class="modal-backdrop" id="uninstallConfirmModal" aria-hidden="true">
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="uninstallConfirmTitle">
@@ -2282,8 +2111,16 @@
   const settingsHistory = { past:[], future:[], current:null, group:null, time:0, restoring:false };
   let historyGesture = null;
   let historySource = null;
-  // changes that act on obs itself (clipping, the two mutes) wait here until Apply, keyed by switch with the value that was asked for, and only while it differs from what obs reports
-  const pendingLive = {};
+  // set while a save is on its way. a resolution change re-applies OBS video settings live (stop outputs -> obs_reset_video -> restart), and letting a second one start before the first finishes can deadlock OBS -- so one save runs at a time and edits made meanwhile go out with the next one.
+  let saveInFlight = false;
+  const AUTO_SAVE_DELAY_MS = 400;
+  let autoSaveTimer = 0;
+  // what the footer says besides the restart note: a save that failed or warned, or the restart on its way
+  let saveNote = { text:"", bad:false };
+  // the settings as the helper last reported them, so the external poll only takes an answer that changed
+  let lastServerSettings = null;
+  // a field being typed in, until Enter or leaving it
+  let typingIn = null;
   // the recording audio list of the audio tab. all pc audio: the pc audio and the microphone. specific apps: the microphone, then a game audio section, which is the same pc audio source once it only takes the ticked programs, with a row for each program the helper found; the icons of programs are fetched once and kept as object urls
   const RA_DESKTOP = { kind:"desktop", name:RK_M("settings.pcAudio"), icon:"audio/desktop", volumeKey:"desktopAudioVolume" };
   const RA_GAME = { kind:"desktop", name:RK_M("settings.gameAudio"), icon:"audio/game", volumeKey:"desktopAudioVolume", section:true };
@@ -2304,8 +2141,8 @@
     balanced:"balanced",
     quality:"smaller_files",
   };
-  // encoder/video changes use the restart path. clip length and motion blur apply through runtime settings. recordingScaleMode + downscaleHeight apply live (helper stops outputs, re-applies video settings, restarts them); only downscaleFilter needs an OBS restart.
-  const restartSettingKeys = new Set(["recordingPreset", "compressionMode", "codecPreference", "fpsNumerator", "downscaleFilter", "recordingSeparateAudioTracks", "theme", "themeCustom", "interfaceLayout", "uiFont", "language"]);
+  // the settings obs reads only as it starts, so saving one restarts obs: the helper sends the list with the settings, and until it has, every change counts as one
+  let restartSettingKeys = null;
 
   const els = {
     recordingPreset: document.getElementById("recordingPreset"),
@@ -2370,35 +2207,7 @@
     fpsWarning: document.getElementById("fpsWarning"),
     clipDir: document.getElementById("clipDir"),
     browseClipDir: document.getElementById("browseClipDir"),
-    browseAppIcon: document.getElementById("browseAppIcon"),
-    appIconGrid: document.getElementById("appIconGrid"),
-    appIconCustomRow: document.getElementById("appIconCustomRow"),
-    appIconCustomPath: document.getElementById("appIconCustomPath"),
-    appIconRecordingDot: document.getElementById("appIconRecordingDot"),
     classicLayout: document.getElementById("classicLayout"),
-    themeGrid: document.getElementById("themeGrid"),
-    themeCustomRow: document.getElementById("themeCustomRow"),
-    themeEditor: document.getElementById("themeEditor"),
-    themeGradientEnabled: document.getElementById("themeGradientEnabled"),
-    themeGradientEditor: document.getElementById("themeGradientEditor"),
-    themeGradientType: document.getElementById("themeGradientType"),
-    themeGradientPreview: document.getElementById("themeGradientPreview"),
-    themeGradientLinearControls: document.getElementById("themeGradientLinearControls"),
-    themeGradientRadialControls: document.getElementById("themeGradientRadialControls"),
-    themeGradientAngle: document.getElementById("themeGradientAngle"),
-    themeGradientAngleValue: document.getElementById("themeGradientAngleValue"),
-    themeGradientCenterX: document.getElementById("themeGradientCenterX"),
-    themeGradientCenterXValue: document.getElementById("themeGradientCenterXValue"),
-    themeGradientCenterY: document.getElementById("themeGradientCenterY"),
-    themeGradientCenterYValue: document.getElementById("themeGradientCenterYValue"),
-    themeGradientRamp: document.getElementById("themeGradientRamp"),
-    themeGradientTargets: document.getElementById("themeGradientTargets"),
-    themeGradientEnabledLabel: document.getElementById("themeGradientEnabledLabel"),
-    removeGradientStopBtn: document.getElementById("removeGradientStopBtn"),
-    themeCustomDark: document.getElementById("themeCustomDark"),
-    themeName: document.getElementById("themeName"),
-    cancelThemeEditBtn: document.getElementById("cancelThemeEditBtn"),
-    saveThemeBtn: document.getElementById("saveThemeBtn"),
     clipKeybind: document.getElementById("clipKeybind"),
     recordingKeybind: document.getElementById("recordingKeybind"),
     openClipsKeybind: document.getElementById("openClipsKeybind"),
@@ -2471,9 +2280,8 @@
     settingsProjectorReparkBtn: document.getElementById("settingsProjectorReparkBtn"),
     settingsSearch: document.getElementById("settingsSearch"),
     searchEmpty: document.getElementById("searchEmpty"),
-    applyBtn: document.getElementById("applyBtn"),
-    okBtn: document.getElementById("okBtn"),
-    cancelBtn: document.getElementById("cancelBtn"),
+    restartObsBtn: document.getElementById("restartObsBtn"),
+    saveNote: document.getElementById("saveNote"),
     statusLine: document.getElementById("statusLine"),
     checkUpdateBtn: document.getElementById("checkUpdateBtn"),
     updateStatusLine: document.getElementById("updateStatusLine"),
@@ -2503,7 +2311,6 @@
   };
 
   // seeded here rather than with the other bindings: applyThemeCustomToEditor can run first, and selecting into an unfilled combo would quietly land on Linear.
-  fillCombo(els.themeGradientType, [{ value:"linear", label:RK_M("settings.linear") }, { value:"radial", label:RK_M("settings.radial") }]);
   // the limits of the storage card, in GB; anything else is typed in through Custom
   const STORAGE_LIMITS = [{ value:"0", label:RK_M("settings.noLimit") }, { value:"25", label:"25 GB" }, { value:"50", label:"50 GB" }, { value:"100", label:"100 GB" }, { value:"250", label:"250 GB" }, { value:"500", label:"500 GB" }, { value:"1024", label:"1 TB" }, { value:"custom", label:RK_M("settings.custom") }];
   fillCombo(els.storageLimit, STORAGE_LIMITS);
@@ -2788,20 +2595,28 @@
     return JSON.stringify(state[key] ?? null) !== JSON.stringify(originalState[key] ?? null);
   }
 
-  function needsObsRestart() {
-    return Array.from(restartSettingKeys).some(settingValueChanged);
+  function sameSetting(a, b) {
+    return JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
   }
 
-  // set while an apply/save round-trip is in flight. a resolution change re-applies OBS video settings live (stop outputs -> obs_reset_video -> restart), and letting a second one start before the first finishes can deadlock OBS -- so Apply stays disabled until the current one returns, even if the form goes dirty again.
-  let applyInFlight = false;
+  // key by key, since the helper answers with its own key order
+  function settingsDiffer(a, b) {
+    return Object.keys(Object.assign({}, a, b)).some((key) => !sameSetting(a[key], b[key]));
+  }
 
-  // what the quick action menu under the logo offers on this page: Save does what Apply does and Cancel what Cancel does; the helper keeps the list for the plugin, sent again only when it changed
-  // var, since updateApplyButton can run before this line has during the first load of the page
+  function isRestartKey(key) {
+    return !restartSettingKeys || restartSettingKeys.has(key);
+  }
+
+  function needsObsRestart() {
+    return Object.keys(state).some((key) => isRestartKey(key) && settingValueChanged(key));
+  }
+
+  // what the quick action menu under the logo offers on this page; the helper keeps the list for the plugin, sent again only when it changed
+  // var, since updateFooter can run before this line has during the first load of the page
   var quickSent = "";
   function publishQuickActions() {
     const actions = [
-      { id:"save", label:RK_M("common.save"), icon:"action/save", disabled:els.applyBtn.disabled },
-      { id:"cancel", label:RK_M("common.cancel"), icon:"editor/close" },
       { id:"undo", label:RK_M("common.undo"), icon:"quick/undo", disabled:document.getElementById("undoSettingsBtn").disabled },
       { id:"redo", label:RK_M("common.redo"), icon:"quick/redo", disabled:document.getElementById("redoSettingsBtn").disabled },
     ];
@@ -2811,16 +2626,16 @@
     fetch(HELPER + "/quick-actions/state?view=settings", { method:"POST", cache:"no-store", headers:{ "Content-Type":"application/json" }, body }).catch(() => { quickSent = ""; });
   }
   window.__rkQuickAction = function (id) {
-    if (id === "save" && !els.applyBtn.disabled) els.applyBtn.click();
-    else if (id === "cancel") document.getElementById("cancelBtn").click();
-    else if (id === "undo" || id === "redo") document.getElementById(id + "SettingsBtn").click();
+    if (id === "undo" || id === "redo") document.getElementById(id + "SettingsBtn").click();
   };
 
-  function updateApplyButton() {
-    const restart = dirty && needsObsRestart();
-    els.applyBtn.textContent = restart ? RK_M("settings.applyRestart") : RK_M("settings.apply");
-    els.applyBtn.classList.toggle("is-primary", restart);
-    els.applyBtn.disabled = !dirty || applyInFlight;
+  // edits save on their own, so the footer only shows what is left: the changes that wait for Restart OBS, and a save that failed
+  function updateFooter() {
+    const restart = needsObsRestart();
+    els.restartObsBtn.hidden = !restart;
+    const text = saveNote.text || (restart ? RK_M("settings.someChangesTakeEffectAfterObsRestarts") : "");
+    if (els.saveNote.textContent !== text) els.saveNote.textContent = text;
+    els.saveNote.classList.toggle("bad", !!saveNote.text && saveNote.bad);
     updateHistoryButtons();
     reportDirty();
     publishQuickActions();
@@ -2839,23 +2654,25 @@
     return dirtyReports;
   }
 
-  // the shell drops a view that has been out of sight for a while, and unsaved edits or an apply on its way would go with it
-  window.__rkCanUnload = () => !dirty && !applyInFlight && !settingsHistory.past.length && !settingsHistory.future.length;
+  // the shell drops a view that has been out of sight for a while, and changes not saved yet or a save on its way would go with it
+  window.__rkCanUnload = () => !dirty && !saveInFlight;
 
+  // record is an edit made here, which saves itself; a refresh of what was saved is not, and neither is a save that failed, which waits for the next edit
   function markDirty(record = true) {
-    dirty = JSON.stringify(state) !== JSON.stringify(originalState) || Object.keys(pendingLive).length > 0;
+    dirty = settingsDiffer(state, originalState);
     if (record) recordSettingsHistory();
     else if (settingsHistory.current) settingsHistory.current = settingsSnapshot();
-    updateApplyButton();
+    updateFooter();
+    if (record) scheduleAutoSave();
   }
 
   function settingsSnapshot() {
-    return clone({ settings:state, live:pendingLive, themeEdit:editingThemeId, themeName:els.themeName.value });
+    return clone({ settings:state, themeEdit:RKAppearance.editing() });
   }
 
   function updateHistoryButtons() {
-    document.getElementById("undoSettingsBtn").disabled = applyInFlight || !settingsHistory.past.length;
-    document.getElementById("redoSettingsBtn").disabled = applyInFlight || !settingsHistory.future.length;
+    document.getElementById("undoSettingsBtn").disabled = !settingsHistory.past.length;
+    document.getElementById("redoSettingsBtn").disabled = !settingsHistory.future.length;
     publishQuickActions();
   }
 
@@ -2868,7 +2685,7 @@
   }
 
   function recordSettingsHistory() {
-    if (!settingsHistory.current || settingsHistory.restoring || applyInFlight) return;
+    if (!settingsHistory.current || settingsHistory.restoring) return;
     const next = settingsSnapshot();
     if (JSON.stringify(next) === JSON.stringify(settingsHistory.current)) return;
     const source = historySource && historySource.target;
@@ -2887,7 +2704,7 @@
   function restoreSettingsHistory(redo) {
     const from = redo ? settingsHistory.future : settingsHistory.past;
     const to = redo ? settingsHistory.past : settingsHistory.future;
-    if (applyInFlight || !from.length) return;
+    if (!from.length) return;
     to.push(settingsSnapshot());
     const next = from.pop();
     const positionChanged = state.overlayStyle !== next.settings.overlayStyle ||
@@ -2896,20 +2713,9 @@
     try {
       Object.keys(state).forEach((key) => { delete state[key]; });
       Object.assign(state, clone(next.settings));
-      Object.keys(pendingLive).forEach((key) => { delete pendingLive[key]; });
-      Object.keys(next.live).forEach((key) => {
-        if (next.live[key] !== liveState[key]) pendingLive[key] = next.live[key];
-      });
       closeCombos();
-      endThemeEdit();
-      if (next.themeEdit) {
-        editingThemeId = next.themeEdit;
-        els.themeName.value = next.themeName;
-        els.saveThemeBtn.textContent = RK_M("settings.updatePreset");
-        els.cancelThemeEditBtn.hidden = false;
-      }
+      RKAppearance.restoreEditing(next.themeEdit);
       syncUi();
-      paintLiveControls();
       if (window.RKOverlayPreview) {
         if (positionChanged) RKOverlayPreview.restorePosition();
         else RKOverlayPreview.refresh();
@@ -2939,7 +2745,7 @@
   document.getElementById("undoSettingsBtn").addEventListener("click", () => restoreSettingsHistory(false));
   document.getElementById("redoSettingsBtn").addEventListener("click", () => restoreSettingsHistory(true));
 
-  // the in-page projector shows every overlay edit live, so nothing is pushed at the real obs source until Apply -- that also means no baseline snapshot is ever armed, so there is nothing for a crash or a closed window to leave half-applied.
+  // the in-page projector shows every overlay edit live, and the real obs source only takes it when the edit saves -- so no baseline snapshot is ever armed, and there is nothing for a crash or a closed window to leave half-applied.
   function queueOverlayPreview() {
     if (window.RKOverlayPreview) RKOverlayPreview.refresh();
     overlayPreviewTouched = true;
@@ -2966,6 +2772,7 @@
       overlayColorMultiply: settingOr("overlayColorMultiply"),
       overlayColorAdd: settingOr("overlayColorAdd"),
     };
+    const sent = clone(state);
     const data = await helperJson("settings/overlay-preview?mode=commit", {
       method:"POST",
       headers:{ "Content-Type":"application/json" },
@@ -2973,11 +2780,12 @@
     });
     ["overlayOpacity", "overlayScale", "overlayRotation", "overlayFlipH", "overlayHueShift", "overlayColorMultiply", "overlayColorAdd"].forEach((key) => {
       if (!data.settings || !Object.prototype.hasOwnProperty.call(data.settings, key)) return;
-      state[key] = data.settings[key];
+      // an edit made while this was on its way stays, and goes out with the next save
+      if (sameSetting(state[key], sent[key])) state[key] = data.settings[key];
       originalState[key] = data.settings[key];
     });
     overlayPreviewTouched = false;
-    markDirty();
+    markDirty(false);
     return true;
   }
 
@@ -3002,11 +2810,12 @@
 
   function acceptSettings(nextSettings) {
     settingsHistory.restoring = true;
-    endThemeEdit();
+    RKAppearance.endEdit();
     Object.assign(state, nextSettings || {});
     state.screenshareGameOverrides = normalizeScreenshareGameOverrides(state.screenshareGameOverrides);
     originalState = clone(state);
     overlayPreviewTouched = false;
+    saveNote = { text:"", bad:false };
     dirty = false;
     syncUi();
     readUi();
@@ -3014,8 +2823,7 @@
     dirty = false;
     settingsHistory.restoring = false;
     resetSettingsHistory();
-    // through updateApplyButton rather than poking .disabled, so the hidden-when-clean rule stays in one place
-    updateApplyButton();
+    updateFooter();
   }
 
   function comboOptionHtml(option, selectedValue) {
@@ -3153,24 +2961,6 @@
   }
   window.addEventListener("resize", () => document.querySelectorAll(".combo.is-open:not([data-self-wired])").forEach(positionCombo));
   document.querySelector(".main").addEventListener("scroll", () => closeCombos());
-
-  function closeWindow() {
-    releaseHotkeyCapture();
-    if (window.RKEmbedded) {
-      // embedded in the obs window: nothing to close, the plugin just switches back to the home view
-      fetch(HELPER + "/close-window?title=ReplayKit%20Settings&embedded=1&t=" + Date.now(), { method:"POST", cache:"no-store" }).catch(() => {});
-      return;
-    }
-    fetch(HELPER + "/close-window?title=ReplayKit%20Settings&t=" + Date.now(), {
-      method:"POST",
-      cache:"no-store",
-    }).catch(() => {});
-    window.close();
-    setTimeout(() => {
-      try { window.open("", "_self"); } catch (_) {}
-      try { window.close(); } catch (_) {}
-    }, 25);
-  }
 
   let hotkeyCaptureActive = false;
   let hotkeyCapturePending = null;
@@ -3854,12 +3644,7 @@
     els.replaySeconds.value = replaySecondsLabel(settingOr("replaySeconds"));
     syncFpsControl(state.fpsNumerator ?? settingOr("fps"));
     els.clipDir.value = settingOr("clipDir");
-    els.appIconCustomPath.value = settingOr("appIconCustomPath");
-    els.appIconRecordingDot.checked = !!settingOr("appIconRecordingDot");
-    paintAppIconSelection();
-    if (state.themeCustom) fillThemeEditor(state.themeCustom);
-    paintThemeSelection();
-    applyThemePreview();
+    RKAppearance.sync();
     els.obsStartupEnabled.checked = !!state.obsStartupEnabled;
     els.runObsAsAdmin.checked = !!state.runObsAsAdmin;
     els.disableObsCloseWarning.checked = !!settingOr("disableObsCloseWarning");
@@ -3970,10 +3755,7 @@
     state.fpsDenominator = 1;
     state.fps = state.fpsNumerator;
     state.clipDir = unquote(els.clipDir.value);
-    state.appIconCustomPath = unquote(els.appIconCustomPath.value);
-    state.appIconRecordingDot = els.appIconRecordingDot.checked;
-    if (state.appIcon === "custom" && !state.appIconCustomPath) state.appIcon = "default";
-    if (state.theme === "custom") state.themeCustom = themeCustomState();
+    RKAppearance.read();
     state.obsStartupEnabled = els.obsStartupEnabled.checked;
     state.runObsAsAdmin = els.runObsAsAdmin.checked;
     state.disableObsCloseWarning = els.disableObsCloseWarning.checked;
@@ -4171,7 +3953,7 @@
     (x, y) => { setOverlayPosition(x, y); markDirty(); },
     (pct) => { els.overlayScale.value = String(pct); els.overlayScale.dispatchEvent(new Event("input")); },
     (degrees) => { els.overlayRotation.value = String(degrees); els.overlayRotation.dispatchEvent(new Event("input")); }, true);
-  // the mic controls write straight into state (the host contract is get/set/onChange), so Apply, Cancel and the dirty check treat them like every other field
+  // the mic controls write straight into state (the host contract is get/set/onChange), so saving, undo and the dirty check treat them like every other field
   if (window.RKMic) RKMic.init({ get:(k) => state[k], set:(k, v) => { state[k] = v; }, onChange:() => markDirty() });
   els.screenshareGameOverridePicker.addEventListener("combochange", syncScreenshareCaptureFields);
   els.addScreenshareGameOverride.addEventListener("click", addScreenshareGameOverride);
@@ -4430,7 +4212,7 @@
     markDirty();
   }, { passive: false });
 
-  [els.obsStartupEnabled, els.runObsAsAdmin, els.disableObsCloseWarning, els.disableObsCrashPopup, els.quitOnClose, els.disableSleeping, els.startMinimized, els.pinObsTrayIcon, els.clipNotificationEnabled, els.recordingNotificationEnabled, els.linkNotificationEnabled, els.autoCopyLink, els.compressSkipFavorites, els.developmentMode, els.sdkMode, els.checkObsUpdates, els.logInterfaceEvents, els.overlayFlipH, els.motionBlurEnabled, els.trimGpuEncode, els.showCodecTags, els.gameRecognition, els.discordRichPresence, els.recordingSeparateAudioTracks, els.editorAutoplay, els.editorLoopPreview, els.editorWheelZoom, els.hideNotificationsFromCapture, els.showCursorDisplayCapture, els.showCursorGameCapture, els.showCursorWindowCapture, els.debugLoggingEnabled, els.autoDeleteLogsOnLaunch, els.screenshareAutoGameKeepFocused, els.appIconRecordingDot, els.bongoLive2d, els.bongoTrack, els.bongoBreath, els.bongoBlink, els.bongoFaces, els.bongoRelativeMouse].forEach((input) => {
+  [els.obsStartupEnabled, els.runObsAsAdmin, els.disableObsCloseWarning, els.disableObsCrashPopup, els.quitOnClose, els.disableSleeping, els.startMinimized, els.pinObsTrayIcon, els.clipNotificationEnabled, els.recordingNotificationEnabled, els.linkNotificationEnabled, els.autoCopyLink, els.compressSkipFavorites, els.developmentMode, els.sdkMode, els.checkObsUpdates, els.logInterfaceEvents, els.overlayFlipH, els.motionBlurEnabled, els.trimGpuEncode, els.showCodecTags, els.gameRecognition, els.discordRichPresence, els.recordingSeparateAudioTracks, els.editorAutoplay, els.editorLoopPreview, els.editorWheelZoom, els.hideNotificationsFromCapture, els.showCursorDisplayCapture, els.showCursorGameCapture, els.showCursorWindowCapture, els.debugLoggingEnabled, els.autoDeleteLogsOnLaunch, els.screenshareAutoGameKeepFocused, els.bongoLive2d, els.bongoTrack, els.bongoBreath, els.bongoBlink, els.bongoFaces, els.bongoRelativeMouse].forEach((input) => {
     input.addEventListener("change", () => {
       readUi();
       markDirty();
@@ -4448,7 +4230,7 @@
   els.debugLoggingEnabled.addEventListener("change", syncDebugLoggingFields);
   els.developmentMode.addEventListener("change", syncDevelopmentFields);
   els.openStorageCard.addEventListener("click", () => { fetch(HELPER + "/storage/open", { method:"POST", cache:"no-store" }).catch(() => {}); });
-  // flip is a live overlay preview, not a save-on-apply toggle -- ride the same preview/commit/cancel path the sliders use so it shows instantly and reverts if the user closes or cancels without applying. runs after the generic checkbox handler above, so readUi() has already put the new value in state.
+  // flip is a live overlay preview like the sliders -- it rides the same preview and commit path so it shows instantly and reaches obs when it saves. runs after the generic checkbox handler above, so readUi() has already put the new value in state.
   els.overlayFlipH.addEventListener("change", () => queueOverlayPreview(true));
   els.settingsSearch.addEventListener("input", () => { applySettingsSearch(); searchSync.send(); });
   RKWindow.onChange((up) => { if (up) searchSync.pull(); });
@@ -4533,7 +4315,6 @@
   });
   async function loadSettings() {
     setStatus(RK_M("settings.loadingSettings"), "");
-    els.applyBtn.disabled = true;
     try {
       const data = await helperJson("settings?t=" + Date.now());
       shareAudioInstalled = typeof data.shareAudioInstalled === "boolean" ? data.shareAudioInstalled : null;
@@ -4558,7 +4339,8 @@
       fillCombo(els.inputOverlayMouse, (overlayLayouts && overlayLayouts.mice) || []);
       if (window.RKOverlayPreview && RKOverlayPreview.setLayouts) RKOverlayPreview.setLayouts(overlayLayouts);
       if (data.defaultClipDir) els.clipDir.placeholder = data.defaultClipDir;
-      clearLivePending();
+      restartSettingKeys = Array.isArray(data.restartKeys) ? new Set(data.restartKeys) : null;
+      lastServerSettings = clone(data.settings);
       acceptSettings(data.settings || {});
       setStatus(RK_M("settings.settingsLoaded"), "good");
       refreshSetupFile();
@@ -4567,126 +4349,158 @@
     }
   }
 
+  // edits save on their own a moment after the last one; the settings that restart obs keep their saved values in what is sent and wait for Restart OBS
+  function autoSaveWanted() {
+    return overlayPreviewTouched || Object.keys(state).some((key) => !isRestartKey(key) && settingValueChanged(key));
+  }
+  function scheduleAutoSave() {
+    clearTimeout(autoSaveTimer);
+    autoSaveTimer = autoSaveWanted() ? setTimeout(autoSave, AUTO_SAVE_DELAY_MS) : 0;
+  }
+  // a drag, a hotkey being set or a field being typed in finishes first, so a number the helper would clamp is not rewritten halfway through
+  function editInProgress() {
+    return !!((typingIn && typingIn === document.activeElement) || historyGesture || activeHotkeyField || hotkeyCaptureActive || hotkeyCapturePending);
+  }
+  function autoSave() {
+    autoSaveTimer = 0;
+    if (saveInFlight || editInProgress()) { scheduleAutoSave(); return; }
+    if (autoSaveWanted()) saveSettings(false);
+  }
+  const TEXT_FIELD = 'input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea';
+  window.addEventListener("input", (event) => {
+    if (event.target === document.activeElement && event.target instanceof Element && event.target.matches(TEXT_FIELD)) typingIn = event.target;
+  }, true);
+  ["change", "focusout"].forEach((name) => window.addEventListener(name, (event) => {
+    if (event.target === typingIn) typingIn = null;
+  }, true));
+
   // the save that is running, so a prompt asked for meanwhile can wait for its outcome instead of asking about edits that are being saved
-  let saveRun = Promise.resolve();
-  async function saveSettings(closeAfter) {
-    if (applyInFlight) return;
-    applyInFlight = true;
-    updateHistoryButtons();
-    els.applyBtn.disabled = true;
-    els.okBtn.disabled = true;
+  let saveRun = Promise.resolve(true);
+  // counts saves, so an answer of the external poll that a save overtook is dropped
+  let saveEpoch = 0;
+  async function saveSettings(restart) {
+    if (saveInFlight) return;
+    clearTimeout(autoSaveTimer);
+    autoSaveTimer = 0;
+    saveInFlight = true;
+    saveEpoch++;
+    updateFooter();
+    let ok = false;
     try {
-      saveRun = runSaveSettings(closeAfter);
-      await saveRun;
+      saveRun = runSaveSettings(restart);
+      ok = await saveRun;
+    } catch (e) {
+      saveNote = { text:RK_M("settings.couldNotSaveTheSettingsError", { error: e.message || e }), bad:true };
     } finally {
-      applyInFlight = false;
-      els.okBtn.disabled = false;
-      updateApplyButton();
+      saveInFlight = false;
+      markDirty(false);
+      // edits made while it ran go out next; after a failure the next edit tries again
+      if (ok) scheduleAutoSave();
     }
   }
 
-  async function runSaveSettings(closeAfter) {
+  // the overlay edits go to the obs source first, then the rest to the helper; restart sends the settings that restart obs too
+  async function runSaveSettings(restart) {
     readUi();
-    // the queued switches go to obs first, in the order they were flipped: they are quick, and a restart that the settings ask for would take them down with it
-    const queued = Object.keys(pendingLive).length;
-    const liveFailed = queued ? await applyLiveChanges() : [];
-    markDirty();
-    let committedOverlayPreview = false;
     try {
-      committedOverlayPreview = await commitOverlayPreview();
+      await commitOverlayPreview();
     } catch (e) {
-      setStatus(RK_M("settings.overlayApplyFailedError", { error: e.message || e }), "bad");
-      markDirty();
-      return;
+      saveNote = { text:RK_M("settings.couldNotSaveTheSettingsError", { error: e.message || e }), bad:true };
+      return false;
     }
-    if (!dirty) {
-      resetSettingsHistory();
-      if (closeAfter) closeWindow();
-      else setStatus(committedOverlayPreview || queued ? RK_M("settings.settingsApplied") : RK_M("settings.noSettingsChanged"), "good");
-      return;
+    if (restart) await RKAppearance.fileCustomTheme();
+    const before = originalState;
+    const body = clone(state);
+    if (!restart) {
+      Object.keys(body).forEach((key) => {
+        if (!isRestartKey(key)) return;
+        if (Object.prototype.hasOwnProperty.call(before, key)) body[key] = clone({ value:before[key] }).value;
+        else delete body[key];
+      });
     }
-    await autoSaveCustomTheme();
-    const restartAfterApply = needsObsRestart();
-    setStatus(restartAfterApply ? RK_M("settings.applyingSettingsAndRestartingObs") : RK_M("settings.applyingSettings"), "");
+    if (!settingsDiffer(body, before)) {
+      saveNote = { text:"", bad:false };
+      return true;
+    }
+    let data;
     try {
       await releaseHotkeyCapture(false);
-      const data = await helperJson("settings" + (restartAfterApply ? "?restart=1" : ""), {
+      data = await helperJson("settings", {
         method:"POST",
         headers:{ "Content-Type":"application/json" },
-        body:JSON.stringify(state),
+        body:JSON.stringify(body),
       });
-      acceptSettings(data.settings || {});
-      // the scene item now sits where the preview drew it, so let the poll follow obs again
-      if (window.RKOverlayPreview) RKOverlayPreview.positionApplied();
-      // a "custom" pick gets filed as a saved preset server-side -- reflect the new tile + selection
-      renderAppIconGrid();
-      renderThemeGrid();
-      applyThemePreview();
-      const warnings = (data.warnings || []).concat(liveFailed.map((name) => RK_M("settings.couldNotChangeName", { name })));
-      if (warnings.length) setStatus(warnings.join(" "), "bad");
-      else setStatus(restartAfterApply ? RK_M("settings.settingsSavedObsIsRestarting") : RK_M("settings.settingsApplied"), "good");
-      // a switch that obs refused stays queued, so the button offers to try it again
-      markDirty();
-      if (closeAfter && !liveFailed.length) closeWindow();
     } catch (e) {
-      setStatus(RK_M("settings.applyFailedError", { error: e.message || e }), "bad");
-      markDirty();
+      saveNote = { text:RK_M("settings.couldNotSaveTheSettingsError", { error: e.message || e }), bad:true };
+      return false;
     }
+    lastServerSettings = clone(data.settings);
+    adoptSavedSettings(data.settings || {}, body);
+    // the scene item now sits where the preview drew it, so let the poll follow obs again, unless the overlay moved while this was on its way
+    if (window.RKOverlayPreview && sameSetting(state.overlayPosition, body.overlayPosition) && state.overlayStyle === body.overlayStyle) RKOverlayPreview.positionApplied();
+    // a "custom" icon gets filed as a saved one server-side -- reflect the new tile + selection
+    if (["appIcon", "appIconCustomPath", "theme", "themeCustom"].some((key) => !sameSetting(body[key], before[key]))) RKAppearance.refresh();
+    const warnings = data.warnings || [];
+    if (warnings.length) saveNote = { text:warnings.join(" "), bad:true };
+    else saveNote = { text:restart ? RK_M("settings.settingsSavedObsIsRestarting") : "", bad:false };
+    return true;
   }
 
-  // applying while still on the anonymous "Custom" slot would leave the palette there, where the next custom edit silently overwrites it. so it is filed as a real preset first -- preset_1, preset_2, ... taking the next free number. runs only on a dirty apply, so pressing Apply with nothing changed never spawns one.
-  async function autoSaveCustomTheme() {
-    if (state.theme !== "custom") return;
-    let highest = 0;
-    themesCache.forEach((theme) => {
-      const match = /^preset_(\d+)$/i.exec((theme.label || "").trim());
-      if (match) highest = Math.max(highest, parseInt(match[1], 10) || 0);
+  // the settings the helper holds now become originalState, and every key not changed here since base shows them, so normalizing and changes made elsewhere come through without dropping an edit made meanwhile; what the fields cannot show as saved is taken as they show it, the way a fresh load takes it
+  function adoptSavedSettings(saved, base) {
+    const kept = new Set(Object.keys(state).filter((key) => !sameSetting(state[key], base[key])));
+    const fresh = clone(saved);
+    let changed = false;
+    Object.keys(fresh).forEach((key) => {
+      if (kept.has(key) || sameSetting(state[key], fresh[key])) return;
+      state[key] = fresh[key];
+      changed = true;
     });
-    const name = "preset_" + (highest + 1);
+    originalState = clone(saved);
+    if (!changed) return;
+    settingsHistory.restoring = true;
     try {
-      const data = await helperJson("appearance/save-theme?label=" + encodeURIComponent(name), {
-        method:"POST", headers:{ "Content-Type":"application/json" },
-        body:JSON.stringify(themeCustomState()),
-      });
-      if (!data || !data.ok || !data.id) return;
-      state.theme = data.id;
-      state.themeCustom = themeCustomState();
-      endThemeEdit();
-      await renderThemeGrid();
-      paintThemeSelection();
-    } catch (e) {
-      // a failed auto-save must not block the apply -- the theme still applies as "custom", just unnamed.
-      setStatus(RK_M("settings.couldNotAutoSaveTheCustom", { error: e.message || e }), "bad");
+      if (!kept.has("screenshareGameOverrides")) state.screenshareGameOverrides = normalizeScreenshareGameOverrides(state.screenshareGameOverrides);
+      syncUi();
+      readUi();
+      if (window.RKOverlayPreview) RKOverlayPreview.refresh();
+    } finally {
+      settingsHistory.restoring = false;
     }
+    Object.keys(state).forEach((key) => {
+      if (!kept.has(key)) originalState[key] = clone({ value:state[key] }).value;
+    });
   }
 
-  // the settings window is hidden (not destroyed) on close, so a reopen re-shows this same JS -- Cancel and a plain close both have to drop every unsaved edit here in the page. state back to the last saved snapshot, repaint, clear dirty, and reset the in-page overlay preview (drag position + its undo history).
+  // Leave without saving drops what is not saved yet (the changes that wait for Restart OBS, or a save that failed): state back to the last saved snapshot, repaint, clear dirty, and reset the in-page overlay preview (drag position + its undo history).
   function revertLocalEdits() {
+    clearTimeout(autoSaveTimer);
+    autoSaveTimer = 0;
     settingsHistory.restoring = true;
-    endThemeEdit();
+    RKAppearance.endEdit();
     Object.keys(state).forEach((k) => { delete state[k]; });
     Object.assign(state, clone(originalState));
     overlayPreviewTouched = false;
-    clearLivePending();
+    saveNote = { text:"", bad:false };
     dirty = false;
     closeCombos();
     syncUi();
     dirty = false;
-    updateApplyButton();
+    updateFooter();
     if (window.RKOverlayPreview) { RKOverlayPreview.resetPosition(); RKOverlayPreview.refresh(); }
     settingsHistory.restoring = false;
     resetSettingsHistory();
   }
 
-  async function cancelSettings() {
-    await cancelOverlayPreview();
-    revertLocalEdits();
-    closeWindow();
+  // the waiting save goes out now and a running one is waited for, before anything asks whether edits are left
+  async function settleSettings() {
+    if (saveInFlight) await saveRun.catch(() => false);
+    if (autoSaveWanted()) await saveSettings(false);
   }
 
-  // true while the user is mid-interaction -- the 2s external poll must not overwrite state then.
+  // true while an edit or a save is under way -- the 2s external poll must not overwrite state then.
   function externalRefreshBusy() {
-    return dirty || applyInFlight || settingsHistory.past.length > 0 || settingsHistory.future.length > 0 || activeHotkeyField || hotkeyCaptureActive || hotkeyCapturePending || !!document.querySelector(".combo.is-open");
+    return saveInFlight || !!autoSaveTimer || editInProgress() || !!document.querySelector(".combo.is-open");
   }
 
   let _externalRefreshInFlight = false;
@@ -4694,18 +4508,21 @@
     // a hidden window keeps this page alive, so the poll waits until the window is showing again
     if (_externalRefreshInFlight || externalRefreshBusy() || !RKWindow.up()) return;
     _externalRefreshInFlight = true;
+    const epoch = saveEpoch;
     try {
       let data;
       try { data = await helperJson("settings?t=" + Date.now()); } catch (e) { return; }
-      // re-check: the user may have opened a dropdown or started editing during the fetch. clobbering their in-progress choice here is the "select native, it jumps back to downscale" race.
-      if (externalRefreshBusy()) return;
+      // re-check: the user may have opened a dropdown or started editing during the fetch, and a save that ran meanwhile makes this answer older than what the page holds. clobbering their in-progress choice here is the "select native, it jumps back to downscale" race.
+      if (externalRefreshBusy() || epoch !== saveEpoch) return;
       const next = data.settings || {};
       fillCombo(els.screenshareGameWindow, data.options.screenshareGameWindows || []);
       fillCombo(els.screenshareGameOverridePicker, data.options.screenshareGameWindows || []);
       // a display plugged in or out while the page is open shows up in the list
       fillCombo(els.captureDisplay, data.options.captureDisplays || [{ value:"primary", label:RK_M("common.primaryDisplay") }]);
-      if (JSON.stringify(next) !== JSON.stringify(state)) {
-        acceptSettings(next);
+      if (!sameSetting(next, lastServerSettings)) {
+        lastServerSettings = clone(next);
+        adoptSavedSettings(next, originalState);
+        markDirty(false);
       }
     } finally { _externalRefreshInFlight = false; }
   }
@@ -4737,8 +4554,9 @@
         setUpdateStatus(data.repairRequired ? RK_M("settings.replaykitNeedsRepairUseTheUpdate") : RK_M("settings.updateAvailableLatestInstalledInstalledUse", { latest: data.latestVersion, installed: data.installedVersion }), "good");
         return;
       }
+      await settleSettings();
       if (dirty) {
-        setUpdateStatus(data.repairRequired ? RK_M("settings.replaykitNeedsRepairApplyOrCancel") : RK_M("settings.updateAvailableLatestApplyOrCancel", { latest: data.latestVersion }), "bad");
+        setUpdateStatus(data.repairRequired ? RK_M("settings.replaykitNeedsRepairRestartOrUndo") : RK_M("settings.updateAvailableLatestRestartOrUndo", { latest: data.latestVersion }), "bad");
         return;
       }
       if (await openUpdatePrompt(data.latestVersion)) {
@@ -4843,8 +4661,9 @@
   async function toggleDiscordScreenshare() {
     if (shareAudioInstalled !== false) return;
     const installing = true;
+    await settleSettings();
     if (dirty) {
-      setDiscordScreenshareUninstallStatus(RK_M("settings.applyOrCancelSettingsChangesFirst"), "bad");
+      setDiscordScreenshareUninstallStatus(RK_M("settings.someSettingsChangesAreNotSavedYet"), "bad");
       return;
     }
     const confirmed = await showDiscordScreenshareConfirmModal(installing);
@@ -4855,8 +4674,6 @@
     const busy = installing ? RK_M("settings.installingDiscordScreenshareSupport") : RK_M("settings.removingDiscordScreenshareSupport");
     const failed = (error) => installing ? RK_M("settings.installFailedError", { error }) : RK_M("settings.removalFailedError", { error });
     els.installShareAudioBtn.disabled = true;
-    els.applyBtn.disabled = true;
-    els.okBtn.disabled = true;
     setDiscordScreenshareUninstallStatus(installing ? RK_M("settings.startingInstall") : RK_M("settings.startingRemoval"), "");
     setStatus(busy, "");
     try {
@@ -4868,8 +4685,6 @@
       setStatus(done, "good");
     } catch (e) {
       els.installShareAudioBtn.disabled = false;
-      els.okBtn.disabled = false;
-      updateApplyButton();
       setDiscordScreenshareUninstallStatus(failed(e.message || e), "bad");
       setStatus(failed(e.message || e), "bad");
       refreshSetupFile();
@@ -4877,8 +4692,9 @@
   }
 
   async function uninstallReplayKit() {
+    await settleSettings();
     if (dirty) {
-      setUninstallStatus(RK_M("settings.applyOrCancelSettingsChangesBefore"), "bad");
+      setUninstallStatus(RK_M("settings.someSettingsChangesAreNotSavedYet"), "bad");
       return;
     }
     const confirmed = await showUninstallConfirmModal();
@@ -4891,8 +4707,6 @@
     if (target === "audio" && shareAudioInstalled !== true) return;
     const options = { confirm:"confirm", keepUserSettings:!!els.uninstallKeepSettings.checked, removeObs:!!els.uninstallRemoveObs.checked };
     els.uninstallReplayKitBtn.disabled = true;
-    els.applyBtn.disabled = true;
-    els.okBtn.disabled = true;
     setUninstallStatus(RK_M("settings.startingRemoval"), "");
     setStatus(target === "audio" ? RK_M("settings.removingSharePreviewAudio") : RK_M("settings.startingReplaykitUninstall"), "");
     try {
@@ -4905,17 +4719,17 @@
       setStatus(data.message || RK_M("settings.uninstallStartedObsWillClose"), "good");
     } catch (e) {
       els.uninstallReplayKitBtn.disabled = false;
-      els.okBtn.disabled = false;
-      updateApplyButton();
       setUninstallStatus(RK_M("settings.uninstallFailedError", { error: e.message || e }), "bad");
       setStatus(RK_M("settings.uninstallFailedError", { error: e.message || e }), "bad");
       refreshSetupFile();
     }
   }
 
-  els.applyBtn.addEventListener("click", () => saveSettings(false));
-  els.okBtn.addEventListener("click", () => saveSettings(true));
-  els.cancelBtn.addEventListener("click", () => { cancelSettings(); });
+  // the button stays as it is while other edits save, so a click that lands during one waits for it and then restarts
+  els.restartObsBtn.addEventListener("click", async () => {
+    while (saveInFlight) await saveRun.catch(() => false);
+    saveSettings(true);
+  });
   els.openLogFolderBtn.addEventListener("click", async () => {
     els.logFolderStatusLine.textContent = "";
     els.logFolderStatusLine.classList.remove("good", "bad");
@@ -4930,7 +4744,7 @@
   els.uninstallReplayKitBtn.addEventListener("click", uninstallReplayKit);
   els.installShareAudioBtn.addEventListener("click", toggleDiscordScreenshare);
   els.setupFileRepairBtn.addEventListener("click", repairSetupFile);
-  // the plugin calls this with the view it was asked for: Save applies first and stays here if that fails, Leave without saving drops the edits, Stay keeps the page
+  // the plugin calls this with the view it was asked for: Save saves first (restarting obs when a change needs it) and stays here if that fails, Leave without saving drops what is not saved, Stay keeps the page
   let leaveTarget = "";
   const leaveModal = document.getElementById("leaveConfirmModal");
   function closeLeaveModal() {
@@ -4942,18 +4756,16 @@
     leaveTarget = String(target || "home");
     // a save and leave is already on its way and goes to the view picked last
     if (leaving) return;
-    // a save still running decides whether anything is left unsaved, so the prompt waits for it
-    if (applyInFlight) {
-      try { await saveRun; } catch (_) {}
-      if (leaving) return;
-    }
+    // what waits to save goes out first and decides whether anything is left unsaved
+    await settleSettings();
+    if (leaving) return;
     // the plugin only had an old answer: nothing is unsaved, so it is put right and the switch goes ahead without asking
     if (!dirty) {
       reportedDirty = null;
       leaveSettings(false);
       return;
     }
-    // same wording as the Apply button: a save that restarts obs says so before it is pressed
+    // a save that restarts obs says so before it is pressed
     const saveBtn = document.getElementById("leaveConfirmSaveBtn");
     saveBtn.textContent = needsObsRestart() ? RK_M("settings.saveRestart") : RK_M("common.save");
     leaveModal.classList.add("is-visible");
@@ -4966,7 +4778,7 @@
     closeLeaveModal();
     try {
       if (save) {
-        await saveSettings(false);
+        await saveSettings(needsObsRestart());
         if (dirty) return;
       } else {
         await cancelOverlayPreview();
@@ -5018,622 +4830,11 @@
   });
   window.addEventListener("pagehide", releaseHotkeyCapture);
   window.addEventListener("beforeunload", releaseHotkeyCapture);
-  // closing the dock (not via Cancel or Apply) with a live overlay preview still uncommitted must revert it -- sendBeacon so the request survives the page going away. the helper-side startup revert is the backstop for a hard crash where this never fires.
-  window.addEventListener("pagehide", () => {
-    if (!overlayPreviewTouched) return;
-  });
 
-  // -- Appearance tab: theme picker -- ReplayKit surfaces preview live here; OBS gets it on the restart that Apply triggers.
-  // the shared close x, cropped to its drawing so the remove button keeps the size of the x it had
-  const APPICON_X_SVG = ((window.RK_ICONS || {})["editor/close"] || "").replace(/viewBox="[^"]*"/, 'viewBox="5 5 14 14"');
-  const THEME_EDIT_SVG = (window.RK_ICONS || {})["action/edit"] || "";
-  // last /appearance/themes payload -- lets selectTheme seed the custom editor from whatever preset the user was on
-  let themesCache = [];
-  let editingThemeId = "";
-  let gradientStops = [];
-  let latestThemePreviewCss = "";
-  let themePreviewChannel = null;
-  try { themePreviewChannel = new BroadcastChannel("replaykit-theme-preview"); } catch (_) {}
-  let themeLiveStyle = document.getElementById("rk-theme-live");
-  if (!themeLiveStyle) {
-    themeLiveStyle = document.createElement("style");
-    themeLiveStyle.id = "rk-theme-live";
-    document.head.appendChild(themeLiveStyle);
-  }
-  // kills transitions/animations for one frame while the preview swaps -- this CEF build otherwise leaves background-color transitions that resolve through var() half-finished when the custom props change, freezing elements on the old accent. real (post-Apply) theme changes reload the dock so dont need this.
-  const themeSwapFreeze = document.createElement("style");
-  themeSwapFreeze.textContent = "html.rk-theme-swapping *,html.rk-theme-swapping *::before,html.rk-theme-swapping *::after{transition:none!important;animation-duration:0s!important;}";
-  document.head.appendChild(themeSwapFreeze);
-  function publishThemePreview(css) {
-    latestThemePreviewCss = css || "";
-    try { localStorage.setItem("replaykit-theme-preview", JSON.stringify({ css:latestThemePreviewCss, time:Date.now() })); } catch (_) {}
-    try { if (themePreviewChannel) themePreviewChannel.postMessage({ css:latestThemePreviewCss }); } catch (_) {}
-  }
-  function clearThemePreview() {
-    latestThemePreviewCss = "";
-    try { localStorage.removeItem("replaykit-theme-preview"); } catch (_) {}
-    try { if (themePreviewChannel) themePreviewChannel.postMessage({ reset:true }); } catch (_) {}
-  }
-  setInterval(() => {
-    if (!latestThemePreviewCss) return;
-    try { localStorage.setItem("replaykit-theme-preview", JSON.stringify({ css:latestThemePreviewCss, time:Date.now() })); } catch (_) {}
-  }, 4000);
-  window.addEventListener("pagehide", clearThemePreview);
-
-  // gradients are per surface. only these four: text, border and danger are colour roles that end up in border-color / color and in the helpers colour arithmetic, where a gradient value paints nothing.
-  const GRADIENT_TARGETS = [
-    { key:"bg", label:RK_M("settings.background") },
-    { key:"panel", label:RK_M("settings.panel") },
-    { key:"field", label:RK_M("settings.field") },
-    { key:"accent", label:RK_M("settings.accent") },
-  ];
-  let gradientTarget = "bg";
-
-  function blankGradient() {
-    return { enabled:false, type:"linear", angle:135, centerX:50, centerY:50, stops:[] };
-  }
-  // every target always has an entry, so switching tabs never has to guard for a missing one; `enabled` is what decides whether it is written out, which keeps a half-built gradient around while you flip between surfaces.
-  let gradientByTarget = {};
-  GRADIENT_TARGETS.forEach((entry) => { gradientByTarget[entry.key] = blankGradient(); });
-
-  function currentGradient() { return gradientByTarget[gradientTarget] || blankGradient(); }
-
-  // the colours of the theme that the editor does not show (the quieter text, the stronger border, the second accent), as steps from what the helper works out from the ones it does show; a custom theme made from a preset carries the steps of that preset, so it starts out as an exact copy of it
-  let customOffsets = null;
-  function themeCustomState() {
-    const o = {};
-    els.themeEditor.querySelectorAll("button[data-k]").forEach((button) => { o[button.dataset.k] = button.dataset.value; });
-    captureGradientEditor();
-    const gradients = {};
-    GRADIENT_TARGETS.forEach((entry) => {
-      const spec = gradientByTarget[entry.key];
-      if (!spec || !spec.enabled || spec.stops.length < 2) return;
-      gradients[entry.key] = {
-        type:spec.type === "radial" ? "radial" : "linear",
-        angle:Math.max(0, Math.min(359, spec.angle | 0)),
-        centerX:Math.max(0, Math.min(100, spec.centerX | 0)),
-        centerY:Math.max(0, Math.min(100, spec.centerY | 0)),
-        stops:spec.stops.slice().sort((left, right) => left.position - right.position).map((stop) => ({ color:stop.color, position:stop.position })),
-      };
-    });
-    o.gradients = gradients;
-    // the helper still reads this legacy field when a theme predates per-token gradients; keep it pointed at bg.
-    o.gradient = gradients.bg ? gradients.bg.stops[gradients.bg.stops.length - 1].color : "";
-    o.dark = els.themeCustomDark.checked;
-    if (customOffsets) o.offsets = customOffsets;
-    return o;
-  }
-
-  // pulls the live editor controls back into the selected targets spec, so nothing is lost on tab switch or save.
-  function captureGradientEditor() {
-    const spec = gradientByTarget[gradientTarget];
-    if (!spec) return;
-    spec.enabled = els.themeGradientEnabled.checked;
-    spec.type = comboValue(els.themeGradientType) === "radial" ? "radial" : "linear";
-    spec.angle = Math.max(0, Math.min(359, parseInt(els.themeGradientAngle.value, 10) || 0));
-    spec.centerX = clampPercent(els.themeGradientCenterX.value, 50);
-    spec.centerY = clampPercent(els.themeGradientCenterY.value, 50);
-    spec.stops = gradientStops.slice().map((stop) => ({ color:stop.color, position:stop.position }));
-  }
-
-  function renderGradientTargets() {
-    els.themeGradientTargets.innerHTML = "";
-    GRADIENT_TARGETS.forEach((entry) => {
-      const spec = gradientByTarget[entry.key];
-      const on = !!(spec && spec.enabled && spec.stops.length >= 2);
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "grad-target" + (entry.key === gradientTarget ? " is-active" : "") + (on ? " has-gradient" : "");
-      button.setAttribute("role", "tab");
-      button.setAttribute("aria-selected", entry.key === gradientTarget ? "true" : "false");
-      button.dataset.tooltip = on ? RK_M("settings.targetUsesAGradient", { target: entry.label }) : RK_M("settings.targetIsAFlatColor", { target: entry.label });
-      button.innerHTML = '<span class="grad-target-dot"></span>';
-      button.appendChild(document.createTextNode(entry.label));
-      button.addEventListener("click", () => {
-        if (entry.key === gradientTarget) return;
-        captureGradientEditor();
-        gradientTarget = entry.key;
-        loadGradientEditor();
-      });
-      els.themeGradientTargets.appendChild(button);
-    });
-  }
-
-  // pushes the selected targets spec into the shared editor controls.
-  function loadGradientEditor() {
-    const spec = currentGradient();
-    const label = (GRADIENT_TARGETS.find((entry) => entry.key === gradientTarget) || {}).label || RK_M("settings.background");
-    els.themeGradientEnabledLabel.textContent = RK_M("settings.useAGradientForTarget", { target: label });
-    els.themeGradientEnabled.checked = !!spec.enabled;
-    els.themeGradientEditor.hidden = !spec.enabled;
-    setComboValue(els.themeGradientType, spec.type === "radial" ? "radial" : "linear", false);
-    els.themeGradientAngle.value = String(spec.angle);
-    els.themeGradientAngleValue.value = String(spec.angle);
-    els.themeGradientCenterX.value = String(spec.centerX); els.themeGradientCenterXValue.value = String(spec.centerX);
-    els.themeGradientCenterY.value = String(spec.centerY); els.themeGradientCenterYValue.value = String(spec.centerY);
-    syncGradientSliderFills();
-    gradientStops = spec.stops.slice().map((stop) => ({ color:stop.color, position:stop.position }));
-    selectedGradientStop = null;
-    renderGradientStops();
-    renderGradientTargets();
-  }
-  let themePreviewTimer = 0;
-  function applyThemePreview() {
-    clearTimeout(themePreviewTimer);
-    themePreviewTimer = setTimeout(async () => {
-      const id = settingOr("theme");
-      let url = HELPER + "/appearance/theme.css?t=" + Date.now();
-      // mid-edit the presets saved css is stale -- preview whatever the editor currently holds
-      if (id === "custom" || editingThemeId) url += "&custom=" + encodeURIComponent(JSON.stringify(themeCustomState()));
-      else url += "&theme=" + encodeURIComponent(id);
-      // the native title bar, rail and menus of the clean layout show the same candidate
-      url += "&preview=1";
-      try {
-        const r = await fetch(url, { cache: "no-store" });
-        const css = r.ok ? await r.text() : "";
-        document.documentElement.classList.add("rk-theme-swapping");
-        themeLiveStyle.textContent = css;
-        publishThemePreview(css);
-        // when a non-default theme is saved the helper injects its own <style id="rk-theme"> before </head>;
-        // rewriting this nodes text alone doesnt always make CEF redo the cascade tie-break, so move it back
-        // to last to guarantee the preview wins.
-        document.head.appendChild(themeLiveStyle);
-        void document.documentElement.offsetHeight; // flush the swap under the freeze before re-enabling motion
-        requestAnimationFrame(() => document.documentElement.classList.remove("rk-theme-swapping"));
-      } catch (e) { /* leave whatever's applied */ }
-    }, 40);
-  }
-  function paintThemeSelection() {
-    const sel = settingOr("theme");
-    els.themeGrid.querySelectorAll(".icon-tile").forEach((t) => t.classList.toggle("is-selected", t.dataset.id === sel));
-    els.themeCustomRow.hidden = sel !== "custom" && !editingThemeId;
-  }
-  function clampPercent(value, fallback) {
-    const parsed = parseInt(value, 10);
-    return Number.isFinite(parsed) ? Math.max(0, Math.min(100, parsed)) : fallback;
-  }
-  function gradientCss() {
-    if (!els.themeGradientEnabled.checked || gradientStops.length < 2) return "none";
-    const stops = gradientStops.slice().sort((left, right) => left.position - right.position)
-      .map((stop) => stop.color + " " + stop.position + "%").join(",");
-    if (comboValue(els.themeGradientType) === "radial")
-      return "radial-gradient(circle at " + els.themeGradientCenterX.value + "% " + els.themeGradientCenterY.value + "%," + stops + ")";
-    return "linear-gradient(" + els.themeGradientAngle.value + "deg," + stops + ")";
-  }
-  const GRADIENT_MAX_STOPS = 6;
-  let selectedGradientStop = null;
-
-  function updateGradientPreview() {
-    els.themeGradientPreview.style.setProperty("--gradient-preview", gradientCss());
-    const radial = comboValue(els.themeGradientType) === "radial";
-    els.themeGradientLinearControls.hidden = radial;
-    els.themeGradientRadialControls.hidden = !radial;
-    // the ramp always reads left-to-right regardless of angle/type -- it edits the colour run, the preview box shows how that run is projected.
-    const sorted = gradientStops.slice().sort((left, right) => left.position - right.position);
-    els.themeGradientRamp.style.setProperty("--ramp",
-      sorted.length >= 2 ? "linear-gradient(90deg," + sorted.map((stop) => stop.color + " " + stop.position + "%").join(",") + ")" : "none");
-    els.removeGradientStopBtn.disabled = !selectedGradientStop || gradientStops.length <= 2;
-  }
-
-  // colour of the ramp at `position`, so a stop added by clicking the ramp starts as the colour already showing there.
-  function gradientColorAt(position) {
-    const sorted = gradientStops.slice().sort((left, right) => left.position - right.position);
-    if (!sorted.length) return "#000000";
-    if (position <= sorted[0].position) return sorted[0].color;
-    const last = sorted[sorted.length - 1];
-    if (position >= last.position) return last.color;
-    for (let i = 0; i < sorted.length - 1; i += 1) {
-      const from = sorted[i], to = sorted[i + 1];
-      if (position < from.position || position > to.position) continue;
-      const span = to.position - from.position;
-      const ratio = span <= 0 ? 0 : (position - from.position) / span;
-      const a = hexToRgb(from.color), b = hexToRgb(to.color);
-      return rgbToHex(a.red + (b.red - a.red) * ratio, a.green + (b.green - a.green) * ratio, a.blue + (b.blue - a.blue) * ratio);
-    }
-    return last.color;
-  }
-
-  function gradientPositionFromEvent(event) {
-    const rect = els.themeGradientRamp.getBoundingClientRect();
-    return clampPercent(Math.round(((event.clientX - rect.left) / Math.max(1, rect.width)) * 100), 0);
-  }
-
-  function renderGradientStops() {
-    gradientStops.sort((left, right) => left.position - right.position);
-    if (selectedGradientStop && !gradientStops.includes(selectedGradientStop)) selectedGradientStop = null;
-    els.themeGradientRamp.innerHTML = "";
-    gradientStops.forEach((stop, index) => {
-      const handle = document.createElement("button");
-      handle.type = "button";
-      handle.className = "grad-ramp-handle" + (stop === selectedGradientStop ? " is-selected" : "");
-      handle.style.left = stop.position + "%";
-      handle.style.setProperty("--color", stop.color);
-      handle.dataset.tooltip = RK_M("settings.colorAtPosition", { color: stop.color, position: stop.position });
-      handle.setAttribute("aria-label", RK_M("settings.gradientStopNumberColorAtPosition", { number: index + 1, color: stop.color, position: stop.position }));
-
-      // a press that never moves is a recolor; anything that moves is a drag. distinguishing them here is what lets one handle do both without a separate edit button.
-      handle.addEventListener("pointerdown", (event) => {
-        event.stopPropagation();
-        event.preventDefault();
-        selectedGradientStop = stop;
-        renderGradientStops();
-        const live = els.themeGradientRamp.querySelector(".grad-ramp-handle.is-selected") || handle;
-        live.classList.add("is-dragging");
-        live.setPointerCapture(event.pointerId);
-        let moved = false;
-        const move = (moveEvent) => {
-          const next = gradientPositionFromEvent(moveEvent);
-          if (next === stop.position) return;
-          moved = true;
-          stop.position = next;
-          live.style.left = next + "%";
-          live.dataset.tooltip = RK_M("settings.colorAtPosition", { color: stop.color, position: next });
-          updateGradientPreview();
-          applyThemeEditorChange();
-        };
-        const up = () => {
-          live.removeEventListener("pointermove", move);
-          live.removeEventListener("pointerup", up);
-          live.classList.remove("is-dragging");
-          if (moved) renderGradientStops();
-          else openColorDialog(stop.color, RK_M("settings.gradientStopNumber", { number: index + 1 }), (value) => {
-            stop.color = cleanHexColor(value, stop.color);
-            renderGradientStops();
-            applyThemeEditorChange();
-          });
-        };
-        live.addEventListener("pointermove", move);
-        live.addEventListener("pointerup", up);
-      });
-      els.themeGradientRamp.appendChild(handle);
-    });
-    updateGradientPreview();
-  }
-  // a fresh gradient for a surface starts from that surfaces own colour so turning it on is a soft change rather than a jump to some unrelated pair.
-  function seedStopsFor(targetKey, c) {
-    const base = cleanHexColor(c[targetKey === "bg" ? "bg" : targetKey], null)
-      || cleanHexColor(c.bg, "#161617");
-    const away = cleanHexColor(c.accent, "#284cb8");
-    return [{ color:base, position:0 }, { color:away, position:100 }];
-  }
-
-  function normalizeStops(raw, targetKey, c) {
-    const list = Array.isArray(raw) ? raw : [];
-    const normalized = list.slice(0, 6).map((stop, index) => ({
-      color:cleanHexColor(stop && stop.color, index === 0 ? (c.bg || "#161617") : (c.accent || "#284cb8")),
-      position:clampPercent(stop && stop.position, index === 0 ? 0 : 100),
-    }));
-    return normalized.length >= 2 ? normalized : seedStopsFor(targetKey, c);
-  }
-  function fillThemeEditor(c) {
-    c = c || {};
-    customOffsets = c.offsets && typeof c.offsets === "object" ? c.offsets : null;
-    els.themeEditor.querySelectorAll("button[data-k]").forEach((button) => {
-      setColorButton(button, c[button.dataset.k] || "#000000", "#000000");
-    });
-    // per-token gradients, falling back to the flat gradient* keys a pre-per-token theme carries (read as bg).
-    const map = (c.gradients && typeof c.gradients === "object") ? c.gradients : {};
-    const legacyStops = Array.isArray(c.gradientStops) && c.gradientStops.length >= 2;
-    const legacyColor = cleanHexColor(c.gradient, null);
-    gradientByTarget = {};
-    GRADIENT_TARGETS.forEach((entry) => {
-      const raw = map[entry.key];
-      if (raw && typeof raw === "object") {
-        gradientByTarget[entry.key] = {
-          enabled:true,
-          type:raw.type === "radial" ? "radial" : "linear",
-          angle:Number.isFinite(parseInt(raw.angle, 10)) ? Math.max(0, Math.min(359, parseInt(raw.angle, 10))) : 135,
-          centerX:clampPercent(raw.centerX, 50),
-          centerY:clampPercent(raw.centerY, 50),
-          stops:normalizeStops(raw.stops, entry.key, c),
-        };
-        return;
-      }
-      const spec = blankGradient();
-      if (entry.key === "bg" && (legacyStops || legacyColor)) {
-        const parsedAngle = parseInt(c.gradientAngle, 10);
-        spec.enabled = true;
-        spec.type = c.gradientType === "radial" ? "radial" : "linear";
-        spec.angle = Number.isFinite(parsedAngle) ? Math.max(0, Math.min(359, parsedAngle)) : 135;
-        spec.centerX = clampPercent(c.gradientCenterX, 50);
-        spec.centerY = clampPercent(c.gradientCenterY, 50);
-        spec.stops = legacyStops ? normalizeStops(c.gradientStops, "bg", c)
-          : [{ color:cleanHexColor(c.bg, "#161617"), position:0 }, { color:legacyColor, position:100 }];
-      } else {
-        spec.stops = seedStopsFor(entry.key, c);
-      }
-      gradientByTarget[entry.key] = spec;
-    });
-    if (!gradientByTarget[gradientTarget]) gradientTarget = "bg";
-    loadGradientEditor();
-    els.themeCustomDark.checked = c.dark !== false;
-  }
-  function endThemeEdit() {
-    editingThemeId = "";
-    els.themeName.value = "";
-    els.saveThemeBtn.textContent = RK_M("settings.saveAsPreset");
-    els.cancelThemeEditBtn.hidden = true;
-  }
-  function selectTheme(id) {
-    endThemeEdit();
-    const prev = state.theme;
-    state.theme = id;
-    // picking Custom off a preset or saved theme carries that themes colors into the editor so it extends instead of starting blank
-    if (id === "custom" && prev !== "custom") {
-      const src = themesCache.find((t) => t.id === prev);
-      if (src && src.seed) state.themeCustom = Object.assign({}, src.seed);
-    }
-    if (id === "custom") fillThemeEditor(state.themeCustom);
-    paintThemeSelection();
-    applyThemePreview();
-    markDirty();
-  }
-  function themeSwatchEl(sw) {
-    sw = sw || {};
-    const box = document.createElement("span");
-    box.className = "theme-sw";
-    box.style.background = sw.background || sw.bg || "#1d1f26";
-    const strip = document.createElement("i");
-    strip.style.background = sw.panel || "#272a33";
-    const dot = document.createElement("b");
-    dot.style.background = sw.accent || "#284cb8";
-    box.append(strip, dot);
-    return box;
-  }
-  function themeTile(id, label, sw, deletable) {
-    const tile = document.createElement("button");
-    tile.type = "button";
-    tile.className = "icon-tile";
-    tile.dataset.id = id;
-    const lab = document.createElement("span");
-    lab.className = "icon-tile-label";
-    if (deletable) lab.setAttribute("translate", "no");
-    lab.textContent = label;
-    tile.append(sw ? themeSwatchEl(sw) : (function () { const s = document.createElement("span"); s.className = "icon-tile-swatch"; s.textContent = "＋"; return s; })(), lab);
-    tile.addEventListener("click", () => selectTheme(id));
-    if (deletable) {
-      const edit = document.createElement("span");
-      edit.className = "icon-tile-edit";
-      edit.setAttribute("role", "button");
-      edit.setAttribute("aria-label", RK_M("settings.editName", { name: label }));
-      edit.dataset.tooltip = RK_M("common.edit");
-      edit.innerHTML = THEME_EDIT_SVG;
-      edit.addEventListener("click", (e) => { e.stopPropagation(); editUserTheme(id); });
-      tile.appendChild(edit);
-      const del = document.createElement("span");
-      del.className = "icon-tile-del";
-      del.setAttribute("role", "button");
-      del.setAttribute("aria-label", RK_M("settings.removeName", { name: label }));
-      del.dataset.tooltip = RK_M("common.remove");
-      del.innerHTML = APPICON_X_SVG;
-      del.addEventListener("click", (e) => { e.stopPropagation(); deleteUserTheme(id); });
-      tile.appendChild(del);
-    }
-    return tile;
-  }
-  function editUserTheme(id) {
-    const theme = themesCache.find((item) => item.id === id);
-    if (!theme || !theme.seed) return;
-    editingThemeId = id;
-    // stay on the preset being edited -- the editor is changing that presets contents, not forking it into Custom
-    state.theme = id;
-    state.themeCustom = Object.assign({}, theme.seed);
-    fillThemeEditor(state.themeCustom);
-    els.themeName.value = theme.label || id.slice(5);
-    els.saveThemeBtn.textContent = RK_M("settings.updatePreset");
-    els.cancelThemeEditBtn.hidden = false;
-    paintThemeSelection();
-    applyThemePreview();
-    markDirty();
-    els.themeName.focus();
-  }
-  async function deleteUserTheme(id) {
-    let data;
-    try { data = await helperJson("appearance/delete-theme?id=" + encodeURIComponent(id), { method: "POST" }); }
-    catch (e) { setStatus(RK_M("settings.couldNotRemoveTheme"), "bad"); return; }
-    if (!data || !data.ok) { setStatus((data && data.message) || RK_M("settings.couldNotRemoveTheme"), "bad"); return; }
-    if (state.theme === id) {
-      state.theme = "default";
-      if (originalState) originalState.theme = "default";
-      applyThemePreview();
-    }
-    if (editingThemeId === id) endThemeEdit();
-    await renderThemeGrid();
-  }
-  async function renderThemeGrid() {
-    let data;
-    try { data = await helperJson("appearance/themes"); } catch (e) { return; }
-    themesCache = data.themes || [];
-    els.themeGrid.innerHTML = "";
-    for (const th of (data.themes || []))
-      els.themeGrid.appendChild(themeTile(th.id, th.label || th.id, th.swatch, !!th.deletable));
-    els.themeGrid.appendChild(themeTile("custom", RK_M("settings.custom"), null, false));
-    if (!state.themeCustom && data.custom) state.themeCustom = data.custom;
-    if (state.theme === "custom") fillThemeEditor(state.themeCustom);
-    paintThemeSelection();
-  }
-  function applyThemeEditorChange() {
-    if (!editingThemeId && state.theme !== "custom") { state.theme = "custom"; paintThemeSelection(); }
-    state.themeCustom = themeCustomState();
-    applyThemePreview();
-    markDirty();
-  }
-  els.themeEditor.querySelectorAll("button[data-k]").forEach((button) => {
-    button.addEventListener("click", () => openColorDialog(button.dataset.value, button.getAttribute("aria-label"), (color) => {
-      setColorButton(button, color, "#000000");
-      applyThemeEditorChange();
-    }));
-  });
-  els.themeGradientEnabled.addEventListener("change", () => {
-    const spec = gradientByTarget[gradientTarget];
-    if (spec) {
-      spec.enabled = els.themeGradientEnabled.checked;
-      // turning it on with nothing stored yet seeds from the surfaces own colour, so the first frame is subtle
-      if (spec.enabled && spec.stops.length < 2) spec.stops = seedStopsFor(gradientTarget, themeCustomState());
-    }
-    els.themeGradientEditor.hidden = !els.themeGradientEnabled.checked;
-    gradientStops = spec ? spec.stops.slice().map((stop) => ({ color:stop.color, position:stop.position })) : [];
-    selectedGradientStop = null;
-    renderGradientStops();
-    renderGradientTargets();
-    applyThemeEditorChange();
-  });
-  els.themeGradientType.addEventListener("combochange", () => { updateGradientPreview(); applyThemeEditorChange(); });
-  // .volume-slider draws its track fill from --fill; every gradient slider keeps it current the same way the audio/overlay ones do.
-  function syncGradientSliderFills() {
-    setSliderFill(els.themeGradientAngle, parseInt(els.themeGradientAngle.value, 10) || 0, 0, 359);
-    setSliderFill(els.themeGradientCenterX, parseInt(els.themeGradientCenterX.value, 10) || 0, 0, 100);
-    setSliderFill(els.themeGradientCenterY, parseInt(els.themeGradientCenterY.value, 10) || 0, 0, 100);
-  }
-  els.themeGradientAngle.addEventListener("input", () => {
-    els.themeGradientAngleValue.value = els.themeGradientAngle.value;
-    syncGradientSliderFills();
-    updateGradientPreview();
-    applyThemeEditorChange();
-  });
-  els.themeGradientAngleValue.addEventListener("change", () => {
-    const angle = Math.max(0, Math.min(359, parseInt(els.themeGradientAngleValue.value, 10) || 0));
-    els.themeGradientAngle.value = String(angle);
-    els.themeGradientAngleValue.value = String(angle);
-    syncGradientSliderFills();
-    updateGradientPreview();
-    applyThemeEditorChange();
-  });
-  function bindGradientCenter(slider, input) {
-    slider.addEventListener("input", () => { input.value = slider.value; syncGradientSliderFills(); updateGradientPreview(); applyThemeEditorChange(); });
-    input.addEventListener("change", () => { const value = clampPercent(input.value, 50); slider.value = String(value); input.value = String(value); syncGradientSliderFills(); updateGradientPreview(); applyThemeEditorChange(); });
-  }
-  bindGradientCenter(els.themeGradientCenterX, els.themeGradientCenterXValue);
-  bindGradientCenter(els.themeGradientCenterY, els.themeGradientCenterYValue);
-  // clicking the ramp itself adds a stop where you clicked, already the colour showing there, so adding one never jolts the gradient.
-  els.themeGradientRamp.addEventListener("pointerdown", (event) => {
-    if (event.target.closest(".grad-ramp-handle")) return;
-    if (gradientStops.length >= GRADIENT_MAX_STOPS) {
-      setStatus(RK_M("settings.aGradientCanHaveAtMost", { count: GRADIENT_MAX_STOPS }), "bad");
-      return;
-    }
-    const position = gradientPositionFromEvent(event);
-    const stop = { color:gradientColorAt(position), position };
-    gradientStops.push(stop);
-    selectedGradientStop = stop;
-    renderGradientStops();
-    applyThemeEditorChange();
-    renderGradientTargets();
-  });
-  els.removeGradientStopBtn.addEventListener("click", () => {
-    if (!selectedGradientStop || gradientStops.length <= 2) return;
-    gradientStops.splice(gradientStops.indexOf(selectedGradientStop), 1);
-    selectedGradientStop = null;
-    renderGradientStops();
-    applyThemeEditorChange();
-    renderGradientTargets();
-  });
-  els.themeCustomDark.addEventListener("change", applyThemeEditorChange);
-  // cancelling an edit closes the editor and drops the unsaved colours back to whatever the preset actually holds
-  els.cancelThemeEditBtn.addEventListener("click", () => {
-    endThemeEdit();
-    paintThemeSelection();
-    applyThemePreview();
-  });
-  els.saveThemeBtn.addEventListener("click", async () => {
-    const name = (els.themeName.value || "").trim();
-    if (!name) { setStatus(RK_M("settings.nameTheThemeFirst"), "bad"); els.themeName.focus(); return; }
-    els.saveThemeBtn.disabled = true;
-    let data;
-    let failure = "";
-    try {
-      let url = "appearance/save-theme?label=" + encodeURIComponent(name);
-      if (editingThemeId) url += "&id=" + encodeURIComponent(editingThemeId);
-      data = await helperJson(url, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(themeCustomState()),
-      });
-    } catch (e) { data = null; failure = e.message || String(e); }
-    els.saveThemeBtn.disabled = false;
-    if (!data || !data.ok) { setStatus(failure || (data && data.message) || RK_M("settings.couldNotSaveTheme"), "bad"); return; }
-    const updated = !!editingThemeId;
-    state.themeCustom = themeCustomState();
-    state.theme = data.id;
-    endThemeEdit();
-    await renderThemeGrid();
-    paintThemeSelection();
-    applyThemePreview();
-    markDirty();
-    setStatus(updated ? RK_M("settings.presetUpdatedApplyToUpdateObs") : RK_M("settings.presetSavedApplyToUseIt"), "good");
-  });
-  renderThemeGrid();
-
-  // -- Appearance tab: app-icon picker -- applies on Apply through the normal save flow (state.appIcon / state.appIconCustomPath)
-  function paintAppIconSelection() {
-    const sel = settingOr("appIcon");
-    els.appIconGrid.querySelectorAll(".icon-tile").forEach((t) => t.classList.toggle("is-selected", t.dataset.id === sel));
-    els.appIconCustomRow.hidden = sel !== "custom";
-  }
-  function selectAppIcon(id) {
-    state.appIcon = id;
-    paintAppIconSelection();
-    if (id === "custom") els.appIconCustomPath.focus();
-    markDirty();
-  }
-  function appIconTile(id, label, url, glyph, deletable) {
-    const tile = document.createElement("button");
-    tile.type = "button";
-    tile.className = "icon-tile";
-    tile.dataset.id = id;
-    let swatch;
-    if (url) { swatch = document.createElement("img"); swatch.src = HELPER + url; swatch.alt = ""; }
-    else { swatch = document.createElement("span"); swatch.className = "icon-tile-swatch"; swatch.textContent = glyph || ""; }
-    const lab = document.createElement("span");
-    lab.className = "icon-tile-label";
-    if (deletable) lab.setAttribute("translate", "no");
-    lab.textContent = label;
-    tile.append(swatch, lab);
-    tile.addEventListener("click", () => selectAppIcon(id));
-    if (deletable) {
-      const del = document.createElement("span");
-      del.className = "icon-tile-del";
-      del.setAttribute("role", "button");
-      del.setAttribute("aria-label", RK_M("settings.removeName", { name: label }));
-      del.title = RK_M("common.remove");
-      del.innerHTML = APPICON_X_SVG;
-      del.addEventListener("click", (e) => { e.stopPropagation(); deleteUserIcon(id); });
-      tile.appendChild(del);
-    }
-    return tile;
-  }
-  async function deleteUserIcon(id) {
-    let data;
-    try { data = await helperJson("appearance/delete-icon?file=" + encodeURIComponent(id), { method: "POST" }); }
-    catch (e) { setStatus(RK_M("settings.couldNotRemoveIcon"), "bad"); return; }
-    if (!data || !data.ok) { setStatus((data && data.message) || RK_M("settings.couldNotRemoveIcon"), "bad"); return; }
-    if (state.appIcon === id) {
-      state.appIcon = "default";
-      if (originalState) originalState.appIcon = "default";
-    }
-    await renderAppIconGrid();
-  }
   // the way over to the obs settings wears the same app icon as the title bar of the window: the one saved in the Appearance tab, or the obs mark
   const obsSwitchIcon = document.getElementById("obsSwitchIcon");
   function setObsSwitchIcon(url) { if (obsSwitchIcon) obsSwitchIcon.src = HELPER + url; }
   setObsSwitchIcon("/obs-icon.svg?v=4");
-  async function renderAppIconGrid() {
-    let data;
-    try { data = await helperJson("appearance/icons"); } catch (e) { return; }
-    els.appIconGrid.innerHTML = "";
-    for (const ic of (data.icons || []))
-      els.appIconGrid.appendChild(appIconTile(ic.id, ic.label || ic.id, ic.url || "", ic.id === "default" ? "OBS" : "", !!ic.deletable));
-    els.appIconGrid.appendChild(appIconTile("custom", RK_M("settings.custom"), "", "＋", false));
-    paintAppIconSelection();
-    const saved = (data.icons || []).find((ic) => ic.id === data.selected);
-    setObsSwitchIcon(saved && saved.url ? saved.url : "/obs-icon.svg?v=4");
-  }
-  renderAppIconGrid();
-
-  els.appIconCustomPath.addEventListener("input", () => {
-    state.appIconCustomPath = unquote(els.appIconCustomPath.value);
-    if (state.appIconCustomPath && state.appIcon !== "custom") { state.appIcon = "custom"; paintAppIconSelection(); }
-    markDirty();
-  });
 
   function unquote(s) {
     s = String(s || "").trim();
@@ -5651,16 +4852,22 @@
     els.browseClipDir.disabled = false;
     if (p) { els.clipDir.value = p; els.clipDir.dispatchEvent(new Event("change")); }
   });
-  els.browseAppIcon.addEventListener("click", async () => {
-    els.browseAppIcon.disabled = true;
-    const p = await browsePathHelper("browse-file", els.appIconCustomPath.value.trim());
-    els.browseAppIcon.disabled = false;
-    if (p) { els.appIconCustomPath.value = p; els.appIconCustomPath.dispatchEvent(new Event("input")); }
+
+  // the theme and app icon picker is the panel the setup wizard shows too; it works on this state and hands every change to markDirty, so undo and saving see it like any other setting
+  RKAppearance.init({
+    state,
+    onChange: () => markDirty(),
+    setStatus,
+    savedState: () => originalState,
+    previewChrome: true,
+    iconsRendered: (data) => {
+      const saved = (data.icons || []).find((ic) => ic.id === data.selected);
+      setObsSwitchIcon(saved && saved.url ? saved.url : "/obs-icon.svg?v=4");
+    },
   });
 
-  // clipping and the two mutes act on obs rather than on the settings file, but they wait for Apply like everything else: a switch only queues its change, Apply or OK sends the queue to obs in the order it was made, Cancel drops it. liveState is what obs reports right now and pendingLive holds what was asked for wherever that differs
+  // clipping and the two mutes act on obs rather than on the settings file: a switch goes to obs the moment it is flipped, the way its hotkey would, so it is not part of the undo history. liveState is what obs reports right now
   const liveEls = { clipping: document.getElementById("liveClipping"), mic: document.getElementById("liveMuteMic"), desktop: document.getElementById("liveMuteDesktop"), discord: document.getElementById("liveMuteDiscord") };
-  const liveLabels = { clipping: "clipping", mic: "the microphone mute", desktop: "the PC audio mute", discord: "the Discord audio mute" };
   const liveState = { clipping: null, mic: null, desktop: null, discord: null };
   function paintLiveControls() {
     Object.keys(liveEls).forEach((key) => {
@@ -5668,16 +4875,12 @@
       const value = liveState[key];
       // null means obs has no such output / input right now, so the switch stays greyed out instead of pretending
       el.disabled = typeof value !== "boolean";
-      if (typeof value === "boolean") el.checked = key in pendingLive ? pendingLive[key] : value;
+      if (typeof value === "boolean") el.checked = value;
     });
     // the rows of the recording audio list show the same switches the other way round
     renderRecordingAudio();
   }
-  function clearLivePending() {
-    Object.keys(pendingLive).forEach((key) => { delete pendingLive[key]; });
-    paintLiveControls();
-  }
-  // controls-state asks obs five things in a row and can take seconds while obs is busy, so one poll is out at a time, and an answer that started before an apply finished is dropped since it can predate what the apply did
+  // controls-state asks obs five things in a row and can take seconds while obs is busy, so one poll is out at a time, and an answer that started before a switch went to obs is dropped since it can predate it
   let liveBusy = false;
   let liveEpoch = 0;
   async function refreshLiveControls() {
@@ -5691,55 +4894,24 @@
     liveState.mic = s.micMuted;
     liveState.desktop = s.desktopMuted;
     liveState.discord = s.discordMuted;
-    // a change that obs has caught up with on its own (a hotkey, another window) is no longer a change
-    let caughtUp = false;
-    Object.keys(pendingLive).forEach((key) => { if (pendingLive[key] === liveState[key]) { delete pendingLive[key]; caughtUp = true; } });
     paintLiveControls();
-    if (caughtUp) markDirty(false);
   }
-  // sends the queue to obs. whatever obs refuses stays queued so the next Apply tries it again, and the names of those come back for the status line
-  async function applyLiveChanges() {
-    liveEpoch++;
-    const failed = [];
-    for (const key of Object.keys(pendingLive)) {
-      const want = pendingLive[key];
-      try {
-        if (key === "clipping") await helperJson("obs/replay-buffer?state=" + (want ? "on" : "off"), { method:"POST" });
-        else await helperJson("audio-mute", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ input:key, muted:want }) });
-        liveState[key] = want;
-        delete pendingLive[key];
-      } catch (e) { failed.push(liveLabels[key]); }
-    }
-    liveEpoch++;
-    paintLiveControls();
-    return failed;
-  }
-  // clipping starts or stops the moment it is switched; the mutes still wait for Apply
-  async function applyClippingNow(want) {
+  // a switch that obs refuses goes back to what obs reports
+  async function applyLiveNow(key, want) {
     liveEpoch++;
     try {
-      await helperJson("obs/replay-buffer?state=" + (want ? "on" : "off"), { method:"POST" });
-      liveState.clipping = want;
-      setStatus(want ? RK_M("settings.clippingOn") : RK_M("settings.clippingOff"), "good");
+      if (key === "clipping") await helperJson("obs/replay-buffer?state=" + (want ? "on" : "off"), { method:"POST" });
+      else await helperJson("audio-mute", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ input:key, muted:want }) });
+      liveState[key] = want;
+      if (key === "clipping") setStatus(want ? RK_M("settings.clippingOn") : RK_M("settings.clippingOff"), "good");
     } catch (e) {
-      setStatus(want ? RK_M("settings.couldNotTurnClippingOnError", { error: e.message || e }) : RK_M("settings.couldNotTurnClippingOffError", { error: e.message || e }), "bad");
+      if (key === "clipping") setStatus(want ? RK_M("settings.couldNotTurnClippingOnError", { error: e.message || e }) : RK_M("settings.couldNotTurnClippingOffError", { error: e.message || e }), "bad");
     }
     liveEpoch++;
     paintLiveControls();
   }
   Object.keys(liveEls).forEach((key) => {
-    liveEls[key].addEventListener("change", () => {
-      const want = liveEls[key].checked;
-      if (key === "clipping") {
-        delete pendingLive.clipping;
-        markDirty();
-        applyClippingNow(want);
-        return;
-      }
-      if (want === liveState[key]) delete pendingLive[key];
-      else pendingLive[key] = want;
-      markDirty();
-    });
+    liveEls[key].addEventListener("change", () => applyLiveNow(key, liveEls[key].checked));
   });
   refreshLiveControls();
   setInterval(refreshLiveControls, 3000);
@@ -5799,7 +4971,7 @@
   function raFixedRowHtml(row) {
     const volume = clampAudioVolume(state[row.volumeKey] ?? 100);
     const known = typeof liveState[row.kind] === "boolean";
-    const muted = row.kind in pendingLive ? pendingLive[row.kind] : liveState[row.kind];
+    const muted = liveState[row.kind];
     const on = known && muted === false;
     return '<div class="ra-row' + (row.section ? " is-section" : "") + (on ? "" : " is-off") + '">' +
       '<label class="check-row"><input type="checkbox" data-live="' + row.kind + '"' + (on ? " checked" : "") + (known ? "" : " disabled") + ' aria-label="' + escapeHtml(RK_M("settings.recordName", { name: row.name })) + '"></label>' +
@@ -5990,19 +5162,16 @@
     document.getElementById("streamableSize").textContent = formatUploadSize(authState.maxUploadBytes);
     document.getElementById("streamableDuration").textContent = authState.maxDurationSec === null ? RK_M("settings.unavailable") : authState.maxDurationSec === 0 ? RK_M("settings.unlimited") : RK_M("settings.countMinutes", { count: (authState.maxDurationSec / 60).toLocaleString(undefined, { maximumFractionDigits:1 }) });
     if (busyText) {
+      acct.status.hidden = false;
       acct.status.textContent = busyText;
-      acct.status.classList.remove("is-off");
       acct.signIn.hidden = true; acct.signOut.hidden = true; acct.force.hidden = true;
       return;
     }
+    // signed out the plan row of the upload details already says anonymous, so only a signed-in account names itself here
+    acct.status.hidden = !authState.signedIn;
     if (authState.signedIn) {
       if (authState.username) acct.status.setAttribute("translate", "no"); else acct.status.removeAttribute("translate");
       acct.status.textContent = authState.username || RK_M("settings.connectedAccount");
-      acct.status.classList.remove("is-off");
-    } else {
-      acct.status.removeAttribute("translate");
-      acct.status.textContent = RK_M("settings.uploadingAnonymously");
-      acct.status.classList.add("is-off");
     }
     document.getElementById("streamableHelp").textContent = authState.signedIn
       ? RK_M("settings.yourClipsAreSharedUsingThis")
@@ -6141,23 +5310,23 @@
   loadSettings().finally(() => { if (window.RKSkeleton) RKSkeleton.uncover(settingsMain); });
   setInterval(refreshExternalSettings, 2000);
 
-  // hidden-not-destroyed window: a reopen just re-shows this page, so re-fetch settings and drop any uncommitted edits to behave like a fresh open. mirrors clips.htmls re-show reset (visibilitychange, plus a focus fallback for CEF hosts that dont deliver visibilitychange on their own hide()/show()).
+  // hidden-not-destroyed window: a reopen just re-shows this page, so the waiting save goes out, settings are fetched again and what still waits for Restart OBS is dropped, to behave like a fresh open. mirrors clips.htmls re-show reset (visibilitychange, plus a focus fallback for CEF hosts that dont deliver visibilitychange on their own hide()/show()).
   let settingsWasHidden = false;
   function reinitSettingsOnShow() {
-    loadSettings().then(() => {
+    settleSettings().catch(() => {}).then(loadSettings).then(() => {
       if (window.RKOverlayPreview) { RKOverlayPreview.resetPosition(); RKOverlayPreview.refresh(); }
     });
   }
-  // embedded in the obs window this page is one view among several, not a window that was closed: going to another view and coming back keeps its edits, and OK / Cancel already reset it themselves, so none of the reset-on-show paths apply there
+  // embedded in the obs window this page is one view among several, not a window that was closed: going to another view and coming back keeps its edits, so none of the reset-on-show paths apply there
   document.addEventListener("visibilitychange", () => {
     if (window.RKEmbedded) return;
-    if (document.hidden) { settingsWasHidden = true; return; }
+    if (document.hidden) { settingsWasHidden = true; settleSettings().catch(() => {}); return; }
     if (settingsWasHidden) { settingsWasHidden = false; reinitSettingsOnShow(); }
   });
   // in its own window the plugin hides and shows this page without cef ever sending visibilitychange or focus, so its own show / hide event drives the same reset
   RKWindow.onChange((up) => {
     if (window.RKEmbedded) return;
-    if (!up) { settingsWasHidden = true; return; }
+    if (!up) { settingsWasHidden = true; settleSettings().catch(() => {}); return; }
     if (settingsWasHidden) { settingsWasHidden = false; reinitSettingsOnShow(); }
   });
   window.addEventListener("focus", () => {

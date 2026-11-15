@@ -871,7 +871,7 @@ namespace ReplayKitHelper
                 string p = ResolveAppIconPath(Normalize(ReadSettings()));
                 if (!string.IsNullOrEmpty(p) && File.Exists(p)) return p;
             }
-            catch { }
+            catch (Exception ex) { Log.Write("EffectiveReplayKitIconPath: " + ex.Message); }
             return File.Exists(Constants.OBS_ICON_PATH) ? Constants.OBS_ICON_PATH : null;
         }
 

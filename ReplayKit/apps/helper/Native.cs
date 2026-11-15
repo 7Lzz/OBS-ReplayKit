@@ -930,7 +930,7 @@ namespace ReplayKitHelper
             if (_resizeBackgroundPrimed) return;
             int bg = CAPTION_COLOR;
             try { bg = Themes.ToColorRef(Themes.Resolve(ReplaykitSettings.Normalize(ReplaykitSettings.ReadSettings())).Bg); }
-            catch { }
+            catch (Exception ex) { Log.Write("PrimeResizeBackground: " + ex.Message); }
             IntPtr brush = CreateSolidBrush(bg);
             SetClassLongPtr64(hWnd, GCLP_HBRBACKGROUND, brush);
             _resizeBackgroundPrimed = true;

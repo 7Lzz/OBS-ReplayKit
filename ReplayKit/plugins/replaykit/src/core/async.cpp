@@ -19,7 +19,7 @@ void RunAsync(std::function<void()> work)
 		return;
 	for (auto it = g_workers.begin(); it != g_workers.end();) {
 		if (it->wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
-			try { it->get(); } catch (...) { blog(LOG_WARNING, "ReplayKit background task failed"); }
+			try { it->get(); } catch (const std::exception &e) { blog(LOG_WARNING, "ReplayKit background task failed: %s", e.what()); } catch (...) { blog(LOG_WARNING, "ReplayKit background task failed"); }
 			it = g_workers.erase(it);
 		} else {
 			++it;
@@ -37,7 +37,7 @@ void StopWorkers()
 		workers.swap(g_workers);
 	}
 	for (auto &worker : workers) {
-		try { worker.get(); } catch (...) { blog(LOG_WARNING, "ReplayKit background task failed"); }
+		try { worker.get(); } catch (const std::exception &e) { blog(LOG_WARNING, "ReplayKit background task failed: %s", e.what()); } catch (...) { blog(LOG_WARNING, "ReplayKit background task failed"); }
 	}
 }
 

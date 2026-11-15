@@ -165,23 +165,7 @@
   .field-wrap:has(> .field-browse) > .text-input { width:auto; flex:1 1 0; min-width:0; }
   .field-browse { flex:none; }
 
-  .icon-grid { display:flex; flex-wrap:wrap; gap:8px; padding:4px 12px 0; }
-  .icon-tile {
-    position:relative; display:flex; flex-direction:column; align-items:center; gap:6px;
-    width:78px; padding:9px 4px 7px;
-    background:var(--field-dark); border:1px solid var(--line); border-radius:7px;
-    color:var(--text); cursor:pointer; font-size:11px; line-height:1;
-    transition:background var(--anim_press) var(--ease_pop), border-color var(--anim_press) var(--ease_pop);
-  }
-  .icon-tile:hover { background:var(--button-hover); }
-  .icon-tile.is-selected { border-color:var(--selected2); background:var(--selected); color:var(--on-accent); }
-  .icon-tile-label { max-width:70px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; line-height:1.4; }
-  .icon-tile img, .icon-tile .icon-tile-swatch { width:40px; height:40px; }
-  .icon-tile img { object-fit:contain; }
-  .icon-tile .icon-tile-swatch { display:flex; align-items:center; justify-content:center; background:var(--field); border-radius:6px; color:var(--muted); font-size:9px; text-align:center; }
-  .theme-sw { width:40px; height:40px; border-radius:6px; overflow:hidden; position:relative; border:1px solid var(--line); }
-  .theme-sw i { position:absolute; left:0; right:0; bottom:0; height:42%; display:block; }
-  .theme-sw b { position:absolute; top:5px; right:5px; width:9px; height:9px; border-radius:50%; box-shadow:0 0 0 1.5px rgba(0,0,0,.25); }
+  .icon-grid { padding:4px 12px 0; }
 
   .footer { display:flex; justify-content:flex-end; align-items:center; gap:8px; padding:9px 8px 13px 0; }
   .footer .status { margin-right:auto; font-size:12px; color:var(--muted); padding-left:4px; }
@@ -891,7 +875,7 @@
       slider.value = String(degrees);
       slider.dispatchEvent(new Event("input"));
     });
-    if (window.RKAppearance) RKAppearance.init({ get:hostGet, set:hostSet, onChange:() => {}, setStatus });
+    if (window.RKAppearance) RKAppearance.init({ state, onChange:() => {}, setStatus, clipsPreview:true });
 
     showStep(1);
   }

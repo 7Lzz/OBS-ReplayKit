@@ -383,6 +383,10 @@
     "source": "ba654163a6dd9fca",
     "text": "ゴミ箱への移動を確認 ({count})"
   },
+  "clips.confirmStreamableDelete": {
+    "source": "474106522234058b",
+    "text": "もう一度クリックすると Streamable から完全に削除されます"
+  },
   "clips.containsGames": {
     "source": "e704b140b41ce861",
     "text": "{games} を含む"
@@ -527,6 +531,10 @@
     "source": "9e6d8f9b4b3d673c",
     "text": "完全に削除"
   },
+  "clips.deleteFromStreamable": {
+    "source": "814603f774347773",
+    "text": "Streamable から削除"
+  },
   "clips.deleteGif": {
     "source": "a3e08b9cd13492d2",
     "text": "GIF を削除"
@@ -550,6 +558,10 @@
   "clips.deletedForGoodSoon": {
     "source": "06feb61b74dcd214",
     "text": "まもなく完全に削除されます"
+  },
+  "clips.deletedFromStreamable": {
+    "source": "241594a07144433d",
+    "text": "アップロードした動画を Streamable から削除しました"
   },
   "clips.deletedHistoryCount": {
     "source": "0347ad9acabf6ba3",
@@ -1604,6 +1616,18 @@
   "clips.streamableCheckTimedOut": {
     "source": "73cbf2a9f94b12d4",
     "text": "Streamable の状態確認が 30 分でタイムアウトしました。"
+  },
+  "clips.streamableDeleteFailed": {
+    "source": "60a24d0a0f5989bf",
+    "text": "アップロードした動画を削除できませんでした。ログイン中の Streamable アカウントがこの動画の所有者か確認してください。"
+  },
+  "clips.streamableDeletedLinkRemains": {
+    "source": "708eb10ac780b0b1",
+    "text": "Streamable で動画は削除されましたが、ReplayKit でリンクを解除できませんでした。"
+  },
+  "clips.streamableLinkChanged": {
+    "source": "48be168a85ec73c7",
+    "text": "Streamable のリンクが変更されたか、利用できなくなりました。"
   },
   "clips.thatCouldNotBeDone": {
     "source": "6eab7f00f3e45f30",
@@ -6289,30 +6313,6 @@
     "source": "417cf9c08b0b8d6c",
     "text": "適用"
   },
-  "settings.applyFailedError": {
-    "source": "9749057463b8fad4",
-    "text": "適用に失敗しました: {error}"
-  },
-  "settings.applyOrCancelSettingsChangesBefore": {
-    "source": "cafd4e725ba3d52d",
-    "text": "アンインストールする前に、設定の変更を適用またはキャンセルしてください。"
-  },
-  "settings.applyOrCancelSettingsChangesFirst": {
-    "source": "24c5292e2868f6aa",
-    "text": "先に設定の変更を適用またはキャンセルしてください。"
-  },
-  "settings.applyRestart": {
-    "source": "62988a30203f965e",
-    "text": "適用して再起動"
-  },
-  "settings.applyingSettings": {
-    "source": "c877ec9b6a085339",
-    "text": "設定を適用しています..."
-  },
-  "settings.applyingSettingsAndRestartingObs": {
-    "source": "d82f0742406d836b",
-    "text": "設定を適用して OBS を再起動しています..."
-  },
   "settings.arrowKeySkip": {
     "source": "6137822ccd053c1e",
     "text": "矢印キーでスキップ"
@@ -6665,10 +6665,6 @@
     "source": "d88142e324dafafd",
     "text": "Bongo Cat の表示を変更できませんでした: {error}"
   },
-  "settings.couldNotChangeName": {
-    "source": "69f79c7a72505e7d",
-    "text": "{name} を変更できませんでした。"
-  },
   "settings.couldNotChangeNoiseSuppressionError": {
     "source": "fbf6531683d5f5da",
     "text": "ノイズ抑制を変更できませんでした: {error}"
@@ -6876,6 +6872,10 @@
   "settings.couldNotRotateOverlayError": {
     "source": "061072c2f3c67ae8",
     "text": "オーバーレイを回転できませんでした: {error}"
+  },
+  "settings.couldNotSaveTheSettingsError": {
+    "source": "f381ed59bdef13ac",
+    "text": "設定を保存できませんでした: {error}"
   },
   "settings.couldNotSaveTheme": {
     "source": "740913bd6cd7b7ac",
@@ -7205,9 +7205,9 @@
     "source": "135ce9d090fd8748",
     "text": "次の解像度に縮小"
   },
-  "settings.dragToMoveUseTheCorners": {
-    "source": "bc8d85be8af34e72",
-    "text": "ドラッグして移動、角をドラッグしてサイズ変更、丸いハンドルをドラッグして回転します。回転は 90 度付近で止まります。Shift を押しながらにするとこの吸着を無効にできます。移動、サイズ変更、回転は Ctrl+Z で元に戻せます。変更は「適用」を押したときに反映されます。"
+  "settings.dragToMoveUseTheCornersToResize": {
+    "source": "f731afc293d36ad8",
+    "text": "ドラッグして移動、角をドラッグしてサイズ変更、丸いハンドルをドラッグして回転します。回転は 90 度付近で止まります。Shift を押しながらにするとこの吸着を無効にできます。移動、サイズ変更、回転は Ctrl+Z で元に戻せます。"
   },
   "settings.dragToPosition": {
     "source": "43ddd66cdc6eb3f4",
@@ -7885,9 +7885,9 @@
     "source": "4f3628452e51e173",
     "text": "Discord の音声をミュート"
   },
-  "settings.mutesOrUnmutesThisSoundIn": {
-    "source": "d0dac12fce8c2c18",
-    "text": "OBS でこの音声をミュートまたはミュート解除します。変更は「適用」または「OK」を押したときに反映されます。"
+  "settings.mutesOrUnmutesThisSoundInObs": {
+    "source": "4ccb5ac674e1f766",
+    "text": "OBS でこの音声をミュートまたはミュート解除します。"
   },
   "settings.n10FpsSmallest": {
     "source": "6690b124bcd6762b",
@@ -8013,10 +8013,6 @@
     "source": "21163f9d9c6e3bc0",
     "text": "利用できる OBS のシーンがありません。"
   },
-  "settings.noSettingsChanged": {
-    "source": "583a5150efd3478e",
-    "text": "設定は変更されていません"
-  },
   "settings.noSignInIsNeededTo": {
     "source": "9a607cb83d8e7a97",
     "text": "クリップのアップロードと共有リンクの作成にサインインは必要ありません。匿名のアップロードには以下の上限が適用されます。新しいアップロードをアカウントに残すにはサインインしてください。"
@@ -8032,6 +8028,10 @@
   "settings.none": {
     "source": "f2953d2931e36d0c",
     "text": "未設定"
+  },
+  "settings.notAffiliatedWithStreamable": {
+    "source": "647bde456f398520",
+    "text": "ReplayKit は Streamable と提携していません。アップロードには Streamable のプランと制限が適用され、Streamable によって変更される場合があります。"
   },
   "settings.num": {
     "source": "c483792012d1aecb",
@@ -8293,10 +8293,6 @@
     "source": "111fd0852e756ee7",
     "text": "仮想カメラ"
   },
-  "settings.overlayApplyFailedError": {
-    "source": "738255c1ef31bf55",
-    "text": "オーバーレイの適用に失敗しました: {error}"
-  },
   "settings.overlayColorAdd": {
     "source": "60fe2f0560fa3a05",
     "text": "オーバーレイの加算の色"
@@ -8477,13 +8473,13 @@
     "source": "7cc1cbde1dd4c94c",
     "text": "ハイエンド PC 向けの高画質設定です。"
   },
-  "settings.presetSavedApplyToUseIt": {
-    "source": "282c7f89ab3a78db",
-    "text": "プリセットを保存しました。OBS で使うには適用してください。"
+  "settings.presetSaved": {
+    "source": "5754d4021b95d016",
+    "text": "プリセットを保存しました。"
   },
-  "settings.presetUpdatedApplyToUpdateObs": {
-    "source": "3004816539b8da5b",
-    "text": "プリセットを更新しました。OBS に反映するには適用してください。"
+  "settings.presetUpdated": {
+    "source": "d64e9dc0662e2c1b",
+    "text": "プリセットを更新しました。"
   },
   "settings.pressAKey": {
     "source": "d5fa95d1806530dd",
@@ -8693,9 +8689,9 @@
     "source": "1f00b398df5fb06f",
     "text": "ReplayKit は最新です ({version})"
   },
-  "settings.replaykitNeedsRepairApplyOrCancel": {
-    "source": "62719d1405529b14",
-    "text": "ReplayKit の修復が必要です。先に設定の変更を適用するかキャンセルしてください。"
+  "settings.replaykitNeedsRepairRestartOrUndo": {
+    "source": "f1826db758cef701",
+    "text": "ReplayKit の修復が必要です。まだ保存されていない設定の変更があるため、先に OBS を再起動するか、変更を元に戻してください。"
   },
   "settings.replaykitNeedsRepairUseTheUpdate": {
     "source": "9848b48c05d56b89",
@@ -8808,10 +8804,6 @@
   "settings.setShortcutsForSavingClipsRecording": {
     "source": "5cdbf8597c6ecc58",
     "text": "クリップの保存、録画、ライブラリを開くためのショートカットを設定します。"
-  },
-  "settings.settingsApplied": {
-    "source": "ff9b0fd84a03a831",
-    "text": "設定を適用しました"
   },
   "settings.settingsChanged": {
     "source": "735553f4b318a7bb",
@@ -8997,6 +8989,14 @@
     "source": "38942d2b60f4ad2a",
     "text": "ギザギザしたエッジをすばやく滑らかにします。細かい部分はぼやけて見えることがあります。"
   },
+  "settings.someChangesTakeEffectAfterObsRestarts": {
+    "source": "e90960b323eb8b66",
+    "text": "一部の変更は OBS の再起動後に反映されます。"
+  },
+  "settings.someSettingsChangesAreNotSavedYet": {
+    "source": "84a4b2684df78edc",
+    "text": "まだ保存されていない設定の変更があります。先に OBS を再起動するか、変更を元に戻してください。"
+  },
   "settings.sounds": {
     "source": "92375472db9662ea",
     "text": "サウンド"
@@ -9056,6 +9056,10 @@
   "settings.storageCompressionType": {
     "source": "2b18fed600f92087",
     "text": "保存容量の圧縮方式"
+  },
+  "settings.streamableUploadDeletion": {
+    "source": "079d533a30adf902",
+    "text": "Streamable アカウントにアップロードしたクリップは、クリップのメニューから削除できます。"
   },
   "settings.switchSpeed": {
     "source": "66caae8c2c48a6a8",
@@ -9265,10 +9269,6 @@
     "source": "b16d021e8f3130c8",
     "text": "無制限"
   },
-  "settings.updateAvailableLatestApplyOrCancel": {
-    "source": "93fac0decc666ec0",
-    "text": "更新があります: {latest}。先に設定の変更を適用するかキャンセルしてください。"
-  },
   "settings.updateAvailableLatestInstalledInstalled": {
     "source": "05c45daac5ecbde8",
     "text": "更新があります: {latest} (インストール済み: {installed})"
@@ -9276,6 +9276,10 @@
   "settings.updateAvailableLatestInstalledInstalledUse": {
     "source": "f3dde09189373d88",
     "text": "更新があります: {latest} (インストール済み: {installed})。上部の更新ボタンからインストールしてください。"
+  },
+  "settings.updateAvailableLatestRestartOrUndo": {
+    "source": "3aacb2b2c5882cd1",
+    "text": "更新があります: {latest}。まだ保存されていない設定の変更があるため、先に OBS を再起動するか、変更を元に戻してください。"
   },
   "settings.updateCheckFailedError": {
     "source": "a3bc85869fe0a75a",
@@ -9304,10 +9308,6 @@
   "settings.uploadSize": {
     "source": "197f08bfbafc075b",
     "text": "アップロードサイズ"
-  },
-  "settings.uploadingAnonymously": {
-    "source": "91310b0ae2cbdb6e",
-    "text": "匿名でアップロード中"
   },
   "settings.useAGradientForBackground": {
     "source": "f6b35c44145b756e",

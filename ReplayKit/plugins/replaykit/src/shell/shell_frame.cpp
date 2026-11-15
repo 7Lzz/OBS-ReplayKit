@@ -2,6 +2,7 @@
 #include "prelude.hpp"
 #include "shell/shell_frame.hpp"
 
+#include "core/dev_log.hpp"
 #include "core/main_window.hpp"
 #include "core/state.hpp"
 #include "core/theme.hpp"
@@ -542,6 +543,14 @@ bool ShellFrameFilter::nativeEventFilter(const QByteArray &, void *message, qint
 		// lParam -1 tells windows not to repaint the (empty) caption on activation, which is what flashes a white bar
 		*result = DefWindowProcW(msg->hwnd, WM_NCACTIVATE, msg->wParam, -1);
 		return true;
+	case WM_SYSCOMMAND:
+		// the window draws no caption and has no native menu bar, so an alt tap would start the menu loop of a system menu that is never drawn; the release of alt after an alt hotkey counts as one, since windows swallows the key of the hotkey. alt+space still opens the system menu
+		if ((msg->wParam & 0xFFF0) == SC_KEYMENU && msg->lParam == 0) {
+			DevLog("alt tap kept out of the hidden system menu");
+			*result = 0;
+			return true;
+		}
+		return false;
 	case WM_WINDOWPOSCHANGED:
 	case WM_MOVE:
 	case WM_SIZE:

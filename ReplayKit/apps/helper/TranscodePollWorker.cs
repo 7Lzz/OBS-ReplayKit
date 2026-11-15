@@ -66,12 +66,12 @@ namespace ReplayKitHelper
                 L("ready -> link copied=" + copied + ", toast handed=" + handed);
             }
 
-            DateTime deadline = DateTime.Now.AddMinutes(30);
+            DateTime deadline = DateTime.UtcNow.AddMinutes(30);
             string scratchDir = Constants.SCRATCH_DIR;
             try { Directory.CreateDirectory(scratchDir); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
 
             string lastWritten = "";
-            while (DateTime.Now < deadline)
+            while (DateTime.UtcNow < deadline)
             {
                 Thread.Sleep(5000);
                 string respPath = Path.Combine(scratchDir, "strmbl_st_" + Guid.NewGuid().ToString("N") + ".txt");
@@ -149,7 +149,7 @@ namespace ReplayKitHelper
                 if (status.Value >= 2) { if (status.Value == 2) NotifyReady(); break; }
             }
 
-            if (DateTime.Now >= deadline)
+            if (DateTime.UtcNow >= deadline)
             {
                 try
                 {

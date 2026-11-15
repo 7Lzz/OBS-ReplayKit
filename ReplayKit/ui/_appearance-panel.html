@@ -1,4 +1,4 @@
-<!-- shared partial (helper #include target: appearance-panel). the full Settings Appearance UI (theme presets + grid, custom colour/gradient editor, save-as-preset, app icon picker, recording dot) lifted from settings.html so the wizard is 1:1. host: RKAppearance.init({ get, set, onChange, setStatus }); RKAppearance.collect() -> {theme, themeCustom, appIcon, appIconCustomPath, appIconRecordingDot}. depends on _color-picker being on the page. -->
+<!-- shared partial (helper #include target: appearance-panel): the theme picker, custom colour and gradient editor, save-as-preset, app icon picker and recording dot of Settings > Appearance and of the setup wizard. host: RKAppearance.init({ state, onChange, setStatus, savedState, previewChrome, clipsPreview, iconsRendered }); the panel reads and writes theme, themeCustom, appIcon, appIconCustomPath and appIconRecordingDot on that state. needs _color-picker on the page by the time init runs. -->
 <style>
   /* when this partial is dropped inside a host that already uses .box as a scroll container (the setup wizard), neutralise the nesting */
   .box .box { height:auto; overflow:visible; background:transparent; padding:0; margin:0 8px 12px 0; }
@@ -107,14 +107,50 @@
   .theme-preview-row { margin-top:8px; }
   .theme-preview-row .btn { height:26px; padding:0 10px; font-size:12px; }
   .theme-section-hint { color:var(--muted); font-size:10px; font-weight:400; }
-  .icon-tile-del { position:absolute; top:3px; right:3px; display:flex; align-items:center; justify-content:center; width:16px; height:16px; padding:0; border:0; border-radius:4px; background:var(--field); color:var(--muted); cursor:pointer; opacity:0; transition:opacity 120ms; }
-  .icon-tile:hover .icon-tile-del { opacity:1; }
+  /* Appearance tab app-icon picker */
+  .icon-grid { display:flex; flex-wrap:wrap; gap:8px; }
+  .icon-tile {
+    position:relative;
+    display:flex; flex-direction:column; align-items:center; gap:6px;
+    width:78px; padding:9px 4px 7px;
+    background:var(--field-dark); border:1px solid var(--line); border-radius:7px;
+    color:var(--text); cursor:pointer; font-size:11px; line-height:1;
+    transition:background var(--anim_press) var(--ease_pop), border-color var(--anim_press) var(--ease_pop);
+  }
+  .icon-tile:hover { background:var(--button-hover); }
+  .icon-tile.is-selected { border-color:var(--selected2); background:var(--selected); color:var(--on-accent); }
+  .icon-tile img, .icon-tile .icon-tile-swatch { width:40px; height:40px; }
+  .icon-tile img { object-fit:contain; image-rendering:auto; }
+  .icon-tile .icon-tile-swatch {
+    display:flex; align-items:center; justify-content:center;
+    background:var(--field); border-radius:6px; color:var(--muted); font-size:9px; text-align:center;
+  }
+  /* line-height 1.4 (not the tile's inherited 1) so descenders -- g j y p -- arent clipped by overflow:hidden */
+  .icon-tile-label { max-width:70px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; line-height:1.4; }
+  .icon-tile-del {
+    position:absolute; top:3px; right:3px;
+    display:flex; align-items:center; justify-content:center;
+    width:16px; height:16px; padding:0; border:0; border-radius:4px;
+    background:var(--field); color:var(--muted); cursor:pointer; opacity:0;
+    transition:opacity var(--anim_press) var(--ease_pop), color 80ms ease-out, background 80ms ease-out;
+  }
+  .icon-tile:hover .icon-tile-del, .icon-tile-del:focus-visible { opacity:1; }
   .icon-tile-del:hover { background:var(--field-dark); color:var(--danger); }
-  .icon-tile-del svg { width:8px; height:8px; fill:currentColor; }
-  .icon-tile-edit { position:absolute; top:3px; left:3px; display:flex; align-items:center; justify-content:center; width:18px; height:18px; padding:0; border:0; border-radius:4px; background:var(--field); color:var(--muted); cursor:pointer; opacity:0; transition:opacity 120ms; }
-  .icon-tile:hover .icon-tile-edit { opacity:1; }
+  .icon-tile-edit {
+    position:absolute; top:3px; left:3px;
+    display:flex; align-items:center; justify-content:center;
+    width:18px; height:18px; padding:0; border:0; border-radius:4px;
+    background:var(--field); color:var(--muted); cursor:pointer; opacity:0;
+    transition:opacity var(--anim_press) var(--ease_pop), color 80ms ease-out, background 80ms ease-out;
+  }
+  .icon-tile:hover .icon-tile-edit, .icon-tile-edit:focus-visible { opacity:1; }
   .icon-tile-edit:hover { background:var(--field-dark); color:var(--text); }
   .icon-tile-edit svg { width:10px; height:10px; fill:currentColor; }
+  .icon-tile-del svg { width:8px; height:8px; fill:currentColor; }
+  /* theme tile swatch */
+  .theme-sw { width:40px; height:40px; border-radius:6px; overflow:hidden; position:relative; border:1px solid var(--line); }
+  .theme-sw i { position:absolute; left:0; right:0; bottom:0; height:42%; display:block; }
+  .theme-sw b { position:absolute; top:5px; right:5px; width:9px; height:9px; border-radius:50%; box-shadow:0 0 0 1.5px rgba(0,0,0,.25); }
 </style>
 <div class="box">
   <div class="box-title" data-i18n="settings.theme"></div>
@@ -208,8 +244,8 @@
 (function () {
   var HELPER = location.origin;
   var state = {};
-  var originalState = null;
-  var host = { get: function () {}, set: function () {}, onChange: function () {}, setStatus: function () {} };
+  // previewChrome: the theme preview reaches the native title bar and menus too; clipsPreview: offer to open the Clips window; savedState: the settings as last saved, so deleting the picked theme or icon there is not seen as an edit; iconsRendered: told the icon list after every load
+  var host = { state: null, onChange: function () {}, setStatus: function () {}, savedState: null, previewChrome: false, clipsPreview: false, iconsRendered: null };
   function markDirty() { try { host.onChange(); } catch (_) {} }
   function setStatus(t, k) { try { host.setStatus(t, k); } catch (_) {} }
   async function helperJson(pathIn, options) {
@@ -224,9 +260,12 @@
     var pct = Math.max(0, Math.min(100, ((value - min) / span) * 100));
     slider.style.setProperty("--fill", pct + "%");
   }
-  var cleanHexColor = window.RKColor.cleanHexColor, setColorButton = window.RKColor.setColorButton;
-  var rgbToHex = window.RKColor.rgbToHex, hexToRgb = window.RKColor.hexToRgb, rgbToHsv = window.RKColor.rgbToHsv, hsvToHex = window.RKColor.hsvToHex;
-  var openColorDialog = window.openColorDialog;
+  // filled in by init, since a host may include the colour picker after this panel
+  var cleanHexColor, setColorButton, rgbToHex, hexToRgb, rgbToHsv, hsvToHex, openColorDialog;
+  function settingOr(key) {
+    var value = state[key];
+    return value === undefined || value === null || value === "" ? (window.RK_SETTING_DEFAULTS || {})[key] : value;
+  }
 
   function comboValue(c) { return c.dataset.value || ""; }
   function renderCombo(c) {
@@ -235,9 +274,15 @@
     var cur = opts.find(function (o) { return o.value === v; }) || opts[0] || { label: "" };
     var lbl = c.querySelector(".combo-label"); if (lbl) lbl.textContent = cur.label || "";
     var menu = c.querySelector(".combo-menu");
-    if (menu) menu.innerHTML = opts.map(function (o) {
-      return '<div class="combo-option' + (o.value === v ? " is-selected" : "") + '" data-value="' + o.value + '">' + o.label + '</div>';
-    }).join("");
+    if (!menu) return;
+    menu.textContent = "";
+    opts.forEach(function (o) {
+      var item = document.createElement("div");
+      item.className = "combo-option" + (o.value === v ? " is-selected" : "");
+      item.dataset.value = o.value;
+      item.textContent = o.label;
+      menu.appendChild(item);
+    });
   }
   function fillCombo(c, opts) {
     c._opts = opts || [];
@@ -283,7 +328,7 @@
     } catch (e) { return ""; }
   }
 
-  // -- Appearance tab: theme picker -- ReplayKit surfaces preview live here; OBS gets it on the restart that Apply triggers.
+  // -- Appearance tab: theme picker -- ReplayKit surfaces preview live here; OBS gets it on the restart that saving a theme needs.
   // the shared close x, cropped to its drawing so the remove button keeps the size of the x it had
   const APPICON_X_SVG = ((window.RK_ICONS || {})["editor/close"] || "").replace(/viewBox="[^"]*"/, 'viewBox="5 5 14 14"');
   const THEME_EDIT_SVG = (window.RK_ICONS || {})["action/edit"] || "";
@@ -300,7 +345,7 @@
     themeLiveStyle.id = "rk-theme-live";
     document.head.appendChild(themeLiveStyle);
   }
-  // kills transitions/animations for one frame while the preview swaps -- this CEF build otherwise leaves background-color transitions that resolve through var() half-finished when the custom props change, freezing elements on the old accent. real (post-Apply) theme changes reload the dock so dont need this.
+  // kills transitions/animations for one frame while the preview swaps -- this CEF build otherwise leaves background-color transitions that resolve through var() half-finished when the custom props change, freezing elements on the old accent. real (saved) theme changes reload the dock so dont need this.
   const themeSwapFreeze = document.createElement("style");
   themeSwapFreeze.textContent = "html.rk-theme-swapping *,html.rk-theme-swapping *::before,html.rk-theme-swapping *::after{transition:none!important;animation-duration:0s!important;}";
   document.head.appendChild(themeSwapFreeze);
@@ -421,11 +466,12 @@
   function applyThemePreview() {
     clearTimeout(themePreviewTimer);
     themePreviewTimer = setTimeout(async () => {
-      const id = state.theme || "default";
+      const id = settingOr("theme");
       let url = HELPER + "/appearance/theme.css?t=" + Date.now();
       // mid-edit the presets saved css is stale -- preview whatever the editor currently holds
       if (id === "custom" || editingThemeId) url += "&custom=" + encodeURIComponent(JSON.stringify(themeCustomState()));
       else url += "&theme=" + encodeURIComponent(id);
+      if (host.previewChrome) url += "&preview=1";
       try {
         const r = await fetch(url, { cache: "no-store" });
         const css = r.ok ? await r.text() : "";
@@ -442,7 +488,7 @@
     }, 40);
   }
   function paintThemeSelection() {
-    const sel = state.theme || "default";
+    const sel = settingOr("theme");
     els.themeGrid.querySelectorAll(".icon-tile").forEach((t) => t.classList.toggle("is-selected", t.dataset.id === sel));
     els.themeCustomRow.hidden = sel !== "custom" && !editingThemeId;
   }
@@ -692,7 +738,8 @@
     if (!data || !data.ok) { setStatus((data && data.message) || RK_M("settings.couldNotRemoveTheme"), "bad"); return; }
     if (state.theme === id) {
       state.theme = "default";
-      if (originalState) originalState.theme = "default";
+      const saved = host.savedState && host.savedState();
+      if (saved) saved.theme = "default";
       applyThemePreview();
     }
     if (editingThemeId === id) endThemeEdit();
@@ -820,13 +867,13 @@
     paintThemeSelection();
     applyThemePreview();
     markDirty();
-    setStatus(updated ? RK_M("settings.presetUpdatedApplyToUpdateObs") : RK_M("settings.presetSavedApplyToUseIt"), "good");
+    setStatus(updated ? RK_M("settings.presetUpdated") : RK_M("settings.presetSaved"), "good");
   });
   /* renderThemeGrid -> boot() */
 
-  // -- Appearance tab: app-icon picker -- applies on Apply through the normal save flow (state.appIcon / state.appIconCustomPath)
+  // -- Appearance tab: app-icon picker -- applies through the normal save flow (state.appIcon / state.appIconCustomPath)
   function paintAppIconSelection() {
-    const sel = state.appIcon || "default";
+    const sel = settingOr("appIcon");
     els.appIconGrid.querySelectorAll(".icon-tile").forEach((t) => t.classList.toggle("is-selected", t.dataset.id === sel));
     els.appIconCustomRow.hidden = sel !== "custom";
   }
@@ -869,7 +916,8 @@
     if (!data || !data.ok) { setStatus((data && data.message) || RK_M("settings.couldNotRemoveIcon"), "bad"); return; }
     if (state.appIcon === id) {
       state.appIcon = "default";
-      if (originalState) originalState.appIcon = "default";
+      const saved = host.savedState && host.savedState();
+      if (saved) saved.appIcon = "default";
     }
     await renderAppIconGrid();
   }
@@ -881,6 +929,7 @@
       els.appIconGrid.appendChild(appIconTile(ic.id, ic.label || ic.id, ic.url || "", ic.id === "default" ? "OBS" : "", !!ic.deletable));
     els.appIconGrid.appendChild(appIconTile("custom", RK_M("settings.custom"), "", "＋", false));
     paintAppIconSelection();
+    if (host.iconsRendered) host.iconsRendered(data);
   }
   /* renderAppIconGrid -> boot() */
   els.appIconCustomPath.addEventListener("input", () => {
@@ -895,7 +944,7 @@
     renderThemeGrid();
     renderAppIconGrid();
     if (els.appIconRecordingDot) {
-      els.appIconRecordingDot.checked = state.appIconRecordingDot !== false;
+      els.appIconRecordingDot.checked = !!settingOr("appIconRecordingDot");
       els.appIconRecordingDot.addEventListener("change", function () { state.appIconRecordingDot = els.appIconRecordingDot.checked; markDirty(); });
     }
     if (els.browseAppIcon) {
@@ -908,21 +957,79 @@
     }
   }
 
+  // a custom palette is filed as a real preset before it is applied, preset_1, preset_2, ... taking the next free number, so the next custom edit cannot overwrite it; a failure leaves it applied as an unnamed custom theme
+  async function fileCustomTheme() {
+    if (state.theme !== "custom") return;
+    let highest = 0;
+    themesCache.forEach((theme) => {
+      const match = /^preset_(\d+)$/i.exec((theme.label || "").trim());
+      if (match) highest = Math.max(highest, parseInt(match[1], 10) || 0);
+    });
+    try {
+      const data = await helperJson("appearance/save-theme?label=" + encodeURIComponent("preset_" + (highest + 1)), {
+        method:"POST", headers:{ "Content-Type":"application/json" },
+        body:JSON.stringify(themeCustomState()),
+      });
+      if (!data || !data.ok || !data.id) return;
+      state.theme = data.id;
+      state.themeCustom = themeCustomState();
+      endThemeEdit();
+      await renderThemeGrid();
+      paintThemeSelection();
+    } catch (e) {
+      setStatus(RK_M("settings.couldNotAutoSaveTheCustom", { error: e.message || e }), "bad");
+    }
+  }
+
   window.RKAppearance = {
     init: function (h) {
-      if (h) host = Object.assign(host, h);
-      ["theme", "themeCustom", "appIcon", "appIconCustomPath", "appIconRecordingDot"].forEach(function (k) {
-        var v = host.get(k);
-        if (v !== undefined && v !== null) state[k] = v;
-      });
-      if (!state.theme) state.theme = "default";
+      host = Object.assign(host, h);
+      state = host.state;
+      cleanHexColor = window.RKColor.cleanHexColor; setColorButton = window.RKColor.setColorButton;
+      rgbToHex = window.RKColor.rgbToHex; hexToRgb = window.RKColor.hexToRgb; rgbToHsv = window.RKColor.rgbToHsv; hsvToHex = window.RKColor.hsvToHex;
+      openColorDialog = window.openColorDialog;
+      if (els.openThemeClipsBtn) els.openThemeClipsBtn.parentElement.hidden = !host.clipsPreview;
       boot();
+    },
+    // paints every control of the panel from the state, after the host loaded or restored it
+    sync: function () {
+      els.appIconCustomPath.value = settingOr("appIconCustomPath");
+      els.appIconRecordingDot.checked = !!settingOr("appIconRecordingDot");
+      paintAppIconSelection();
+      if (state.themeCustom) fillThemeEditor(state.themeCustom);
+      paintThemeSelection();
+      applyThemePreview();
+    },
+    // reads the fields of the panel back into the state
+    read: function () {
+      state.appIconCustomPath = unquote(els.appIconCustomPath.value);
+      state.appIconRecordingDot = els.appIconRecordingDot.checked;
+      if (state.appIcon === "custom" && !state.appIconCustomPath) state.appIcon = "default";
+      if (state.theme === "custom") state.themeCustom = themeCustomState();
+    },
+    // the preset being edited, kept in the undo history of the host and put back by restoreEditing
+    editing: function () { return editingThemeId ? { id: editingThemeId, name: els.themeName.value } : null; },
+    restoreEditing: function (edit) {
+      endThemeEdit();
+      if (!edit) return;
+      editingThemeId = edit.id;
+      els.themeName.value = edit.name;
+      els.saveThemeBtn.textContent = RK_M("settings.updatePreset");
+      els.cancelThemeEditBtn.hidden = false;
+    },
+    endEdit: endThemeEdit,
+    fileCustomTheme: fileCustomTheme,
+    // after the helper saved: a custom pick may be a preset and the icon list may hold a new file
+    refresh: function () {
+      renderAppIconGrid();
+      renderThemeGrid();
+      applyThemePreview();
     },
     collect: function () {
       return {
-        theme: state.theme,
+        theme: settingOr("theme"),
         themeCustom: state.theme === "custom" ? themeCustomState() : (state.themeCustom || undefined),
-        appIcon: state.appIcon || "default",
+        appIcon: settingOr("appIcon"),
         appIconCustomPath: state.appIconCustomPath || "",
         appIconRecordingDot: state.appIconRecordingDot !== false,
       };

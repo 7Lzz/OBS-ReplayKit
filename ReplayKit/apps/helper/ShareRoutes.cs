@@ -82,6 +82,24 @@ namespace ReplayKitHelper
                 return false;
             }
 
+            if (path == "/delete-upload")
+            {
+                if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
+                if (!req.Headers.TryGetValue("content-type", out string contentType) || !string.Equals(contentType, "application/json", StringComparison.OrdinalIgnoreCase))
+                {
+                    HttpResponse.SendText(stream, 400, "Bad Request", "JSON required");
+                    return false;
+                }
+                JObject body;
+                try { body = JObject.Parse(req.Body ?? ""); }
+                catch (Newtonsoft.Json.JsonException) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false }); return false; }
+                var selected = Clips.GetSafeClipPath((body["file"] as JValue)?.Value as string);
+                if (selected == null) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("common.badFilename") }); return false; }
+                var result = StreamableDelete.Delete(selected, (body["url"] as JValue)?.Value as string);
+                HttpResponse.SendJson(stream, result.Code, new JObject { ["ok"] = result.Code == 200, ["message"] = result.Message });
+                return false;
+            }
+
             if (path == "/remove-link")
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }

@@ -19,7 +19,6 @@ namespace ReplayKitHelper
         public const int MAX_CONCURRENT_VIDEO_JOBS = 2;
         public const long PREVIEW_CHUNK = 4 * 1024 * 1024;
         public const int MAX_PREVIEW_STREAM = 2;
-        public const long ANON_SIZE_CAP = 250L * 1024 * 1024;
         public const int ANON_RETENTION_DAYS = 1;
         public const int SIGNED_IN_DEFAULT_RETENTION = 90;
         // streamable free / anon tier caps a video at 10 minutes -- longer uploads fine then fail transcode with "Video too long".

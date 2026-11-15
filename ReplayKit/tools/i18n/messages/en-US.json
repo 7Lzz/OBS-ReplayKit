@@ -383,6 +383,10 @@
     "context": "Tooltip in the clips library. Keep {count} as written.",
     "text": "Confirm move to trash ({count})"
   },
+  "clips.confirmStreamableDelete": {
+    "text": "Click again to permanently delete from Streamable",
+    "context": "Second-click confirmation tooltip and accessibility label on the Streamable delete menu item."
+  },
   "clips.containsGames": {
     "context": "Text in the game picker of the clips library. Keep {games} as written.",
     "text": "Contains {games}"
@@ -527,6 +531,10 @@
     "context": "Screen reader label in the deleted history of the clips library.",
     "text": "Delete for good"
   },
+  "clips.deleteFromStreamable": {
+    "text": "Delete from Streamable",
+    "context": "Clip menu action that deletes the upload from the signed-in Streamable account."
+  },
   "clips.deleteGif": {
     "context": "Text in the screenshots and GIFs section of the clips library. Also used in the clips library.",
     "text": "Delete GIF"
@@ -550,6 +558,10 @@
   "clips.deletedForGoodSoon": {
     "context": "Text in the deleted history of the clips library.",
     "text": "Deleted for good soon"
+  },
+  "clips.deletedFromStreamable": {
+    "text": "Upload deleted from Streamable",
+    "context": "Success toast after deleting the uploaded video and clearing its local link."
   },
   "clips.deletedHistoryCount": {
     "context": "Text in the deleted history of the clips library. Keep {count} as written.",
@@ -1606,6 +1618,18 @@
     "context": "Error in the clips library, sent by the background helper.",
     "text": "The Streamable status check timed out after 30 minutes."
   },
+  "clips.streamableDeleteFailed": {
+    "text": "Could not delete the upload. Check that the signed-in Streamable account owns it.",
+    "context": "Error after Streamable fails or refuses to confirm deletion."
+  },
+  "clips.streamableDeletedLinkRemains": {
+    "text": "Streamable deleted the upload, but ReplayKit could not clear its link.",
+    "context": "Partial success after Streamable confirms deletion and a local database write fails."
+  },
+  "clips.streamableLinkChanged": {
+    "text": "The Streamable link changed or is no longer available.",
+    "context": "Error when the clip no longer has the same upload link that the user confirmed."
+  },
   "clips.thatCouldNotBeDone": {
     "context": "Error message in the deleted history of the clips library.",
     "text": "That could not be done"
@@ -2328,7 +2352,7 @@
     "text": "Reset to default"
   },
   "common.restartObs": {
-    "context": "Text in a dialog in OBS. Also used in the Home page, the tray menu.",
+    "context": "Text in a dialog in OBS. Also used in the Home page, the tray menu, the footer of the Settings window.",
     "text": "Restart OBS"
   },
   "common.rotation": {
@@ -6291,30 +6315,6 @@
     "context": "Text in the look and effects panel of the clip editor. Also used in the Settings window.",
     "text": "Apply"
   },
-  "settings.applyFailedError": {
-    "context": "Status line in the Settings window. Keep {error} as written.",
-    "text": "Apply failed: {error}"
-  },
-  "settings.applyOrCancelSettingsChangesBefore": {
-    "context": "Status line in the Settings window.",
-    "text": "Apply or cancel settings changes before uninstalling."
-  },
-  "settings.applyOrCancelSettingsChangesFirst": {
-    "context": "Status line in the Settings window.",
-    "text": "Apply or cancel settings changes first."
-  },
-  "settings.applyRestart": {
-    "context": "Text in the Settings window.",
-    "text": "Apply & Restart"
-  },
-  "settings.applyingSettings": {
-    "context": "Status line in the Settings window.",
-    "text": "Applying settings..."
-  },
-  "settings.applyingSettingsAndRestartingObs": {
-    "context": "Status line in the Settings window.",
-    "text": "Applying settings and restarting OBS..."
-  },
   "settings.arrowKeySkip": {
     "context": "Text in Settings > Video Editor > Playback.",
     "text": "Arrow key skip"
@@ -6667,10 +6667,6 @@
     "context": "Warning shown after settings are applied in a ReplayKit window, sent by the background helper. Keep {error} as written.",
     "text": "Could not change Bongo Cat visibility: {error}"
   },
-  "settings.couldNotChangeName": {
-    "context": "Text in the Settings window. Keep {name} as written.",
-    "text": "Could not change {name}."
-  },
   "settings.couldNotChangeNoiseSuppressionError": {
     "context": "Warning shown after settings are applied in a ReplayKit window, sent by the background helper. Keep {error} as written.",
     "text": "Could not change noise suppression: {error}"
@@ -6878,6 +6874,10 @@
   "settings.couldNotRotateOverlayError": {
     "context": "Warning shown after settings are applied in a ReplayKit window, sent by the background helper. Keep {error} as written.",
     "text": "Could not rotate overlay: {error}"
+  },
+  "settings.couldNotSaveTheSettingsError": {
+    "context": "Note in the footer of the Settings window when the settings could not be saved. Keep {error} as written.",
+    "text": "Could not save the settings: {error}"
   },
   "settings.couldNotSaveTheme": {
     "context": "Status line in Settings > Appearance. Also used in the Settings window.",
@@ -7207,9 +7207,9 @@
     "context": "Name of a setting in Settings > Output > Recording.",
     "text": "Downscale To"
   },
-  "settings.dragToMoveUseTheCorners": {
+  "settings.dragToMoveUseTheCornersToResize": {
     "context": "Description under a setting in Settings > Overlay.",
-    "text": "Drag to move, use the corners to resize, or drag the round handle to rotate. Rotation snaps near 90-degree angles. Hold Shift to disable snapping. Press Ctrl+Z to undo a move, resize or rotation. Changes are applied when you press Apply."
+    "text": "Drag to move, use the corners to resize, or drag the round handle to rotate. Rotation snaps near 90-degree angles. Hold Shift to disable snapping. Press Ctrl+Z to undo a move, resize or rotation."
   },
   "settings.dragToPosition": {
     "context": "Explanatory text in Settings > Overlay.",
@@ -7887,9 +7887,9 @@
     "context": "Screen reader label in Settings > Audio > Discord. Also used in the Settings window.",
     "text": "Mute Discord audio"
   },
-  "settings.mutesOrUnmutesThisSoundIn": {
+  "settings.mutesOrUnmutesThisSoundInObs": {
     "context": "Description under a setting in Settings > Audio > Discord.",
-    "text": "Mutes or unmutes this sound in OBS. The change is applied when you press Apply or OK."
+    "text": "Mutes or unmutes this sound in OBS."
   },
   "settings.n10FpsSmallest": {
     "context": "Label in the Settings window.",
@@ -8015,10 +8015,6 @@
     "context": "Message the helper shows when an action fails or finishes in a ReplayKit window, sent by the background helper.",
     "text": "No OBS scene is available."
   },
-  "settings.noSettingsChanged": {
-    "context": "Status line in the Settings window.",
-    "text": "No settings changed"
-  },
   "settings.noSignInIsNeededTo": {
     "context": "Text in the Settings window.",
     "text": "No sign-in is needed to upload clips and create shareable links. Anonymous uploads use the limits below. Sign in to keep new uploads with your account."
@@ -8034,6 +8030,10 @@
   "settings.none": {
     "context": "Text in the look and effects panel of the clip editor. Also used in the Settings window.",
     "text": "None"
+  },
+  "settings.notAffiliatedWithStreamable": {
+    "context": "Explanatory text in Settings > Account > Upload details, after the note about limits. Keep the names ReplayKit and Streamable as written.",
+    "text": "ReplayKit is not affiliated with Streamable. Uploads follow Streamable's plans and limits, which Streamable can change."
   },
   "settings.num": {
     "context": "Text in the Settings window.",
@@ -8295,10 +8295,6 @@
     "context": "Name of an OBS output inside a settings warning, shown in parentheses.",
     "text": "Virtual camera"
   },
-  "settings.overlayApplyFailedError": {
-    "context": "Status line in the Settings window. Keep {error} as written.",
-    "text": "Overlay apply failed: {error}"
-  },
   "settings.overlayColorAdd": {
     "context": "Screen reader label in Settings > Overlay. Also used in the Settings window.",
     "text": "Overlay color add"
@@ -8479,13 +8475,13 @@
     "context": "Line under an option in a dropdown of the Settings window, sent by the background helper.",
     "text": "Higher-quality target for high-end PCs."
   },
-  "settings.presetSavedApplyToUseIt": {
+  "settings.presetSaved": {
     "context": "Status line in Settings > Appearance. Also used in the Settings window.",
-    "text": "Preset saved. Apply to use it in OBS."
+    "text": "Preset saved."
   },
-  "settings.presetUpdatedApplyToUpdateObs": {
+  "settings.presetUpdated": {
     "context": "Status line in Settings > Appearance. Also used in the Settings window.",
-    "text": "Preset updated. Apply to update OBS."
+    "text": "Preset updated."
   },
   "settings.pressAKey": {
     "context": "Text in the Settings window.",
@@ -8695,9 +8691,9 @@
     "context": "Status line in the Settings window. Keep {version} as written.",
     "text": "ReplayKit is up to date ({version})"
   },
-  "settings.replaykitNeedsRepairApplyOrCancel": {
+  "settings.replaykitNeedsRepairRestartOrUndo": {
     "context": "Status line in the Settings window.",
-    "text": "ReplayKit needs repair. Apply or cancel your settings changes first."
+    "text": "ReplayKit needs repair. Some settings changes are not saved yet, so restart OBS or undo them first."
   },
   "settings.replaykitNeedsRepairUseTheUpdate": {
     "context": "Status line in the Settings window.",
@@ -8810,10 +8806,6 @@
   "settings.setShortcutsForSavingClipsRecording": {
     "context": "Text in the Settings window.",
     "text": "Set shortcuts for saving clips, recording, and opening your library."
-  },
-  "settings.settingsApplied": {
-    "context": "Status line in the Settings window.",
-    "text": "Settings applied"
   },
   "settings.settingsChanged": {
     "context": "Status line in the Settings window.",
@@ -8999,6 +8991,14 @@
     "context": "Label in the Settings window.",
     "text": "Smooth jagged edges quickly. Fine details may look softer."
   },
+  "settings.someChangesTakeEffectAfterObsRestarts": {
+    "context": "Note in the footer of the Settings window, next to the Restart OBS button. Settings save by themselves; these changes wait until OBS restarts.",
+    "text": "Some changes take effect after OBS restarts."
+  },
+  "settings.someSettingsChangesAreNotSavedYet": {
+    "context": "Status text in Settings > Advanced, shown instead of installing or removing while settings changes wait for an OBS restart or could not be saved.",
+    "text": "Some settings changes are not saved yet. Restart OBS or undo them first."
+  },
   "settings.sounds": {
     "context": "Heading in Settings > Audio > Microphone.",
     "text": "Sounds"
@@ -9058,6 +9058,10 @@
   "settings.storageCompressionType": {
     "context": "Screen reader label in Settings > Storage > Storage.",
     "text": "Storage compression type"
+  },
+  "settings.streamableUploadDeletion": {
+    "context": "Explains how to delete account uploads under Settings > Account > Connection.",
+    "text": "You can use the clip menu to delete clips uploaded to your Streamable account."
   },
   "settings.switchSpeed": {
     "context": "Text in Settings > Screenshare > Discord Screenshare.",
@@ -9267,10 +9271,6 @@
     "context": "Text in the Settings window.",
     "text": "Unlimited"
   },
-  "settings.updateAvailableLatestApplyOrCancel": {
-    "context": "Status line in the Settings window. Keep {latest} as written.",
-    "text": "Update available: {latest}. Apply or cancel your settings changes first."
-  },
   "settings.updateAvailableLatestInstalledInstalled": {
     "context": "Status line in the Settings window. Keep {installed}, {latest} as written.",
     "text": "Update available: {latest} (installed {installed})"
@@ -9278,6 +9278,10 @@
   "settings.updateAvailableLatestInstalledInstalledUse": {
     "context": "Status line in the Settings window. Keep {installed}, {latest} as written.",
     "text": "Update available: {latest} (installed {installed}). Use the update button at the top to install it."
+  },
+  "settings.updateAvailableLatestRestartOrUndo": {
+    "context": "Status line in the Settings window. Keep {latest} as written.",
+    "text": "Update available: {latest}. Some settings changes are not saved yet, so restart OBS or undo them first."
   },
   "settings.updateCheckFailedError": {
     "context": "Status line in the Settings window. Keep {error} as written.",
@@ -9306,10 +9310,6 @@
   "settings.uploadSize": {
     "context": "Text in Settings > Account > Upload details.",
     "text": "Upload size"
-  },
-  "settings.uploadingAnonymously": {
-    "context": "Status line in the Settings window.",
-    "text": "Uploading anonymously"
   },
   "settings.useAGradientForBackground": {
     "context": "Text in Settings > Appearance. Also used in the Settings window.",

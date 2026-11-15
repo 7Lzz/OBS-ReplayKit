@@ -2980,7 +2980,7 @@ const CLIP_HOVER_PROFILES = {
     btn.setAttribute("aria-label", deleteLabelFor(btn));
     const toTrash = trashOn && !btn.dataset.deleteLabel;
     const label = btn.querySelector(".menu-item-label");
-    if (label) label.textContent = toTrash ? RK_M("clips.moveToTrash") : RK_M("common.delete");
+    if (label) label.textContent = btn.dataset.deleteKind === "streamable" ? deleteLabelFor(btn) : toTrash ? RK_M("clips.moveToTrash") : RK_M("common.delete");
     const confirm = btn.querySelector(".delete-confirm-text");
     if (confirm) confirm.textContent = toTrash ? RK_M("clips.trash") : RK_M("common.delete2");
   }
@@ -3013,7 +3013,7 @@ const CLIP_HOVER_PROFILES = {
     resetDeleteButton(btn);
     btn.classList.add("is-armed");
     const toTrash = trashOn && !btn.dataset.deleteLabel;
-    btn.dataset.tooltip = toTrash ? RK_M("clips.clickAgainToMoveToTrash") : RK_M("common.clickAgainToDelete");
+    btn.dataset.tooltip = btn.dataset.deleteKind === "streamable" ? RK_M("clips.confirmStreamableDelete") : toTrash ? RK_M("clips.clickAgainToMoveToTrash") : RK_M("common.clickAgainToDelete");
     btn.setAttribute("aria-label", btn.dataset.tooltip);
     const label = btn.querySelector(".menu-item-label");
     if (label) label.textContent = toTrash ? RK_M("clips.trash") : RK_M("common.delete2");
@@ -3124,6 +3124,11 @@ const CLIP_HOVER_PROFILES = {
                   <svg class="menu-item-icon" viewBox="0 0 24 24">${ICON.CLIPBOARD}</svg>
                   <span>${escapeHtml(RK_M("clips.copyToClipboard"))}</span>
                 </div>
+                <div class="menu-item delete-menu-item delete-btn delete-upload-item" style="display:none" role="button" tabindex="0"
+                     data-delete-kind="streamable" data-delete-label="${escapeHtml(RK_M("clips.deleteFromStreamable"))}">
+                  <svg class="menu-item-icon" viewBox="0 0 24 24">${ICON.TRASH}</svg>
+                  <span class="menu-item-label">${escapeHtml(RK_M("clips.deleteFromStreamable"))}</span>
+                </div>
                 <div class="menu-heading">${escapeHtml(RK_M("common.edit"))}</div>
                 <div class="menu-item trim-clip-item">
                   <svg class="menu-item-icon" viewBox="0 0 24 24">${ICON.CONTENT_CUT}</svg>
@@ -3203,7 +3208,8 @@ const CLIP_HOVER_PROFILES = {
     const favoriteMenuItem = card.querySelector(".favorite-menu-item");
     const selectMenuItem = card.querySelector(".select-menu-item");
     const renameMenuItem = card.querySelector(".rename-menu-item");
-    const deleteMenuItem = card.querySelector(".delete-menu-item");
+    const deleteMenuItem = card.querySelector(".delete-menu-item:not(.delete-upload-item)");
+    const deleteUploadItem = card.querySelector(".delete-upload-item");
     const openFolderEl = card.querySelector(".open-folder-item");
     const deleteClipEl = card.querySelector(".delete-btn");
 
@@ -3832,7 +3838,7 @@ const CLIP_HOVER_PROFILES = {
     function handleDeleteAction(e, trigger) {
       e.preventDefault();
       e.stopPropagation();
-      const inMenu = trigger === deleteMenuItem;
+      const inMenu = trigger !== deleteClipEl;
       resetAllArmedDeleteButtons(trigger);
       if (!trigger.classList.contains("is-armed")) {
         if (!inMenu) closeAllMenus();
@@ -3845,6 +3851,10 @@ const CLIP_HOVER_PROFILES = {
       }
       resetDeleteButton(trigger);
       closeCardMenu(menuDropdown);
+      if (trigger === deleteUploadItem) {
+        deleteUpload(card.dataset.name, trigger.dataset.url);
+        return;
+      }
       // on the drafts tab the trash of the card lets go of the draft and leaves the clip; the red Delete of the menu is still the clip
       if (trigger === deleteClipEl && card.classList.contains("is-draft-card")) {
         const draftName = card.dataset.name;
@@ -3859,6 +3869,15 @@ const CLIP_HOVER_PROFILES = {
     }
     deleteMenuItem.addEventListener("click", (e) => handleDeleteAction(e, deleteMenuItem));
     deleteClipEl.addEventListener("click", (e) => handleDeleteAction(e, deleteClipEl));
+    deleteUploadItem.addEventListener("click", (e) => {
+      if (deleteUploadItem.dataset.url) handleDeleteAction(e, deleteUploadItem);
+    });
+    deleteUploadItem.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter" && e.key !== " ") return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (!e.repeat) deleteUploadItem.click();
+    });
     card.querySelector(".export-gif-item").addEventListener("click", async (e) => {
       e.stopPropagation();
       const name = card.dataset.name;
@@ -3949,6 +3968,40 @@ const CLIP_HOVER_PROFILES = {
     renderActions(card, clip, true);
     syncDraftUi(card, clip.name);
     return card;
+  }
+
+  async function deleteUpload(name, url) {
+    if (!url || !linkOpAllowed(name)) return;
+    const folder = clipsFolder;
+    linkTransitionBusy.add(name);
+    try {
+      const res = await fetch(HELPER + "/delete-upload", {
+        method: "POST", cache: "no-store", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ file: name, url }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.ok !== true) throw new Error(data.message || RK_M("clips.streamableDeleteFailed"));
+      if (folder === clipsFolder) {
+        clipIdentityRevision++;
+        const clips = new Set([...loadedClips, ...resolvedFavoriteClips, ...resolvedDraftClips.values(), ...lastClipsByName.values()]);
+        let unlinked = false;
+        for (const clip of clips) {
+          if (clip.name !== name || clip.streamable_url !== url) continue;
+          for (const field of ["streamable_url", "uploaded_at", "retention_days", "transcode_status", "transcode_percent", "transcode_error", "ready"]) delete clip[field];
+          unlinked = true;
+        }
+        if (unlinked) clipsLinkedTotal = Math.max(0, clipsLinkedTotal - 1);
+        renderLoadedClips(loadedClips);
+      }
+      showToast(escapeHtml(RK_M("clips.deletedFromStreamable")), "info");
+      scheduleToastHide(2400);
+    } catch (e) {
+      showToast(escapeHtml(e.message || RK_M("clips.streamableDeleteFailed")), "bad");
+      scheduleToastHide(TOAST_ERROR_MS);
+    } finally {
+      linkTransitionBusy.delete(name);
+      scheduleNextPoll(POLL_FAST_MS);
+    }
   }
 
   async function deleteClip(card) {
@@ -4566,20 +4619,21 @@ const CLIP_HOVER_PROFILES = {
   function updateDisplayProgress(name, fill, reportedPercent, smoothTime) {
     const reported = Math.max(0, Math.min(100, Number(reportedPercent) || 0));
     let v = progressVisuals.get(name);
-    if (!v) {
-      v = { displayed: 0, target: 0, vel: 0, fill: null, raf: 0, lastT: 0 };
+    if (!v || v.smoothTime !== smoothTime) {
+      v = { displayed: 0, target: 0, vel: 0, fills: new Set(), smoothTime, raf: 0, lastT: 0 };
       progressVisuals.set(name, v);
     }
     // monotonic: the fill only ever moves toward the newest real percentage, never back
     if (reported > v.target) v.target = reported;
-    v.fill = fill;
+    for (const node of v.fills) if (!node.isConnected) v.fills.delete(node);
+    v.fills.add(fill);
     fill.style.width = v.displayed.toFixed(3) + "%";
     if (v.raf) return;
     v.lastT = 0;
     // critically-damped follow (unity-style SmoothDamp): the fill carries a velocity, so a coarse jump in the reported percent bends its path instead of restarting an ease -- kills the stop-and-go at each reported point. st ~= how long to close most of a gap: 0.6 for the ~1/s upload meter, larger for the transcode bar whose samples land ~5s apart (so it glides the whole gap instead of snapping then sitting).
     const st = (typeof smoothTime === "number" && smoothTime > 0) ? smoothTime : 0.6;
     const step = (now) => {
-      if (progressVisuals.get(name) !== v || !v.fill) { v.raf = 0; return; }
+      if (progressVisuals.get(name) !== v) { v.raf = 0; return; }
       const dt = v.lastT ? Math.min(0.05, (now - v.lastT) / 1000) : 0.016;
       v.lastT = now;
       const omega = 2 / st;
@@ -4591,14 +4645,13 @@ const CLIP_HOVER_PROFILES = {
       let out = v.target + (change + temp) * expf;
       if (out > v.target) { out = v.target; v.vel = 0; }
       v.displayed = out;
-      v.fill.style.width = v.displayed.toFixed(3) + "%";
       if (v.target - v.displayed > 0.08 || v.vel > 0.4) {
         v.raf = requestAnimationFrame(step);
       } else {
         v.displayed = v.target;
-        v.fill.style.width = v.displayed.toFixed(3) + "%";
         v.raf = 0;
       }
+      for (const node of v.fills) node.style.width = v.displayed.toFixed(3) + "%";
     };
     v.raf = requestAnimationFrame(step);
   }
@@ -4612,6 +4665,13 @@ const CLIP_HOVER_PROFILES = {
   function renderActions(card, clip, force) {
     const actions = card.querySelector(".actions");
     const meta = card.querySelector(".meta");
+    const deleteUploadItem = card.querySelector(".delete-upload-item");
+    const deleteUrl = lastUploadStatus?.streamableSignedIn ? clip.streamable_url || "" : "";
+    if (deleteUploadItem.dataset.url !== deleteUrl) {
+      deleteUploadItem.dataset.url = deleteUrl;
+      deleteUploadItem.style.display = deleteUrl ? "" : "none";
+      resetDeleteButton(deleteUploadItem);
+    }
     if (window.RKClipGames) RKClipGames.badge(meta, clip, { change: true, current: () => currentClipForCard(card) });
     const status = lastUploadJobsByName.get(clip.name)
       || (lastUploadStatus && lastUploadStatus.clipName === clip.name ? lastUploadStatus : null);
@@ -4681,8 +4741,7 @@ const CLIP_HOVER_PROFILES = {
     meta.querySelectorAll(".link-status, .link-status-dot").forEach(n => n.remove());
     actions.innerHTML = "";
     actions.classList.toggle("is-progress", state === "compressing" || state === "uploading" || (showTranscodeBar && !draftOpen));
-    // cleared here (before the transcode bar is (re)built below) so a fresh amber bar smooth-damps up from 0 instead of inheriting the upload bar target of 100. the poll-to-poll nudge goes through the fast path above, which returns before this line.
-    if (state !== "compressing" && state !== "uploading") progressVisuals.delete(clip.name);
+    if (!stillTicking && !showTranscodeBar) progressVisuals.delete(clip.name);
     const linkMenuItem = card.querySelector(".link-menu-item");
     if (linkMenuItem) {
       const label = linkMenuItem.querySelector(".menu-item-label");
@@ -4922,8 +4981,7 @@ const CLIP_HOVER_PROFILES = {
       || loadedClips.find((c) => c && c.name === filename);
     if (!clip) return;
     const selector = '.card[data-name="' + CSS.escape(filename) + '"]';
-    const card = gridEl.querySelector(selector) || rowGridEls.map((grid) => grid.querySelector(selector)).find(Boolean);
-    if (card) renderActions(card, clip, true);
+    document.querySelectorAll(selector).forEach(card => renderActions(card, clip, true));
   }
 
   function updateCard(card, clip) {
@@ -4990,13 +5048,12 @@ const CLIP_HOVER_PROFILES = {
     const allFilterActive = (activeFilter === "all");
     if (allFilterActive) ensureFavoriteResolve();
     const favClips = allFilterActive ? applyClipFilter(favoriteClipsForRender(loadedClips)) : [];
-    const shownAbove = new Set(favClips.map(c => c.name));
-    const linkedClips = allFilterActive ? clips.filter(c => c.streamable_url && !shownAbove.has(c.name)) : [];
-    linkedClips.forEach(c => shownAbove.add(c.name));
+    const favoritesShown = new Set(favClips.map(c => c.name));
+    const restClips = allFilterActive ? clips.filter(c => !favoritesShown.has(c.name)) : clips;
+    const linkedClips = allFilterActive ? restClips.filter(c => c.streamable_url) : [];
+    const linkedNames = new Set(linkedClips.map(c => c.name));
     if (allFilterActive) ensureDraftResolve();
-    const draftClips = allFilterActive ? applyClipFilter(draftClipsForRender(loadedClips)).filter(c => !shownAbove.has(c.name)) : [];
-    draftClips.forEach(c => shownAbove.add(c.name));
-    const restClips = allFilterActive ? clips.filter(c => !shownAbove.has(c.name)) : clips;
+    const draftClips = allFilterActive ? applyClipFilter(draftClipsForRender(loadedClips)).filter(c => !favoritesShown.has(c.name) && !linkedNames.has(c.name)) : [];
     clipSectionRows = [
       { key: "favorites", headingEl: favoritesHeadingEl, grid: favoritesGridEl, rows: favClips },
       { key: "linked", headingEl: linkedHeadingEl, grid: linkedGridEl, rows: linkedClips },
@@ -5023,7 +5080,7 @@ const CLIP_HOVER_PROFILES = {
     const grouped = clipGroupsActive();
     allClips = grouped ? groupClipsByGame(restClips) : restClips;
     if (!grouped) virtualGroups = [];
-    allClipsExpected = (clipsNextOffset >= clipsTotal || activeFilter !== "all" || clipSearchQuery.trim()) ? restClips.length : Math.max(restClips.length, clipsTotal - shownAbove.size);
+    allClipsExpected = (clipsNextOffset >= clipsTotal || activeFilter !== "all" || clipSearchQuery.trim()) ? restClips.length : Math.max(restClips.length, clipsTotal - favoritesShown.size);
     // a clip that moved into a section above, or a new order of the games, is a different list for the virtual window even when the clips themselves are the same
     const restKey = (grouped ? "games|" : "") + allClips.map(c => c.name).join("\n");
     const restChanged = restKey !== lastRestKey;

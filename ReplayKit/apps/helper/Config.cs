@@ -84,7 +84,7 @@ namespace ReplayKitHelper
                     try { File.Delete(file); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
                 }
             }
-            catch { }
+            catch (Exception ex) { Log.Write("ClearLogsAtStartup: " + ex.Message); }
         }
 
         // utf-8 (no bom) text writer, thru a per-call-unique temp file in the scratch dir then an atomic replace, so a concurrent reader never sees a half-written file and a crash between the write and the rename never leaves a stray .tmp sitting next to a real file. same pattern the upload/compress status files use.

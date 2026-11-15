@@ -383,6 +383,10 @@
     "source": "ba654163a6dd9fca",
     "text": "In den Papierkorb verschieben bestätigen ({count})"
   },
+  "clips.confirmStreamableDelete": {
+    "source": "474106522234058b",
+    "text": "Erneut klicken, um das Video dauerhaft von Streamable zu löschen"
+  },
   "clips.containsGames": {
     "source": "e704b140b41ce861",
     "text": "Enthält {games}"
@@ -527,6 +531,10 @@
     "source": "9e6d8f9b4b3d673c",
     "text": "Endgültig löschen"
   },
+  "clips.deleteFromStreamable": {
+    "source": "814603f774347773",
+    "text": "Von Streamable löschen"
+  },
   "clips.deleteGif": {
     "source": "a3e08b9cd13492d2",
     "text": "GIF löschen"
@@ -550,6 +558,10 @@
   "clips.deletedForGoodSoon": {
     "source": "06feb61b74dcd214",
     "text": "Bald endgültig gelöscht"
+  },
+  "clips.deletedFromStreamable": {
+    "source": "241594a07144433d",
+    "text": "Upload von Streamable gelöscht"
   },
   "clips.deletedHistoryCount": {
     "source": "0347ad9acabf6ba3",
@@ -1605,6 +1617,18 @@
   "clips.streamableCheckTimedOut": {
     "source": "73cbf2a9f94b12d4",
     "text": "Die Statusprüfung bei Streamable hat nach 30 Minuten abgebrochen."
+  },
+  "clips.streamableDeleteFailed": {
+    "source": "60a24d0a0f5989bf",
+    "text": "Der Upload konnte nicht gelöscht werden. Prüfe, ob das angemeldete Streamable-Konto der Eigentümer ist."
+  },
+  "clips.streamableDeletedLinkRemains": {
+    "source": "708eb10ac780b0b1",
+    "text": "Streamable hat den Upload gelöscht, aber ReplayKit konnte den Link nicht entfernen."
+  },
+  "clips.streamableLinkChanged": {
+    "source": "48be168a85ec73c7",
+    "text": "Der Streamable-Link wurde geändert oder ist nicht mehr verfügbar."
   },
   "clips.thatCouldNotBeDone": {
     "source": "6eab7f00f3e45f30",
@@ -6290,30 +6314,6 @@
     "source": "417cf9c08b0b8d6c",
     "text": "Übernehmen"
   },
-  "settings.applyFailedError": {
-    "source": "9749057463b8fad4",
-    "text": "Anwenden fehlgeschlagen: {error}"
-  },
-  "settings.applyOrCancelSettingsChangesBefore": {
-    "source": "cafd4e725ba3d52d",
-    "text": "Übernimm oder verwirf die Änderungen an den Einstellungen vor dem Deinstallieren."
-  },
-  "settings.applyOrCancelSettingsChangesFirst": {
-    "source": "24c5292e2868f6aa",
-    "text": "Übernimm oder verwirf zuerst die Änderungen an den Einstellungen."
-  },
-  "settings.applyRestart": {
-    "source": "62988a30203f965e",
-    "text": "Übernehmen und neu starten"
-  },
-  "settings.applyingSettings": {
-    "source": "c877ec9b6a085339",
-    "text": "Einstellungen werden übernommen..."
-  },
-  "settings.applyingSettingsAndRestartingObs": {
-    "source": "d82f0742406d836b",
-    "text": "Einstellungen werden übernommen und OBS wird neu gestartet..."
-  },
   "settings.arrowKeySkip": {
     "source": "6137822ccd053c1e",
     "text": "Sprung mit Pfeiltasten"
@@ -6666,10 +6666,6 @@
     "source": "d88142e324dafafd",
     "text": "Sichtbarkeit von Bongo Cat konnte nicht geändert werden: {error}"
   },
-  "settings.couldNotChangeName": {
-    "source": "69f79c7a72505e7d",
-    "text": "{name} konnte nicht geändert werden."
-  },
   "settings.couldNotChangeNoiseSuppressionError": {
     "source": "fbf6531683d5f5da",
     "text": "Rauschunterdrückung konnte nicht geändert werden: {error}"
@@ -6877,6 +6873,10 @@
   "settings.couldNotRotateOverlayError": {
     "source": "061072c2f3c67ae8",
     "text": "Das Overlay konnte nicht gedreht werden: {error}"
+  },
+  "settings.couldNotSaveTheSettingsError": {
+    "source": "f381ed59bdef13ac",
+    "text": "Die Einstellungen konnten nicht gespeichert werden: {error}"
   },
   "settings.couldNotSaveTheme": {
     "source": "740913bd6cd7b7ac",
@@ -7206,9 +7206,9 @@
     "source": "135ce9d090fd8748",
     "text": "Skalieren auf"
   },
-  "settings.dragToMoveUseTheCorners": {
-    "source": "bc8d85be8af34e72",
-    "text": "Zum Verschieben ziehen, zum Skalieren an den Ecken ziehen oder zum Drehen am runden Griff ziehen. Die Drehung rastet nahe 90-Grad-Winkeln ein. Umschalt gedrückt halten, um das Einrasten zu deaktivieren. Strg+Z macht ein Verschieben, Skalieren oder Drehen rückgängig. Änderungen werden mit Übernehmen angewendet."
+  "settings.dragToMoveUseTheCornersToResize": {
+    "source": "f731afc293d36ad8",
+    "text": "Zum Verschieben ziehen, zum Skalieren an den Ecken ziehen oder zum Drehen am runden Griff ziehen. Die Drehung rastet nahe 90-Grad-Winkeln ein. Umschalt gedrückt halten, um das Einrasten zu deaktivieren. Strg+Z macht ein Verschieben, Skalieren oder Drehen rückgängig."
   },
   "settings.dragToPosition": {
     "source": "43ddd66cdc6eb3f4",
@@ -7886,9 +7886,9 @@
     "source": "4f3628452e51e173",
     "text": "Discord-Audio stummschalten"
   },
-  "settings.mutesOrUnmutesThisSoundIn": {
-    "source": "d0dac12fce8c2c18",
-    "text": "Schaltet diesen Ton in OBS stumm oder laut. Die Änderung wird mit Übernehmen oder OK angewendet."
+  "settings.mutesOrUnmutesThisSoundInObs": {
+    "source": "4ccb5ac674e1f766",
+    "text": "Schaltet diesen Ton in OBS stumm oder laut."
   },
   "settings.n10FpsSmallest": {
     "source": "6690b124bcd6762b",
@@ -8014,10 +8014,6 @@
     "source": "21163f9d9c6e3bc0",
     "text": "Keine OBS-Szene verfügbar."
   },
-  "settings.noSettingsChanged": {
-    "source": "583a5150efd3478e",
-    "text": "Keine Einstellungen geändert"
-  },
   "settings.noSignInIsNeededTo": {
     "source": "9a607cb83d8e7a97",
     "text": "Zum Hochladen von Clips und Erstellen teilbarer Links ist keine Anmeldung nötig. Anonyme Uploads nutzen die unten stehenden Limits. Anmelden, um neue Uploads dem eigenen Konto zuzuordnen."
@@ -8033,6 +8029,10 @@
   "settings.none": {
     "source": "f2953d2931e36d0c",
     "text": "Keine"
+  },
+  "settings.notAffiliatedWithStreamable": {
+    "source": "647bde456f398520",
+    "text": "ReplayKit ist nicht mit Streamable verbunden. Uploads richten sich nach den Tarifen und Limits von Streamable, die Streamable ändern kann."
   },
   "settings.num": {
     "source": "c483792012d1aecb",
@@ -8294,10 +8294,6 @@
     "source": "111fd0852e756ee7",
     "text": "Virtuelle Kamera"
   },
-  "settings.overlayApplyFailedError": {
-    "source": "738255c1ef31bf55",
-    "text": "Anwenden des Overlays fehlgeschlagen: {error}"
-  },
   "settings.overlayColorAdd": {
     "source": "60fe2f0560fa3a05",
     "text": "Overlay-Farbe addieren"
@@ -8478,13 +8474,13 @@
     "source": "7cc1cbde1dd4c94c",
     "text": "Höhere Qualität für leistungsstarke PCs."
   },
-  "settings.presetSavedApplyToUseIt": {
-    "source": "282c7f89ab3a78db",
-    "text": "Vorlage gespeichert. Übernehmen, um sie in OBS zu verwenden."
+  "settings.presetSaved": {
+    "source": "5754d4021b95d016",
+    "text": "Vorlage gespeichert."
   },
-  "settings.presetUpdatedApplyToUpdateObs": {
-    "source": "3004816539b8da5b",
-    "text": "Vorlage aktualisiert. Übernehmen, um OBS zu aktualisieren."
+  "settings.presetUpdated": {
+    "source": "d64e9dc0662e2c1b",
+    "text": "Vorlage aktualisiert."
   },
   "settings.pressAKey": {
     "source": "d5fa95d1806530dd",
@@ -8694,9 +8690,9 @@
     "source": "1f00b398df5fb06f",
     "text": "ReplayKit ist auf dem neuesten Stand ({version})"
   },
-  "settings.replaykitNeedsRepairApplyOrCancel": {
-    "source": "62719d1405529b14",
-    "text": "ReplayKit muss repariert werden. Zuerst die Einstellungsänderungen übernehmen oder abbrechen."
+  "settings.replaykitNeedsRepairRestartOrUndo": {
+    "source": "f1826db758cef701",
+    "text": "ReplayKit muss repariert werden. Einige Einstellungsänderungen sind noch nicht gespeichert, starte also zuerst OBS neu oder mache sie rückgängig."
   },
   "settings.replaykitNeedsRepairUseTheUpdate": {
     "source": "9848b48c05d56b89",
@@ -8809,10 +8805,6 @@
   "settings.setShortcutsForSavingClipsRecording": {
     "source": "5cdbf8597c6ecc58",
     "text": "Tastenkürzel zum Speichern von Clips, Aufnehmen und Öffnen der Bibliothek festlegen."
-  },
-  "settings.settingsApplied": {
-    "source": "ff9b0fd84a03a831",
-    "text": "Einstellungen angewendet"
   },
   "settings.settingsChanged": {
     "source": "735553f4b318a7bb",
@@ -8998,6 +8990,14 @@
     "source": "38942d2b60f4ad2a",
     "text": "Gezackte Kanten schnell glätten. Feine Details wirken eventuell weicher."
   },
+  "settings.someChangesTakeEffectAfterObsRestarts": {
+    "source": "e90960b323eb8b66",
+    "text": "Einige Änderungen werden erst nach einem Neustart von OBS wirksam."
+  },
+  "settings.someSettingsChangesAreNotSavedYet": {
+    "source": "84a4b2684df78edc",
+    "text": "Einige Einstellungsänderungen sind noch nicht gespeichert. Starte zuerst OBS neu oder mache sie rückgängig."
+  },
   "settings.sounds": {
     "source": "92375472db9662ea",
     "text": "Geräusche"
@@ -9057,6 +9057,10 @@
   "settings.storageCompressionType": {
     "source": "2b18fed600f92087",
     "text": "Komprimierungstyp für Speicher"
+  },
+  "settings.streamableUploadDeletion": {
+    "source": "079d533a30adf902",
+    "text": "Über das Clip-Menü kannst du Clips löschen, die du in dein Streamable-Konto hochgeladen hast."
   },
   "settings.switchSpeed": {
     "source": "66caae8c2c48a6a8",
@@ -9266,10 +9270,6 @@
     "source": "b16d021e8f3130c8",
     "text": "Unbegrenzt"
   },
-  "settings.updateAvailableLatestApplyOrCancel": {
-    "source": "93fac0decc666ec0",
-    "text": "Update verfügbar: {latest}. Übernimm oder verwirf zuerst deine Einstellungsänderungen."
-  },
   "settings.updateAvailableLatestInstalledInstalled": {
     "source": "05c45daac5ecbde8",
     "text": "Update verfügbar: {latest} (installiert: {installed})"
@@ -9277,6 +9277,10 @@
   "settings.updateAvailableLatestInstalledInstalledUse": {
     "source": "f3dde09189373d88",
     "text": "Update verfügbar: {latest} (installiert: {installed}). Klicke oben auf die Update-Schaltfläche, um es zu installieren."
+  },
+  "settings.updateAvailableLatestRestartOrUndo": {
+    "source": "3aacb2b2c5882cd1",
+    "text": "Update verfügbar: {latest}. Einige Einstellungsänderungen sind noch nicht gespeichert, starte also zuerst OBS neu oder mache sie rückgängig."
   },
   "settings.updateCheckFailedError": {
     "source": "a3bc85869fe0a75a",
@@ -9305,10 +9309,6 @@
   "settings.uploadSize": {
     "source": "197f08bfbafc075b",
     "text": "Upload-Größe"
-  },
-  "settings.uploadingAnonymously": {
-    "source": "91310b0ae2cbdb6e",
-    "text": "Anonymer Upload"
   },
   "settings.useAGradientForBackground": {
     "source": "f6b35c44145b756e",

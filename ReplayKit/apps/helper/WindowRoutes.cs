@@ -72,7 +72,7 @@ namespace ReplayKitHelper
                 // server-side foreground-raise for an existing dock-spawned popup (e.g. "view clips" clicked while the clips window is already open). the docks window.focus() is unreliable inside cef; this route uses win32 SetForegroundWindow + the AttachThreadInput dance which works regardless of who currently owns the foreground.
                 string title = Q("title", "Clips");
                 bool focused = false;
-                try { focused = Native.FocusWindow(title); } catch { }
+                try { focused = Native.FocusWindow(title); } catch (Exception ex) { Log.Write(path + ": " + ex.Message); }
                 HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["focused"] = focused });
                 return false;
             }
@@ -97,7 +97,7 @@ namespace ReplayKitHelper
                 uint ownerPid = title == "ReplayKit Update" ? 0 : (ParentWatchdog.ParentPid > 0 ? (uint)ParentWatchdog.ParentPid : 0);
                 int closed = 0;
                 // settings and setup are only hidden by the plugin and shown again later, so their taskbar tab has to survive the close; only the update popup really goes away
-                try { closed = Native.CloseWindowsByTitle(new[] { title }, ownerPid, title == "ReplayKit Update"); } catch { }
+                try { closed = Native.CloseWindowsByTitle(new[] { title }, ownerPid, title == "ReplayKit Update"); } catch (Exception ex) { Log.Write(path + ": " + ex.Message); }
                 HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["closed"] = closed });
                 return false;
             }
@@ -107,7 +107,7 @@ namespace ReplayKitHelper
                 // server-side maximize for a dock-spawned popup. called from clips.html when the user enters fullscreen on a clip so the host window fills the screen. js in cef cant resize its own host, hence the win32 round-trip. the native side snapshots the original rect so /window/restore can put it back unless the user manually unmaximized or dragged the host while fullscreened.
                 string title = Q("title", "Clips");
                 bool maximized = false;
-                try { maximized = Native.MaximizeObsWindow(title); } catch { }
+                try { maximized = Native.MaximizeObsWindow(title); } catch (Exception ex) { Log.Write(path + ": " + ex.Message); }
                 HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["maximized"] = maximized });
                 return false;
             }
@@ -124,7 +124,7 @@ namespace ReplayKitHelper
                     return false;
                 }
                 if (title == "Clips") PipeClient.SendClipsFullscreen(true);
-                try { fullscreen = Native.EnterObsWindowFullscreen(title); } catch { }
+                try { fullscreen = Native.EnterObsWindowFullscreen(title); } catch (Exception ex) { Log.Write(path + ": " + ex.Message); }
                 if (!fullscreen && title == "Clips") PipeClient.SendClipsFullscreen(false);
                 HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["fullscreen"] = fullscreen });
                 return false;
@@ -140,7 +140,7 @@ namespace ReplayKitHelper
                     HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["restored"] = true });
                     return false;
                 }
-                try { restored = Native.ExitObsWindowFullscreen(title); } catch { }
+                try { restored = Native.ExitObsWindowFullscreen(title); } catch (Exception ex) { Log.Write(path + ": " + ex.Message); }
                 if (title == "Clips") PipeClient.SendClipsFullscreen(false);
                 HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["restored"] = restored });
                 return false;
@@ -151,7 +151,7 @@ namespace ReplayKitHelper
                 // counterpart to /window/maximize: restore the saved rect only if the Clips host is still maximized. if the user dragged or unmaximized it while fullscreened, their manual placement wins.
                 string title = Q("title", "Clips");
                 bool restored = false;
-                try { restored = Native.RestoreObsWindow(title); } catch { }
+                try { restored = Native.RestoreObsWindow(title); } catch (Exception ex) { Log.Write(path + ": " + ex.Message); }
                 HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["restored"] = restored });
                 return false;
             }
@@ -169,7 +169,7 @@ namespace ReplayKitHelper
                 else if (title == "ReplayKit Setup") { minW = 640; minH = 520; }
                 else { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("helper.unsupportedWindowTitle") }); return false; }
                 bool resizing = false;
-                try { resizing = Native.BeginResizeWindow(title, minW, minH, maxW, maxH); } catch { }
+                try { resizing = Native.BeginResizeWindow(title, minW, minH, maxW, maxH); } catch (Exception ex) { Log.Write(path + ": " + ex.Message); }
                 HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["resizing"] = resizing });
                 return false;
             }
@@ -196,7 +196,7 @@ namespace ReplayKitHelper
                     return false;
                 }
                 bool applied = false;
-                try { applied = Native.SetWindowSizeCentered(title, w, h); } catch { }
+                try { applied = Native.SetWindowSizeCentered(title, w, h); } catch (Exception ex) { Log.Write(path + ": " + ex.Message); }
                 HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["applied"] = applied });
                 return false;
             }
