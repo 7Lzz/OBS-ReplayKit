@@ -15,6 +15,8 @@ namespace ReplayKitShared
         // inside the logs folder: the installer writes how an update ended and its own pid, and the helper reads both
         public const string UpdateResultFile = "update_result.json";
         public const string UpdatePidFile = "update_pid";
+        // inside the logs folder: the share window writes its log there and the helper reads it for the sdk
+        public const string ShareWindowLogFile = "share-window.log";
 
         // the helper downloads an update into a folder of this prefix and a guid, and the installer deletes only a folder of that shape
         public const string UpdateFolderPrefix = "update-";

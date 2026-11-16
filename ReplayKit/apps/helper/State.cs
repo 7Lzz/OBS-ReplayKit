@@ -263,8 +263,6 @@ namespace ReplayKitHelper
         // -- ProjectorLock --
         public readonly object ProjectorLock = new object();
         public bool ReplaykitDiscordProjectorInspectMode;
-        // the window the plugin opened for share preview that had not reached its projector list when the open gave up waiting, taken by the next attempt instead of opening another; 0 when none
-        public long ReplaykitDiscordProjectorPendingHwnd;
 
         // -- VideoApplyLock -- serializes the stop-outputs / SetVideoSettings (obs_reset_video) / restart-outputs cycle. concurrent obs_reset_video calls deadlock obss video graph -- 2026-08-28 a user hard-froze obs by rapidly re-applying the downscale resolution.
         public readonly object VideoApplyLock = new object();
@@ -274,8 +272,6 @@ namespace ReplayKitHelper
         public readonly object IpcLock = new object();
         public bool IpcClientConnected;
         public long ObsMainWindowHwnd;           // 0 until the plugin sends MAINWIN
-        public List<long> ProjectorHwnds;        // null = pipe down / no snapshot yet; non-null (even empty) = authoritative
-        public DateTime ProjectorHwndsAtUtc;
 
         // -- ObsWebSocketLock --
         public readonly object ObsWebSocketLock = new object();

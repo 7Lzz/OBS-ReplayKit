@@ -620,6 +620,7 @@
 <link rel="stylesheet" href="rk-theme.css" />
 <!--#include scrollbar-->
 <!--#include interaction-states-->
+<!--#include transform-readout-->
 <!--#include switch-->
 <!--#include combo-->
 <!--#include slider-->
@@ -1017,7 +1018,63 @@
           </div>
         </div>
       </div>
-    </section>
+      <div class="box" id="shareCoverBox">
+        <div class="box-title" data-i18n="settings.whileObsIsAway"></div>
+        <div class="form-row is-stacked-row" style="grid-template-columns:180px 1fr; align-items:start">
+          <div class="label"><span data-i18n="settings.shareCardPreview"></span><span class="setting-description" data-i18n="settings.shareCardPreviewNote"></span></div>
+          <div class="field-wrap" style="flex-direction:column; align-items:stretch"><!--#include share-card-editor--></div>
+        </div>
+        <div class="form-row">
+          <div class="label" data-i18n="settings.shareCardBackground"></div>
+          <div class="field-wrap"><div class="combo" id="shareCoverBackground" tabindex="0" role="combobox" aria-expanded="false"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button><div class="combo-menu" role="listbox"></div></div></div>
+        </div>
+        <div class="form-row" id="shareCoverImageRow">
+          <div class="label" data-i18n="settings.shareCardImage"></div>
+          <div class="field-wrap"><div class="projector-action-row"><button class="btn" type="button" id="shareCoverImagePick" data-i18n="settings.chooseImage"></button><button class="btn" type="button" id="shareCoverImageRemove" data-i18n="common.remove"></button></div></div>
+        </div>
+        <div class="form-row" id="shareCoverFitRow">
+          <div class="label" data-i18n="settings.shareCardImageFit"></div>
+          <div class="field-wrap"><div class="combo" id="shareCoverFit" tabindex="0" role="combobox" aria-expanded="false"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button><div class="combo-menu" role="listbox"></div></div></div>
+        </div>
+        <div class="form-row">
+          <div class="label" data-i18n="settings.shareCardText"></div>
+          <div class="field-wrap"><input class="text-input" id="shareCoverText" type="text" maxlength="80" autocomplete="off" data-i18n-placeholder="screenshare.coverDefaultText" aria-label="Card text" data-i18n-aria-label="settings.shareCardText"></div>
+        </div>
+        <div class="form-row tight">
+          <div></div>
+          <div class="check-row"><input aria-label="Show the text" id="shareCoverShowText" type="checkbox" data-i18n-aria-label="settings.showTheText"/><span><span data-i18n="settings.showTheText"></span></span></div>
+        </div>
+        <div class="form-row">
+          <div class="label"><span data-i18n="settings.shareCardSound"></span><span class="setting-description" data-i18n="settings.shareCardSoundNote"></span></div>
+          <div class="field-wrap"><div class="combo" id="shareCoverSound" tabindex="0" role="combobox" aria-expanded="false"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button><div class="combo-menu" role="listbox"></div></div></div>
+        </div>
+        <div class="form-row" id="shareCoverSoundFileRow">
+          <div class="label" data-i18n="settings.shareCardSoundFile"></div>
+          <div class="field-wrap"><div class="projector-action-row"><button class="btn" type="button" id="shareCoverSoundPick" data-i18n="settings.chooseSound"></button><button class="btn" type="button" id="shareCoverSoundRemove" data-i18n="common.remove"></button></div></div>
+        </div>
+        <div class="form-row" id="shareCoverVolumeRow">
+          <div class="label" data-i18n="settings.shareCardSoundVolume"></div>
+          <div class="field-wrap">
+            <div class="volume-control">
+              <input class="text-input volume-value" id="shareCoverSoundVolumeValue" type="text" inputmode="numeric" autocomplete="off" aria-label="Card sound volume" data-i18n-aria-label="settings.shareCardSoundVolume">
+              <div class="volume-slider-wrap">
+                <input class="volume-slider rk-range" id="shareCoverSoundVolume" type="range" data-limit="share_cover_sound_volume" step="1" aria-label="Card sound volume slider" data-i18n-aria-label="settings.shareCardSoundVolumeSlider">
+              </div>
+            </div>
+            <button class="icon-btn field-reset" type="button" id="resetShareCoverSoundVolume" title="Reset to default" data-i18n-title="common.resetToDefault">
+              <svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg>
+            </button>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="label"><span data-i18n="settings.keepTheCardAfterObsCloses"></span><span class="setting-description" data-i18n="settings.keepTheCardNote"></span></div>
+          <div class="field-wrap"><div class="combo" id="shareWindowKeep" tabindex="0" role="combobox" aria-expanded="false"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button><div class="combo-menu" role="listbox"></div></div></div>
+        </div>
+        <div class="form-row">
+          <div class="label update-label"><span data-i18n="settings.tryTheCard"></span><span class="inline-status" id="shareCoverStatus" role="status" aria-live="polite"></span></div>
+          <div class="field-wrap"><button class="btn" type="button" id="shareCoverShowBtn" data-i18n="settings.showTheCardNow"></button></div>
+        </div>
+      </div>    </section>
 
     <section class="page" id="page-audio">
       <div class="box">
@@ -1330,30 +1387,6 @@
             <button class="icon-btn field-reset" type="button" id="resetOverlayOpacity" title="Reset to default" data-i18n-title="common.resetToDefault">
               <svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg>
             </button>
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="label" data-i18n="common.size"></div>
-          <div class="field-wrap">
-            <div class="volume-control">
-              <input class="text-input volume-value" id="overlayScaleValue" type="text" inputmode="numeric" autocomplete="off" aria-label="Overlay size" data-i18n-aria-label="settings.overlaySize">
-              <div class="volume-slider-wrap">
-                <input class="volume-slider rk-range" id="overlayScale" type="range" data-limit="overlayScale" step="1" aria-label="Overlay size slider" data-i18n-aria-label="settings.overlaySizeSlider">
-              </div>
-            </div>
-            <button class="icon-btn field-reset" type="button" id="resetOverlayScale" title="Reset to default" data-i18n-title="common.resetToDefault">
-              <svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg>
-            </button>
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="label" data-i18n="common.rotation"></div>
-          <div class="field-wrap">
-            <div class="volume-control">
-              <input class="text-input volume-value" id="overlayRotationValue" type="text" inputmode="numeric" autocomplete="off" aria-label="Overlay rotation in degrees" data-i18n-aria-label="settings.overlayRotationInDegrees">
-              <div class="volume-slider-wrap"><input class="volume-slider rk-range" id="overlayRotation" type="range" data-limit="overlayRotation" step="1" aria-label="Overlay rotation slider" data-i18n-aria-label="settings.overlayRotationSlider"></div>
-            </div>
-            <button class="icon-btn field-reset" type="button" id="resetOverlayRotation" title="Reset to default" data-i18n-title="common.resetToDefault"><svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
           </div>
         </div>
         <div class="form-row">
@@ -2170,14 +2203,28 @@
     sidebarGithubLink: document.getElementById("sidebarGithubLink"),
     screenshareSwitchDelay: document.getElementById("screenshareSwitchDelay"),
     screenshareSwitchDelayValue: document.getElementById("screenshareSwitchDelayValue"),
+    shareCoverBackground: document.getElementById("shareCoverBackground"),
+    shareCoverImageRow: document.getElementById("shareCoverImageRow"),
+    shareCoverImagePick: document.getElementById("shareCoverImagePick"),
+    shareCoverImageRemove: document.getElementById("shareCoverImageRemove"),
+    shareCoverFitRow: document.getElementById("shareCoverFitRow"),
+    shareCoverFit: document.getElementById("shareCoverFit"),
+    shareCoverText: document.getElementById("shareCoverText"),
+    shareCoverShowText: document.getElementById("shareCoverShowText"),
+    shareCoverSound: document.getElementById("shareCoverSound"),
+    shareCoverSoundFileRow: document.getElementById("shareCoverSoundFileRow"),
+    shareCoverSoundPick: document.getElementById("shareCoverSoundPick"),
+    shareCoverSoundRemove: document.getElementById("shareCoverSoundRemove"),
+    shareCoverVolumeRow: document.getElementById("shareCoverVolumeRow"),
+    shareCoverSoundVolume: document.getElementById("shareCoverSoundVolume"),
+    shareCoverSoundVolumeValue: document.getElementById("shareCoverSoundVolumeValue"),
+    shareWindowKeep: document.getElementById("shareWindowKeep"),
+    shareCoverShowBtn: document.getElementById("shareCoverShowBtn"),
+    shareCoverStatus: document.getElementById("shareCoverStatus"),
     screenshareSwitchDelayRow: document.getElementById("screenshareSwitchDelayRow"),
     overlayStyle: document.getElementById("overlayStyle"),
     overlayOpacity: document.getElementById("overlayOpacity"),
     overlayOpacityValue: document.getElementById("overlayOpacityValue"),
-    overlayScale: document.getElementById("overlayScale"),
-    overlayScaleValue: document.getElementById("overlayScaleValue"),
-    overlayRotation: document.getElementById("overlayRotation"),
-    overlayRotationValue: document.getElementById("overlayRotationValue"),
     overlayFlipH: document.getElementById("overlayFlipH"),
     bongoMode: document.getElementById("bongoMode"),
     bongoModeRow: document.getElementById("bongoModeRow"),
@@ -3616,6 +3663,15 @@
     setComboValue(els.screenshareGameWindow, settingOr("screenshareGameWindow"), false);
     renderScreenshareGameOverrides();
     els.screenshareAutoGameKeepFocused.checked = !!state.screenshareAutoGameKeepFocused;
+    setComboValue(els.shareCoverBackground, settingOr("share_cover_background"), false);
+    setComboValue(els.shareCoverFit, settingOr("share_cover_fit"), false);
+    els.shareCoverText.value = settingOr("share_cover_text") || "";
+    els.shareCoverShowText.checked = !!settingOr("share_cover_show_text");
+    setComboValue(els.shareCoverSound, settingOr("share_cover_sound"), false);
+    syncVolumeControl(els.shareCoverSoundVolume, els.shareCoverSoundVolumeValue, settingOr("share_cover_sound_volume"));
+    refreshFieldResetState("share_cover_sound_volume", SETTING_DEFAULTS.share_cover_sound_volume);
+    setComboValue(els.shareWindowKeep, settingOr("share_window_keep"), false);
+    syncShareCoverRows();
     syncSwitchDelayControl(settingOr("screenshareSwitchDelaySeconds"));
     refreshFieldResetState("screenshareSwitchDelaySeconds", DEFAULT_SCREENSHARE_SWITCH_DELAY);
     syncScreenshareCaptureFields();
@@ -3623,8 +3679,6 @@
     syncDiscordScreenshareRow();
     setComboValue(els.overlayStyle, settingOr("overlayStyle"), false);
     syncIntegerRangeControl(els.overlayOpacity, els.overlayOpacityValue, settingOr("overlayOpacity"), clampOverlayOpacity, SETTING_LIMITS.overlayOpacity.min, SETTING_LIMITS.overlayOpacity.max);
-    syncIntegerRangeControl(els.overlayScale, els.overlayScaleValue, settingOr("overlayScale"), clampOverlayScale, SETTING_LIMITS.overlayScale.min, SETTING_LIMITS.overlayScale.max);
-    syncIntegerRangeControl(els.overlayRotation, els.overlayRotationValue, settingOr("overlayRotation"), clampOverlayRotation, SETTING_LIMITS.overlayRotation.min, SETTING_LIMITS.overlayRotation.max);
     els.overlayFlipH.checked = !!state.overlayFlipH;
     setComboValue(els.bongoMode, settingOr("bongoMode"), false);
     setComboValue(els.inputOverlayKeyboard, settingOr("inputOverlayKeyboard"), false);
@@ -3634,8 +3688,6 @@
     syncOverlayRows();
     syncIntegerRangeControl(els.overlayHueShift, els.overlayHueShiftValue, settingOr("overlayHueShift"), clampHueShift, SETTING_LIMITS.overlayHueShift.min, SETTING_LIMITS.overlayHueShift.max);
     refreshFieldResetState("overlayOpacity", DEFAULT_OVERLAY_OPACITY);
-    refreshFieldResetState("overlayScale", DEFAULT_OVERLAY_SCALE);
-    refreshFieldResetState("overlayRotation", DEFAULT_OVERLAY_ROTATION);
     refreshFieldResetState("overlayHueShift", DEFAULT_OVERLAY_HUE_SHIFT);
     syncColorControl(els.overlayColorMultiply, els.overlayColorMultiplyValue, settingOr("overlayColorMultiply"), DEFAULT_OVERLAY_COLOR_MULTIPLY);
     syncColorControl(els.overlayColorAdd, els.overlayColorAddValue, settingOr("overlayColorAdd"), DEFAULT_OVERLAY_COLOR_ADD);
@@ -3733,11 +3785,16 @@
     state.screenshareGameWindow = comboValue(els.screenshareGameWindow) || "";
     state.screenshareGameOverrides = normalizeScreenshareGameOverrides(state.screenshareGameOverrides);
     state.screenshareAutoGameKeepFocused = !!els.screenshareAutoGameKeepFocused.checked;
+    state.share_cover_background = comboValue(els.shareCoverBackground) || SETTING_DEFAULTS.share_cover_background;
+    state.share_cover_fit = comboValue(els.shareCoverFit) || SETTING_DEFAULTS.share_cover_fit;
+    state.share_cover_text = els.shareCoverText.value.trim().slice(0, 80);
+    state.share_cover_show_text = !!els.shareCoverShowText.checked;
+    state.share_cover_sound = comboValue(els.shareCoverSound) || SETTING_DEFAULTS.share_cover_sound;
+    state.share_cover_sound_volume = clampVolume(els.shareCoverSoundVolume.value);
+    state.share_window_keep = comboValue(els.shareWindowKeep) || SETTING_DEFAULTS.share_window_keep;
     state.screenshareSwitchDelaySeconds = clampSwitchDelay(els.screenshareSwitchDelay.value);
     state.overlayStyle = comboValue(els.overlayStyle);
     state.overlayOpacity = clampOverlayOpacity(els.overlayOpacity.value);
-    state.overlayScale = clampOverlayScale(els.overlayScale.value);
-    state.overlayRotation = clampOverlayRotation(els.overlayRotation.value);
     state.overlayFlipH = els.overlayFlipH.checked;
     state.bongoMode = comboValue(els.bongoMode);
     state.inputOverlayKeyboard = comboValue(els.inputOverlayKeyboard) || "wasd-minimal";
@@ -3951,10 +4008,19 @@
   if (window.RKOverlayPreview) RKOverlayPreview.init(
     () => { try { readUi(); } catch (_) {} return state; },
     (x, y) => { setOverlayPosition(x, y); markDirty(); },
-    (pct) => { els.overlayScale.value = String(pct); els.overlayScale.dispatchEvent(new Event("input")); },
-    (degrees) => { els.overlayRotation.value = String(degrees); els.overlayRotation.dispatchEvent(new Event("input")); }, true);
+    // the preview is the only control for the size and the rotation, so they go straight into state like a drag does
+    (pct) => { state.overlayScale = clampOverlayScale(pct); queueOverlayPreview(); },
+    (degrees) => { state.overlayRotation = clampOverlayRotation(degrees); queueOverlayPreview(); }, true,
+    () => {
+      if (state.overlayScale === DEFAULT_OVERLAY_SCALE && state.overlayRotation === DEFAULT_OVERLAY_ROTATION) return;
+      state.overlayScale = DEFAULT_OVERLAY_SCALE;
+      state.overlayRotation = DEFAULT_OVERLAY_ROTATION;
+      queueOverlayPreview();
+    });
   // the mic controls write straight into state (the host contract is get/set/onChange), so saving, undo and the dirty check treat them like every other field
   if (window.RKMic) RKMic.init({ get:(k) => state[k], set:(k, v) => { state[k] = v; }, onChange:() => markDirty() });
+  // the card editor writes the layout straight into state too, so saving, undo and the dirty check treat it like every other field
+  if (window.RKShareCardEditor) RKShareCardEditor.init({ get:settingOr, set:(k, v) => { state[k] = v; }, onChange:() => markDirty() });
   els.screenshareGameOverridePicker.addEventListener("combochange", syncScreenshareCaptureFields);
   els.addScreenshareGameOverride.addEventListener("click", addScreenshareGameOverride);
   {
@@ -3975,6 +4041,7 @@
   [
     [els.clipSoundVolume, els.clipSoundVolumeValue, "clipSoundVolume", DEFAULT_CLIP_SOUND_VOLUME, "resetClipSoundVolume"],
     [els.recordingSoundVolume, els.recordingSoundVolumeValue, "recordingSoundVolume", DEFAULT_RECORDING_SOUND_VOLUME, "resetRecordingSoundVolume"],
+    [els.shareCoverSoundVolume, els.shareCoverSoundVolumeValue, "share_cover_sound_volume", SETTING_DEFAULTS.share_cover_sound_volume, "resetShareCoverSoundVolume"],
   ].forEach(([slider, input, key, def, resetId]) => {
     slider.addEventListener("input", () => {
       state[key] = clampVolume(slider.value);
@@ -4042,8 +4109,6 @@
 
   [
     [els.overlayOpacity, els.overlayOpacityValue, "overlayOpacity", clampOverlayOpacity, SETTING_LIMITS.overlayOpacity.min, SETTING_LIMITS.overlayOpacity.max, DEFAULT_OVERLAY_OPACITY, "resetOverlayOpacity"],
-    [els.overlayScale, els.overlayScaleValue, "overlayScale", clampOverlayScale, SETTING_LIMITS.overlayScale.min, SETTING_LIMITS.overlayScale.max, DEFAULT_OVERLAY_SCALE, "resetOverlayScale"],
-    [els.overlayRotation, els.overlayRotationValue, "overlayRotation", clampOverlayRotation, SETTING_LIMITS.overlayRotation.min, SETTING_LIMITS.overlayRotation.max, DEFAULT_OVERLAY_ROTATION, "resetOverlayRotation"],
     [els.overlayHueShift, els.overlayHueShiftValue, "overlayHueShift", clampHueShift, SETTING_LIMITS.overlayHueShift.min, SETTING_LIMITS.overlayHueShift.max, DEFAULT_OVERLAY_HUE_SHIFT, "resetOverlayHueShift"],
   ].forEach(([slider, input, key, clampFn, min, max, def, resetId]) => {
     slider.addEventListener("input", () => {
@@ -4332,6 +4397,28 @@
       fillCombo(els.screenshareCaptureMode, data.options.screenshareCaptureModes || []);
       fillCombo(els.screenshareGameWindow, data.options.screenshareGameWindows || []);
       fillCombo(els.screenshareGameOverridePicker, data.options.screenshareGameWindows || []);
+      fillCombo(els.shareCoverBackground, [
+        { value:"theme", label:RK_M("settings.shareCardBackgroundTheme") },
+        { value:"image", label:RK_M("settings.shareCardBackgroundImage") },
+        { value:"lastframe", label:RK_M("settings.shareCardBackgroundLastFrame") },
+      ]);
+      fillCombo(els.shareCoverFit, [
+        { value:"fit", label:RK_M("settings.shareCardFitWhole") },
+        { value:"fill", label:RK_M("settings.shareCardFitFill") },
+      ]);
+      fillCombo(els.shareCoverSound, [
+        { value:"default", label:RK_M("settings.shareCardSoundDefault") },
+        { value:"custom", label:RK_M("settings.shareCardSoundCustom") },
+        { value:"off", label:RK_M("settings.shareCardSoundOff") },
+      ]);
+      fillCombo(els.shareWindowKeep, [
+        { value:"off", label:RK_M("settings.keepCardOff") },
+        { value:"5m", label:RK_M("settings.keepCard5m") },
+        { value:"15m", label:RK_M("settings.keepCard15m") },
+        { value:"1h", label:RK_M("settings.keepCard1h") },
+        { value:"always", label:RK_M("settings.keepCardAlways") },
+      ]);
+      refreshShareCover();
       fillCombo(els.overlayStyle, data.options.overlays || []);
       fillCombo(els.bongoMode, data.options.bongoModes || []);
       overlayLayouts = data.options.inputOverlay || null;
@@ -4805,6 +4892,68 @@
       closeDiscordScreenshareConfirmModal(false);
     }
   });
+  // the card of the share window: the rows that apply to the picked background and sound, the card editor, and the buttons that pick or drop an image or a sound
+  let shareCoverStatus = { hasImage:false, hasSound:false, hasDefaultSound:false, hasCard:false };
+  function syncShareCoverRows() {
+    const background = comboValue(els.shareCoverBackground);
+    const sound = comboValue(els.shareCoverSound);
+    els.shareCoverImageRow.hidden = background !== "image";
+    els.shareCoverFitRow.hidden = background !== "image";
+    els.shareCoverImageRemove.disabled = !shareCoverStatus.hasImage;
+    els.shareCoverSoundFileRow.hidden = sound !== "custom";
+    els.shareCoverSoundRemove.disabled = !shareCoverStatus.hasSound;
+    els.shareCoverVolumeRow.hidden = sound === "off";
+    if (window.RKShareCardEditor) RKShareCardEditor.refresh();
+  }
+  async function refreshShareCover() {
+    try { shareCoverStatus = await helperJson("share/cover/state"); }
+    catch (_) { return; }
+    if (window.RKShareCardEditor) RKShareCardEditor.refresh(shareCoverStatus);
+    syncShareCoverRows();
+  }
+  // a pick or a removal is saved by the helper itself, so the page takes those values as saved rather than as its own edits
+  function takeSavedCoverSettings(saved) {
+    if (!saved) return;
+    ["share_cover_background", "share_cover_sound"].forEach((key) => {
+      if (saved[key] === undefined) return;
+      state[key] = saved[key];
+      originalState[key] = saved[key];
+    });
+    setComboValue(els.shareCoverBackground, state.share_cover_background, false);
+    setComboValue(els.shareCoverSound, state.share_cover_sound, false);
+  }
+  // the same status line as the updates row: green when the card went up, red when an action failed
+  function setShareCoverStatus(text, kind) {
+    els.shareCoverStatus.textContent = text || "";
+    els.shareCoverStatus.classList.toggle("good", kind === "good");
+    els.shareCoverStatus.classList.toggle("bad", kind === "bad");
+  }
+  async function runShareCoverAction(button, path) {
+    button.disabled = true;
+    setShareCoverStatus("");
+    try {
+      const result = await helperJson(path, { method:"POST" });
+      takeSavedCoverSettings(result.settings);
+      if (result.cover) shareCoverStatus = result.cover;
+      if (path === "share/cover/show") setShareCoverStatus(RK_M("settings.shareCardShown"), "good");
+      await refreshShareCover();
+    } catch (error) {
+      setShareCoverStatus(error.message, "bad");
+    } finally {
+      button.disabled = false;
+      syncShareCoverRows();
+    }
+  }
+  [els.shareCoverBackground, els.shareCoverFit, els.shareCoverSound, els.shareWindowKeep].forEach((combo) => {
+    combo.addEventListener("combochange", () => { readUi(); syncShareCoverRows(); markDirty(); });
+  });
+  els.shareCoverShowText.addEventListener("change", () => { readUi(); syncShareCoverRows(); markDirty(); });
+  els.shareCoverText.addEventListener("input", () => { readUi(); syncShareCoverRows(); markDirty(); });
+  els.shareCoverImagePick.addEventListener("click", () => runShareCoverAction(els.shareCoverImagePick, "share/cover/image"));
+  els.shareCoverImageRemove.addEventListener("click", () => runShareCoverAction(els.shareCoverImageRemove, "share/cover/image/remove"));
+  els.shareCoverSoundPick.addEventListener("click", () => runShareCoverAction(els.shareCoverSoundPick, "share/cover/sound"));
+  els.shareCoverSoundRemove.addEventListener("click", () => runShareCoverAction(els.shareCoverSoundRemove, "share/cover/sound/remove"));
+  els.shareCoverShowBtn.addEventListener("click", () => runShareCoverAction(els.shareCoverShowBtn, "share/cover/show"));
   els.settingsProjectorInspectBtn.addEventListener("click", () => {
     runSettingsProjectorAction(els.settingsProjectorInspectBtn, "projector-inspect", RK_M("settings.showingProjector"), RK_M("settings.projectorShown"), RK_M("settings.showProjector"));
   });

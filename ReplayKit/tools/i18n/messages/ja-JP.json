@@ -2413,6 +2413,10 @@
     "source": "60bb3338e0ad558c",
     "text": "大きさ"
   },
+  "common.sizeAndRotation": {
+    "source": "fa1c797ebf25e621",
+    "text": "{size}% · {rotation}°"
+  },
   "common.smaller": {
     "source": "215848cff2f44baf",
     "text": "小さく"
@@ -4949,6 +4953,10 @@
     "source": "9e31e252b6d49609",
     "text": "字幕"
   },
+  "editor.subtitleSizeAndRotation": {
+    "source": "0ace000910f8813b",
+    "text": "{size} px · {rotation}°"
+  },
   "editor.subtitlePresets": {
     "source": "f704f42f6e0091fa",
     "text": "字幕のプリセット"
@@ -6149,21 +6157,45 @@
     "source": "977a84715be6a085",
     "text": "Windows から実際のモニターの作業領域が報告されませんでした。"
   },
-  "screenshare.obsProjectorWindowInformationIsUnavailable": {
-    "source": "c2659974a9f520e8",
-    "text": "OBS のプロジェクターウィンドウの情報を取得できません。"
-  },
   "screenshare.obsProjectorWindowWasFoundBut": {
     "source": "b2b6981650a0028d",
     "text": "OBS のプロジェクターウィンドウは見つかりましたが、Windows が移動またはサイズ変更の要求を拒否しました。"
   },
-  "screenshare.obsProjectorWindowWasFoundBut2": {
-    "source": "b568bc9513748137",
-    "text": "OBS のプロジェクターウィンドウは見つかりましたが、何度試しても閉じませんでした。"
-  },
   "screenshare.obsProjectorWindowWasMovedBut": {
     "source": "513efdfb320a0fb8",
     "text": "OBS のプロジェクターウィンドウは移動されましたが、Windows がタスクバーを隠す要求を拒否しました。"
+  },
+  "screenshare.theShareWindowIsMissing": {
+    "source": "b5f7a930d8477eb4",
+    "text": "Share Preview ウィンドウのプログラムが見つかりません ({path})。ReplayKit のインストーラーをもう一度実行してください。"
+  },
+  "screenshare.theShareWindowCouldNotStart": {
+    "source": "964d6e4a8ff066b8",
+    "text": "Share Preview ウィンドウを起動できませんでした。Share Preview をオフにしてからもう一度オンにし、失敗が続く場合は ReplayKit のログを確認してください。"
+  },
+  "screenshare.theShareWindowDidNotClose": {
+    "source": "df55f2f86a7f167f",
+    "text": "Share Preview ウィンドウは、終了するよう指示した後も閉じませんでした。"
+  },
+  "screenshare.coverDefaultText": {
+    "source": "a99e83da4583ab31",
+    "text": "すぐ戻ります"
+  },
+  "screenshare.theImageCouldNotBeUsed": {
+    "source": "5807af0d4a5d3ff9",
+    "text": "その画像は使えませんでした。PNG、JPG、BMP、GIF のファイルを選んでください。"
+  },
+  "screenshare.theSoundNeedsFfmpeg": {
+    "source": "4559f79ab94267d6",
+    "text": "サウンドには ffmpeg が必要ですが、まだインストールされていません。ReplayKit のインストーラーをもう一度実行してください。"
+  },
+  "screenshare.theSoundCouldNotBeUsed": {
+    "source": "9e4fb0659b9c288b",
+    "text": "そのサウンドは使えませんでした。別のオーディオファイルを選んでください。"
+  },
+  "screenshare.turnOnSharePreviewFirst": {
+    "source": "bd28264ea2b20433",
+    "text": "先に Share Preview をオンにしてください。"
   },
   "screenshare.obsStreamAudioPlaybackEndpointIs": {
     "source": "67f2ce393de09ce9",
@@ -6177,14 +6209,6 @@
     "source": "2b610cccfc59aa23",
     "text": "OBS の映像設定を利用できません: {error}"
   },
-  "screenshare.obsWindowedProjectorWasOpenedBut": {
-    "source": "ec315d83d6113eb7",
-    "text": "OBS のウィンドウ付きプロジェクターを開きましたが、ウィンドウが見つかりませんでした。"
-  },
-  "screenshare.openingObsWindowedProjectorFailedError": {
-    "source": "2d9dcd1cb049f442",
-    "text": "OBS のウィンドウ付きプロジェクターを開けませんでした: {error}"
-  },
   "screenshare.projectorSourceMonitorBoundsAreInvalid": {
     "source": "93020dd93b70a042",
     "text": "プロジェクターのソースモニターの範囲が無効です。"
@@ -6196,10 +6220,6 @@
   "screenshare.theObsProjectorWindowChangeDid": {
     "source": "243400152e4ba38f",
     "text": "OBS のプロジェクターウィンドウの変更は、有効な共有ウィンドウで完了しませんでした。"
-  },
-  "screenshare.theObsProjectorWindowCouldNot": {
-    "source": "e0ee22530dadb67b",
-    "text": "OBS のプロジェクターウィンドウを確認または待機させられませんでした。"
   },
   "screenshare.thePreviousProjectorWindowChangeIs": {
     "source": "e6ca2f0e117d83de",
@@ -7208,6 +7228,10 @@
   "settings.dragToPosition": {
     "source": "43ddd66cdc6eb3f4",
     "text": "ドラッグして位置を設定"
+  },
+  "settings.resetOverlaySizeAndRotation": {
+    "source": "910d03d1f3f121c3",
+    "text": "サイズと回転をリセット"
   },
   "settings.editName": {
     "source": "70d7cc5a6422feaa",
@@ -8329,14 +8353,6 @@
     "source": "7ec4d75cc9910ae1",
     "text": "オーバーレイの不透明度のスライダー"
   },
-  "settings.overlayRotationInDegrees": {
-    "source": "2f729c1b6874b5ed",
-    "text": "オーバーレイの回転 (度)"
-  },
-  "settings.overlayRotationSlider": {
-    "source": "c129339a890ed309",
-    "text": "オーバーレイの回転のスライダー"
-  },
   "settings.overlaySceneItemsFailedError": {
     "source": "b5b4ac45a7bbb1be",
     "text": "オーバーレイの設定は保存されましたが、OBS のシーンの項目を読み取れませんでした: {error}"
@@ -8349,10 +8365,6 @@
     "source": "94d8f258ed868945",
     "text": "オーバーレイの設定は保存されましたが、再起動用の OBS シーンファイルを準備できませんでした: {error}"
   },
-  "settings.overlaySize": {
-    "source": "a50962ddfe53b823",
-    "text": "オーバーレイのサイズ"
-  },
   "settings.overlaySizeSceneItemsFailedError": {
     "source": "f8b400ff6c79c2f1",
     "text": "オーバーレイのサイズは保存されましたが、OBS のシーンの項目を読み取れませんでした: {error}"
@@ -8360,10 +8372,6 @@
   "settings.overlaySizeSceneLookupFailedError": {
     "source": "dd23826f43e78e66",
     "text": "オーバーレイのサイズは保存されましたが、OBS のシーンの検索に失敗しました: {error}"
-  },
-  "settings.overlaySizeSlider": {
-    "source": "11cc91e490df3ccd",
-    "text": "オーバーレイのサイズのスライダー"
   },
   "settings.pageDown": {
     "source": "38adab48f20e4552",
@@ -8668,6 +8676,134 @@
   "settings.repark": {
     "source": "40c2985c92ed985e",
     "text": "待機位置に戻す"
+  },
+  "settings.whileObsIsAway": {
+    "source": "ff7f616253d9151a",
+    "text": "OBS が閉じている間"
+  },
+  "settings.shareCardPreview": {
+    "source": "3af72fd745b3989d",
+    "text": "カードのプレビュー"
+  },
+  "settings.shareCardPreviewNote": {
+    "source": "45b0ab019c17e4a4",
+    "text": "OBS が閉じている間、再起動中、更新中に Discord の視聴者に表示されるものです。"
+  },
+  "settings.shareCardBackground": {
+    "source": "7d67b6c9f37716ad",
+    "text": "背景"
+  },
+  "settings.shareCardBackgroundTheme": {
+    "source": "8fd954f2b25eb2ab",
+    "text": "テーマの色"
+  },
+  "settings.shareCardBackgroundImage": {
+    "source": "cbff02b1de749e35",
+    "text": "自分の画像"
+  },
+  "settings.shareCardBackgroundLastFrame": {
+    "source": "97a18995a9e7d1ac",
+    "text": "最後のゲーム画面（暗く）"
+  },
+  "settings.shareCardImage": {
+    "source": "fc6eaa65315f601d",
+    "text": "画像"
+  },
+  "settings.shareCardImageFit": {
+    "source": "32cc0d85750055d1",
+    "text": "画像の合わせ方"
+  },
+  "settings.shareCardFitWhole": {
+    "source": "369293a21deb39b2",
+    "text": "画像全体を表示"
+  },
+  "settings.shareCardFitFill": {
+    "source": "06a81292f8359d12",
+    "text": "カード全体に合わせる"
+  },
+  "settings.shareCardText": {
+    "source": "c028d4bda5c6fda7",
+    "text": "テキスト"
+  },
+  "settings.showTheText": {
+    "source": "d17c8c9bbb4640bc",
+    "text": "テキストを表示"
+  },
+  "settings.shareCardSound": {
+    "source": "4e1288ba9755d7cd",
+    "text": "サウンド"
+  },
+  "settings.shareCardSoundNote": {
+    "source": "f78575f6ccf1b16a",
+    "text": "カードが表示されている間、配信で流れます。自分には聞こえません。"
+  },
+  "settings.shareCardSoundDefault": {
+    "source": "3c1a0cdbcfd6cc9a",
+    "text": "既定のサウンド"
+  },
+  "settings.shareCardSoundCustom": {
+    "source": "dd90af84e22187ee",
+    "text": "自分のサウンド"
+  },
+  "settings.shareCardSoundOff": {
+    "source": "40aab9dfcc6a214b",
+    "text": "サウンドなし"
+  },
+  "settings.shareCardSoundFile": {
+    "source": "c57864b74a1a98f1",
+    "text": "サウンドファイル"
+  },
+  "settings.chooseSound": {
+    "source": "a0ff61dc6aea6e4e",
+    "text": "サウンドを選ぶ"
+  },
+  "settings.shareCardSoundVolume": {
+    "source": "25c4333eb6d1d390",
+    "text": "サウンドの音量"
+  },
+  "settings.shareCardSoundVolumeSlider": {
+    "source": "ff512b3729993d4c",
+    "text": "サウンドの音量スライダー"
+  },
+  "settings.keepTheCardAfterObsCloses": {
+    "source": "60dabedaae281b48",
+    "text": "OBS を閉じた後もカードを残す"
+  },
+  "settings.keepTheCardNote": {
+    "source": "2f179e7287ce29de",
+    "text": "再起動と更新の間は常に残ります。これは OBS を閉じたときやクラッシュしたときの設定です。"
+  },
+  "settings.keepCardOff": {
+    "source": "271e707aebb8c461",
+    "text": "OBS と一緒に閉じる"
+  },
+  "settings.keepCard5m": {
+    "source": "1f40f7a5fa15caa1",
+    "text": "5 分"
+  },
+  "settings.keepCard15m": {
+    "source": "d356929940f32942",
+    "text": "15 分"
+  },
+  "settings.keepCard1h": {
+    "source": "d47049285cae9ef7",
+    "text": "1 時間"
+  },
+  "settings.keepCardAlways": {
+    "source": "7a86c86d4ec7c752",
+    "text": "OBS をもう一度開くまで"
+  },
+  "settings.tryTheCard": {
+    "source": "170978231e15a41b",
+    "text": "試す"
+  },
+  "settings.showTheCardNow": {
+    "source": "b674b42006bf7930",
+    "text": "今すぐカードを表示"
+  },
+  "settings.shareCardShown": {
+    "source": "e2599c18a54a52da",
+    "text": "カードが 10 秒間配信に表示されます。"
   },
   "settings.reparkingProjector": {
     "source": "1487536689800d09",

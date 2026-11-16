@@ -210,47 +210,9 @@ namespace ReplayKitSetup
         }
 
         // the running shell starts a shortcut at the level of the signed in user and leaves no console to attach to, so obs does not inherit the administrator token of this exe. wscript.shell is late-bound com, so the trimmer warnings are moot
-        [UnconditionalSuppressMessage("Trimming", "IL2072", Justification = "com idispatch dispatch, no trimmable managed members")]
-        [UnconditionalSuppressMessage("Trimming", "IL2075", Justification = "com idispatch dispatch, no trimmable managed members")]
         private static bool LaunchObsViaShell(string obsExe, Action<string> log)
         {
-            string link = Path.Combine(TempLayout.Scratch, "obs-launch.lnk");
-            object shell = null;
-            object shortcut = null;
-            try
-            {
-                Directory.CreateDirectory(Path.GetDirectoryName(link));
-                Type shellType = Type.GetTypeFromProgID("WScript.Shell");
-                shell = Activator.CreateInstance(shellType);
-                shortcut = shellType.InvokeMember("CreateShortcut", BindingFlags.InvokeMethod, null, shell, new object[] { link });
-                Type shortcutType = shortcut.GetType();
-                shortcutType.InvokeMember("TargetPath", BindingFlags.SetProperty, null, shortcut, new object[] { obsExe });
-                shortcutType.InvokeMember("Arguments", BindingFlags.SetProperty, null, shortcut, new object[] { ObsLaunch.Arguments });
-                shortcutType.InvokeMember("WorkingDirectory", BindingFlags.SetProperty, null, shortcut, new object[] { Path.GetDirectoryName(obsExe) });
-                shortcutType.InvokeMember("Save", BindingFlags.InvokeMethod, null, shortcut, null);
-            }
-            catch (Exception exc) when (exc is COMException || exc is TargetInvocationException || exc is MissingMemberException || exc is ArgumentNullException || exc is IOException || exc is UnauthorizedAccessException)
-            {
-                log?.Invoke("failed to prepare the OBS launch shortcut: " + exc.Message);
-                return false;
-            }
-            finally
-            {
-                if (shortcut != null) Marshal.ReleaseComObject(shortcut);
-                if (shell != null) Marshal.ReleaseComObject(shell);
-            }
-
-            try
-            {
-                var psi = new ProcessStartInfo("explorer.exe", Win32Args.Build(link)) { UseShellExecute = false, CreateNoWindow = true };
-                Process.Start(psi)?.Dispose();
-                return true;
-            }
-            catch (Exception exc) when (exc is System.ComponentModel.Win32Exception || exc is InvalidOperationException)
-            {
-                log?.Invoke("failed to start OBS through the shell: " + exc.Message);
-                return false;
-            }
+            return ShellLaunch.Start(obsExe, ObsLaunch.Arguments, Path.Combine(TempLayout.Scratch, "obs-launch.lnk"), log);
         }
 
         // the setup, uninstall and update flows all run elevated; obs only keeps those rights when the run as administrator setting asks for them

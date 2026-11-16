@@ -2416,6 +2416,10 @@
     "source": "60bb3338e0ad558c",
     "text": "Размер"
   },
+  "common.sizeAndRotation": {
+    "source": "fa1c797ebf25e621",
+    "text": "{size}% · {rotation}°"
+  },
   "common.smaller": {
     "source": "215848cff2f44baf",
     "text": "Меньше"
@@ -4952,6 +4956,10 @@
     "source": "9e31e252b6d49609",
     "text": "Субтитр"
   },
+  "editor.subtitleSizeAndRotation": {
+    "source": "0ace000910f8813b",
+    "text": "{size} px · {rotation}°"
+  },
   "editor.subtitlePresets": {
     "source": "f704f42f6e0091fa",
     "text": "Пресеты субтитров"
@@ -6152,21 +6160,45 @@
     "source": "977a84715be6a085",
     "text": "Windows не сообщила реальную рабочую область монитора."
   },
-  "screenshare.obsProjectorWindowInformationIsUnavailable": {
-    "source": "c2659974a9f520e8",
-    "text": "Информация об окне проектора OBS недоступна."
-  },
   "screenshare.obsProjectorWindowWasFoundBut": {
     "source": "b2b6981650a0028d",
     "text": "Окно проектора OBS найдено, но Windows отклонила запрос на перемещение или изменение размера."
   },
-  "screenshare.obsProjectorWindowWasFoundBut2": {
-    "source": "b568bc9513748137",
-    "text": "Окно проектора OBS найдено, но оно не закрылось после нескольких попыток."
-  },
   "screenshare.obsProjectorWindowWasMovedBut": {
     "source": "513efdfb320a0fb8",
     "text": "Окно проектора OBS перемещено, но Windows отклонила запрос на скрытие с панели задач."
+  },
+  "screenshare.theShareWindowIsMissing": {
+    "source": "b5f7a930d8477eb4",
+    "text": "Программа окна Share Preview отсутствует ({path}). Запустите установщик ReplayKit снова."
+  },
+  "screenshare.theShareWindowCouldNotStart": {
+    "source": "964d6e4a8ff066b8",
+    "text": "Не удалось запустить окно Share Preview. Выключите и снова включите Share Preview, а если ошибка повторяется, проверьте журналы ReplayKit."
+  },
+  "screenshare.theShareWindowDidNotClose": {
+    "source": "df55f2f86a7f167f",
+    "text": "Окно Share Preview не закрылось, даже после команды завершиться."
+  },
+  "screenshare.coverDefaultText": {
+    "source": "a99e83da4583ab31",
+    "text": "Скоро вернусь"
+  },
+  "screenshare.theImageCouldNotBeUsed": {
+    "source": "5807af0d4a5d3ff9",
+    "text": "Это изображение не подошло. Выберите файл PNG, JPG, BMP или GIF."
+  },
+  "screenshare.theSoundNeedsFfmpeg": {
+    "source": "4559f79ab94267d6",
+    "text": "Для звука нужен ffmpeg, который ещё не установлен. Запустите установщик ReplayKit снова."
+  },
+  "screenshare.theSoundCouldNotBeUsed": {
+    "source": "9e4fb0659b9c288b",
+    "text": "Этот звук не подошёл. Выберите другой аудиофайл."
+  },
+  "screenshare.turnOnSharePreviewFirst": {
+    "source": "bd28264ea2b20433",
+    "text": "Сначала включите Share Preview."
   },
   "screenshare.obsStreamAudioPlaybackEndpointIs": {
     "source": "67f2ce393de09ce9",
@@ -6180,14 +6212,6 @@
     "source": "2b610cccfc59aa23",
     "text": "Настройки видео OBS недоступны: {error}"
   },
-  "screenshare.obsWindowedProjectorWasOpenedBut": {
-    "source": "ec315d83d6113eb7",
-    "text": "Проектор OBS Windowed Projector открыт, но его окно не найдено."
-  },
-  "screenshare.openingObsWindowedProjectorFailedError": {
-    "source": "2d9dcd1cb049f442",
-    "text": "Не удалось открыть проектор OBS Windowed Projector: {error}"
-  },
   "screenshare.projectorSourceMonitorBoundsAreInvalid": {
     "source": "93020dd93b70a042",
     "text": "Границы монитора источника проектора некорректны."
@@ -6199,10 +6223,6 @@
   "screenshare.theObsProjectorWindowChangeDid": {
     "source": "243400152e4ba38f",
     "text": "Изменение окна проектора OBS не завершилось корректным окном общего доступа."
-  },
-  "screenshare.theObsProjectorWindowCouldNot": {
-    "source": "e0ee22530dadb67b",
-    "text": "Окно проектора OBS не удалось подтвердить или отложить."
   },
   "screenshare.thePreviousProjectorWindowChangeIs": {
     "source": "e6ca2f0e117d83de",
@@ -7211,6 +7231,10 @@
   "settings.dragToPosition": {
     "source": "43ddd66cdc6eb3f4",
     "text": "Перетащите, чтобы расположить"
+  },
+  "settings.resetOverlaySizeAndRotation": {
+    "source": "910d03d1f3f121c3",
+    "text": "Сбросить размер и поворот"
   },
   "settings.editName": {
     "source": "70d7cc5a6422feaa",
@@ -8332,14 +8356,6 @@
     "source": "7ec4d75cc9910ae1",
     "text": "Ползунок непрозрачности оверлея"
   },
-  "settings.overlayRotationInDegrees": {
-    "source": "2f729c1b6874b5ed",
-    "text": "Поворот оверлея в градусах"
-  },
-  "settings.overlayRotationSlider": {
-    "source": "c129339a890ed309",
-    "text": "Ползунок поворота оверлея"
-  },
   "settings.overlaySceneItemsFailedError": {
     "source": "b5b4ac45a7bbb1be",
     "text": "Настройка оверлея сохранена, но элементы сцены OBS не удалось прочитать: {error}"
@@ -8352,10 +8368,6 @@
     "source": "94d8f258ed868945",
     "text": "Настройка оверлея сохранена, но файл сцены OBS не удалось подготовить к перезапуску: {error}"
   },
-  "settings.overlaySize": {
-    "source": "a50962ddfe53b823",
-    "text": "Размер оверлея"
-  },
   "settings.overlaySizeSceneItemsFailedError": {
     "source": "f8b400ff6c79c2f1",
     "text": "Размер оверлея сохранён, но элементы сцены OBS не удалось прочитать: {error}"
@@ -8363,10 +8375,6 @@
   "settings.overlaySizeSceneLookupFailedError": {
     "source": "dd23826f43e78e66",
     "text": "Размер оверлея сохранён, но поиск сцены OBS не удался: {error}"
-  },
-  "settings.overlaySizeSlider": {
-    "source": "11cc91e490df3ccd",
-    "text": "Ползунок размера оверлея"
   },
   "settings.pageDown": {
     "source": "38adab48f20e4552",
@@ -8671,6 +8679,134 @@
   "settings.repark": {
     "source": "40c2985c92ed985e",
     "text": "Отложить снова"
+  },
+  "settings.whileObsIsAway": {
+    "source": "ff7f616253d9151a",
+    "text": "Пока OBS закрыт"
+  },
+  "settings.shareCardPreview": {
+    "source": "3af72fd745b3989d",
+    "text": "Предпросмотр карточки"
+  },
+  "settings.shareCardPreviewNote": {
+    "source": "45b0ab019c17e4a4",
+    "text": "Что видят зрители в Discord, пока OBS закрыт, перезапускается или обновляется."
+  },
+  "settings.shareCardBackground": {
+    "source": "7d67b6c9f37716ad",
+    "text": "Фон"
+  },
+  "settings.shareCardBackgroundTheme": {
+    "source": "8fd954f2b25eb2ab",
+    "text": "Цвет темы"
+  },
+  "settings.shareCardBackgroundImage": {
+    "source": "cbff02b1de749e35",
+    "text": "Своё изображение"
+  },
+  "settings.shareCardBackgroundLastFrame": {
+    "source": "97a18995a9e7d1ac",
+    "text": "Последний кадр игры, затемнённый"
+  },
+  "settings.shareCardImage": {
+    "source": "fc6eaa65315f601d",
+    "text": "Изображение"
+  },
+  "settings.shareCardImageFit": {
+    "source": "32cc0d85750055d1",
+    "text": "Размещение изображения"
+  },
+  "settings.shareCardFitWhole": {
+    "source": "369293a21deb39b2",
+    "text": "Показать изображение целиком"
+  },
+  "settings.shareCardFitFill": {
+    "source": "06a81292f8359d12",
+    "text": "Заполнить карточку"
+  },
+  "settings.shareCardText": {
+    "source": "c028d4bda5c6fda7",
+    "text": "Текст"
+  },
+  "settings.showTheText": {
+    "source": "d17c8c9bbb4640bc",
+    "text": "Показывать текст"
+  },
+  "settings.shareCardSound": {
+    "source": "4e1288ba9755d7cd",
+    "text": "Звук"
+  },
+  "settings.shareCardSoundNote": {
+    "source": "f78575f6ccf1b16a",
+    "text": "Звучит в трансляции, пока видна карточка. Вы сами его не слышите."
+  },
+  "settings.shareCardSoundDefault": {
+    "source": "3c1a0cdbcfd6cc9a",
+    "text": "Стандартный звук"
+  },
+  "settings.shareCardSoundCustom": {
+    "source": "dd90af84e22187ee",
+    "text": "Свой звук"
+  },
+  "settings.shareCardSoundOff": {
+    "source": "40aab9dfcc6a214b",
+    "text": "Без звука"
+  },
+  "settings.shareCardSoundFile": {
+    "source": "c57864b74a1a98f1",
+    "text": "Звуковой файл"
+  },
+  "settings.chooseSound": {
+    "source": "a0ff61dc6aea6e4e",
+    "text": "Выбрать звук"
+  },
+  "settings.shareCardSoundVolume": {
+    "source": "25c4333eb6d1d390",
+    "text": "Громкость звука"
+  },
+  "settings.shareCardSoundVolumeSlider": {
+    "source": "ff512b3729993d4c",
+    "text": "Ползунок громкости звука"
+  },
+  "settings.keepTheCardAfterObsCloses": {
+    "source": "60dabedaae281b48",
+    "text": "Оставлять карточку после закрытия OBS"
+  },
+  "settings.keepTheCardNote": {
+    "source": "2f179e7287ce29de",
+    "text": "При перезапусках и обновлениях она остаётся всегда. Это настройка для случаев, когда вы закрываете OBS или он падает."
+  },
+  "settings.keepCardOff": {
+    "source": "271e707aebb8c461",
+    "text": "Закрывать вместе с OBS"
+  },
+  "settings.keepCard5m": {
+    "source": "1f40f7a5fa15caa1",
+    "text": "5 минут"
+  },
+  "settings.keepCard15m": {
+    "source": "d356929940f32942",
+    "text": "15 минут"
+  },
+  "settings.keepCard1h": {
+    "source": "d47049285cae9ef7",
+    "text": "1 час"
+  },
+  "settings.keepCardAlways": {
+    "source": "7a86c86d4ec7c752",
+    "text": "Пока OBS не откроется снова"
+  },
+  "settings.tryTheCard": {
+    "source": "170978231e15a41b",
+    "text": "Проверить"
+  },
+  "settings.showTheCardNow": {
+    "source": "b674b42006bf7930",
+    "text": "Показать карточку сейчас"
+  },
+  "settings.shareCardShown": {
+    "source": "e2599c18a54a52da",
+    "text": "Карточка видна в трансляции 10 секунд."
   },
   "settings.reparkingProjector": {
     "source": "1487536689800d09",

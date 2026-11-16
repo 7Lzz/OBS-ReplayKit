@@ -4004,6 +4004,25 @@ const CLIP_HOVER_PROFILES = {
     }
   }
 
+  // a deleted clip leaves every list the page draws from at once (the clips, the favorites and the clips found for the drafts), so no shelf keeps showing it until the next read; a draft of it stays with the helper, since the clip can come back out of the trash
+  function dropDeletedClips(names) {
+    const gone = new Set(names);
+    if (!gone.size) return;
+    for (const name of gone) {
+      localState.delete(name);
+      selectedClipNames.delete(name);
+      setFavorite(name, false);
+      lastClipsByName.delete(name);
+      resolvedDraftClips.delete(name);
+    }
+    allClips = allClips.filter((clip) => !gone.has(clip.name));
+    loadedClips = loadedClips.filter((clip) => !gone.has(clip.name));
+    resolvedFavoriteClips = resolvedFavoriteClips.filter((clip) => !gone.has(clip.name));
+    clipsTotal = Math.max(0, clipsTotal - gone.size);
+    clipsNextOffset = Math.min(clipsNextOffset, clipsTotal);
+    renderLoadedClips(loadedClips);
+  }
+
   async function deleteClip(card) {
     const filename = card.dataset.name;
     if (!filename) return;
@@ -4025,14 +4044,7 @@ const CLIP_HOVER_PROFILES = {
         if (activePreview === video) activePreview = null;
         abortVideoLoad(video);
       }
-      localState.delete(filename);
-      selectedClipNames.delete(filename);
-      setFavorite(filename, false);
-      lastClipsByName.delete(filename);
-      loadedClips = loadedClips.filter((clip) => clip.name !== filename);
-      clipsTotal = Math.max(0, clipsTotal - 1);
-      clipsNextOffset = Math.min(clipsNextOffset, clipsTotal);
-      renderLoadedClips(loadedClips);
+      dropDeletedClips([filename]);
       refreshBulkSelectionUi();
       const shownName = '<span translate="no">' + escapeHtml(displayClipName(filename)) + "</span>";
       showToast(data.kept ? RK_M("clips.movedNameToTheTrash", { name: shownName }) : RK_M("clips.deletedName", { name: shownName }), "info");
@@ -6557,21 +6569,9 @@ const CLIP_HOVER_PROFILES = {
         if (!firstFailure) firstFailure = (err && err.message) || "";
       }
     }
-    const deletedSet = new Set(deleted);
-    if (deleted.length) window.dispatchEvent(new Event("replaykit:deleted-changed"));
-    deleted.forEach((name) => {
-      selectedClipNames.delete(name);
-      localState.delete(name);
-      setFavorite(name, false);
-      lastClipsByName.delete(name);
-    });
-    if (deletedSet.size) {
-      allClips = allClips.filter((clip) => !deletedSet.has(clip.name));
-      loadedClips = loadedClips.filter((clip) => !deletedSet.has(clip.name));
-      resolvedFavoriteClips = resolvedFavoriteClips.filter((clip) => !deletedSet.has(clip.name));
-      clipsTotal = Math.max(0, clipsTotal - deletedSet.size);
-      clipsNextOffset = Math.min(clipsNextOffset, clipsTotal);
-      renderLoadedClips(loadedClips);
+    if (deleted.length) {
+      dropDeletedClips(deleted);
+      window.dispatchEvent(new Event("replaykit:deleted-changed"));
       scheduleNextPoll(50);
     }
     if (bulkDeleteBtn) bulkDeleteBtn.disabled = false;

@@ -48,7 +48,7 @@ namespace ReplayKitHelper
             [PreserveSig] int GetMute(out bool mute);
         }
 
-        // how many streams of obs on the cable were muted and are not now, or -1 when the cable could not be read; obs only has a stream there while it monitors, and windows saves the unmute for the streams it opens later
+        // how many streams of obs and of the share window on the cable were muted and are not now, or -1 when the cable could not be read; discord takes the share audio from the share window, which plays it into the cable, and windows saves the unmute for the streams it opens later
         public static int UnmuteObs(string deviceId)
         {
             string obs = Constants.ResolveObsExe();
@@ -65,12 +65,13 @@ namespace ReplayKitHelper
                 for (int i = 0; i < count; i++)
                 {
                     if (sessions.GetSession(i, out var session) != 0 || session.GetProcessId(out uint pid) != 0) continue;
-                    if (!string.Equals(ProcessPath(pid), obs, StringComparison.OrdinalIgnoreCase)) continue;
+                    string path = ProcessPath(pid);
+                    if (!string.Equals(path, obs, StringComparison.OrdinalIgnoreCase) && !string.Equals(path, ShareWindow.ExePath, StringComparison.OrdinalIgnoreCase)) continue;
                     var volume = (ISimpleAudioVolume)session;
                     if (volume.GetMute(out bool muted) != 0 || !muted) continue;
                     if (volume.SetMute(false, IntPtr.Zero) == 0) unmuted++;
                 }
-                if (unmuted > 0) Log.Write("share cable: took a Windows mixer mute off " + unmuted + " OBS stream(s)");
+                if (unmuted > 0) Log.Write("share cable: took a Windows mixer mute off " + unmuted + " OBS or share window stream(s)");
                 return unmuted;
             }
             catch (Exception ex) when (ex is COMException || ex is InvalidCastException)

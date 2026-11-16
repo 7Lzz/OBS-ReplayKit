@@ -10,7 +10,7 @@ param(
 $ErrorActionPreference = "Stop"
 $ProgressPreference = 'SilentlyContinue'
 . (Join-Path $PSScriptRoot '..\..\scripts\obs_versions.ps1')
-# src/core/shared_values.hpp is generated, so a build started on its own makes it first
+# src/core/shared_values.hpp and the share_window_values.hpp it includes are generated, so a build started on its own makes them first
 & (Join-Path $PSScriptRoot '..\..\scripts\sync_shared.ps1')
 
 if (-not $OutPath) {
@@ -44,6 +44,8 @@ $sourceFiles = @(Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot "src") -Rec
 $buildInputs = $sourceFiles + @(
     (Join-Path $PSScriptRoot "CMakeLists.txt"),
     (Join-Path $PSScriptRoot "third_party\obs-browser\browser-panel.hpp"),
+    (Join-Path $PSScriptRoot "..\..\apps\share-window\protocol\share_protocol.hpp"),
+    (Join-Path $PSScriptRoot "..\..\apps\share-window\protocol\share_window_values.hpp"),
     $ObsVersionsManifest,
     (Join-Path $PSScriptRoot '..\..\scripts\obs_versions.ps1'),
     $PSCommandPath

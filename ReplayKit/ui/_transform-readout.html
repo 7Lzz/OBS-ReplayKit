@@ -1,0 +1,37 @@
+<!-- shared partial (helper #include target: transform-readout). the small label every preview with move, resize and turn handles shows for an item (the overlay preview, the share card editor, the layers, subtitles and main picture of the video editor): the preview decides what it reads and when it shows, this draws it and puts it under the box the item covers on screen once turned, or over that box when there is no room below. host: RKReadout.make(parent) adds a hidden label to parent, which must be positioned; RKReadout.place(label, text, item, area) shows text under the element item, kept inside the element area; RKReadout.hide(label). -->
+<style>
+  .rk-readout { position:absolute; z-index:5; left:0; top:0; transform:translateX(-50%); padding:0 6px; border-radius:4px; border:1px solid var(--line); background:var(--window); color:var(--text); font-size:10.5px; line-height:16px; white-space:nowrap; pointer-events:none; transition:opacity 120ms linear; }
+  .rk-readout[hidden] { display:none; }
+</style>
+<script>
+(function () {
+  // the space between the item and its label, in screen pixels
+  var GAP = 6;
+  window.RKReadout = {
+    make: function (parent) {
+      var label = document.createElement("div");
+      label.className = "rk-readout";
+      label.hidden = true;
+      parent.appendChild(label);
+      return label;
+    },
+    // measured on screen, so a turned, mirrored or scaled item is placed by what it covers
+    place: function (label, text, item, area) {
+      label.textContent = text;
+      label.hidden = false;
+      var parent = label.offsetParent;
+      // a label in a hidden part of the page has nothing to be placed against yet
+      if (!parent) return;
+      var origin = parent.getBoundingClientRect(), box = item.getBoundingClientRect(), bounds = (area || parent).getBoundingClientRect();
+      var width = label.offsetWidth, height = label.offsetHeight;
+      var top = box.bottom + GAP;
+      if (top + height > bounds.bottom) top = box.top - GAP - height;
+      top = Math.max(bounds.top, Math.min(bounds.bottom - height, top));
+      var left = Math.max(bounds.left + width / 2, Math.min(bounds.right - width / 2, box.left + box.width / 2));
+      label.style.left = left - origin.left + "px";
+      label.style.top = top - origin.top + "px";
+    },
+    hide: function (label) { label.hidden = true; },
+  };
+})();
+</script>

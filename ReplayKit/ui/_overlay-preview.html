@@ -1,4 +1,4 @@
-<!-- shared partial (helper #include target: overlay-preview). a bare fake screen that draws the SELECTED input overlay at its real size + corner position on the canvas (mirrors the helper InputOverlayTransform / BongoTransform math), reacting to real keyboard + mouse in this window, with the live overlay style (opacity / size / flip / hue / colour) applied. wasd + mouse are the real input-overlay preset sheets driven by their own layout json; bongo is RKBongo (live2d-bongo partial) drawing the selected Bango Cat mode the way the obs source does. colours are theme tokens so it follows the Appearance theme. host: RKOverlayPreview.init(getStyle, onMove, onScale, onRotate) where getStyle() -> the overlay* fields, onMove(x, y) takes a drag and onScale(percent) a corner resize already clamped to the size slider range, then .start()/.stop() on section show/hide and .refresh() whenever a control changes. -->
+<!-- shared partial (helper #include target: overlay-preview). a bare fake screen that draws the SELECTED input overlay at its real size + corner position on the canvas (mirrors the helper InputOverlayTransform / BongoTransform math), reacting to real keyboard + mouse in this window, with the live overlay style (opacity / size / flip / hue / colour) applied. wasd + mouse are the real input-overlay preset sheets driven by their own layout json; bongo is RKBongo (live2d-bongo partial) drawing the selected Bango Cat mode the way the obs source does. colours are theme tokens so it follows the Appearance theme. host: RKOverlayPreview.init(getStyle, onMove, onScale, onRotate, handlesHistory, onReset) where getStyle() -> the overlay* fields, onMove(x, y) takes a drag and onScale(percent) a corner resize already clamped to the overlayScale range, onReset (optional) shows a button that puts the size and rotation back, then .start()/.stop() on section show/hide and .refresh() whenever a control changes. -->
 <style>
   /* the overlay renders at its true canvas fraction, so small parts (the mouse wheel is ~0.4% of canvas width) only become readable on a wide screen */
   .ovp-wrap { width:100%; max-width:760px; margin:2px 0 8px; }
@@ -34,6 +34,9 @@
   .ovp-rotate::after { content:""; position:absolute; left:50%; top:10px; width:1px; height:14px; margin-left:-.5px; background:var(--line2); pointer-events:none; }
   .ovp-rotate[hidden] { display:none; }
   .ovp-screen:hover .ovp-rotate, .ovp-rotate.is-dragging { opacity:1; }
+  /* the size and turn label of the shared transform-readout partial, shown with the handles */
+  .ovp-screen .rk-readout { opacity:0; }
+  .ovp-screen:hover .rk-readout, .ovp-screen .rk-readout.is-active { opacity:1; }
   .ovp-layer { position:absolute; overflow:visible; }
   .ovp-layer[hidden] { display:none; }
   .ovp-sprite { position:absolute; left:0; top:0; transform-origin:0 0; }
@@ -50,6 +53,9 @@
   <div class="ovp-hint">
     <span class="ovp-hint-text" data-i18n="settings.dragToPosition"></span>
     <span class="control-note" data-i18n="settings.dragToMoveUseTheCornersToResize"></span>
+    <button class="icon-btn field-reset" type="button" id="ovpReset" hidden title="Reset the size and rotation" data-i18n-title="settings.resetOverlaySizeAndRotation">
+      <svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg>
+    </button>
   </div>
   <div class="ovp-screen" id="ovpScreen">
     <div class="ovp-off" id="ovpOff" hidden data-i18n="settings.inputOverlayIsOff"></div>
@@ -62,6 +68,7 @@
     </div>
     <div class="ovp-grip" data-corner="nw"></div><div class="ovp-grip" data-corner="ne"></div><div class="ovp-grip" data-corner="sw"></div><div class="ovp-grip" data-corner="se"></div>
     <div class="ovp-rotate" id="ovpRotate"></div>
+    <div class="rk-readout" id="ovpReadout" hidden></div>
   </div>
 </div>
 <script>
@@ -81,8 +88,10 @@
   var onScale = null;
   var onRotate = null;
   var rotateHandle = document.getElementById("ovpRotate");
+  var resetButton = document.getElementById("ovpReset");
+  var readout = document.getElementById("ovpReadout");
   var grips = Array.prototype.slice.call(screenEl.querySelectorAll(".ovp-grip"));
-  // the size slider range, which is all the helper accepts for overlayScale
+  // the overlayScale range the helper accepts
   var SCALE_MIN = window.RK_SETTING_LIMITS.overlayScale.min, SCALE_MAX = window.RK_SETTING_LIMITS.overlayScale.max;
 
   // a desktop grab painted behind the fake screen so the overlay is positioned against the users real screen, taken again every second while the section is on screen so it follows what is there now. preloaded via Image() so the css only flips once the bytes are in, no half-paint or broken-image flash; a grab that fails leaves the last one up
@@ -297,7 +306,7 @@
       bx = Math.min(r.wasd.x, r.mouse.x); by = Math.min(r.wasd.y, r.mouse.y);
       bw = Math.max(r.wasd.x + r.wasd.w, r.mouse.x + r.mouse.w) - bx;
       bh = Math.max(r.wasd.y + r.wasd.h, r.mouse.y + r.mouse.h) - by;
-    } else { applyStyle(); return; }
+    } else { RKReadout.hide(readout); applyStyle(); return; }
     var localW = bw, localH = bh, localX0 = bx, localY0 = by;
     // a wasd group of another shape than the picked layouts make is the one obs has until apply, so it is not drawn into
     var live = liveRect;
@@ -348,6 +357,9 @@
       if (mouseSize.w > 0) mouseInner.style.transform = "scale(" + (r.mouse.w * k * fx / mouseSize.w) + ")";
     }
     applyStyle();
+    // after applyStyle, which gives the stage its turn, so the label goes under what the overlay covers now
+    if (onScale || onRotate) RKReadout.place(readout, RK_M("common.sizeAndRotation", { size: clampNum(curScalePct(), SCALE_MIN, SCALE_MAX, 100), rotation: curRotation() }), stage, screenEl);
+    else RKReadout.hide(readout);
   }
 
   // ---- drag to reposition ----
@@ -428,6 +440,7 @@
     resize = { grip: grip, px: ev.clientX, py: ev.clientY, w: stageRect.w, h: stageRect.h, k: screenEl.clientWidth / CANVAS_W, before: snapshot(posOverride),
                pct: clampNum(curScalePct(), SCALE_MIN, SCALE_MAX, 100), sx: grip.dataset.corner[1] === "e" ? 1 : -1, sy: grip.dataset.corner[0] === "s" ? 1 : -1 };
     grip.classList.add("is-dragging");
+    readout.classList.add("is-active");
     try { grip.setPointerCapture(ev.pointerId); } catch (_) {}
   }
   function onGripMove(ev) {
@@ -441,6 +454,7 @@
   function onGripUp(ev) {
     if (!resize) return;
     resize.grip.classList.remove("is-dragging");
+    readout.classList.remove("is-active");
     try { resize.grip.releasePointerCapture(ev.pointerId); } catch (_) {}
     if (resize.before.scale !== clampNum(curScalePct(), SCALE_MIN, SCALE_MAX, 100)) pushHistory(resize.before);
     resize = null;
@@ -648,6 +662,7 @@
     var cx = screen.left + (stageRect.x + stageRect.w / 2) * k, cy = screen.top + (stageRect.y + stageRect.h / 2) * k;
     turn = { cx:cx, cy:cy, angle:Math.atan2(ev.clientY - cy, ev.clientX - cx) * 180 / Math.PI, before:snapshot(posOverride) };
     rotateHandle.classList.add("is-dragging");
+    readout.classList.add("is-active");
     try { rotateHandle.setPointerCapture(ev.pointerId); } catch (_) {}
   }
   function onRotateMove(ev) {
@@ -666,6 +681,7 @@
     if (turn.before.rotation !== curRotation()) pushHistory(turn.before);
     turn = null;
     rotateHandle.classList.remove("is-dragging");
+    readout.classList.remove("is-active");
     try { rotateHandle.releasePointerCapture(ev.pointerId); } catch (_) {}
   }
   // the saved overlayPosition setting for the style being previewed, as canvas fractions, or null
@@ -680,12 +696,15 @@
   function normHex(v, dflt) { v = String(v || "").trim().toLowerCase(); return /^#[0-9a-f]{6}$/.test(v) ? v : dflt; }
 
   window.RKOverlayPreview = {
-    init: function (fn, onMoveFn, onScaleFn, onRotateFn, handlesHistory) {
+    init: function (fn, onMoveFn, onScaleFn, onRotateFn, handlesHistory, onResetFn) {
       historyHandled = handlesHistory === true;
       if (typeof fn === "function") getStyle = fn;
       if (typeof onMoveFn === "function") onMove = onMoveFn;
       if (typeof onScaleFn === "function") onScale = onScaleFn;
       if (typeof onRotateFn === "function") onRotate = onRotateFn;
+      // a host that has no size and rotation controls of its own puts them back thru this button
+      resetButton.hidden = typeof onResetFn !== "function";
+      if (!resetButton.hidden) resetButton.addEventListener("click", function () { onResetFn(); });
       loadBackdrop();
     },
     // host calls this once the drag has been saved, so the poll can resume following the scene item
@@ -698,6 +717,8 @@
       var changed = setMode(s.overlayStyle || "input_overlay");
       if (changed) liveRect = liveRects[mode] || null;
       posOverride = savedPosition();
+      // with no saved spot the save that follows puts the overlay back in the corner the helper computes, so that corner is drawn now; the box obs reports is still the dragged one until that save reaches it
+      if (!posOverride) liveRect = null;
       posDirty = true;
       clearMoveHistory();
       if (changed) applyMode();

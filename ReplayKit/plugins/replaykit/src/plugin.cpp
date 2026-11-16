@@ -21,6 +21,7 @@
 #include "notify/clip_toast.hpp"
 #include "overlays/bongo.hpp"
 #include "shell/shell.hpp"
+#include "share/share_link.hpp"
 
 OBS_DECLARE_MODULE()
 
@@ -38,6 +39,7 @@ bool obs_module_load(void)
 	InstallOpenClipsHotkeyFilter();
 	obs_frontend_add_event_callback(OnFrontendEvent, nullptr);
 	StartPipeServer();
+	ShareLinkStart();
 	return true;
 }
 
@@ -69,7 +71,6 @@ void obs_module_unload(void)
 	// destroy queued callbacks before their code is unloaded with this module.
 	delete g_callbacks;
 	g_callbacks = nullptr;
-	ForgetProjectorTimer();
 	RemoveNotifyTrackFilter();
 	RemoveOpenClipsHotkey();
 	ClipBufferShutdown();

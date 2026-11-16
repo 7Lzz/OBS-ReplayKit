@@ -443,15 +443,6 @@ namespace ReplayKitSetup
         private const string WindowCaptureSourceName = "Window Capture";
         private const string WindowCaptureSourceUuid = "edb2d9d4-7b53-4f3a-a760-61cd03ce9b6c";
         private const string DesktopAudioSourceName = "Desktop Audio (excl. Discord)";
-        private static readonly string[] DesktopAudioExcludeProcesses =
-        {
-            "Discord.exe", "DiscordSystemHelper.exe", "DiscordCanary.exe", "DiscordPTB.exe", "DiscordDevelopment.exe",
-            "obs64.exe", "obs32.exe", "obs.exe",
-            // obss cef subprocess -- excluded so clip playback audio in the dock isnt captured as desktop audio and monitored back into the discord share, doubling the copy discord already grabs from the same process tree.
-            "obs-browser-page.exe",
-            // the helper plays the settings mic test back through the speakers, and desktop audio capture would otherwise record that echo into clips.
-            "OBSReplayKit.exe",
-        };
         private static readonly IReadOnlyDictionary<string, string> MotionBlurSourceUuids = OverlayScene.MotionBlurFilterUuids;
         private static readonly IReadOnlyDictionary<string, string> OverlayOpacityFilterUuids = OverlayScene.OpacityFilterUuids;
 
@@ -1262,7 +1253,7 @@ namespace ReplayKitSetup
             if (source.Value<string>("id") != "audio_capture" || source.Value<string>("name") != DesktopAudioSourceName) return;
             if (!(source["settings"] is JObject settings)) { settings = new JObject(); source["settings"] = settings; }
             settings["mode"] = "session";
-            settings["executable_list"] = new JArray(DesktopAudioExcludeProcesses.Select(name => new JObject { ["value"] = name }));
+            settings["executable_list"] = new JArray(DesktopAudioExclusions.Programs.Select(name => new JObject { ["value"] = name }));
             settings["exclude"] = true;
         }
 

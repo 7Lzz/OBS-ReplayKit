@@ -61,6 +61,9 @@
     <Compile Include="..\..\shared\InputOverlayLayout.cs" Link="InputOverlayLayout.cs" />
     <Compile Include="..\..\shared\ThemeSheet.cs" Link="ThemeSheet.cs" />
     <Compile Include="..\..\shared\Monitors.cs" Link="Monitors.cs" />
+    <Compile Include="..\..\shared\ShareWindowLayout.cs" Link="ShareWindowLayout.cs" />
+    <Compile Include="..\..\shared\DesktopAudioExclusions.cs" Link="DesktopAudioExclusions.cs" />
+    <Compile Include="..\..\shared\ShellLaunch.cs" Link="ShellLaunch.cs" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />

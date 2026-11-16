@@ -1,0 +1,249 @@
+<!-- shared partial (helper #include target: share-card-editor). the share card drawn live from the settings the way the plugin draws it (share_card.cpp: each item placed by its centre and turned around it, with the sizes and colours /share/cover/state names as look), with the logo and the text dragged, resized at their corners and turned by their round handle like the overlay preview; undo and redo are the history of the page. host: RKShareCardEditor.init({ get, set, onChange }) where get(key) is the setting the page shows, set(key, value) puts one into its state and onChange() records and saves the edit; .refresh(cover) redraws, with the /share/cover/state answer when there is a new one. -->
+<style>
+  .sce-wrap { width:100%; max-width:760px; margin:2px 0 8px; }
+  .sce-hint { display:flex; justify-content:flex-end; align-items:center; gap:6px; margin-bottom:4px; }
+  .sce-hint-text { font-size:10.5px; color:var(--muted); }
+  .sce-screen { position:relative; width:100%; aspect-ratio:16 / 9; overflow:hidden; border-radius:4px; background:var(--window-solid); border:1px solid var(--line); user-select:none; }
+  .sce-screen:not(.is-ready) .sce-item { visibility:hidden; }
+  .sce-backdrop { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+  .sce-backdrop[hidden] { display:none; }
+  .sce-backdrop.is-last-frame { object-fit:cover; filter:brightness(.35); }
+  .sce-item { position:absolute; transform-origin:center; cursor:grab; touch-action:none; }
+  .sce-item[hidden] { display:none; }
+  .sce-item.is-dragging { cursor:grabbing; }
+  .sce-item::after { content:""; position:absolute; inset:-2px; border:1px dashed transparent; border-radius:2px; pointer-events:none; transition:border-color 120ms linear; }
+  .sce-screen:hover .sce-item::after, .sce-item.is-active::after { border-color:var(--line2); }
+  .sce-logo { display:block; width:100%; height:100%; pointer-events:none; }
+  .sce-text { display:block; white-space:pre; font-family:var(--font); font-weight:600; line-height:normal; }
+  .sce-grip { position:absolute; width:10px; height:10px; margin:-5px 0 0 -5px; box-sizing:border-box; border-radius:2px; border:1px solid rgb(var(--accent-rgb)); background:var(--window); opacity:0; transition:opacity 120ms linear; touch-action:none; z-index:2; }
+  .sce-grip[data-corner="nw"] { left:0; top:0; cursor:nwse-resize; }
+  .sce-grip[data-corner="ne"] { left:100%; top:0; cursor:nesw-resize; }
+  .sce-grip[data-corner="sw"] { left:0; top:100%; cursor:nesw-resize; }
+  .sce-grip[data-corner="se"] { left:100%; top:100%; cursor:nwse-resize; }
+  .sce-turn { position:absolute; left:50%; top:-24px; z-index:3; width:12px; height:12px; margin:-6px 0 0 -6px; box-sizing:border-box; border-radius:50%; border:2px solid var(--text); background:rgb(var(--accent-rgb)); opacity:0; transition:opacity 120ms linear; cursor:grab; touch-action:none; }
+  .sce-turn::after { content:""; position:absolute; left:50%; top:10px; width:1px; height:14px; margin-left:-.5px; background:var(--line2); pointer-events:none; }
+  .sce-screen:hover .sce-grip, .sce-screen:hover .sce-turn, .sce-item.is-active .sce-grip, .sce-item.is-active .sce-turn { opacity:1; }
+  /* the size and turn labels of the shared transform-readout partial, shown with the handles */
+  .sce-screen .rk-readout { opacity:0; }
+  .sce-screen:hover .rk-readout, .sce-screen .rk-readout.is-active { opacity:1; }
+</style>
+<div class="sce-wrap">
+  <div class="sce-hint">
+    <span class="sce-hint-text" data-i18n="settings.dragToPosition"></span>
+    <span class="control-note" data-i18n="settings.dragToMoveUseTheCornersToResize"></span>
+    <button class="icon-btn field-reset" type="button" id="sceReset" title="Reset to default" data-i18n-title="common.resetToDefault">
+      <svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg>
+    </button>
+  </div>
+  <div class="sce-screen" id="sceScreen">
+    <img class="sce-backdrop" id="sceBackdrop" alt="" hidden>
+    <div class="sce-item" id="sceIcon" data-item="icon">
+      <img class="sce-logo" src="/icons/fallback/obs-icon.svg" alt="" draggable="false">
+      <div class="sce-grip" data-corner="nw"></div><div class="sce-grip" data-corner="ne"></div><div class="sce-grip" data-corner="sw"></div><div class="sce-grip" data-corner="se"></div>
+      <div class="sce-turn"></div>
+    </div>
+    <div class="sce-item" id="sceTextItem" data-item="text">
+      <span class="sce-text" id="sceText"></span>
+      <div class="sce-grip" data-corner="nw"></div><div class="sce-grip" data-corner="ne"></div><div class="sce-grip" data-corner="sw"></div><div class="sce-grip" data-corner="se"></div>
+      <div class="sce-turn"></div>
+    </div>
+    <div class="rk-readout" id="sceIconReadout" hidden></div>
+    <div class="rk-readout" id="sceTextReadout" hidden></div>
+  </div>
+</div>
+<script>
+(function () {
+  var screenEl = document.getElementById("sceScreen");
+  var backdrop = document.getElementById("sceBackdrop");
+  var textEl = document.getElementById("sceText");
+  var items = { icon: document.getElementById("sceIcon"), text: document.getElementById("sceTextItem") };
+  var readouts = { icon: document.getElementById("sceIconReadout"), text: document.getElementById("sceTextReadout") };
+  var POSITION = window.RK_SETTING_LIMITS.share_cover_layout_position;
+  var SCALE = window.RK_SETTING_LIMITS.share_cover_layout_scale;
+  var TURN = window.RK_SETTING_LIMITS.share_cover_layout_rotation;
+  // the middle of the card pulls an item centre in from this many screen pixels, and a turn snaps within this many degrees of a straight angle
+  var SNAP_PX = 3, SNAP_DEGREES = 5;
+  var host = null, cover = {}, layout = null, gesture = null, backdropKey = "";
+
+  function clamp(value, range) { return Math.max(range.min, Math.min(range.max, value)); }
+  function copyLayout(from) {
+    var out = {};
+    ["icon", "text"].forEach(function (name) {
+      var at = from[name];
+      out[name] = { x: Number(at.x), y: Number(at.y), scale: Number(at.scale), rotation: Number(at.rotation) };
+    });
+    return out;
+  }
+  function sameLayout(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
+
+  // the background the card is drawn on; an image background without its image draws the theme card, as the helper does
+  function background() {
+    var value = host.get("share_cover_background");
+    return value === "image" && !cover.hasImage ? "theme" : value;
+  }
+
+  function showBackdrop(kind) {
+    var key = kind === "image" ? kind + "|" + host.get("share_cover_fit") + "|" + (cover.imageStamp || 0) : kind === "lastframe" ? kind + "|" + (cover.grabStamp || 0) : "";
+    if (key === backdropKey) return;
+    backdropKey = key;
+    if (!key) { backdrop.hidden = true; backdrop.removeAttribute("src"); return; }
+    backdrop.className = "sce-backdrop" + (kind === "lastframe" ? " is-last-frame" : "");
+    backdrop.style.objectFit = kind === "image" && host.get("share_cover_fit") !== "fill" ? "contain" : "cover";
+    // the desktop stands in for the last game frame the share window dims under the card
+    backdrop.src = kind === "image" ? "/share/cover/image.png?t=" + (cover.imageStamp || 0) : "/desktop-preview.jpg?t=" + (cover.grabStamp || 0);
+    backdrop.hidden = false;
+  }
+
+  function setItem(el, at) {
+    el.style.left = at.x + "%";
+    el.style.top = at.y + "%";
+    el.style.transform = "translate(-50%, -50%) rotate(" + at.rotation + "deg)";
+  }
+
+  function placeReadout(name) {
+    if (items[name].hidden) { RKReadout.hide(readouts[name]); return; }
+    RKReadout.place(readouts[name], RK_M("common.sizeAndRotation", { size: layout[name].scale, rotation: layout[name].rotation }), items[name], screenEl);
+  }
+
+  // the plate colour of the look as css, its opacity counted 0 to 255 as the plugin counts it
+  function plateColor(look) {
+    var hex = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(look.plateColor || "");
+    if (!hex) return "transparent";
+    return "rgba(" + parseInt(hex[1], 16) + ", " + parseInt(hex[2], 16) + ", " + parseInt(hex[3], 16) + ", " + Number(look.plateOpacity) / 255 + ")";
+  }
+
+  // sizes follow the card height, so the preview keeps the proportions of the card at any width
+  function place() {
+    var height = screenEl.clientHeight, look = cover.look;
+    if (!height || !look || !layout) return;
+    var px = height / 1080;
+    var side = look.logo * px * layout.icon.scale / 100;
+    items.icon.style.width = side + "px";
+    items.icon.style.height = side + "px";
+    setItem(items.icon, layout.icon);
+    var size = px * layout.text.scale / 100;
+    textEl.style.fontSize = look.text * size + "px";
+    var plate = textEl.classList.contains("has-plate");
+    textEl.style.padding = plate ? look.plateY * size + "px " + look.plateX * size + "px" : "0";
+    textEl.style.borderRadius = plate ? look.plateRadius * size + "px" : "0";
+    textEl.style.background = plate ? plateColor(look) : "none";
+    setItem(items.text, layout.text);
+    placeReadout("icon");
+    placeReadout("text");
+  }
+
+  function render() {
+    if (!host) return;
+    if (!gesture) layout = copyLayout(host.get("share_cover_layout"));
+    var kind = background();
+    var width = cover.width > 0 && cover.height > 0 ? cover.width : 16, tall = cover.width > 0 && cover.height > 0 ? cover.height : 9;
+    screenEl.style.aspectRatio = width + " / " + tall;
+    showBackdrop(kind);
+    items.icon.hidden = kind === "image";
+    var custom = String(host.get("share_cover_text") || "").trim();
+    textEl.textContent = custom || RK_M("screenshare.coverDefaultText");
+    items.text.hidden = !host.get("share_cover_show_text");
+    textEl.style.color = kind === "theme" || !cover.look ? "var(--text)" : cover.look.lightText;
+    textEl.classList.toggle("has-plate", kind === "image");
+    screenEl.classList.toggle("is-ready", !!cover.look);
+    place();
+  }
+
+  function commit() {
+    host.set("share_cover_layout", copyLayout(layout));
+    host.onChange();
+  }
+
+  function onItemDown(ev) {
+    if (!host || ev.button !== 0 || !cover.look || gesture) return;
+    var el = ev.currentTarget, name = el.dataset.item;
+    var handle = ev.target.closest(".sce-grip, .sce-turn");
+    ev.preventDefault();
+    ev.stopPropagation();
+    var box = screenEl.getBoundingClientRect(), at = layout[name];
+    var cx = box.left + at.x / 100 * box.width, cy = box.top + at.y / 100 * box.height;
+    gesture = {
+      el: el, name: name, pointerId: ev.pointerId, box: box, cx: cx, cy: cy, px: ev.clientX, py: ev.clientY,
+      kind: !handle ? "move" : handle.classList.contains("sce-turn") ? "turn" : "size",
+      start: { x: at.x, y: at.y, scale: at.scale, rotation: at.rotation },
+      distance: Math.max(1, Math.hypot(ev.clientX - cx, ev.clientY - cy)),
+      angle: Math.atan2(ev.clientY - cy, ev.clientX - cx) * 180 / Math.PI,
+    };
+    el.classList.add("is-active");
+    readouts[name].classList.add("is-active");
+    if (gesture.kind === "move") el.classList.add("is-dragging");
+    try { el.setPointerCapture(ev.pointerId); } catch (_) {}
+  }
+
+  function onItemMove(ev) {
+    if (!gesture || ev.pointerId !== gesture.pointerId) return;
+    var g = gesture, at = layout[g.name];
+    if (g.kind === "move") {
+      var x = g.start.x + (ev.clientX - g.px) / g.box.width * 100;
+      var y = g.start.y + (ev.clientY - g.py) / g.box.height * 100;
+      if (!ev.shiftKey) {
+        if (Math.abs(x - 50) * g.box.width / 100 <= SNAP_PX) x = 50;
+        if (Math.abs(y - 50) * g.box.height / 100 <= SNAP_PX) y = 50;
+      }
+      at.x = Math.round(clamp(x, POSITION) * 100) / 100;
+      at.y = Math.round(clamp(y, POSITION) * 100) / 100;
+    } else if (g.kind === "size") {
+      at.scale = Math.round(clamp(g.start.scale * Math.hypot(ev.clientX - g.cx, ev.clientY - g.cy) / g.distance, SCALE));
+    } else {
+      var degrees = g.start.rotation + Math.atan2(ev.clientY - g.cy, ev.clientX - g.cx) * 180 / Math.PI - g.angle;
+      degrees = ((degrees + 180) % 360 + 360) % 360 - 180;
+      if (!ev.shiftKey) {
+        var straight = Math.round(degrees / 90) * 90;
+        if (Math.abs(degrees - straight) <= SNAP_DEGREES) degrees = straight === 180 ? -180 : straight;
+      }
+      at.rotation = Math.round(clamp(degrees, TURN));
+    }
+    place();
+  }
+
+  function onItemUp(ev) {
+    if (!gesture || ev.pointerId !== gesture.pointerId) return;
+    var g = gesture;
+    gesture = null;
+    g.el.classList.remove("is-active", "is-dragging");
+    readouts[g.name].classList.remove("is-active");
+    try { g.el.releasePointerCapture(ev.pointerId); } catch (_) {}
+    var at = layout[g.name];
+    if (at.x !== g.start.x || at.y !== g.start.y || at.scale !== g.start.scale || at.rotation !== g.start.rotation) commit();
+  }
+
+  function reset() {
+    if (!host || gesture) return;
+    var defaults = copyLayout(window.RK_SETTING_DEFAULTS.share_cover_layout);
+    if (sameLayout(defaults, layout)) return;
+    layout = defaults;
+    commit();
+    place();
+  }
+
+  Object.keys(items).forEach(function (name) {
+    var el = items[name];
+    el.addEventListener("pointerdown", onItemDown);
+    el.addEventListener("pointermove", onItemMove);
+    el.addEventListener("pointerup", onItemUp);
+    el.addEventListener("pointercancel", onItemUp);
+  });
+  document.getElementById("sceReset").addEventListener("click", reset);
+  // everything is sized from the card box, which has no size while its tab is hidden, so the card is laid out again whenever that size changes
+  new ResizeObserver(place).observe(screenEl);
+
+  window.RKShareCardEditor = {
+    init: function (given) { host = given; render(); },
+    refresh: function (status) {
+      if (status) {
+        var hadImage = cover.imageStamp || 0;
+        cover = Object.assign({}, status);
+        // a new state answer can follow a new image pick or a new look at the desktop, so both are fetched again
+        cover.imageStamp = hadImage + 1;
+        cover.grabStamp = Date.now();
+      }
+      render();
+    },
+  };
+})();
+</script>

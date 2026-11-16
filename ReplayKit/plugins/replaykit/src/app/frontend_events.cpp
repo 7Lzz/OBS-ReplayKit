@@ -14,7 +14,6 @@
 #include "app/main_window_filter.hpp"
 #include "app/obs_menu.hpp"
 #include "app/settings_poll.hpp"
-#include "app/share_projector.hpp"
 #include "chrome/caption_track_filter.hpp"
 #include "chrome/title_keybind_badge.hpp"
 #include "core/app_icon.hpp"
@@ -31,6 +30,7 @@
 #include "layout/ui_layout.hpp"
 #include "notify/clip_toast.hpp"
 #include "notify/notify_button.hpp"
+#include "share/share_link.hpp"
 #include "notify/notify_panel.hpp"
 #include "ui/anchored_panel.hpp"
 #include "ui/popup_host.hpp"
@@ -99,7 +99,6 @@ void FileScreenshot(const QString &path, int tries, qint64 captureAt)
 		blog(LOG_WARNING, "[replaykit] screenshot left where obs saved it: it could not be moved");
 }
 
-QTimer *g_projectorPublishTimer = nullptr;
 QTimer *g_notifyTimer = nullptr;
 NotifyTrackFilter *g_notifyTrackFilter = nullptr;
 
@@ -123,7 +122,7 @@ void TellHelperFileSaved(const char *path, bool clip = false)
 void OnFrontendEvent(enum obs_frontend_event event, void *)
 {
 	if (event == OBS_FRONTEND_EVENT_SCRIPTING_SHUTDOWN) {
-		StopOpeningShareProjector();
+		ShareLinkStop();
 		ClipBufferShutdown();
 		return;
 	}
@@ -132,8 +131,6 @@ void OnFrontendEvent(enum obs_frontend_event event, void *)
 		CefCloseForShutdown();
 		PatchBrowserDockTitleInUserIni(); // fires after obs already wrote user.ini, so this rename sticks
 		PrepareDocksForNextLaunch();
-		if (g_projectorPublishTimer)
-			g_projectorPublishTimer->stop();
 		if (g_dockTweakTimer)
 			g_dockTweakTimer->stop();
 		if (g_openClipsHotkeyTimer)
@@ -216,12 +213,6 @@ void OnFrontendEvent(enum obs_frontend_event event, void *)
 	g_openClipsHotkeyTimer->start(1000);
 	PollHelperSettings();
 
-	// 250ms matches the helpers own poll cadence when its waiting for a projector to appear -- the pipe thread forwards this snapshot to the helper at the same rate.
-	g_projectorPublishTimer = new QTimer(g_callbacks);
-	QObject::connect(g_projectorPublishTimer, &QTimer::timeout, g_callbacks, []() { PublishProjectorWindows(); });
-	g_projectorPublishTimer->start(250);
-	PublishProjectorWindows();
-
 	// the bell in obss own title bar. the Clips and Settings windows get theirs as they are created. the clean shell has its own title bar with the bell and keybind badges built in, so the caption overlays are only for the classic layout
 	if (g_shellOn) {
 		ShellStart();
@@ -246,12 +237,6 @@ void OnFrontendEvent(enum obs_frontend_event event, void *)
 	InstallTrayMenu();
 	// the menus of the obs menu bar are polished before anybody opens one, once the interface has settled
 	QTimer::singleShot(3000, g_callbacks, []() { PrepareObsMenus(); });
-}
-
-// the timer is a child of the callback object, which is deleted on unload, so only the pointer is dropped here
-void ForgetProjectorTimer()
-{
-	g_projectorPublishTimer = nullptr;
 }
 
 // the app-wide filter would otherwise keep running against the button and badge lists after unload

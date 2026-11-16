@@ -24,6 +24,10 @@ namespace ReplayKitShared
         public const string NotificationsFile = "notifications.json";
         public const string DefaultsAppliedFile = "defaults_applied.json";
         public const string WindowStateFile = "window_state.ini";
+        // the share preview card: the image picked for it re-saved as png, its sound converted to wav, and the card the plugin draws from them for the share window
+        public const string ShareCoverImageFile = "share_cover_image.png";
+        public const string ShareCoverSoundFile = "share_cover_sound.wav";
+        public const string ShareCoverCardFile = "share_cover_card.png";
         // the hand-off between the installer and a helper that can still be the one of the release before, so it keeps its place in the folder root
         public const string UpdatePendingFile = "update_pending.json";
 
@@ -58,6 +62,10 @@ namespace ReplayKitShared
             new Entry { File = NotificationsFile, OldFolders = new[] { Root } },
             new Entry { File = DefaultsAppliedFile, OldFolders = new[] { Root } },
             new Entry { File = WindowStateFile, OldFolders = new[] { Root } },
+            // new with the share window, so the root never held them and the move finds nothing
+            new Entry { File = ShareCoverImageFile, OldFolders = new[] { Root } },
+            new Entry { File = ShareCoverSoundFile, OldFolders = new[] { Root } },
+            new Entry { File = ShareCoverCardFile, OldFolders = new[] { Root }, Regenerated = true },
         };
 
         // written by the helper for diagnosis only and not read by anything; it lives with the logs now

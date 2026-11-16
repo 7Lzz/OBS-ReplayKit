@@ -317,12 +317,10 @@ namespace ReplayKitHelper
             return value.Value<bool>() == expected;
         }
 
-        // obs-browser-page.exe is obss own cef subprocess -- without excluding it, clip audio played back in the dock gets treated as ordinary desktop audio, monitored back out to the discord share, and doubles up with the copy discord already grabs directly from the same process tree.
-        internal static readonly string[] DiscordAudioExes = { "Discord.exe", "DiscordSystemHelper.exe", "DiscordCanary.exe", "DiscordPTB.exe", "DiscordDevelopment.exe" };
-        private static readonly string[] DesktopAudioExcludeExes = DiscordAudioExes.Concat(new[] { "obs64.exe", "obs32.exe", "obs.exe", "obs-browser-page.exe", HelperExeName }).ToArray();
+        internal static IReadOnlyList<string> DiscordAudioExes => DesktopAudioExclusions.DiscordPrograms;
 
         // the programs the desktop capture never takes, whatever the recording audio tab says
-        internal static IReadOnlyList<string> DesktopAudioExcludeList => DesktopAudioExcludeExes;
+        internal static IReadOnlyList<string> DesktopAudioExcludeList => DesktopAudioExclusions.Programs;
 
         // keep the app list ready when switching back from device capture.
         private static void SetDesktopAudioCaptureSettingsObject(JObject settingsObject, JObject settings)
@@ -1244,8 +1242,8 @@ namespace ReplayKitHelper
             return settings;
         }
 
-        // the mic test plays from the helper process, which desktop audio capture would otherwise record as an echo in every clip saved during the test -- the exclusion list is normally written on apply, so make sure it is there right before a test plays.
-        internal static void EnsureHelperExcludedFromDesktopAudio()
+        // the mic test and the share window play sound that desktop audio capture would otherwise record into every clip, and the list is normally written on apply, so a scene from before a program joined it gets it right before that program plays
+        internal static void EnsureDesktopAudioExclusions()
         {
             lock (SettingsStore.Gate)
             {
@@ -1253,12 +1251,12 @@ namespace ReplayKitHelper
                 if (!current.Ok) return;
                 var settings = ReadSettings();
                 if (UsesOutputDeviceRecording(settings) || CapturesOutputDevice(current.Data?["inputSettings"])) return;
-                // a list of the programs to take (the specific mode) never holds the helper, since the choices cannot name it
+                // a list of the programs to take (the specific mode) never holds them, since the choices cannot name them
                 if (current.Data?["inputSettings"]?["exclude"]?.Value<bool>() == false) return;
-                var excluded = current.Data?["inputSettings"]?["executable_list"] as JArray;
-                if (excluded != null && excluded.Any(e => string.Equals(e["value"]?.Value<string>(), HelperExeName, StringComparison.OrdinalIgnoreCase))) return;
+                var excluded = (current.Data?["inputSettings"]?["executable_list"] as JArray)?.Select(e => e["value"]?.Value<string>() ?? "").ToList() ?? new List<string>();
+                if (DesktopAudioExclusions.Programs.All(name => excluded.Contains(name, StringComparer.OrdinalIgnoreCase))) return;
                 var result = SetDesktopAudioCaptureSettingsLive(settings, current);
-                if (!result.Ok) Log.Write("EnsureHelperExcludedFromDesktopAudio: " + result.Message);
+                if (!result.Ok) Log.Write("EnsureDesktopAudioExclusions: " + result.Message);
             }
         }
 

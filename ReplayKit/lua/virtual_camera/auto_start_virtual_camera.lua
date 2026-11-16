@@ -1,4 +1,4 @@
--- Discord output startup. default path is an OBS Windowed Projector that Discord can select as a window share. OBS Virtual Camera is legacy/manual only and is not started unless replaykit_settings.json explicitly sets discord_output_mode="virtual_camera_legacy".
+-- Discord output startup. the share window of ReplayKit is what Discord selects as a window share; this script keeps the desktop audio monitoring the share window relays in step with Share Preview. OBS Virtual Camera is legacy/manual only and is not started unless replaykit_settings.json explicitly sets discord_output_mode="virtual_camera_legacy".
 
 obs = obslua
 
@@ -364,12 +364,12 @@ function script_description()
     return [[<b>Discord Share Ready Projector</b><br>
 On OBS launch:<br>
 &nbsp;&nbsp;1. Reads the saved ReplayKit Discord output mode.<br>
-&nbsp;&nbsp;2. Keeps OBS Virtual Camera stopped and lets the ReplayKit helper
-open and move an OBS Windowed Projector for Discord Go Live.<br>
+&nbsp;&nbsp;2. Keeps OBS Virtual Camera stopped while the ReplayKit helper
+runs the share window for Discord Go Live.<br>
 &nbsp;&nbsp;3. Polls the saved Share Preview state for audio monitoring sync.<br><br>
 Pair with Discord: share the window named
 <code>OBS ReplayKit Discord Share (Projector - Desktop Audio)</code> through application screenshare.<br>
-The OBS projector window is renamed, moved, and hidden from the taskbar by ReplayKit.<br><br>
+The share window stays open while OBS restarts or updates and shows a be right back card meanwhile.<br><br>
 <b>Important:</b> for friends to hear your game audio, the
 <i>Game Capture</i> source must be hooking the game (its preview shows
 the game). If only <i>Display Capture</i> is showing the game, friends

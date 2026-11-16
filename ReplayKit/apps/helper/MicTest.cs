@@ -61,7 +61,7 @@ namespace ReplayKitHelper
                     deviceId = match.Id;
                 }
                 // only playback makes sound from this process, so only playback needs the desktop audio exclusion
-                if (playback) SettingsLiveApply.EnsureHelperExcludedFromDesktopAudio();
+                if (playback) SettingsLiveApply.EnsureDesktopAudioExclusions();
 
                 lock (Gate)
                 {

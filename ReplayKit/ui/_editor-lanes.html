@@ -308,6 +308,8 @@
   .lay-item:hover::after, .lay-item.is-selected::after { border-color: rgba(255, 255, 255, .7); }
   .lay-item .lay-grip, .lay-item .lay-rot { opacity: 0; }
   .lay-item:hover .lay-grip, .lay-item.is-selected .lay-grip, .lay-item:hover .lay-rot, .lay-item.is-selected .lay-rot { opacity: 1; }
+  /* the size and turn label of the main picture sits right after its handles and goes when the page hides them */
+  .main-picture-handles[hidden] + .rk-readout { display: none; }
   .tl-cue-text { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; pointer-events: none; user-select: none; }
   .tl-chip svg { width: 12px; height: 12px; fill: currentColor; flex: 0 0 auto; }
   .tl-chip-label { overflow: hidden; text-overflow: ellipsis; }
@@ -791,7 +793,25 @@
     }
 
     var mainTransform = {w:1, rotate:0};
-    var mainPicture, mainHandles;
+    var mainPicture, mainHandles, mainReadout;
+
+    // the size and turn labels of the shared transform-readout partial measure the page, so each is placed again only when what it reads or the item it follows changed, never on every tick of the playhead; a preview that changes size drops every key so the labels are measured again
+    var readoutKeys = new WeakMap();
+    var readoutResize = new ResizeObserver(function () {
+      readoutKeys = new WeakMap();
+      placeLayerReadout();
+      placeSubReadout();
+    });
+    if (EDITOR_SIGNAL) EDITOR_SIGNAL.addEventListener("abort", function () { readoutResize.disconnect(); });
+    function placeReadout(label, text, item, area, key) {
+      if (readoutKeys.get(label) === key && !label.hidden) return;
+      readoutKeys.set(label, key);
+      RKReadout.place(label, text, item, area);
+    }
+    function hideReadout(label) {
+      readoutKeys.delete(label);
+      RKReadout.hide(label);
+    }
 
     function paintMainPicture() {
       if (!mainPicture) return;
@@ -799,6 +819,8 @@
       mainHandles.style.width = mainPicture.offsetWidth * mainTransform.w + "px";
       mainHandles.style.height = mainPicture.offsetHeight * mainTransform.w + "px";
       mainHandles.style.transform = "translate(-50%, -50%) rotate(" + mainTransform.rotate + "deg)";
+      if (mainHandles.hidden) { hideReadout(mainReadout); return; }
+      placeReadout(mainReadout, RK_M("common.sizeAndRotation", { size: Math.round(mainTransform.w * 100), rotation: mainTransform.rotate }), mainHandles, mainHandles.parentNode, mainHandles.style.width + mainHandles.style.height + mainTransform.rotate);
     }
 
     function scaleFromPointer(start, event, min, max) {
@@ -810,6 +832,9 @@
     function bindMainPicture(picture, handles) {
       mainPicture = picture;
       mainHandles = handles;
+      // right after the handles, so the css that hides the label with them reaches it when the page hides them
+      mainReadout = RKReadout.make(handles.parentNode);
+      handles.after(mainReadout);
       opts.video.addEventListener("rkframe", paintMainPicture, {signal:EDITOR_SIGNAL});
       handles.addEventListener("pointerdown", function (event) {
         if (event.button !== 0 || !event.target.closest(".lay-grip, .lay-rot")) return;
@@ -1278,6 +1303,28 @@
         l.on = on;
       });
       box.hidden = !parts.length;
+      placeSubReadout();
+    }
+
+    // the label of the subtitle under the pointer or being dragged, the one whose handles show; its size is the size of the row, in pixels of the 1080p picture
+    var subReadout = null, subHover = "", subHeld = "";
+    function placeSubReadout() {
+      var box = dom.subOverlay;
+      var id = subHeld || subHover;
+      var node = box && id ? box.querySelector('.sub-cue[data-cue="' + CSS.escape(id) + '"]') : null;
+      var row = node && findRow(node.dataset.row);
+      if (!row) { if (subReadout) hideReadout(subReadout); return; }
+      // the overlay is emptied whenever a subtitle on it changes, which takes the label with it
+      if (!subReadout || subReadout.parentNode !== box) subReadout = RKReadout.make(box);
+      var rotation = row.style.rotate || 0;
+      placeReadout(subReadout, RK_M("editor.subtitleSizeAndRotation", { size: row.style.size, rotation: rotation }), node, box, [id, row.style.x, row.style.y, row.style.size, rotation].join("|"));
+    }
+    function onSubHover(e) {
+      var node = e.type === "pointerover" ? e.target.closest(".sub-cue") : e.relatedTarget && e.relatedTarget.closest && e.relatedTarget.closest(".sub-cue");
+      var id = node ? node.dataset.cue : "";
+      if (id === subHover) return;
+      subHover = id;
+      placeSubReadout();
     }
 
     function makeSubEl() {
@@ -1470,6 +1517,11 @@
       if (!row) return;
       e.preventDefault();
       e.stopPropagation();
+      // the pointer can leave the subtitle while it drags it, so its label follows the subtitle until the button comes up
+      subHeld = node.dataset.cue;
+      var release = function () { subHeld = ""; placeSubReadout(); };
+      window.addEventListener("pointerup", release, { once: true, signal: dragEvents.signal });
+      window.addEventListener("pointercancel", release, { once: true, signal: dragEvents.signal });
       if (e.target.closest(".sub-rot")) { rotateSub(e, node, row); return; }
       var grip = e.target.closest(".sub-grip");
       if (grip) { resizeSub(e, node, row, grip.dataset.corner); return; }
@@ -1951,10 +2003,32 @@
       });
       Object.keys(layerViews).forEach(function (id) { if (!live[id]) { destroyLayerView(layerViews[id]); delete layerViews[id]; } });
       host.hidden = !st.layers.length;
+      placeLayerReadout();
       // the playhead only moves a few times a second on its own, so a gif is kept on its frame every frame while the clip plays
       if (playing && !layerRaf && st.layers.some(function (l) { return l.kind === "media" && l.gif; })) layerRaf = requestAnimationFrame(function () { layerRaf = 0; paintLayers(); });
     }
     var layerRaf = 0;
+
+    // the label of the layer under the pointer, else of the selected one, the two whose handles show
+    var layerReadout = null, hoveredLayer = "";
+    function placeLayerReadout() {
+      var host = dom.layerOverlay;
+      if (!host) return;
+      if (!layerReadout || layerReadout.parentNode !== host) layerReadout = RKReadout.make(host);
+      var l = findLayer(hoveredLayer) || findLayer(st.selected);
+      var v = l && layerViews[l.id];
+      if (!v || v.box.hidden) { hideReadout(layerReadout); return; }
+      var size = Math.round(l.w * 100), rotation = l.rotate || 0;
+      placeReadout(layerReadout, RK_M("common.sizeAndRotation", { size: size, rotation: rotation }), v.box, host, [l.id, l.x, l.y, size, rotation].join("|"));
+    }
+    function onLayerHover(e) {
+      var box = e.type === "pointerover" ? e.target.closest(".lay-item") : e.relatedTarget && e.relatedTarget.closest && e.relatedTarget.closest(".lay-item");
+      var id = box ? box.dataset.layer : "";
+      if (id === hoveredLayer) return;
+      hoveredLayer = id;
+      placeLayerReadout();
+    }
+
     document.addEventListener("visibilitychange", function () {
       if (document.hidden && layerRaf) { cancelAnimationFrame(layerRaf); layerRaf = 0; }
       paintLayers();
@@ -5843,6 +5917,9 @@
         dom.subs.addEventListener("contextmenu", onSubContext);
         if (dom.subOverlay) {
           dom.subOverlay.addEventListener("pointerdown", onPlaceDown);
+          dom.subOverlay.addEventListener("pointerover", onSubHover);
+          dom.subOverlay.addEventListener("pointerout", onSubHover);
+          readoutResize.observe(dom.subOverlay);
           // a press on a subtitle is the subtitle, never a click on the video under it
           dom.subOverlay.addEventListener("click", function (e) { if (e.target.closest(".sub-cue")) e.stopPropagation(); });
         }
@@ -5854,6 +5931,9 @@
       }
       if (dom.layerOverlay) {
         dom.layerOverlay.addEventListener("pointerdown", onLayerPlaceDown);
+        dom.layerOverlay.addEventListener("pointerover", onLayerHover);
+        dom.layerOverlay.addEventListener("pointerout", onLayerHover);
+        readoutResize.observe(dom.layerOverlay);
         // a press on a layer is the layer, never a click on the video under it
         dom.layerOverlay.addEventListener("click", function (e) { if (e.target.closest(".lay-item")) e.stopPropagation(); });
       }

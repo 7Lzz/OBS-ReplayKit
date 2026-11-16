@@ -9,15 +9,10 @@ namespace rk {
 
 namespace {
 
-// ipc pipe: this plugin is the server, the helper connects as a client and reconnects on its own -- replaces the old scratch-file handoff. the gui thread fills g_mainWinValue / g_projectorCsv; the pipe thread forwards those to the helper and applies inbound OPENCLIPS / ALLOWCLOSE / CONFIRM <kind> (see PipeDispatchLine for the full list).
+// ipc pipe: this plugin is the server, the helper connects as a client and reconnects on its own -- replaces the old scratch-file handoff. the gui thread fills g_mainWinValue; the pipe thread forwards it to the helper and applies inbound OPENCLIPS / ALLOWCLOSE / CONFIRM <kind> (see PipeDispatchLine for the full list).
 constexpr const wchar_t *kIpcPipeName = L"\\\\.\\pipe\\OBSReplayKitIpc";
 std::thread g_pipeThread;
 std::atomic<bool> g_pipeStop{false};
-std::mutex g_projectorCsvMutex;
-std::string g_projectorCsv;
-bool g_projectorCsvReady = false;
-// GetTickCount64() of the last PublishProjectorWindows run -- the pipe thread stops forwarding PROJECTORS if this goes stale (obs gui thread stalled), so the helper ages its snapshot out and falls back, same as the old file mtime.
-unsigned long long g_projectorCsvAtMs = 0;
 
 // writes one newline-terminated line to the connected helper. false on any write failure so the caller drops the connection and waits for a reconnect.
 bool PipeWriteLine(HANDLE pipe, const std::string &line)
@@ -36,11 +31,10 @@ bool PipeWriteLine(HANDLE pipe, const std::string &line)
 	return true;
 }
 
-// serves one connected helper until it disconnects or the plugin shuts down. non-blocking: PeekNamedPipe drains inbound, small WriteFiles push outbound, a 40ms sleep paces the loop. LOCALE and MAINWIN go once per connection, PROJECTORS about every 250ms (the cadence the old file write used).
+// serves one connected helper until it disconnects or the plugin shuts down. non-blocking: PeekNamedPipe drains inbound, small WriteFiles push outbound, a 40ms sleep paces the loop. LOCALE and MAINWIN go once per connection.
 void PipeServeClient(HANDLE pipe)
 {
 	bool mainWinSent = false;
-	auto lastProjectors = std::chrono::steady_clock::now() - std::chrono::milliseconds(250);
 	std::string inbound;
 	const char *locale = obs_get_locale();
 	if (!PipeWriteLine(pipe, std::string("LOCALE ") + (locale ? locale : "")))
@@ -68,22 +62,9 @@ void PipeServeClient(HANDLE pipe)
 			if (!PipeWriteLine(pipe, "LANGUAGE_ACK"))
 				return;
 		}
-		const long long shareProjector = g_pipeShareProjectorAck.exchange(-1);
-		if (shareProjector >= 0) {
-			if (!PipeWriteLine(pipe, "SHAREPROJECTOR_ACK " + std::to_string(shareProjector)))
-				return;
-		}
-		auto now = std::chrono::steady_clock::now();
-		if (now - lastProjectors >= std::chrono::milliseconds(250)) {
-			lastProjectors = now;
-			std::string csv;
-			bool fresh;
-			{
-				std::lock_guard<std::mutex> lock(g_projectorCsvMutex);
-				csv = g_projectorCsv;
-				fresh = g_projectorCsvReady && GetTickCount64() - g_projectorCsvAtMs <= 2000;
-			}
-			if (fresh && !PipeWriteLine(pipe, "PROJECTORS " + csv))
+		const int shareCard = g_pipeShareCardAck.exchange(-1);
+		if (shareCard >= 0) {
+			if (!PipeWriteLine(pipe, "SHARECARD_ACK " + std::to_string(shareCard)))
 				return;
 		}
 
@@ -155,24 +136,7 @@ std::atomic<unsigned long long> g_allowCloseUntilMs{0};
 std::atomic<bool> g_pipeSendAllowCloseAck{false};
 std::atomic<bool> g_pipeSendOutputsReleasedAck{false};
 std::atomic<bool> g_pipeSendLanguageAck{false};
-std::atomic<long long> g_pipeShareProjectorAck{-1};
-
-// obs marks every real projector window with windowHandle()->setProperty("isOBSProjectorWindow", true) -- see OBSProjector.cpp, which does this specifically so obss own code (SetDisplayAffinity) can recognize one reliably. thats a qt object property, invisible to plain win32 enumeration, so the helper (a separate process with no qt/obs-object access) cant read it directly -- this plugin can, since it runs inside obss own qt process. this refreshes the hwnd list the pipe thread streams to the helper so it can check the SAME authoritative signal obs uses internally instead of inferring "looks like a projector" from window class + ownership heuristics, which had real false-positive risk (NameDialog, the Scripts window, the auto-config wizard are independently-owned top-level windows too). must run on the gui thread for topLevelWindows()/winId().
-void PublishProjectorWindows()
-{
-	QStringList hwnds;
-	for (QWindow *w : QGuiApplication::topLevelWindows()) {
-		if (w && w->property("isOBSProjectorWindow").toBool())
-			hwnds << QString::number((quintptr)w->winId());
-	}
-	std::string csv = hwnds.join(',').toStdString();
-	{
-		std::lock_guard<std::mutex> lock(g_projectorCsvMutex);
-		g_projectorCsv = csv;
-		g_projectorCsvReady = true;
-		g_projectorCsvAtMs = GetTickCount64();
-	}
-}
+std::atomic<int> g_pipeShareCardAck{-1};
 
 // starts the thread that serves the helper; the stop flag is cleared first so a reload does not begin stopped
 void StartPipeServer()

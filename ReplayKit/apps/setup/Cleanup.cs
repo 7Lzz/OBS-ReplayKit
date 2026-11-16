@@ -61,6 +61,8 @@ namespace ReplayKitSetup
         public static bool StopObsAndHelpers(Action<string> log = null)
         {
             Obs.CloseObs(log);
+            // every caller removes replaykit or its share preview audio, and with that no share window may stay
+            bool windowStopped = ShareWindowInstall.Stop(log);
             var keep = new HashSet<int> { Process.GetCurrentProcess().Id };
             var parent = CurrentParentPid();
             if (parent.HasValue) keep.Add(parent.Value);
@@ -84,7 +86,7 @@ namespace ReplayKitSetup
                     }
                 }
             }
-            return stopped;
+            return stopped && windowStopped;
         }
 
         public static bool RemoveReplaykitPlugins(Action<string> log = null)

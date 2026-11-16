@@ -2415,6 +2415,10 @@
     "source": "60bb3338e0ad558c",
     "text": "Tamanho"
   },
+  "common.sizeAndRotation": {
+    "source": "fa1c797ebf25e621",
+    "text": "{size}% · {rotation}°"
+  },
   "common.smaller": {
     "source": "215848cff2f44baf",
     "text": "Menor"
@@ -4951,6 +4955,10 @@
     "source": "9e31e252b6d49609",
     "text": "Legenda"
   },
+  "editor.subtitleSizeAndRotation": {
+    "source": "0ace000910f8813b",
+    "text": "{size} px · {rotation}°"
+  },
   "editor.subtitlePresets": {
     "source": "f704f42f6e0091fa",
     "text": "Predefinições de legenda"
@@ -6151,21 +6159,45 @@
     "source": "977a84715be6a085",
     "text": "O Windows não informou a área de trabalho real de nenhum monitor."
   },
-  "screenshare.obsProjectorWindowInformationIsUnavailable": {
-    "source": "c2659974a9f520e8",
-    "text": "As informações da janela do projetor do OBS não estão disponíveis."
-  },
   "screenshare.obsProjectorWindowWasFoundBut": {
     "source": "b2b6981650a0028d",
     "text": "A janela do projetor do OBS foi encontrada, mas o Windows recusou o pedido de mover/redimensionar."
   },
-  "screenshare.obsProjectorWindowWasFoundBut2": {
-    "source": "b568bc9513748137",
-    "text": "A janela do projetor do OBS foi encontrada, mas não fechou após várias tentativas."
-  },
   "screenshare.obsProjectorWindowWasMovedBut": {
     "source": "513efdfb320a0fb8",
     "text": "A janela do projetor do OBS foi movida, mas o Windows recusou o pedido de ocultar a barra de tarefas."
+  },
+  "screenshare.theShareWindowIsMissing": {
+    "source": "b5f7a930d8477eb4",
+    "text": "O programa da janela do Share Preview está faltando ({path}). Execute o instalador do ReplayKit novamente."
+  },
+  "screenshare.theShareWindowCouldNotStart": {
+    "source": "964d6e4a8ff066b8",
+    "text": "Não foi possível iniciar a janela do Share Preview. Desative e ative o Share Preview de novo e verifique os registros do ReplayKit se continuar falhando."
+  },
+  "screenshare.theShareWindowDidNotClose": {
+    "source": "df55f2f86a7f167f",
+    "text": "A janela do Share Preview não fechou, mesmo depois de receber a ordem para encerrar."
+  },
+  "screenshare.coverDefaultText": {
+    "source": "a99e83da4583ab31",
+    "text": "Já volto"
+  },
+  "screenshare.theImageCouldNotBeUsed": {
+    "source": "5807af0d4a5d3ff9",
+    "text": "Não foi possível usar essa imagem. Escolha um arquivo PNG, JPG, BMP ou GIF."
+  },
+  "screenshare.theSoundNeedsFfmpeg": {
+    "source": "4559f79ab94267d6",
+    "text": "Um som precisa do ffmpeg, que ainda não está instalado. Execute o instalador do ReplayKit novamente."
+  },
+  "screenshare.theSoundCouldNotBeUsed": {
+    "source": "9e4fb0659b9c288b",
+    "text": "Não foi possível usar esse som. Escolha outro arquivo de áudio."
+  },
+  "screenshare.turnOnSharePreviewFirst": {
+    "source": "bd28264ea2b20433",
+    "text": "Ative o Share Preview primeiro."
   },
   "screenshare.obsStreamAudioPlaybackEndpointIs": {
     "source": "67f2ce393de09ce9",
@@ -6179,14 +6211,6 @@
     "source": "2b610cccfc59aa23",
     "text": "Configurações de vídeo do OBS indisponíveis: {error}"
   },
-  "screenshare.obsWindowedProjectorWasOpenedBut": {
-    "source": "ec315d83d6113eb7",
-    "text": "O Projetor em Janela do OBS foi aberto, mas a janela não pôde ser encontrada."
-  },
-  "screenshare.openingObsWindowedProjectorFailedError": {
-    "source": "2d9dcd1cb049f442",
-    "text": "Falha ao abrir o Projetor em Janela do OBS: {error}"
-  },
   "screenshare.projectorSourceMonitorBoundsAreInvalid": {
     "source": "93020dd93b70a042",
     "text": "Os limites do monitor da fonte do projetor são inválidos."
@@ -6198,10 +6222,6 @@
   "screenshare.theObsProjectorWindowChangeDid": {
     "source": "243400152e4ba38f",
     "text": "A alteração da janela do projetor do OBS não terminou com uma janela de compartilhamento válida."
-  },
-  "screenshare.theObsProjectorWindowCouldNot": {
-    "source": "e0ee22530dadb67b",
-    "text": "A janela do projetor do OBS não pôde ser confirmada ou estacionada."
   },
   "screenshare.thePreviousProjectorWindowChangeIs": {
     "source": "e6ca2f0e117d83de",
@@ -7210,6 +7230,10 @@
   "settings.dragToPosition": {
     "source": "43ddd66cdc6eb3f4",
     "text": "Arraste para posicionar"
+  },
+  "settings.resetOverlaySizeAndRotation": {
+    "source": "910d03d1f3f121c3",
+    "text": "Redefinir o tamanho e a rotação"
   },
   "settings.editName": {
     "source": "70d7cc5a6422feaa",
@@ -8331,14 +8355,6 @@
     "source": "7ec4d75cc9910ae1",
     "text": "Controle deslizante da opacidade da sobreposição"
   },
-  "settings.overlayRotationInDegrees": {
-    "source": "2f729c1b6874b5ed",
-    "text": "Rotação da sobreposição em graus"
-  },
-  "settings.overlayRotationSlider": {
-    "source": "c129339a890ed309",
-    "text": "Controle deslizante da rotação da sobreposição"
-  },
   "settings.overlaySceneItemsFailedError": {
     "source": "b5b4ac45a7bbb1be",
     "text": "A configuração da sobreposição foi salva, mas os itens da cena do OBS não puderam ser lidos: {error}"
@@ -8351,10 +8367,6 @@
     "source": "94d8f258ed868945",
     "text": "A configuração da sobreposição foi salva, mas o arquivo da cena do OBS não pôde ser preparado para a reinicialização: {error}"
   },
-  "settings.overlaySize": {
-    "source": "a50962ddfe53b823",
-    "text": "Tamanho da sobreposição"
-  },
   "settings.overlaySizeSceneItemsFailedError": {
     "source": "f8b400ff6c79c2f1",
     "text": "O tamanho da sobreposição foi salvo, mas os itens da cena do OBS não puderam ser lidos: {error}"
@@ -8362,10 +8374,6 @@
   "settings.overlaySizeSceneLookupFailedError": {
     "source": "dd23826f43e78e66",
     "text": "O tamanho da sobreposição foi salvo, mas a busca da cena do OBS falhou: {error}"
-  },
-  "settings.overlaySizeSlider": {
-    "source": "11cc91e490df3ccd",
-    "text": "Controle deslizante do tamanho da sobreposição"
   },
   "settings.pageDown": {
     "source": "38adab48f20e4552",
@@ -8670,6 +8678,134 @@
   "settings.repark": {
     "source": "40c2985c92ed985e",
     "text": "Estacionar novamente"
+  },
+  "settings.whileObsIsAway": {
+    "source": "ff7f616253d9151a",
+    "text": "Enquanto o OBS está fora"
+  },
+  "settings.shareCardPreview": {
+    "source": "3af72fd745b3989d",
+    "text": "Prévia do cartão"
+  },
+  "settings.shareCardPreviewNote": {
+    "source": "45b0ab019c17e4a4",
+    "text": "O que os espectadores do Discord veem enquanto o OBS está fechado, reiniciando ou atualizando."
+  },
+  "settings.shareCardBackground": {
+    "source": "7d67b6c9f37716ad",
+    "text": "Fundo"
+  },
+  "settings.shareCardBackgroundTheme": {
+    "source": "8fd954f2b25eb2ab",
+    "text": "Cor do tema"
+  },
+  "settings.shareCardBackgroundImage": {
+    "source": "cbff02b1de749e35",
+    "text": "Minha própria imagem"
+  },
+  "settings.shareCardBackgroundLastFrame": {
+    "source": "97a18995a9e7d1ac",
+    "text": "Último quadro do jogo, escurecido"
+  },
+  "settings.shareCardImage": {
+    "source": "fc6eaa65315f601d",
+    "text": "Imagem"
+  },
+  "settings.shareCardImageFit": {
+    "source": "32cc0d85750055d1",
+    "text": "Ajuste da imagem"
+  },
+  "settings.shareCardFitWhole": {
+    "source": "369293a21deb39b2",
+    "text": "Mostrar a imagem inteira"
+  },
+  "settings.shareCardFitFill": {
+    "source": "06a81292f8359d12",
+    "text": "Preencher o cartão"
+  },
+  "settings.shareCardText": {
+    "source": "c028d4bda5c6fda7",
+    "text": "Texto"
+  },
+  "settings.showTheText": {
+    "source": "d17c8c9bbb4640bc",
+    "text": "Mostrar o texto"
+  },
+  "settings.shareCardSound": {
+    "source": "4e1288ba9755d7cd",
+    "text": "Som"
+  },
+  "settings.shareCardSoundNote": {
+    "source": "f78575f6ccf1b16a",
+    "text": "Toca na transmissão enquanto o cartão aparece. Você mesmo não ouve."
+  },
+  "settings.shareCardSoundDefault": {
+    "source": "3c1a0cdbcfd6cc9a",
+    "text": "Som padrão"
+  },
+  "settings.shareCardSoundCustom": {
+    "source": "dd90af84e22187ee",
+    "text": "Meu próprio som"
+  },
+  "settings.shareCardSoundOff": {
+    "source": "40aab9dfcc6a214b",
+    "text": "Sem som"
+  },
+  "settings.shareCardSoundFile": {
+    "source": "c57864b74a1a98f1",
+    "text": "Arquivo de som"
+  },
+  "settings.chooseSound": {
+    "source": "a0ff61dc6aea6e4e",
+    "text": "Escolher som"
+  },
+  "settings.shareCardSoundVolume": {
+    "source": "25c4333eb6d1d390",
+    "text": "Volume do som"
+  },
+  "settings.shareCardSoundVolumeSlider": {
+    "source": "ff512b3729993d4c",
+    "text": "Controle deslizante do volume do som"
+  },
+  "settings.keepTheCardAfterObsCloses": {
+    "source": "60dabedaae281b48",
+    "text": "Manter o cartão depois que o OBS fechar"
+  },
+  "settings.keepTheCardNote": {
+    "source": "2f179e7287ce29de",
+    "text": "Reinícios e atualizações sempre o mantêm. Isto vale para quando você fecha o OBS ou ele trava."
+  },
+  "settings.keepCardOff": {
+    "source": "271e707aebb8c461",
+    "text": "Fechar junto com o OBS"
+  },
+  "settings.keepCard5m": {
+    "source": "1f40f7a5fa15caa1",
+    "text": "5 minutos"
+  },
+  "settings.keepCard15m": {
+    "source": "d356929940f32942",
+    "text": "15 minutos"
+  },
+  "settings.keepCard1h": {
+    "source": "d47049285cae9ef7",
+    "text": "1 hora"
+  },
+  "settings.keepCardAlways": {
+    "source": "7a86c86d4ec7c752",
+    "text": "Até o OBS abrir de novo"
+  },
+  "settings.tryTheCard": {
+    "source": "170978231e15a41b",
+    "text": "Testar"
+  },
+  "settings.showTheCardNow": {
+    "source": "b674b42006bf7930",
+    "text": "Mostrar o cartão agora"
+  },
+  "settings.shareCardShown": {
+    "source": "e2599c18a54a52da",
+    "text": "O cartão aparece na transmissão por 10 segundos."
   },
   "settings.reparkingProjector": {
     "source": "1487536689800d09",

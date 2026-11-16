@@ -110,15 +110,17 @@
   <Target Name="PackAssetBundle" BeforeTargets="PrepareForBuild" Condition="'$(Configuration)' == 'Release'">
     <PropertyGroup>
       <!-- per-user runtime files that can turn up in the working tree and must never ship, whichever folder they land in -->
-      <AssetBundleExclude>$(RepoDir)resources\icons\user\**\*;$(RepoDir)**\themes-user\**\*;$(RepoDir)**\game-icons\**\*;$(RepoDir)ui\rk-theme.css;$(RepoDir)**\*.pdb;$(RepoDir)**\*.log;$(RepoDir)**\auth.dat;$(RepoDir)**\auth_cookies.txt;$(RepoDir)**\cookies.txt;$(RepoDir)**\helper_config.json;$(RepoDir)**\clips_db.json;$(RepoDir)**\clips_index.json;$(RepoDir)**\edit_drafts.json;$(RepoDir)**\deleted_history.json;$(RepoDir)**\profile_picture.png;$(RepoDir)**\game_mappings.json;$(RepoDir)**\notifications.json;$(RepoDir)**\window_state.ini;$(RepoDir)**\hotkey_capture_signal.json;$(RepoDir)**\auth.jar;$(RepoDir)**\.env;$(RepoDir)**\.env.*;$(RepoDir)**\*.session</AssetBundleExclude>
+      <AssetBundleExclude>$(RepoDir)resources\icons\user\**\*;$(RepoDir)**\themes-user\**\*;$(RepoDir)**\game-icons\**\*;$(RepoDir)ui\rk-theme.css;$(RepoDir)**\*.pdb;$(RepoDir)**\*.log;$(RepoDir)**\auth.dat;$(RepoDir)**\auth_cookies.txt;$(RepoDir)**\cookies.txt;$(RepoDir)**\helper_config.json;$(RepoDir)**\clips_db.json;$(RepoDir)**\clips_index.json;$(RepoDir)**\edit_drafts.json;$(RepoDir)**\deleted_history.json;$(RepoDir)**\profile_picture.png;$(RepoDir)**\share_cover_*;$(RepoDir)**\game_mappings.json;$(RepoDir)**\notifications.json;$(RepoDir)**\window_state.ini;$(RepoDir)**\hotkey_capture_signal.json;$(RepoDir)**\auth.jar;$(RepoDir)**\.env;$(RepoDir)**\.env.*;$(RepoDir)**\*.session</AssetBundleExclude>
     </PropertyGroup>
     <!-- where each repo folder lands inside the bundle. the bundle layout is what the installer and the updater of every earlier release read (obs-studio\ mirrors %APPDATA%\obs-studio\), so only the left side of this map ever changes -->
     <ItemGroup>
       <AssetBundleFile Include="$(RepoDir)ui\**\*" Exclude="$(AssetBundleExclude)" BundleDir="obs-studio\obs-replayKit\obs-custom-dock\" />
       <AssetBundleFile Include="$(RepoDir)lua\**\*" Exclude="$(AssetBundleExclude)" BundleDir="obs-studio\obs-replayKit\scripts\" />
       <AssetBundleFile Include="$(RepoDir)dist\helper\*" Exclude="$(AssetBundleExclude)" BundleDir="obs-studio\obs-replayKit\scripts\helper\" />
+      <AssetBundleFile Include="$(RepoDir)dist\share-window\ReplayKitShare.exe" BundleDir="obs-studio\obs-replayKit\share-window\" />
       <AssetBundleFile Include="$(RepoDir)resources\icons\**\*" Exclude="$(AssetBundleExclude)" BundleDir="obs-studio\obs-replayKit\icons\" />
       <AssetBundleFile Include="$(RepoDir)resources\fonts\**\*" Exclude="$(AssetBundleExclude)" BundleDir="obs-studio\obs-replayKit\fonts\" />
+      <AssetBundleFile Include="$(RepoDir)resources\sounds\**\*" Exclude="$(AssetBundleExclude)" BundleDir="obs-studio\obs-replayKit\sounds\" />
       <AssetBundleFile Include="$(RepoDir)resources\data\**\*" Exclude="$(AssetBundleExclude)" BundleDir="obs-studio\obs-replayKit\data\" />
       <AssetBundleFile Include="$(RepoDir)config\replaykit_settings.json;$(RepoDir)dist\version.json" BundleDir="obs-studio\obs-replayKit\" />
       <AssetBundleFile Include="$(RepoDir)config\obs\**\*" Exclude="$(AssetBundleExclude)" BundleDir="obs-studio\" />

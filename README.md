@@ -93,7 +93,7 @@ You can also use **Start Recording** and **Stop Recording** in the dock for full
 
 You can configure desktop, microphone, and Discord audio separately, including which tracks they use.
 
-**Share Preview is optional.** It uses a virtual audio cable driver and an OBS projector window to let you share your OBS scene in Discord or other apps that support application window sharing. You don't need it for normal recording or clipping.
+**Share Preview is optional.** It uses a virtual audio cable driver and a hidden ReplayKit window to let you share your OBS scene in Discord or other apps that support application window sharing. The window stays open while OBS restarts, updates or crashes and shows a "be right back" card until OBS is back, so your stream doesn't end. You don't need it for normal recording or clipping.
 
 ### Updating or uninstalling
 

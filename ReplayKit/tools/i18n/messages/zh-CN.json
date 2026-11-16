@@ -2413,6 +2413,10 @@
     "source": "60bb3338e0ad558c",
     "text": "大小"
   },
+  "common.sizeAndRotation": {
+    "source": "fa1c797ebf25e621",
+    "text": "{size}% · {rotation}°"
+  },
   "common.smaller": {
     "source": "215848cff2f44baf",
     "text": "更小"
@@ -4949,6 +4953,10 @@
     "source": "9e31e252b6d49609",
     "text": "字幕"
   },
+  "editor.subtitleSizeAndRotation": {
+    "source": "0ace000910f8813b",
+    "text": "{size} px · {rotation}°"
+  },
   "editor.subtitlePresets": {
     "source": "f704f42f6e0091fa",
     "text": "字幕预设"
@@ -6149,21 +6157,45 @@
     "source": "977a84715be6a085",
     "text": "Windows 未报告真实的显示器工作区。"
   },
-  "screenshare.obsProjectorWindowInformationIsUnavailable": {
-    "source": "c2659974a9f520e8",
-    "text": "OBS 投影窗口信息不可用。"
-  },
   "screenshare.obsProjectorWindowWasFoundBut": {
     "source": "b2b6981650a0028d",
     "text": "找到了 OBS 投影窗口，但 Windows 拒绝了移动/调整大小的请求。"
   },
-  "screenshare.obsProjectorWindowWasFoundBut2": {
-    "source": "b568bc9513748137",
-    "text": "找到了 OBS 投影窗口，但经多次尝试后仍未关闭。"
-  },
   "screenshare.obsProjectorWindowWasMovedBut": {
     "source": "513efdfb320a0fb8",
     "text": "OBS 投影窗口已移动，但 Windows 拒绝了隐藏任务栏的请求。"
+  },
+  "screenshare.theShareWindowIsMissing": {
+    "source": "b5f7a930d8477eb4",
+    "text": "缺少 Share Preview 窗口程序（{path}）。请重新运行 ReplayKit 安装程序。"
+  },
+  "screenshare.theShareWindowCouldNotStart": {
+    "source": "964d6e4a8ff066b8",
+    "text": "无法启动 Share Preview 窗口。请关闭再打开 Share Preview，如果仍然失败，请查看 ReplayKit 日志。"
+  },
+  "screenshare.theShareWindowDidNotClose": {
+    "source": "df55f2f86a7f167f",
+    "text": "即使已要求结束，Share Preview 窗口仍未关闭。"
+  },
+  "screenshare.coverDefaultText": {
+    "source": "a99e83da4583ab31",
+    "text": "马上回来"
+  },
+  "screenshare.theImageCouldNotBeUsed": {
+    "source": "5807af0d4a5d3ff9",
+    "text": "无法使用该图片。请选择 PNG、JPG、BMP 或 GIF 文件。"
+  },
+  "screenshare.theSoundNeedsFfmpeg": {
+    "source": "4559f79ab94267d6",
+    "text": "声音需要 ffmpeg，但尚未安装。请重新运行 ReplayKit 安装程序。"
+  },
+  "screenshare.theSoundCouldNotBeUsed": {
+    "source": "9e4fb0659b9c288b",
+    "text": "无法使用该声音。请选择其他音频文件。"
+  },
+  "screenshare.turnOnSharePreviewFirst": {
+    "source": "bd28264ea2b20433",
+    "text": "请先打开 Share Preview。"
   },
   "screenshare.obsStreamAudioPlaybackEndpointIs": {
     "source": "67f2ce393de09ce9",
@@ -6177,14 +6209,6 @@
     "source": "2b610cccfc59aa23",
     "text": "OBS 视频设置不可用：{error}"
   },
-  "screenshare.obsWindowedProjectorWasOpenedBut": {
-    "source": "ec315d83d6113eb7",
-    "text": "已打开 OBS 窗口化投影，但找不到其窗口。"
-  },
-  "screenshare.openingObsWindowedProjectorFailedError": {
-    "source": "2d9dcd1cb049f442",
-    "text": "打开 OBS 窗口化投影失败：{error}"
-  },
   "screenshare.projectorSourceMonitorBoundsAreInvalid": {
     "source": "93020dd93b70a042",
     "text": "投影源显示器范围无效。"
@@ -6196,10 +6220,6 @@
   "screenshare.theObsProjectorWindowChangeDid": {
     "source": "243400152e4ba38f",
     "text": "OBS 投影窗口的更改未以有效的共享窗口完成。"
-  },
-  "screenshare.theObsProjectorWindowCouldNot": {
-    "source": "e0ee22530dadb67b",
-    "text": "无法确认或停放 OBS 投影窗口。"
   },
   "screenshare.thePreviousProjectorWindowChangeIs": {
     "source": "e6ca2f0e117d83de",
@@ -7208,6 +7228,10 @@
   "settings.dragToPosition": {
     "source": "43ddd66cdc6eb3f4",
     "text": "拖动以定位"
+  },
+  "settings.resetOverlaySizeAndRotation": {
+    "source": "910d03d1f3f121c3",
+    "text": "重置大小和旋转"
   },
   "settings.editName": {
     "source": "70d7cc5a6422feaa",
@@ -8329,14 +8353,6 @@
     "source": "7ec4d75cc9910ae1",
     "text": "叠加层不透明度滑块"
   },
-  "settings.overlayRotationInDegrees": {
-    "source": "2f729c1b6874b5ed",
-    "text": "叠加层旋转角度（度）"
-  },
-  "settings.overlayRotationSlider": {
-    "source": "c129339a890ed309",
-    "text": "叠加层旋转滑块"
-  },
   "settings.overlaySceneItemsFailedError": {
     "source": "b5b4ac45a7bbb1be",
     "text": "叠加层设置已保存，但无法读取 OBS 场景项目：{error}"
@@ -8349,10 +8365,6 @@
     "source": "94d8f258ed868945",
     "text": "叠加层设置已保存，但无法为重启准备 OBS 场景文件：{error}"
   },
-  "settings.overlaySize": {
-    "source": "a50962ddfe53b823",
-    "text": "叠加层大小"
-  },
   "settings.overlaySizeSceneItemsFailedError": {
     "source": "f8b400ff6c79c2f1",
     "text": "叠加层大小已保存，但无法读取 OBS 场景项目：{error}"
@@ -8360,10 +8372,6 @@
   "settings.overlaySizeSceneLookupFailedError": {
     "source": "dd23826f43e78e66",
     "text": "叠加层大小已保存，但查找 OBS 场景失败：{error}"
-  },
-  "settings.overlaySizeSlider": {
-    "source": "11cc91e490df3ccd",
-    "text": "叠加层大小滑块"
   },
   "settings.pageDown": {
     "source": "38adab48f20e4552",
@@ -8668,6 +8676,134 @@
   "settings.repark": {
     "source": "40c2985c92ed985e",
     "text": "重新停放"
+  },
+  "settings.whileObsIsAway": {
+    "source": "ff7f616253d9151a",
+    "text": "OBS 关闭期间"
+  },
+  "settings.shareCardPreview": {
+    "source": "3af72fd745b3989d",
+    "text": "卡片预览"
+  },
+  "settings.shareCardPreviewNote": {
+    "source": "45b0ab019c17e4a4",
+    "text": "OBS 关闭、重启或更新时 Discord 观众看到的画面。"
+  },
+  "settings.shareCardBackground": {
+    "source": "7d67b6c9f37716ad",
+    "text": "背景"
+  },
+  "settings.shareCardBackgroundTheme": {
+    "source": "8fd954f2b25eb2ab",
+    "text": "主题颜色"
+  },
+  "settings.shareCardBackgroundImage": {
+    "source": "cbff02b1de749e35",
+    "text": "我自己的图片"
+  },
+  "settings.shareCardBackgroundLastFrame": {
+    "source": "97a18995a9e7d1ac",
+    "text": "最后一帧游戏画面（调暗）"
+  },
+  "settings.shareCardImage": {
+    "source": "fc6eaa65315f601d",
+    "text": "图片"
+  },
+  "settings.shareCardImageFit": {
+    "source": "32cc0d85750055d1",
+    "text": "图片适配"
+  },
+  "settings.shareCardFitWhole": {
+    "source": "369293a21deb39b2",
+    "text": "显示整张图片"
+  },
+  "settings.shareCardFitFill": {
+    "source": "06a81292f8359d12",
+    "text": "填满卡片"
+  },
+  "settings.shareCardText": {
+    "source": "c028d4bda5c6fda7",
+    "text": "文字"
+  },
+  "settings.showTheText": {
+    "source": "d17c8c9bbb4640bc",
+    "text": "显示文字"
+  },
+  "settings.shareCardSound": {
+    "source": "4e1288ba9755d7cd",
+    "text": "声音"
+  },
+  "settings.shareCardSoundNote": {
+    "source": "f78575f6ccf1b16a",
+    "text": "卡片显示时会在直播中播放，你自己听不到。"
+  },
+  "settings.shareCardSoundDefault": {
+    "source": "3c1a0cdbcfd6cc9a",
+    "text": "默认声音"
+  },
+  "settings.shareCardSoundCustom": {
+    "source": "dd90af84e22187ee",
+    "text": "我自己的声音"
+  },
+  "settings.shareCardSoundOff": {
+    "source": "40aab9dfcc6a214b",
+    "text": "无声音"
+  },
+  "settings.shareCardSoundFile": {
+    "source": "c57864b74a1a98f1",
+    "text": "声音文件"
+  },
+  "settings.chooseSound": {
+    "source": "a0ff61dc6aea6e4e",
+    "text": "选择声音"
+  },
+  "settings.shareCardSoundVolume": {
+    "source": "25c4333eb6d1d390",
+    "text": "声音音量"
+  },
+  "settings.shareCardSoundVolumeSlider": {
+    "source": "ff512b3729993d4c",
+    "text": "声音音量滑块"
+  },
+  "settings.keepTheCardAfterObsCloses": {
+    "source": "60dabedaae281b48",
+    "text": "OBS 关闭后保留卡片"
+  },
+  "settings.keepTheCardNote": {
+    "source": "2f179e7287ce29de",
+    "text": "重启和更新时始终保留。此项用于你关闭 OBS 或 OBS 崩溃时。"
+  },
+  "settings.keepCardOff": {
+    "source": "271e707aebb8c461",
+    "text": "随 OBS 一起关闭"
+  },
+  "settings.keepCard5m": {
+    "source": "1f40f7a5fa15caa1",
+    "text": "5 分钟"
+  },
+  "settings.keepCard15m": {
+    "source": "d356929940f32942",
+    "text": "15 分钟"
+  },
+  "settings.keepCard1h": {
+    "source": "d47049285cae9ef7",
+    "text": "1 小时"
+  },
+  "settings.keepCardAlways": {
+    "source": "7a86c86d4ec7c752",
+    "text": "直到 OBS 再次打开"
+  },
+  "settings.tryTheCard": {
+    "source": "170978231e15a41b",
+    "text": "试一下"
+  },
+  "settings.showTheCardNow": {
+    "source": "b674b42006bf7930",
+    "text": "立即显示卡片"
+  },
+  "settings.shareCardShown": {
+    "source": "e2599c18a54a52da",
+    "text": "卡片会在直播中显示 10 秒。"
   },
   "settings.reparkingProjector": {
     "source": "1487536689800d09",

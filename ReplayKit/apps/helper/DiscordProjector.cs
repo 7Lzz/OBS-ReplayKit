@@ -10,7 +10,7 @@ using Newtonsoft.Json.Linq;
 
 namespace ReplayKitHelper
 {
-    // discord "share preview" via an obs windowed projector: finds/opens/parks it hidden-but-discoverable beside its monitor (so discords own screen picker lists it) when enabled, or shows it centered for a user-triggered visual check ("inspect"), or closes it when disabled. every find/open/park/close sequence runs under ProjectorLock so Repark/Inspect/Disable/the keep-alive tick can never interleave with each other -- see the comment on Repark below, which documents a real concurrency bug this fixed. ProjectorNative.cs is the win32 layer underneath.
+    // discord "share preview" thru the share window (ShareWindow.cs), the replaykit process that owns the window discord streams and outlives obs: starts and parks it hidden-but-discoverable beside its monitor (so discords own screen picker lists it) when enabled, or shows it centered for a user-triggered visual check ("inspect"), or ends it when disabled, and while share preview is off no share window may run. every start/park/end sequence runs under ProjectorLock so Repark/Inspect/Disable/the keep-alive tick can never interleave with each other. ProjectorNative.cs is the win32 layer underneath.
     internal static class DiscordProjector
     {
         private static volatile bool disablePending;
@@ -265,35 +265,6 @@ namespace ReplayKitHelper
             return new InspectRect { X = x, Y = y, Width = width, Height = height };
         }
 
-        public static long FindProjectorWindow(JObject settings, string titleOverride = "")
-        {
-            string title = string.IsNullOrWhiteSpace(titleOverride) ? GetProjectorShareTitle(settings) : titleOverride;
-            long hwnd = ProjectorNative.FindProjectorWindow(title);
-            if (hwnd == 0) Log.Write("Find projector: no match for title '" + title + "'");
-            else Log.Write("Find projector: matched hwnd=" + hwnd + " for title '" + title + "'");
-            return hwnd;
-        }
-
-        private const int ProjectorHandoffMaxAgeSeconds = 2;
-
-        // the native plugin (core/ipc_pipe.cpp) streams the hwnds obs itself marked with isOBSProjectorWindow over the OBSReplayKitIpc pipe every 250ms -- the actual authoritative signal obs uses internally. PipeClient caches the latest snapshot in Server.State. returns null (not an empty list) when the pipe isnt connected or no snapshot has landed in the last couple publish cycles, so the caller can tell "confirmed no projectors exist" apart from "the plugin isnt running or obs is mid-shutdown, this genuinely doesnt know" and fall back to the window-heuristic scan -- an empty list here would silently collapse those two very different situations into one.
-        private static List<long> GetProjectorHwndsFromPlugin()
-        {
-            lock (Server.State.IpcLock)
-            {
-                if (!Server.State.IpcClientConnected || Server.State.ProjectorHwnds == null) return null;
-                if ((DateTime.UtcNow - Server.State.ProjectorHwndsAtUtc).TotalSeconds > ProjectorHandoffMaxAgeSeconds) return null;
-                return new List<long>(Server.State.ProjectorHwnds);
-            }
-        }
-
-        // Only OBS-confirmed projectors can be moved or hidden; the main window can also have "Projector" in its title.
-        private static List<long> GetObsWindowCandidates()
-        {
-            var fromPlugin = GetProjectorHwndsFromPlugin();
-            return fromPlugin == null ? null : fromPlugin.Where(ProjectorNative.IsProjectorWindow).ToList();
-        }
-
         public sealed class OpenProjectorResult
         {
             public bool Ok;
@@ -302,54 +273,18 @@ namespace ReplayKitHelper
             public string Message;
         }
 
-        private static OpenProjectorResult OpenIfMissing(JObject settings, string titleOverride = "")
+        // the running share window, started when none runs; it starts see-through and off every desktop, and the park below shows it
+        private static OpenProjectorResult EnsureWindow(JObject settings, string titleOverride = "")
         {
             string title = string.IsNullOrWhiteSpace(titleOverride) ? GetProjectorShareTitle(settings) : titleOverride;
-            long hwnd = FindProjectorWindow(settings, title);
-            if (hwnd != 0)
+            var info = ShareWindow.EnsureRunning(title, ShareWindow.KeepSeconds(settings));
+            if (!info.Ok || info.Hwnd == 0 || !ShareWindow.IsOwnWindow(info.Hwnd))
             {
-                int extra = ProjectorNative.CloseDuplicateProjectorWindows(title, hwnd);
-                if (extra > 0) Log.Write("Closed " + extra + " leaked Discord projector window(s)");
-                Server.State.ReplaykitDiscordProjectorPendingHwnd = 0;
-                return new OpenProjectorResult { Ok = true, Hwnd = hwnd, Opened = false };
+                string message = info.Message ?? Locales.Message("screenshare.theShareWindowCouldNotStart");
+                Log.Write("warn: " + message);
+                return new OpenProjectorResult { Ok = false, Message = message };
             }
-
-            // a projector an earlier attempt opened but gave up waiting for is taken now instead of opening another, once; if it fails again the next attempt opens a fresh one
-            long opened = Server.State.ReplaykitDiscordProjectorPendingHwnd;
-            Server.State.ReplaykitDiscordProjectorPendingHwnd = 0;
-            bool fresh = opened == 0;
-            if (fresh)
-            {
-                // the plugin opens it, since only from inside obs can it be made see-through before obs first shows it, and it answers with the exact window it opened, so a projector the user opens in the meantime (a source projector of Game Capture shows the game without the overlay) is never taken for it
-                Log.Write("Opening OBS Windowed Projector for title '" + title + "'");
-                if (!PipeClient.OpenShareProjectorAndWait(5000, out opened))
-                {
-                    Log.Write("warn: the native plugin did not answer the share projector open");
-                    return new OpenProjectorResult { Ok = false, Hwnd = 0, Opened = false, Message = Locales.Message("screenshare.openingObsWindowedProjectorFailedError", "error", Locales.Message("helper.thePluginDidNotAnswerIn")) };
-                }
-                if (opened == 0) return new OpenProjectorResult { Ok = false, Hwnd = 0, Opened = true, Message = Locales.Message("screenshare.obsWindowedProjectorWasOpenedBut") };
-            }
-
-            // the plugin streams the projectors obs marked every 250 ms and a window is only handled once it is in that list; 24x250ms=6s for a slow pc
-            for (int i = 0; i < 24; i++)
-            {
-                if (ProjectorNative.IsProjectorWindow(opened))
-                {
-                    if (!ProjectorNative.PreParkProjectorWindow(opened, title))
-                    {
-                        ProjectorNative.CloseWindow(opened);
-                        return new OpenProjectorResult { Ok = false, Message = Locales.Message("screenshare.theObsProjectorWindowCouldNot") };
-                    }
-                    int extra = ProjectorNative.CloseDuplicateProjectorWindows(title, opened);
-                    if (extra > 0) Log.Write("Closed " + extra + " leaked Discord projector window(s)");
-                    Log.Write("Opened OBS projector: hwnd=" + opened + " after " + (i * 250) + "ms");
-                    return new OpenProjectorResult { Ok = true, Hwnd = opened, Opened = true };
-                }
-                Thread.Sleep(250);
-            }
-            if (fresh) Server.State.ReplaykitDiscordProjectorPendingHwnd = opened;
-            Log.Write("warn: OBS Windowed Projector hwnd=" + opened + " was opened but never reached the projector list after 6s" + (fresh ? " (the next check takes it instead of opening another)" : ""));
-            return new OpenProjectorResult { Ok = false, Hwnd = 0, Opened = true, Message = Locales.Message("screenshare.obsWindowedProjectorWasOpenedBut") };
+            return new OpenProjectorResult { Ok = true, Hwnd = info.Hwnd, Opened = info.Started };
         }
 
         private static JObject ParkedRectToJson(ParkedRect r) => new JObject
@@ -383,7 +318,7 @@ namespace ReplayKitHelper
             return obj;
         }
 
-        // finds/opens/parks the layered projector beside its monitor with nonzero alpha so discord can capture it during fullscreen gameplay. runs the whole find/open/park sequence under ProjectorLock -- without it, a helper restart firing this function at the same moment as the keep-alive tick could see no projector from both, and both would open one. Inspect and Disable take the same lock for their own find/open/close sequences so none of the three can interleave with each other either.
+        // starts the share window when none runs and parks it beside its monitor with nonzero alpha so discord can capture it during fullscreen gameplay, all under ProjectorLock so a helper restart and the keep-alive tick can never start or move it at the same time; Inspect and Disable take the same lock
         public static JObject Repark(JObject settings = null, string titleOverride = "", bool force = false)
         {
             parkedWindow = null;
@@ -414,7 +349,7 @@ namespace ReplayKitHelper
 
                 var warnings = new List<string>();
                 string title = string.IsNullOrWhiteSpace(titleOverride) ? GetProjectorShareTitle(settings) : titleOverride;
-                var open = OpenIfMissing(settings, title);
+                var open = EnsureWindow(settings, title);
                 if (!open.Ok)
                 {
                     warnings.Add(open.Message);
@@ -467,6 +402,8 @@ namespace ReplayKitHelper
 
                 parkedWindow = new ParkedWindow { Hwnd = open.Hwnd, Title = title, Rect = rect };
                 Log.Write("Discord projector ready");
+                // a window just started has no card yet, and a theme or card change since the last park shows up here at the latest
+                ShareCover.Apply(settings, open.Opened);
                 return new JObject
                 {
                     ["ok"] = true,
@@ -499,7 +436,7 @@ namespace ReplayKitHelper
                     return new JObject { ["ok"] = false, ["message"] = Locales.Message("screenshare.thePreviousProjectorWindowChangeIs") };
                 var warnings = new List<string>();
                 string title = string.IsNullOrWhiteSpace(titleOverride) ? GetProjectorShareTitle(settings) : titleOverride;
-                var open = OpenIfMissing(settings, title);
+                var open = EnsureWindow(settings, title);
                 if (!open.Ok)
                 {
                     warnings.Add(open.Message);
@@ -562,39 +499,16 @@ namespace ReplayKitHelper
                     disablePending = true;
                     return new JObject { ["ok"] = false, ["message"] = Locales.Message("screenshare.thePreviousProjectorWindowChangeIs") };
                 }
-                if (GetObsWindowCandidates() == null)
-                {
-                    disablePending = true;
-                    return new JObject { ["ok"] = false, ["message"] = Locales.Message("screenshare.obsProjectorWindowInformationIsUnavailable") };
-                }
                 disablePending = false;
                 Server.State.ReplaykitDiscordProjectorInspectMode = false;
-                // disabling ends any open attempt still being tracked, and its window is closed too since it never got the share title the sweep below closes by
-                long pending = Server.State.ReplaykitDiscordProjectorPendingHwnd;
-                Server.State.ReplaykitDiscordProjectorPendingHwnd = 0;
-                if (pending != 0) ProjectorNative.CloseWindow(pending);
-                long hwnd = FindProjectorWindow(settings, title);
-                if (hwnd == 0)
-                {
+                if (!ShareWindow.AnyRunning())
                     return new JObject { ["ok"] = true, ["title"] = title, ["applied"] = new JArray("Share preview already disabled"), ["warnings"] = new JArray(warnings) };
-                }
-
-                // posting wm_close doesnt guarantee obs actually destroyed the projector -- verify it really went away instead of trusting the post, since a parked/ghosted projector left alive here keeps playing its own program audio mix to the default device long after this "succeeds". sweeps every exact-title match, not just the one Find picked as best, so a leaked duplicate from the keep-alive bug cant survive a disable.
-                for (int attempt = 1; attempt <= 6; attempt++)
-                {
-                    ProjectorNative.CloseWindow(hwnd);
-                    ProjectorNative.CloseDuplicateProjectorWindows(title, 0);
-                    Thread.Sleep(Math.Min(500, 100 * attempt));
-                    hwnd = FindProjectorWindow(settings, title);
-                    if (hwnd == 0)
-                    {
-                        return new JObject { ["ok"] = true, ["title"] = title, ["applied"] = new JArray("Share preview disabled"), ["warnings"] = new JArray(warnings) };
-                    }
-                }
-
-                string msg = Locales.Message("screenshare.obsProjectorWindowWasFoundBut2");
+                // with share preview off no share window may run, so one that does not close when asked is ended
+                if (ShareWindow.Quit(3000))
+                    return new JObject { ["ok"] = true, ["title"] = title, ["applied"] = new JArray("Share preview disabled"), ["warnings"] = new JArray(warnings) };
+                string msg = Locales.Message("screenshare.theShareWindowDidNotClose");
                 warnings.Add(msg);
-                return new JObject { ["ok"] = false, ["hwnd"] = hwnd, ["title"] = title, ["message"] = msg, ["warnings"] = new JArray(warnings) };
+                return new JObject { ["ok"] = false, ["title"] = title, ["message"] = msg, ["warnings"] = new JArray(warnings) };
             }
         }
 
@@ -738,23 +652,18 @@ namespace ReplayKitHelper
                 Log.Write("Discord projector keep-alive skipped: " + ex.Message);
                 return;
             }
-            if (!(settings["discord_projector_enabled"]?.Value<bool>() ?? true))
+            // share preview off means no share window, whatever started one
+            if (SettingsLiveApply.GetSharePreviewFlags()["enabled"]?.Value<bool>() != true)
             {
-                Log.Write("Discord projector keep-alive skipped: projector disabled in settings");
+                if (ShareWindow.AnyRunning())
+                {
+                    Log.Write("A share window runs while share preview is off; ending it");
+                    var off = Disable(settings);
+                    if (off["ok"]?.Value<bool>() != true) Log.Write("warn: " + off["message"]?.Value<string>());
+                }
                 return;
             }
             ClearCableMute();
-            string mode = settings["discord_output_mode"]?.Value<string>() ?? "";
-            if (mode != "projector")
-            {
-                Log.Write("Discord projector keep-alive skipped: output mode is '" + mode + "'");
-                return;
-            }
-            if (!(settings["discord_screenshare_enabled"]?.Value<bool>() ?? true))
-            {
-                Log.Write("Discord projector keep-alive skipped: screenshare disabled in settings");
-                return;
-            }
             if (Server.State.ReplaykitDiscordProjectorInspectMode)
             {
                 Log.Write("Discord projector keep-alive skipped: inspect mode active");
@@ -797,12 +706,11 @@ namespace ReplayKitHelper
             });
         }
 
+        // once the plugin is connected and obs shows its window, obs runs far enough to hand frames to the share window
         private static bool WindowInfoReady()
         {
             lock (Server.State.IpcLock)
-                return Server.State.IpcClientConnected && Server.State.ObsMainWindowHwnd != 0 &&
-                    Server.State.ProjectorHwnds != null &&
-                    (DateTime.UtcNow - Server.State.ProjectorHwndsAtUtc).TotalSeconds <= ProjectorHandoffMaxAgeSeconds;
+                return Server.State.IpcClientConnected && Server.State.ObsMainWindowHwnd != 0;
         }
 
         private static bool ApplyStartup()

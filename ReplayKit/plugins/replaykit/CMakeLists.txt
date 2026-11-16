@@ -25,7 +25,6 @@ set(REPLAYKIT_SOURCES
     src/app/obs_menu.cpp
     src/app/sdk_commands.cpp
     src/app/settings_poll.cpp
-    src/app/share_projector.cpp
 
     src/chrome/caption_track_filter.cpp
     src/chrome/title_keybind_badge.cpp
@@ -89,6 +88,9 @@ set(REPLAYKIT_SOURCES
     src/shell/shell_views.cpp
     src/shell/shell_sleep.cpp
     src/shell/shell_win_button.cpp
+    src/share/share_audio.cpp
+    src/share/share_card.cpp
+    src/share/share_link.cpp
 
     src/tray/tray_menu.cpp
 
@@ -108,6 +110,8 @@ add_library(replaykit MODULE ${REPLAYKIT_SOURCES})
 target_include_directories(replaykit PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/src"
     "${CMAKE_CURRENT_SOURCE_DIR}/third_party/obs-browser"
+    # the layout of the state shared with the share window, which owns it, and the generated names both use
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../apps/share-window/protocol"
     "${OBS_HEADERS_DIR}/libobs"
     "${OBS_HEADERS_DIR}/frontend/api"
 )

@@ -194,6 +194,7 @@
 <link rel="stylesheet" href="rk-theme.css" />
 <!--#include scrollbar-->
 <!--#include interaction-states-->
+<!--#include transform-readout-->
 <!--#include switch-->
 <!--#include combo-->
 <!--#include slider-->
@@ -856,6 +857,13 @@
 
     const hostGet = (k) => state[k];
     const hostSet = (k, v) => { state[k] = v; };
+    // the preview is the only control for the size and the rotation, so it writes them into state and the overlay controls pull them from there for the save
+    const setOverlayTransform = (scale, rotation) => {
+      state.overlayScale = scale;
+      state.overlayRotation = rotation;
+      if (window.RKOverlay) RKOverlay.refresh();
+      if (window.RKOverlayPreview) RKOverlayPreview.refresh();
+    };
     if (window.RKMic) RKMic.init({ get:hostGet, set:hostSet, onChange:() => {} });
     if (window.RKOverlay) RKOverlay.init({ get:hostGet, set:hostSet, styles:opts.overlays || [], modes:opts.bongoModes || [], onChange:() => { if (window.RKOverlayPreview) RKOverlayPreview.refresh(); } });
     // stored per style, becuase the two overlays are nothing alike in size and one shared corner would put the other one off the canvas
@@ -864,17 +872,8 @@
       if (style !== "input_overlay" && style !== "bongo_cat") return;
       state.overlayPosition = Object.assign({}, state.overlayPosition);
       state.overlayPosition[style] = { x, y };
-    }, (pct) => {
-      const slider = document.getElementById("ovcScale");
-      if (!slider) return;
-      slider.value = String(pct);
-      slider.dispatchEvent(new Event("input"));
-    }, (degrees) => {
-      const slider = document.getElementById("ovcRotation");
-      if (!slider) return;
-      slider.value = String(degrees);
-      slider.dispatchEvent(new Event("input"));
-    });
+    }, (pct) => { setOverlayTransform(pct, state.overlayRotation); }, (degrees) => { setOverlayTransform(state.overlayScale, degrees); }, false,
+    () => { setOverlayTransform(window.RK_SETTING_DEFAULTS.overlayScale, window.RK_SETTING_DEFAULTS.overlayRotation); });
     if (window.RKAppearance) RKAppearance.init({ state, onChange:() => {}, setStatus, clipsPreview:true });
 
     showStep(1);

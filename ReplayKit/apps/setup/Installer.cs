@@ -165,11 +165,13 @@ namespace ReplayKitSetup
             foreach (var src in Directory.EnumerateFiles(Config.OBS_ASSETS_DIR, "*", SearchOption.AllDirectories))
             {
                 string rel = src.Substring(Config.OBS_ASSETS_DIR.Length).TrimStart('\\', '/');
+                if (ShareWindowInstall.IsShareWindowFile(rel)) continue;
                 string dst = InstallTarget(rel);
                 InstallFile(src, rel, dst, prefs);
                 log?.Invoke("-> " + rel.Replace('\\', '/'));
                 count++;
             }
+            if (ShareWindowInstall.Install(log)) count++;
             WriteReplaykitVersion(log);
             CacheSetupExecutable(log);
             CleanupReplaykitLegacyFiles(log);
@@ -590,6 +592,8 @@ namespace ReplayKitSetup
                 {
                     string fileRel = src.Substring(runtimeSrc.Length).TrimStart('\\', '/');
                     string rel = Path.Combine("obs-replayKit", fileRel);
+                    // the share window can be running thru the update, which only the install of its own handles
+                    if (ShareWindowInstall.IsShareWindowFile(rel)) continue;
                     if (PreservesRuntimeFile(rel))
                     {
                         log?.Invoke("preserve: " + rel.Replace('\\', '/'));
@@ -657,6 +661,7 @@ namespace ReplayKitSetup
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { log?.Invoke("warn: update staging cleanup failed: " + ex.Message); }
             }
 
+            if (!ShareWindowInstall.Install(log)) problems?.Add("the Share Preview window");
             // after the copy has gone through, never before: a copy that is rolled back puts the old helper and scripts back, and those look for the settings in the old places
             MigrateStateLayout(log);
             CacheSetupExecutable(log);

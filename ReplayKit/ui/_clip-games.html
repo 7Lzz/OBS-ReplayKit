@@ -271,6 +271,8 @@ window.RKClipGames = (function () {
         const data = await response.json();
         if (!response.ok || !data.ok) throw Error(data.message || RK_M("clips.gameCouldNotBeRemoved"));
         owned = null;
+        // the clips of a removed game are counted elsewhere now, so the filter and the clips are read again the way they are after a game is set
+        window.dispatchEvent(new CustomEvent("replaykit:game-tags-changed"));
         busy(false);
         await load();
       } catch (error) { busy(false); status.textContent = error.message; }
@@ -449,6 +451,8 @@ window.RKClipGames = (function () {
     }
     paint(); refresh(true);
     window.addEventListener("replaykit:game-tags-changed", () => refresh(true));
+    // a deleted clip or screenshot changes the counts at once, which the throttle of refresh would hold back for up to ten seconds
+    window.addEventListener("replaykit:deleted-changed", () => refresh(true));
     // nothing is filtered by a game the page no longer shows, and the list is read again once games are back
     onEnabled = on => {
       if (on) { refresh(true); return; }

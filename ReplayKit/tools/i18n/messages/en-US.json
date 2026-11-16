@@ -2415,6 +2415,10 @@
     "context": "Label in the timeline of the clip editor. Also used in Settings > Overlay, the Settings window, the clips library.",
     "text": "Size"
   },
+  "common.sizeAndRotation": {
+    "context": "Small label under an item that can be moved, resized and rotated (the overlay preview in Settings and the setup wizard, the share card preview, and the layers and main picture in the video editor) while it shows its handles: its size in percent and its rotation in degrees. Keep {size} and {rotation} as written.",
+    "text": "{size}% · {rotation}°"
+  },
   "common.smaller": {
     "context": "Heading in a dialog of the clips library. Also used in the Settings window, the Storage page.",
     "text": "Smaller"
@@ -4951,6 +4955,10 @@
     "context": "Text in the look and effects panel of the clip editor. Also used in the timeline of the clip editor, the tools panel of the clip editor (subtitles, elements, audio).",
     "text": "Subtitle"
   },
+  "editor.subtitleSizeAndRotation": {
+    "context": "Small label under a subtitle on the video editor preview while it shows its handles: its text size in pixels of a 1080p picture and its rotation in degrees. Keep {size} and {rotation} as written.",
+    "text": "{size} px · {rotation}°"
+  },
   "editor.subtitlePresets": {
     "context": "Title in the look and effects panel of the clip editor.",
     "text": "Subtitle presets"
@@ -6151,21 +6159,45 @@
     "context": "Message the helper shows when an action fails or finishes in a ReplayKit window, sent by the background helper.",
     "text": "No real monitor work area was reported by Windows."
   },
-  "screenshare.obsProjectorWindowInformationIsUnavailable": {
-    "context": "Message the helper shows when an action fails or finishes in a ReplayKit window, sent by the background helper.",
-    "text": "OBS projector window information is unavailable."
-  },
   "screenshare.obsProjectorWindowWasFoundBut": {
     "context": "Text in a ReplayKit window, sent by the background helper.",
     "text": "OBS projector window was found, but Windows rejected the move/resize request."
   },
-  "screenshare.obsProjectorWindowWasFoundBut2": {
-    "context": "Text in a ReplayKit window, sent by the background helper.",
-    "text": "OBS projector window was found, but it did not close after repeated attempts."
-  },
   "screenshare.obsProjectorWindowWasMovedBut": {
     "context": "Text in a ReplayKit window, sent by the background helper.",
     "text": "OBS projector window was moved, but Windows rejected the taskbar-hide request."
+  },
+  "screenshare.theShareWindowIsMissing": {
+    "context": "Error shown when Share Preview cannot start its share window, sent by the background helper. {path} is the file path of the missing program.",
+    "text": "The Share Preview window program is missing ({path}). Run the ReplayKit installer again."
+  },
+  "screenshare.theShareWindowCouldNotStart": {
+    "context": "Error shown when Share Preview cannot start its share window, sent by the background helper.",
+    "text": "The Share Preview window could not be started. Turn Share Preview off and on again, and check the ReplayKit logs if it keeps failing."
+  },
+  "screenshare.theShareWindowDidNotClose": {
+    "context": "Error shown when turning Share Preview off could not close its share window, sent by the background helper.",
+    "text": "The Share Preview window did not close, even after it was told to end."
+  },
+  "screenshare.coverDefaultText": {
+    "context": "The text of the card Discord viewers see while OBS is closed or restarting, drawn large on the stream; also the placeholder of the card text field.",
+    "text": "Be right back"
+  },
+  "screenshare.theImageCouldNotBeUsed": {
+    "context": "Text in a ReplayKit window, sent by the background helper, about the card Discord viewers see while OBS is closed or restarting.",
+    "text": "That image could not be used. Pick a PNG, JPG, BMP or GIF file."
+  },
+  "screenshare.theSoundNeedsFfmpeg": {
+    "context": "Text in a ReplayKit window, sent by the background helper, about the card Discord viewers see while OBS is closed or restarting.",
+    "text": "A sound needs ffmpeg, which isn't installed yet. Run the ReplayKit installer again."
+  },
+  "screenshare.theSoundCouldNotBeUsed": {
+    "context": "Text in a ReplayKit window, sent by the background helper, about the card Discord viewers see while OBS is closed or restarting.",
+    "text": "That sound could not be used. Pick another audio file."
+  },
+  "screenshare.turnOnSharePreviewFirst": {
+    "context": "Text in a ReplayKit window, sent by the background helper, about the card Discord viewers see while OBS is closed or restarting.",
+    "text": "Turn on Share Preview first."
   },
   "screenshare.obsStreamAudioPlaybackEndpointIs": {
     "context": "Message the helper shows when an action fails or finishes in a ReplayKit window, sent by the background helper.",
@@ -6179,14 +6211,6 @@
     "context": "Message the helper shows when an action fails or finishes in a ReplayKit window, sent by the background helper. Keep {error} as written.",
     "text": "OBS video settings unavailable: {error}"
   },
-  "screenshare.obsWindowedProjectorWasOpenedBut": {
-    "context": "Message the helper shows when an action fails or finishes in a ReplayKit window, sent by the background helper.",
-    "text": "OBS Windowed Projector was opened, but its window could not be found."
-  },
-  "screenshare.openingObsWindowedProjectorFailedError": {
-    "context": "Message the helper shows when an action fails or finishes in a ReplayKit window, sent by the background helper. Keep {error} as written.",
-    "text": "Opening OBS Windowed Projector failed: {error}"
-  },
   "screenshare.projectorSourceMonitorBoundsAreInvalid": {
     "context": "Error message in a ReplayKit window, sent by the background helper.",
     "text": "Projector source monitor bounds are invalid."
@@ -6198,10 +6222,6 @@
   "screenshare.theObsProjectorWindowChangeDid": {
     "context": "Text in a ReplayKit window, sent by the background helper.",
     "text": "The OBS projector window change did not finish with a valid sharing window."
-  },
-  "screenshare.theObsProjectorWindowCouldNot": {
-    "context": "Message the helper shows when an action fails or finishes in a ReplayKit window, sent by the background helper.",
-    "text": "The OBS projector window could not be confirmed or parked."
   },
   "screenshare.thePreviousProjectorWindowChangeIs": {
     "context": "Message the helper shows when an action fails or finishes in a ReplayKit window, sent by the background helper.",
@@ -7210,6 +7230,10 @@
   "settings.dragToPosition": {
     "context": "Explanatory text in Settings > Overlay.",
     "text": "Drag to position"
+  },
+  "settings.resetOverlaySizeAndRotation": {
+    "context": "Tooltip of the reset button above the overlay preview in Settings > Overlay. It puts the overlay size and rotation back to their defaults; the preview is the only place they are set.",
+    "text": "Reset the size and rotation"
   },
   "settings.editName": {
     "context": "Screen reader label in Settings > Appearance. Also used in the Settings window. Keep {name} as written.",
@@ -8331,14 +8355,6 @@
     "context": "Screen reader label in Settings > Overlay. Also used in the Settings window.",
     "text": "Overlay opacity slider"
   },
-  "settings.overlayRotationInDegrees": {
-    "context": "Screen reader label in Settings > Overlay. Also used in the Settings window.",
-    "text": "Overlay rotation in degrees"
-  },
-  "settings.overlayRotationSlider": {
-    "context": "Screen reader label in Settings > Overlay. Also used in the Settings window.",
-    "text": "Overlay rotation slider"
-  },
   "settings.overlaySceneItemsFailedError": {
     "context": "Warning shown after settings are applied in a ReplayKit window, sent by the background helper. Keep {error} as written; it is the reason, often in English.",
     "text": "The overlay setting was saved, but the OBS scene items could not be read: {error}"
@@ -8351,10 +8367,6 @@
     "context": "Warning shown after settings are applied in a ReplayKit window, sent by the background helper. Keep {error} as written.",
     "text": "Overlay setting was saved, but the OBS scene file could not be prepared for restart: {error}"
   },
-  "settings.overlaySize": {
-    "context": "Screen reader label in Settings > Overlay. Also used in the Settings window.",
-    "text": "Overlay size"
-  },
   "settings.overlaySizeSceneItemsFailedError": {
     "context": "Warning shown after settings are applied in a ReplayKit window, sent by the background helper. Keep {error} as written; it is the reason, often in English.",
     "text": "The overlay size was saved, but the OBS scene items could not be read: {error}"
@@ -8362,10 +8374,6 @@
   "settings.overlaySizeSceneLookupFailedError": {
     "context": "Warning shown after settings are applied in a ReplayKit window, sent by the background helper. Keep {error} as written; it is the reason, often in English.",
     "text": "The overlay size was saved, but the OBS scene lookup failed: {error}"
-  },
-  "settings.overlaySizeSlider": {
-    "context": "Screen reader label in Settings > Overlay. Also used in the Settings window.",
-    "text": "Overlay size slider"
   },
   "settings.pageDown": {
     "context": "Text in the Settings window.",
@@ -8670,6 +8678,134 @@
   "settings.repark": {
     "context": "Button label in Settings > Screenshare > Discord Screenshare. Also used in the Settings window.",
     "text": "Repark"
+  },
+  "settings.whileObsIsAway": {
+    "context": "On the Share Preview page of ReplayKit Settings, in the box about the card Discord viewers see while OBS is closed or restarting. Box title.",
+    "text": "While OBS is away"
+  },
+  "settings.shareCardPreview": {
+    "context": "On the Share Preview page of ReplayKit Settings, in the box about the card Discord viewers see while OBS is closed or restarting. Label of the card preview image.",
+    "text": "Card preview"
+  },
+  "settings.shareCardPreviewNote": {
+    "context": "On the Share Preview page of ReplayKit Settings, in the box about the card Discord viewers see while OBS is closed or restarting.",
+    "text": "What Discord viewers see while OBS is closed, restarting or updating."
+  },
+  "settings.shareCardBackground": {
+    "context": "On the Share Preview page of ReplayKit Settings, in the box about the card Discord viewers see while OBS is closed or restarting. Label of a choice.",
+    "text": "Background"
+  },
+  "settings.shareCardBackgroundTheme": {
+    "context": "On the Share Preview page of ReplayKit Settings, in the box about the card Discord viewers see while OBS is closed or restarting. Choice: the theme colour of ReplayKit as the card background.",
+    "text": "Theme color"
+  },
+  "settings.shareCardBackgroundImage": {
+    "context": "On the Share Preview page of ReplayKit Settings, in the box about the card Discord viewers see while OBS is closed or restarting. Choice: an image the user picks as the card background.",
+    "text": "My own image"
+  },
+  "settings.shareCardBackgroundLastFrame": {
+    "context": "On the Share Preview page of ReplayKit Settings, in the box about the card Discord viewers see while OBS is closed or restarting. Choice: the last picture of the stream, frozen and darkened, as the card background.",
+    "text": "Last game frame, dimmed"
+  },
+  "settings.shareCardImage": {
+    "context": "On the Share Preview page of ReplayKit Settings, in the box about the card Discord viewers see while OBS is closed or restarting. Label of the row with the image buttons.",
+    "text": "Image"
+  },
+  "settings.shareCardImageFit": {
+    "context": "On the Share Preview page of ReplayKit Settings, in the box about the card Discord viewers see while OBS is closed or restarting. Label of a choice of how the image fills the card.",
+    "text": "Image fit"
+  },
+  "settings.shareCardFitWhole": {
+    "context": "On the Share Preview page of ReplayKit Settings, in the box about the card Discord viewers see while OBS is closed or restarting. Choice: the whole image shows, with bars where it does not fill the card.",
+    "text": "Show the whole image"
+  },
+  "settings.shareCardFitFill": {
+    "context": "On the Share Preview page of ReplayKit Settings, in the box about the card Discord viewers see while OBS is closed or restarting. Choice: the image covers the whole card and its edges are cut off.",
+    "text": "Fill the card"
+  },
+  "settings.shareCardText": {
+    "context": "On the Share Preview page of ReplayKit Settings, in the box about the card Discord viewers see while OBS is closed or restarting. Label of the text field for the card text.",
+    "text": "Text"
+  },
+  "settings.showTheText": {
+    "context": "On the Share Preview page of ReplayKit Settings, in the box about the card Discord viewers see while OBS is closed or restarting. Checkbox.",
+    "text": "Show the text"
+  },
+  "settings.shareCardSound": {
+    "context": "On the Share Preview page of ReplayKit Settings, in the box about the card Discord viewers see while OBS is closed or restarting. Label of a choice.",
+    "text": "Sound"
+  },
+  "settings.shareCardSoundNote": {
+    "context": "On the Share Preview page of ReplayKit Settings, in the box about the card Discord viewers see while OBS is closed or restarting.",
+    "text": "Plays on the stream while the card shows. You don't hear it yourself."
+  },
+  "settings.shareCardSoundDefault": {
+    "context": "On the Share Preview page of ReplayKit Settings, in the box about the card Discord viewers see while OBS is closed or restarting. Choice: the sound that comes with ReplayKit.",
+    "text": "Default sound"
+  },
+  "settings.shareCardSoundCustom": {
+    "context": "On the Share Preview page of ReplayKit Settings, in the box about the card Discord viewers see while OBS is closed or restarting. Choice: a sound file the user picks.",
+    "text": "My own sound"
+  },
+  "settings.shareCardSoundOff": {
+    "context": "On the Share Preview page of ReplayKit Settings, in the box about the card Discord viewers see while OBS is closed or restarting. Choice: the card plays no sound.",
+    "text": "No sound"
+  },
+  "settings.shareCardSoundFile": {
+    "context": "On the Share Preview page of ReplayKit Settings, in the box about the card Discord viewers see while OBS is closed or restarting. Label of the row with the sound file buttons.",
+    "text": "Sound file"
+  },
+  "settings.chooseSound": {
+    "context": "On the Share Preview page of ReplayKit Settings, in the box about the card Discord viewers see while OBS is closed or restarting. Button that opens a file picker for an audio file.",
+    "text": "Choose sound"
+  },
+  "settings.shareCardSoundVolume": {
+    "context": "On the Share Preview page of ReplayKit Settings, in the box about the card Discord viewers see while OBS is closed or restarting. Label of the volume control of the card sound.",
+    "text": "Sound volume"
+  },
+  "settings.shareCardSoundVolumeSlider": {
+    "context": "On the Share Preview page of ReplayKit Settings, in the box about the card Discord viewers see while OBS is closed or restarting. Accessible name of the volume slider.",
+    "text": "Sound volume slider"
+  },
+  "settings.keepTheCardAfterObsCloses": {
+    "context": "On the Share Preview page of ReplayKit Settings, in the box about the card Discord viewers see while OBS is closed or restarting. Label of a choice of how long the card stays.",
+    "text": "Keep the card after OBS closes"
+  },
+  "settings.keepTheCardNote": {
+    "context": "On the Share Preview page of ReplayKit Settings, in the box about the card Discord viewers see while OBS is closed or restarting.",
+    "text": "Restarts and updates always keep it. This is for when you close OBS or it crashes."
+  },
+  "settings.keepCardOff": {
+    "context": "On the Share Preview page of ReplayKit Settings, in the box about the card Discord viewers see while OBS is closed or restarting. Choice: the card closes together with OBS.",
+    "text": "Close it with OBS"
+  },
+  "settings.keepCard5m": {
+    "context": "On the Share Preview page of ReplayKit Settings, in the box about the card Discord viewers see while OBS is closed or restarting. Choice of a duration.",
+    "text": "5 minutes"
+  },
+  "settings.keepCard15m": {
+    "context": "On the Share Preview page of ReplayKit Settings, in the box about the card Discord viewers see while OBS is closed or restarting. Choice of a duration.",
+    "text": "15 minutes"
+  },
+  "settings.keepCard1h": {
+    "context": "On the Share Preview page of ReplayKit Settings, in the box about the card Discord viewers see while OBS is closed or restarting. Choice of a duration.",
+    "text": "1 hour"
+  },
+  "settings.keepCardAlways": {
+    "context": "On the Share Preview page of ReplayKit Settings, in the box about the card Discord viewers see while OBS is closed or restarting. Choice: the card stays until OBS starts again.",
+    "text": "Until OBS opens again"
+  },
+  "settings.tryTheCard": {
+    "context": "On the Share Preview page of ReplayKit Settings, in the box about the card Discord viewers see while OBS is closed or restarting. Label of the row with the button that shows the card now.",
+    "text": "Try it"
+  },
+  "settings.showTheCardNow": {
+    "context": "On the Share Preview page of ReplayKit Settings, in the box about the card Discord viewers see while OBS is closed or restarting. Button.",
+    "text": "Show the card now"
+  },
+  "settings.shareCardShown": {
+    "context": "On the Share Preview page of ReplayKit Settings, in the box about the card Discord viewers see while OBS is closed or restarting. Status after the button showed the card.",
+    "text": "The card shows on the stream for 10 seconds."
   },
   "settings.reparkingProjector": {
     "context": "Text in the Settings window.",

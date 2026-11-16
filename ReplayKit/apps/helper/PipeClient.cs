@@ -10,8 +10,7 @@ using Newtonsoft.Json.Linq;
 
 namespace ReplayKitHelper
 {
-    // client half of the ipc pipe with the native plugin (core/ipc_pipe.cpp), which is the server. replaces the old scratch-file handoff (obsreplaykit_main_window.txt / obsreplaykit_projector_windows.txt / open_clips.command / obs-allow-close). the plugin is the server because it outlives helper hot-swaps; this side just reconnects. inbound (plugin -> helper): MAINWIN <hwnd>, PROJECTORS <csv>, LOCALE <code>. outbound: OPENCLIPS, OPENSETTINGS [page], OPENSTORAGE, CLOSESTORAGE, OPENOBSSETTINGS, OPENSETUP / OPENSETUPQUIET,
-        // ALLOWCLOSE (+ ALLOWCLOSE_ACK back), LANGUAGE <code|-> (+ LANGUAGE_ACK back), OPENSHAREPROJECTOR (+ SHAREPROJECTOR_ACK <hwnd> back), SETICON <path|->, SETICONDOT <0|1>, RKICON <path>, CLIPSFULLSCREEN <0|1>, CLOSEVIEW <settings|setup|clips>, VIEWSHOWN <home|clips|settings|setup>, SHELLNAV <back|forward>, SHELLPONG <n>, CONFIRM <kind>. newline-delimited utf8 text, one message per line.
+    // client half of the ipc pipe with the native plugin (core/ipc_pipe.cpp), which is the server. replaces the old scratch-file handoff (obsreplaykit_main_window.txt / obsreplaykit_projector_windows.txt / open_clips.command / obs-allow-close). the plugin is the server because it outlives helper hot-swaps; this side just reconnects. inbound (plugin -> helper): MAINWIN <hwnd>, LOCALE <code>. outbound: OPENCLIPS, OPENSETTINGS [page], OPENSTORAGE, CLOSESTORAGE, OPENOBSSETTINGS, OPENSETUP / OPENSETUPQUIET, ALLOWCLOSE (+ ALLOWCLOSE_ACK back), LANGUAGE <code|-> (+ LANGUAGE_ACK back), SETICON <path|->, SETICONDOT <0|1>, RKICON <path>, CLIPSFULLSCREEN <0|1>, CLOSEVIEW <settings|setup|clips>, VIEWSHOWN <home|clips|settings|setup>, SHELLNAV <back|forward>, SHELLPONG <n>, CONFIRM <kind>. newline-delimited utf8 text, one message per line.
     internal static class PipeClient
     {
         private const string PipeName = "OBSReplayKitIpc";
@@ -30,10 +29,10 @@ namespace ReplayKitHelper
         private static readonly ManualResetEventSlim OutputsReleasedAck = new ManualResetEventSlim(false);
         private static readonly object ReleaseOutputsLock = new object();
         private static readonly ManualResetEventSlim LanguageAck = new ManualResetEventSlim(false);
+        private static readonly ManualResetEventSlim ShareCardAck = new ManualResetEventSlim(false);
+        private static readonly object ShareCardLock = new object();
+        private static int shareCardResult;
         private static readonly object LanguageLock = new object();
-        private static readonly ManualResetEventSlim ShareProjectorAck = new ManualResetEventSlim(false);
-        private static long shareProjectorHwnd;
-        private static readonly object ShareProjectorLock = new object();
         private static volatile string obsLocale;
         // the language obs started in, as the plugin says on connecting; null while no plugin is connected
         internal static string ObsLocale => obsLocale;
@@ -116,11 +115,7 @@ namespace ReplayKitHelper
                     capturePeer = false;
                     obsLocale = null;
                     lock (WriteLock) { _stream = null; _writer = null; }
-                    lock (Server.State.IpcLock)
-                    {
-                        Server.State.IpcClientConnected = false;
-                        Server.State.ProjectorHwnds = null;
-                    }
+                    lock (Server.State.IpcLock) Server.State.IpcClientConnected = false;
                 }
                 if (!_stop && !Server.State.Shutdown) Thread.Sleep(1000);
             }
@@ -174,17 +169,6 @@ namespace ReplayKitHelper
                         lock (Server.State.IpcLock) Server.State.ObsMainWindowHwnd = hwnd;
                     DiscordProjector.StartAtStartup();
                     break;
-                case "PROJECTORS":
-                    var list = new List<long>();
-                    foreach (var tok in payload.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries))
-                        if (long.TryParse(tok.Trim(), out long n) && n != 0) list.Add(n);
-                    lock (Server.State.IpcLock)
-                    {
-                        Server.State.ProjectorHwnds = list;
-                        Server.State.ProjectorHwndsAtUtc = DateTime.UtcNow;
-                    }
-                    DiscordProjector.StartAtStartup();
-                    break;
                 case "ALLOWCLOSE_ACK":
                     AllowCloseAck.Set();
                     break;
@@ -197,30 +181,27 @@ namespace ReplayKitHelper
                 case "LANGUAGE_ACK":
                     LanguageAck.Set();
                     break;
-                case "SHAREPROJECTOR_ACK":
-                    Interlocked.Exchange(ref shareProjectorHwnd, long.TryParse(payload, out long opened) && opened > 0 ? opened : 0);
-                    ShareProjectorAck.Set();
+                case "SHARECARD_ACK":
+                    Interlocked.Exchange(ref shareCardResult, payload.Trim() == "1" ? 1 : 0);
+                    ShareCardAck.Set();
                     break;
             }
         }
 
-        // has the plugin open the program projector of share preview, which it makes see-through before obs shows it; false when the plugin is not connected or never answers, and opened is the window it opened, 0 when it saw no projector show
-        public static bool OpenShareProjectorAndWait(int timeoutMs, out long opened)
+        // has the plugin draw the share window card the request describes (ShareCover builds it) and waits for it; false when the plugin is not connected, never answers or could not draw it
+        public static bool RenderShareCardAndWait(string requestJson, int timeoutMs)
         {
-            opened = 0;
-            lock (ShareProjectorLock)
+            lock (ShareCardLock)
             {
-                ShareProjectorAck.Reset();
-                Interlocked.Exchange(ref shareProjectorHwnd, 0);
-                if (!TryWrite("OPENSHAREPROJECTOR")) return false;
-                if (!ShareProjectorAck.Wait(timeoutMs))
+                ShareCardAck.Reset();
+                Interlocked.Exchange(ref shareCardResult, 0);
+                if (!TryWrite("SHARECARD " + requestJson)) return false;
+                if (!ShareCardAck.Wait(timeoutMs))
                 {
-                    Log.Write("OPENSHAREPROJECTOR: no answer from the plugin in " + timeoutMs + " ms");
+                    Log.Write("SHARECARD: no answer from the plugin in " + timeoutMs + " ms");
                     return false;
                 }
-                opened = Interlocked.Read(ref shareProjectorHwnd);
-                if (opened == 0) Log.Write("OPENSHAREPROJECTOR: the plugin saw no projector show");
-                return true;
+                return Volatile.Read(ref shareCardResult) == 1;
             }
         }
 

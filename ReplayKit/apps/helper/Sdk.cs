@@ -42,6 +42,8 @@ namespace ReplayKitHelper
             Register("update.badge", "shows the update button of the title bar for args.version (9.9.9 when left out) as if the update check had found it, or takes it away with args.clear; the next update check, every 30 minutes, puts the real state back", args => Update.PreviewBadge(args["clear"]?.Value<bool>() == true ? "" : args["version"]?.ToString() ?? "9.9.9"));
             Register("update.obs-badge", "shows the grey obs update button of the title bar for args.version (99.0.0 when left out) as if the obs check had found it, or takes it away with args.clear; the next obs check puts the real state back", args => ObsUpdate.PreviewBadge(args["clear"]?.Value<bool>() == true ? "" : args["version"]?.ToString() ?? "99.0.0"));
             Register("helper.info", "version, process id, uptime and the switches that matter of the helper", HelperInfo);
+            Register("share.window.state", "the share window: live or card, frames received and presented, presents per second, its texture, gpu, hold and keep times and the audio it plays", args => ShareWindow.State());
+            Register("share.window.card", "shows the card of the share window for args.seconds (1 to 60), while share preview is on", ShareWindowCard);
             Register("capture.state", "reports accepted native capture evidence without exposing process paths", args => ClipGames.Status());
             Register("presence.state", "the discord rich presence: whether it is on and set up, the game it follows, whether discord is connected, the activity it shows and the last error", args => DiscordPresence.State());
             Register("roblox.state", "the roblox experience the roblox logs say is open now, and how many experiences have a name and icon", args => RobloxExperiences.State());
@@ -125,6 +127,14 @@ namespace ReplayKitHelper
             waiting.Body = body ?? "";
             waiting.Done.Set();
             return true;
+        }
+
+        private static JObject ShareWindowCard(JObject args)
+        {
+            int seconds = args?["seconds"]?.Value<int>() ?? 10;
+            if (seconds < 1 || seconds > 60) return new JObject { ["ok"] = false, ["message"] = "seconds must be 1 to 60" };
+            if (SettingsLiveApply.GetSharePreviewFlags()["enabled"]?.Value<bool>() != true) return new JObject { ["ok"] = false, ["message"] = "share preview is off" };
+            return ShareWindow.Send("SHOWCARD " + seconds);
         }
 
         private static JObject HelperInfo(JObject args)

@@ -192,6 +192,14 @@ namespace ReplayKitHelper
                 ["discord_projector_edge"] = SettingDefaults.DiscordProjectorEdge,
                 ["discord_projector_title_hint"] = SettingDefaults.DiscordProjectorTitleHint,
                 ["discord_projector_hide_taskbar"] = SettingDefaults.DiscordProjectorHideTaskbar,
+                ["share_window_keep"] = SettingDefaults.ShareWindowKeep,
+                ["share_cover_background"] = SettingDefaults.ShareCoverBackground,
+                ["share_cover_fit"] = SettingDefaults.ShareCoverFit,
+                ["share_cover_text"] = SettingDefaults.ShareCoverText,
+                ["share_cover_show_text"] = SettingDefaults.ShareCoverShowText,
+                ["share_cover_sound"] = SettingDefaults.ShareCoverSound,
+                ["share_cover_sound_volume"] = SettingDefaults.ShareCoverSoundVolume,
+                ["share_cover_layout"] = DefaultShareCoverLayout(),
                 ["screenshareCaptureMode"] = SettingDefaults.ScreenshareCaptureMode,
                 ["screenshareGameWindow"] = SettingDefaults.ScreenshareGameWindow,
                 ["screenshareGameOverrides"] = new JArray(),
@@ -483,6 +491,45 @@ namespace ReplayKitHelper
         internal const double BongoSpeedMax = 3.0;
         // 0 is no limit, the default
         internal const int StorageLimitGbMax = 1000000;
+        // the share card layout: each item centre in percent of the card, its size in percent of the size the default card draws it at, and its turn in degrees
+        internal const double ShareCoverLayoutPositionMin = 0.0;
+        internal const double ShareCoverLayoutPositionMax = 100.0;
+        internal const int ShareCoverLayoutScaleMin = 25;
+        internal const int ShareCoverLayoutScaleMax = 400;
+        internal const int ShareCoverLayoutRotationMin = -180;
+        internal const int ShareCoverLayoutRotationMax = 180;
+
+        // the default card: the logo over the text, the pair in the middle of the card
+        internal static JObject DefaultShareCoverLayout() => new JObject
+        {
+            ["icon"] = new JObject { ["x"] = 50.0, ["y"] = 42.0, ["scale"] = 100, ["rotation"] = 0 },
+            ["text"] = new JObject { ["x"] = 50.0, ["y"] = 63.0, ["scale"] = 100, ["rotation"] = 0 },
+        };
+
+        // a field that is missing, not a finite number or out of range keeps the place the default card gives it
+        internal static JObject NormalizeShareCoverLayout(JToken value)
+        {
+            var result = DefaultShareCoverLayout();
+            if (!(value is JObject map)) return result;
+            foreach (var item in new[] { "icon", "text" })
+            {
+                if (!(map[item] is JObject given)) continue;
+                var target = (JObject)result[item];
+                if (TryLayoutNumber(given["x"], ShareCoverLayoutPositionMin, ShareCoverLayoutPositionMax, out double x)) target["x"] = Math.Round(x, 2);
+                if (TryLayoutNumber(given["y"], ShareCoverLayoutPositionMin, ShareCoverLayoutPositionMax, out double y)) target["y"] = Math.Round(y, 2);
+                if (TryLayoutNumber(given["scale"], ShareCoverLayoutScaleMin, ShareCoverLayoutScaleMax, out double scale)) target["scale"] = (int)Math.Round(scale);
+                if (TryLayoutNumber(given["rotation"], ShareCoverLayoutRotationMin, ShareCoverLayoutRotationMax, out double rotation)) target["rotation"] = (int)Math.Round(rotation);
+            }
+            return result;
+        }
+
+        private static bool TryLayoutNumber(JToken token, double min, double max, out double value)
+        {
+            value = 0;
+            if (token == null || (token.Type != JTokenType.Integer && token.Type != JTokenType.Float)) return false;
+            value = token.Value<double>();
+            return !double.IsNaN(value) && !double.IsInfinity(value) && value >= min && value <= max;
+        }
 
         // the range Normalize holds each setting to that a page has an input for; HttpResponse writes it into any page that names RK_SETTING_LIMITS and onto every input with a data-limit attribute, so a page never offers a value the helper would refuse
         public static JObject GetSettingLimits() => new JObject
@@ -494,6 +541,11 @@ namespace ReplayKitHelper
             ["screenshareSwitchDelaySeconds"] = LimitRange(SwitchDelaySecondsMin, SwitchDelaySecondsMax),
             ["clipSoundVolume"] = LimitRange(SettingLimits.SoundVolumeMin, SettingLimits.SoundVolumeMax),
             ["recordingSoundVolume"] = LimitRange(SettingLimits.SoundVolumeMin, SettingLimits.SoundVolumeMax),
+            ["share_cover_sound_volume"] = LimitRange(SettingLimits.SoundVolumeMin, SettingLimits.SoundVolumeMax),
+            // the fields of share_cover_layout, which the card editor drags rather than types
+            ["share_cover_layout_position"] = LimitRange(ShareCoverLayoutPositionMin, ShareCoverLayoutPositionMax),
+            ["share_cover_layout_scale"] = LimitRange(ShareCoverLayoutScaleMin, ShareCoverLayoutScaleMax),
+            ["share_cover_layout_rotation"] = LimitRange(ShareCoverLayoutRotationMin, ShareCoverLayoutRotationMax),
             ["desktopAudioVolume"] = LimitRange(0, MicTest.VolumeMax),
             ["discordAudioVolume"] = LimitRange(0, MicTest.VolumeMax),
             ["micVolume"] = LimitRange(0, MicTest.VolumeMax),
@@ -663,6 +715,14 @@ namespace ReplayKitHelper
                 ["discord_projector_edge"] = GetEnumSetting(data, "discord_projector_edge", defaults["discord_projector_edge"].Value<string>(), SettingLimits.DiscordProjectorEdges),
                 ["discord_projector_title_hint"] = GetTextSetting(data, "discord_projector_title_hint", defaults["discord_projector_title_hint"].Value<string>(), SettingLimits.DiscordProjectorTitleHintMaxLength),
                 ["discord_projector_hide_taskbar"] = true,
+                ["share_window_keep"] = GetEnumSetting(data, "share_window_keep", defaults["share_window_keep"].Value<string>(), SettingLimits.ShareWindowKeepChoices),
+                ["share_cover_background"] = GetEnumSetting(data, "share_cover_background", defaults["share_cover_background"].Value<string>(), SettingLimits.ShareCoverBackgrounds),
+                ["share_cover_fit"] = GetEnumSetting(data, "share_cover_fit", defaults["share_cover_fit"].Value<string>(), SettingLimits.ShareCoverFits),
+                ["share_cover_text"] = GetTextSetting(data, "share_cover_text", defaults["share_cover_text"].Value<string>(), SettingLimits.ShareCoverTextMaxLength),
+                ["share_cover_show_text"] = GetBoolSetting(data, "share_cover_show_text", defaults["share_cover_show_text"].Value<bool>()),
+                ["share_cover_sound"] = GetEnumSetting(data, "share_cover_sound", defaults["share_cover_sound"].Value<string>(), SettingLimits.ShareCoverSounds),
+                ["share_cover_sound_volume"] = GetIntSetting(data, "share_cover_sound_volume", defaults["share_cover_sound_volume"].Value<int>(), SettingLimits.SoundVolumeMin, SettingLimits.SoundVolumeMax),
+                ["share_cover_layout"] = NormalizeShareCoverLayout(data["share_cover_layout"]),
                 ["screenshareCaptureMode"] = GetEnumSetting(data, "screenshareCaptureMode", defaults["screenshareCaptureMode"].Value<string>(), SettingLimits.ScreenshareCaptureModes),
                 ["screenshareGameWindow"] = GetTextSetting(data, "screenshareGameWindow", defaults["screenshareGameWindow"].Value<string>(), SettingLimits.ScreenshareGameWindowMaxLength),
                 ["screenshareGameOverrides"] = NormalizeScreenshareGameOverrides(data["screenshareGameOverrides"]),

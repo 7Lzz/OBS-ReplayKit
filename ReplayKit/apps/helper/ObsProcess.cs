@@ -65,6 +65,8 @@ namespace ReplayKitHelper
         // a plain exit leaves obs and the helper running when a normal close cannot finish; a restart someone pressed and an update have to happen (the installer cannot replace the files of a running obs either), so for those obs is made to stop once the normal close has had its time, and the armed relauncher brings it back
         internal static void StopObsForRestart(string reason, bool mustStop)
         {
+            // every close thru here is a restart, an update or a setup run that starts obs again, so the share window keeps its card until obs is back, whatever its keep time
+            ShareWindow.HoldForObsReturn(600, reason);
             Thread.Sleep(300);
             try
             {

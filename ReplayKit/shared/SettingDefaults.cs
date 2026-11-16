@@ -43,6 +43,15 @@ namespace ReplayKitShared
         public const string DiscordProjectorEdge = "bottom";
         public const string DiscordProjectorTitleHint = "OBS ReplayKit Discord Share";
         public const bool DiscordProjectorHideTaskbar = true;
+        // how long the share window keeps showing its card once obs closed for real or crashed
+        public const string ShareWindowKeep = "5m";
+        // the card of the share window: its background, how an own image fills it, its text (empty is the default be right back), whether the text shows, its sound and how loud
+        public const string ShareCoverBackground = "theme";
+        public const string ShareCoverFit = "fit";
+        public const string ShareCoverText = "";
+        public const bool ShareCoverShowText = true;
+        public const string ShareCoverSound = "default";
+        public const int ShareCoverSoundVolume = 80;
         public const string ScreenshareCaptureMode = "hybrid_auto";
         public const string ScreenshareGameWindow = "";
         public const bool ScreenshareAutoGameKeepFocused = false;

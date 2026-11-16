@@ -260,7 +260,7 @@ namespace ReplayKitHelper
         {
             "shareMode", "discord_screenshare_enabled", "discord_output_mode", "discord_projector_enabled",
             "discord_projector_width", "discord_projector_height", "discord_projector_visible_pixels",
-            "discord_projector_monitor_index", "discord_projector_edge", "discord_projector_title_hint", "discord_projector_hide_taskbar",
+            "discord_projector_monitor_index", "discord_projector_edge", "discord_projector_title_hint", "discord_projector_hide_taskbar", "share_window_keep", "share_cover_background", "share_cover_fit", "share_cover_text", "share_cover_show_text", "share_cover_sound", "share_cover_sound_volume", "share_cover_layout",
         };
 
         internal static bool TestDiscordOutputOnlyRequest(JObject incoming)

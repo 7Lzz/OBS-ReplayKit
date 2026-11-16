@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace ReplayKitHelper
 {
-    // window-management primitives for the discord share-preview projector: find/open/close/park/style an obs windowed-projector hwnd. a few externs repeat ones in Native.cs on purpose so this class stays self-contained
+    // window-management primitives for the share preview window: park, style and show the window of the share window process. a few externs repeat ones in Native.cs on purpose so this class stays self-contained
     internal static class ProjectorNative
     {
         private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
@@ -80,20 +80,8 @@ namespace ReplayKitHelper
         [StructLayout(LayoutKind.Sequential)]
         private struct RECT { public int Left, Top, Right, Bottom; }
 
-        public static bool IsProjectorWindow(long hwndValue)
-        {
-            long main;
-            lock (Server.State.IpcLock)
-            {
-                main = Server.State.ObsMainWindowHwnd;
-                if (hwndValue == 0 || main == 0 || hwndValue == main || !Server.State.IpcClientConnected ||
-                    Server.State.ProjectorHwnds == null || !Server.State.ProjectorHwnds.Contains(hwndValue) ||
-                    (DateTime.UtcNow - Server.State.ProjectorHwndsAtUtc).TotalSeconds > 2) return false;
-            }
-            GetWindowThreadProcessId(new IntPtr(main), out uint mainProcess);
-            GetWindowThreadProcessId(new IntPtr(hwndValue), out uint projectorProcess);
-            return mainProcess != 0 && mainProcess == projectorProcess;
-        }
+        // only the window the running share window reported is ever moved or styled
+        public static bool IsProjectorWindow(long hwndValue) => ShareWindow.IsOwnWindow(hwndValue);
 
         private static bool EnsureNormalAppWindow(IntPtr hWnd)
         {
@@ -103,76 +91,6 @@ namespace ReplayKitHelper
             long next = (style | WS_EX_APPWINDOW) & ~WS_EX_TOOLWINDOW;
             if (next != style) SetWindowLongPtr(hWnd, GWL_EXSTYLE, new IntPtr(next));
             return SetWindowPos(hWnd, IntPtr.Zero, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
-        }
-
-        public static bool PreParkProjectorWindow(long hwndValue, string title)
-        {
-            return RunWithTimeout(cancel =>
-            {
-                IntPtr hWnd = new IntPtr(hwndValue);
-                if (cancel.IsCancellationRequested || !IsProjectorWindow(hwndValue)) return false;
-                if (!SetProjectorGhosted(hwndValue, true, 0)) return false;
-                if (cancel.IsCancellationRequested) return false;
-                if (!string.IsNullOrWhiteSpace(title) && !SetWindowText(hWnd, title)) return false;
-                if (cancel.IsCancellationRequested) return false;
-                return EnsureNormalAppWindow(hWnd);
-            }, 1500);
-        }
-
-        private static bool IsObsFamilyProcess(uint pid, out string processName)
-        {
-            processName = "";
-            if (pid == 0) return false;
-            try
-            {
-                using (var p = Process.GetProcessById((int)pid))
-                {
-                    processName = p.ProcessName.ToLowerInvariant();
-                    return processName == "obs64" || processName == "obs32" || processName == "obs" || processName.StartsWith("obs-");
-                }
-            }
-            catch (Exception ex) when (ex is ArgumentException || ex is InvalidOperationException) { return false; }
-        }
-
-        // only the projector carrying the exact share title counts: replaykit opens it and names it straight away, and obs is set not to bring projectors back on start (SaveProjectors=false in the user.ini replaykit ships), so any other projector is one the user opened (a source projector of Game Capture shows the game without the overlay), and a looser match parked it as the share or closed it on turning share preview off. no visibility filter on purpose -- a layered projector has stopped reporting itself as "visible" while still alive and still playing its own audio mix to the default device
-        public static long FindProjectorWindow(string shareTitle)
-        {
-            if (string.IsNullOrWhiteSpace(shareTitle)) return 0;
-            long found = 0;
-            EnumWindows((hWnd, lParam) =>
-            {
-                if (!IsProjectorWindow(hWnd.ToInt64())) return true;
-                var sb = new StringBuilder(512);
-                GetWindowText(hWnd, sb, sb.Capacity);
-                if (!string.Equals(sb.ToString(), shareTitle, StringComparison.Ordinal)) return true;
-                GetWindowThreadProcessId(hWnd, out uint pid);
-                if (!IsObsFamilyProcess(pid, out _)) return true;
-                found = hWnd.ToInt64();
-                return false;
-            }, IntPtr.Zero);
-            return found;
-        }
-
-        // self-healing sweep for the accumulating-hidden-projectors bug: the keep-alive tick opens a replacement whenever it cant find the parked projector, but never closed the original if it was still alive elsewhere -- only matches windows carrying the exact branded title (set by this classs own SetWindowText calls), so it can never touch a projector the user opened themselves from OBSs own menu. keepHwndValue=0 closes every match (used when disabling share preview); nonzero keeps that hwnd and closes the rest (used right after find/open, so at most one of these is ever alive between keep-alive ticks).
-        public static int CloseDuplicateProjectorWindows(string exactTitle, long keepHwndValue)
-        {
-            if (OperationPending() || string.IsNullOrWhiteSpace(exactTitle)) return 0;
-            IntPtr keep = new IntPtr(keepHwndValue);
-            int closed = 0;
-            EnumWindows((hWnd, lParam) =>
-            {
-                if (keep != IntPtr.Zero && hWnd == keep) return true;
-                if (!IsProjectorWindow(hWnd.ToInt64())) return true;
-                var sb = new StringBuilder(512);
-                GetWindowText(hWnd, sb, sb.Capacity);
-                if (!string.Equals(sb.ToString(), exactTitle, StringComparison.Ordinal)) return true;
-                GetWindowThreadProcessId(hWnd, out uint pid);
-                if (!IsObsFamilyProcess(pid, out _)) return true;
-                PostMessage(hWnd, WM_CLOSE, IntPtr.Zero, IntPtr.Zero);
-                closed++;
-                return true;
-            }, IntPtr.Zero);
-            return closed;
         }
 
         public static string GetWindowTitle(long hwndValue)
@@ -391,13 +309,6 @@ namespace ReplayKitHelper
             if (rect.Left != x || rect.Top != y || (rect.Right - rect.Left) != width || (rect.Bottom - rect.Top) != height) return false;
             if (!string.IsNullOrWhiteSpace(title) && !string.Equals(GetWindowTitle(hwndValue), title, StringComparison.Ordinal)) return false;
             return true;
-        }
-
-        public static bool CloseWindow(long hwndValue)
-        {
-            IntPtr hWnd = new IntPtr(hwndValue);
-            if (OperationPending() || !IsProjectorWindow(hwndValue)) return false;
-            return PostMessage(hWnd, WM_CLOSE, IntPtr.Zero, IntPtr.Zero);
         }
     }
 }

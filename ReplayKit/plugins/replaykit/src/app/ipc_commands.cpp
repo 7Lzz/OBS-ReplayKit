@@ -11,7 +11,6 @@
 #include "app/obs_menu.hpp"
 #include "app/sdk_commands.hpp"
 #include "app/settings_poll.hpp"
-#include "app/share_projector.hpp"
 #include "core/app_icon.hpp"
 #include "core/ipc_pipe.hpp"
 #include "core/main_window.hpp"
@@ -35,6 +34,7 @@
 #include "windows/obs_settings.hpp"
 #include "windows/settings_window.hpp"
 #include "windows/setup_window.hpp"
+#include "share/share_card.hpp"
 
 namespace rk {
 
@@ -208,6 +208,10 @@ void PipeDispatchLine(const std::string &line)
 		QMetaObject::invokeMethod(g_callbacks, []() {
 			ShellStartOutputWhenFree([]() { g_pipeSendOutputsReleasedAck.store(true); });
 		}, Qt::QueuedConnection);
+	} else if (line.rfind("SHARECARD ", 0) == 0) {
+		// drawn on the ui thread, where qt draws text and svg
+		const std::string request = line.substr(10);
+		QMetaObject::invokeMethod(g_callbacks, [request]() { g_pipeShareCardAck.store(RenderShareCard(request) ? 1 : 0); }, Qt::QueuedConnection);
 	} else if (line.rfind("LANGUAGE ", 0) == 0) {
 		// the language obs starts in next, set in the user config obs holds and saved the way its own language picker does, so no later save of obs writes the old one back; - clears it to follow windows
 		const std::string code = line.substr(9);
@@ -226,13 +230,6 @@ void PipeDispatchLine(const std::string &line)
 				g_pipeSendLanguageAck.store(true);
 			else
 				blog(LOG_WARNING, "[replaykit] the picked language could not be saved to the obs user config");
-		}, Qt::QueuedConnection);
-	} else if (line == "OPENSHAREPROJECTOR") {
-		QMetaObject::invokeMethod(g_callbacks, []() {
-			const HWND opened = OpenShareProjectorHidden();
-			if (!opened)
-				blog(LOG_WARNING, "[replaykit] obs showed no projector while the share projector was being opened");
-			g_pipeShareProjectorAck.store(static_cast<long long>(reinterpret_cast<quintptr>(opened)));
 		}, Qt::QueuedConnection);
 	} else if (line == "SETTINGSAPPLIED") {
 		QMetaObject::invokeMethod(g_callbacks, []() {

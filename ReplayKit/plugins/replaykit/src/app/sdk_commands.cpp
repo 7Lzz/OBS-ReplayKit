@@ -37,6 +37,7 @@
 #include "tray/tray_menu.hpp"
 #include "ui/anchored_panel.hpp"
 #include "ui/popup_host.hpp"
+#include "share/share_link.hpp"
 
 namespace rk {
 
@@ -476,6 +477,7 @@ void RegisterBuiltins()
 {
     SdkRegister("capture.state", "reports capture attribution sampling without exposing process paths", [](const QJsonObject &) { auto out = CaptureContextProbe(); out["ok"] = true; return out; });
 	SdkRegister("commands", "the commands of the native plugin", Commands);
+	SdkRegister("share.state", "the share window link: attached window, texture, frames copied and skipped, and the audio relays", [](const QJsonObject &) { auto out = ShareLinkProbe(); out["ok"] = true; return out; });
 	SdkRegister("ui.state", "the view, the window, the preview and its lock, the storage card and how many menus are open", UiState);
 	SdkRegister("memory.state", "committed and resident memory before and after the last hidden-window cleanup", [](const QJsonObject &) { return IdleMemory::Probe(); });
 	SdkRegister("ui.view", "shows a view: args.view is home, projector, clips, settings, setup or obs-settings", UiView);

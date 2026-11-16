@@ -28,6 +28,9 @@ if ($LASTEXITCODE -ne 0) { throw 'win-capture-audio build failed.' }
 Write-Host '[3c/4] Building input-overlay...'
 & powershell -NoProfile -File (Join-Path $PSScriptRoot '..\plugins\input-overlay\build.ps1')
 if ($LASTEXITCODE -ne 0) { throw 'input-overlay build failed.' }
+Write-Host '[3e/4] Building the share window...'
+& powershell -NoProfile -File (Join-Path $PSScriptRoot '..\apps\share-window\build.ps1')
+if ($LASTEXITCODE -ne 0) { throw 'Share window build failed.' }
 Write-Host '[3d/4] Checking the plugins against every OBS version...'
 & powershell -NoProfile -File (Join-Path $PSScriptRoot 'verify_obs_versions.ps1')
 if ($LASTEXITCODE -ne 0) { throw 'A bundled plugin does not load in every OBS version of obs-versions.json.' }

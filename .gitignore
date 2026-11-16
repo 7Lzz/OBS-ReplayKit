@@ -17,6 +17,7 @@ ReplayKit/publish_tmp/
 /ReplayKit/Bundle.props
 # written from ReplayKit/shared/HelperEndpoint.cs and StateLayout.cs by scripts/sync_shared.ps1 on every build, so those values are only ever edited there
 /ReplayKit/plugins/replaykit/src/core/shared_values.hpp
+/ReplayKit/apps/share-window/protocol/share_window_values.hpp
 /ReplayKit/lua/shared_values.lua
 /ReplayKit/ui/helper-endpoint.js
 
@@ -30,6 +31,7 @@ compression_history.json
 edit_drafts.json
 deleted_history.json
 profile_picture.png
+share_cover_*
 notifications.json
 window_state.ini
 hotkey_capture_signal.json

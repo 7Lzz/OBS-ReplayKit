@@ -2415,6 +2415,10 @@
     "source": "60bb3338e0ad558c",
     "text": "Taille"
   },
+  "common.sizeAndRotation": {
+    "source": "fa1c797ebf25e621",
+    "text": "{size} % · {rotation}°"
+  },
   "common.smaller": {
     "source": "215848cff2f44baf",
     "text": "Plus petit"
@@ -4951,6 +4955,10 @@
     "source": "9e31e252b6d49609",
     "text": "Sous-titre"
   },
+  "editor.subtitleSizeAndRotation": {
+    "source": "0ace000910f8813b",
+    "text": "{size} px · {rotation}°"
+  },
   "editor.subtitlePresets": {
     "source": "f704f42f6e0091fa",
     "text": "Préréglages de sous-titres"
@@ -6151,21 +6159,45 @@
     "source": "977a84715be6a085",
     "text": "Windows n'a signalé aucune zone de travail d'écran réelle."
   },
-  "screenshare.obsProjectorWindowInformationIsUnavailable": {
-    "source": "c2659974a9f520e8",
-    "text": "Les informations de la fenêtre du projecteur d'OBS sont indisponibles."
-  },
   "screenshare.obsProjectorWindowWasFoundBut": {
     "source": "b2b6981650a0028d",
     "text": "La fenêtre du projecteur d'OBS a été trouvée, mais Windows a refusé la demande de déplacement ou de redimensionnement."
   },
-  "screenshare.obsProjectorWindowWasFoundBut2": {
-    "source": "b568bc9513748137",
-    "text": "La fenêtre du projecteur d'OBS a été trouvée, mais elle ne s'est pas fermée après plusieurs tentatives."
-  },
   "screenshare.obsProjectorWindowWasMovedBut": {
     "source": "513efdfb320a0fb8",
     "text": "La fenêtre du projecteur d'OBS a été déplacée, mais Windows a refusé de masquer la barre des tâches."
+  },
+  "screenshare.theShareWindowIsMissing": {
+    "source": "b5f7a930d8477eb4",
+    "text": "Le programme de la fenêtre Share Preview est introuvable ({path}). Relancez l'installateur de ReplayKit."
+  },
+  "screenshare.theShareWindowCouldNotStart": {
+    "source": "964d6e4a8ff066b8",
+    "text": "La fenêtre Share Preview n'a pas pu démarrer. Désactivez puis réactivez Share Preview, et consultez les journaux de ReplayKit si l'échec continue."
+  },
+  "screenshare.theShareWindowDidNotClose": {
+    "source": "df55f2f86a7f167f",
+    "text": "La fenêtre Share Preview ne s'est pas fermée, même après qu'on lui a demandé de s'arrêter."
+  },
+  "screenshare.coverDefaultText": {
+    "source": "a99e83da4583ab31",
+    "text": "Je reviens tout de suite"
+  },
+  "screenshare.theImageCouldNotBeUsed": {
+    "source": "5807af0d4a5d3ff9",
+    "text": "Cette image n'a pas pu être utilisée. Choisissez un fichier PNG, JPG, BMP ou GIF."
+  },
+  "screenshare.theSoundNeedsFfmpeg": {
+    "source": "4559f79ab94267d6",
+    "text": "Un son nécessite ffmpeg, qui n'est pas encore installé. Relancez l'installateur de ReplayKit."
+  },
+  "screenshare.theSoundCouldNotBeUsed": {
+    "source": "9e4fb0659b9c288b",
+    "text": "Ce son n'a pas pu être utilisé. Choisissez un autre fichier audio."
+  },
+  "screenshare.turnOnSharePreviewFirst": {
+    "source": "bd28264ea2b20433",
+    "text": "Activez d'abord Share Preview."
   },
   "screenshare.obsStreamAudioPlaybackEndpointIs": {
     "source": "67f2ce393de09ce9",
@@ -6179,14 +6211,6 @@
     "source": "2b610cccfc59aa23",
     "text": "Paramètres vidéo d'OBS indisponibles : {error}"
   },
-  "screenshare.obsWindowedProjectorWasOpenedBut": {
-    "source": "ec315d83d6113eb7",
-    "text": "Le projecteur fenêtré d'OBS a été ouvert, mais sa fenêtre est introuvable."
-  },
-  "screenshare.openingObsWindowedProjectorFailedError": {
-    "source": "2d9dcd1cb049f442",
-    "text": "Échec de l'ouverture du projecteur fenêtré d'OBS : {error}"
-  },
   "screenshare.projectorSourceMonitorBoundsAreInvalid": {
     "source": "93020dd93b70a042",
     "text": "Les limites de l'écran source du projecteur sont invalides."
@@ -6198,10 +6222,6 @@
   "screenshare.theObsProjectorWindowChangeDid": {
     "source": "243400152e4ba38f",
     "text": "Le changement de fenêtre du projecteur d'OBS ne s'est pas terminé avec une fenêtre de partage valide."
-  },
-  "screenshare.theObsProjectorWindowCouldNot": {
-    "source": "e0ee22530dadb67b",
-    "text": "La fenêtre du projecteur d'OBS n'a pas pu être confirmée ni replacée."
   },
   "screenshare.thePreviousProjectorWindowChangeIs": {
     "source": "e6ca2f0e117d83de",
@@ -7210,6 +7230,10 @@
   "settings.dragToPosition": {
     "source": "43ddd66cdc6eb3f4",
     "text": "Faites glisser pour positionner"
+  },
+  "settings.resetOverlaySizeAndRotation": {
+    "source": "910d03d1f3f121c3",
+    "text": "Réinitialiser la taille et la rotation"
   },
   "settings.editName": {
     "source": "70d7cc5a6422feaa",
@@ -8331,14 +8355,6 @@
     "source": "7ec4d75cc9910ae1",
     "text": "Curseur d'opacité de l'incrustation"
   },
-  "settings.overlayRotationInDegrees": {
-    "source": "2f729c1b6874b5ed",
-    "text": "Rotation de l'incrustation en degrés"
-  },
-  "settings.overlayRotationSlider": {
-    "source": "c129339a890ed309",
-    "text": "Curseur de rotation de l'incrustation"
-  },
   "settings.overlaySceneItemsFailedError": {
     "source": "b5b4ac45a7bbb1be",
     "text": "Le paramètre de la superposition a été enregistré, mais les éléments de la scène OBS n’ont pas pu être lus : {error}"
@@ -8351,10 +8367,6 @@
     "source": "94d8f258ed868945",
     "text": "Le paramètre d'incrustation a été enregistré, mais le fichier de scène d'OBS n'a pas pu être préparé pour le redémarrage : {error}"
   },
-  "settings.overlaySize": {
-    "source": "a50962ddfe53b823",
-    "text": "Taille de l'incrustation"
-  },
   "settings.overlaySizeSceneItemsFailedError": {
     "source": "f8b400ff6c79c2f1",
     "text": "La taille de la superposition a été enregistrée, mais les éléments de la scène OBS n’ont pas pu être lus : {error}"
@@ -8362,10 +8374,6 @@
   "settings.overlaySizeSceneLookupFailedError": {
     "source": "dd23826f43e78e66",
     "text": "La taille de la superposition a été enregistrée, mais la recherche de la scène OBS a échoué : {error}"
-  },
-  "settings.overlaySizeSlider": {
-    "source": "11cc91e490df3ccd",
-    "text": "Curseur de taille de l'incrustation"
   },
   "settings.pageDown": {
     "source": "38adab48f20e4552",
@@ -8670,6 +8678,134 @@
   "settings.repark": {
     "source": "40c2985c92ed985e",
     "text": "Replacer"
+  },
+  "settings.whileObsIsAway": {
+    "source": "ff7f616253d9151a",
+    "text": "Pendant l'absence d'OBS"
+  },
+  "settings.shareCardPreview": {
+    "source": "3af72fd745b3989d",
+    "text": "Aperçu de la carte"
+  },
+  "settings.shareCardPreviewNote": {
+    "source": "45b0ab019c17e4a4",
+    "text": "Ce que voient les spectateurs Discord pendant qu'OBS est fermé, redémarre ou se met à jour."
+  },
+  "settings.shareCardBackground": {
+    "source": "7d67b6c9f37716ad",
+    "text": "Arrière-plan"
+  },
+  "settings.shareCardBackgroundTheme": {
+    "source": "8fd954f2b25eb2ab",
+    "text": "Couleur du thème"
+  },
+  "settings.shareCardBackgroundImage": {
+    "source": "cbff02b1de749e35",
+    "text": "Ma propre image"
+  },
+  "settings.shareCardBackgroundLastFrame": {
+    "source": "97a18995a9e7d1ac",
+    "text": "Dernière image du jeu, assombrie"
+  },
+  "settings.shareCardImage": {
+    "source": "fc6eaa65315f601d",
+    "text": "Image"
+  },
+  "settings.shareCardImageFit": {
+    "source": "32cc0d85750055d1",
+    "text": "Ajustement de l'image"
+  },
+  "settings.shareCardFitWhole": {
+    "source": "369293a21deb39b2",
+    "text": "Afficher l'image entière"
+  },
+  "settings.shareCardFitFill": {
+    "source": "06a81292f8359d12",
+    "text": "Remplir la carte"
+  },
+  "settings.shareCardText": {
+    "source": "c028d4bda5c6fda7",
+    "text": "Texte"
+  },
+  "settings.showTheText": {
+    "source": "d17c8c9bbb4640bc",
+    "text": "Afficher le texte"
+  },
+  "settings.shareCardSound": {
+    "source": "4e1288ba9755d7cd",
+    "text": "Son"
+  },
+  "settings.shareCardSoundNote": {
+    "source": "f78575f6ccf1b16a",
+    "text": "Est diffusé sur le stream tant que la carte s'affiche. Vous ne l'entendez pas vous-même."
+  },
+  "settings.shareCardSoundDefault": {
+    "source": "3c1a0cdbcfd6cc9a",
+    "text": "Son par défaut"
+  },
+  "settings.shareCardSoundCustom": {
+    "source": "dd90af84e22187ee",
+    "text": "Mon propre son"
+  },
+  "settings.shareCardSoundOff": {
+    "source": "40aab9dfcc6a214b",
+    "text": "Aucun son"
+  },
+  "settings.shareCardSoundFile": {
+    "source": "c57864b74a1a98f1",
+    "text": "Fichier son"
+  },
+  "settings.chooseSound": {
+    "source": "a0ff61dc6aea6e4e",
+    "text": "Choisir un son"
+  },
+  "settings.shareCardSoundVolume": {
+    "source": "25c4333eb6d1d390",
+    "text": "Volume du son"
+  },
+  "settings.shareCardSoundVolumeSlider": {
+    "source": "ff512b3729993d4c",
+    "text": "Curseur du volume du son"
+  },
+  "settings.keepTheCardAfterObsCloses": {
+    "source": "60dabedaae281b48",
+    "text": "Garder la carte après la fermeture d'OBS"
+  },
+  "settings.keepTheCardNote": {
+    "source": "2f179e7287ce29de",
+    "text": "Les redémarrages et mises à jour la gardent toujours. Ceci vaut quand vous fermez OBS ou qu'il plante."
+  },
+  "settings.keepCardOff": {
+    "source": "271e707aebb8c461",
+    "text": "La fermer avec OBS"
+  },
+  "settings.keepCard5m": {
+    "source": "1f40f7a5fa15caa1",
+    "text": "5 minutes"
+  },
+  "settings.keepCard15m": {
+    "source": "d356929940f32942",
+    "text": "15 minutes"
+  },
+  "settings.keepCard1h": {
+    "source": "d47049285cae9ef7",
+    "text": "1 heure"
+  },
+  "settings.keepCardAlways": {
+    "source": "7a86c86d4ec7c752",
+    "text": "Jusqu'à la réouverture d'OBS"
+  },
+  "settings.tryTheCard": {
+    "source": "170978231e15a41b",
+    "text": "Essayer"
+  },
+  "settings.showTheCardNow": {
+    "source": "b674b42006bf7930",
+    "text": "Afficher la carte maintenant"
+  },
+  "settings.shareCardShown": {
+    "source": "e2599c18a54a52da",
+    "text": "La carte s'affiche sur le stream pendant 10 secondes."
   },
   "settings.reparkingProjector": {
     "source": "1487536689800d09",

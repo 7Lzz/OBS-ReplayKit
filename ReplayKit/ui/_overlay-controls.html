@@ -1,4 +1,4 @@
-<!-- shared partial (helper #include target: overlay-controls). the input-overlay control set (style, flip, opacity, size, hue, colour multiply/add + resets) for the setup wizard. uses settings.html's OWN component classes and markup -- .combo, .check-row, .volume-control, .color-control, .field-reset -- so the wizard and Settings are the same controls, not lookalikes; the css those need is carried here because setup.html does not define it. host: RKOverlay.init({ get, set, onChange }); RKOverlay.collect() returns the overlay* fields. depends on _color-picker being on the page. -->
+<!-- shared partial (helper #include target: overlay-controls). the input-overlay control set (style, flip, opacity, hue, colour multiply/add + resets) for the setup wizard; the size and rotation are set in the overlay preview, so they have no control here but are still pulled from the host and collected. uses settings.html's OWN component classes and markup -- .combo, .check-row, .volume-control, .color-control, .field-reset -- so the wizard and Settings are the same controls, not lookalikes; the css those need is carried here because setup.html does not define it. host: RKOverlay.init({ get, set, onChange }); RKOverlay.collect() returns the overlay* fields. depends on _color-picker being on the page. -->
 <style>
   #ovcModeRow[hidden] { display:none; }
   /* lifted verbatim from settings.html so the sliders and the colour boxes match it */
@@ -54,26 +54,6 @@
   </div>
 </div>
 <div class="form-row">
-  <div class="label" data-i18n="common.size"></div>
-  <div class="field-wrap">
-    <div class="volume-control">
-      <input class="text-input volume-value" id="ovcScaleValue" type="text" inputmode="numeric" autocomplete="off" aria-label="Overlay size" data-i18n-aria-label="settings.overlaySize">
-      <div class="volume-slider-wrap"><input class="volume-slider rk-range" id="ovcScale" type="range" data-limit="overlayScale" step="1" aria-label="Overlay size slider" data-i18n-aria-label="settings.overlaySizeSlider"></div>
-    </div>
-    <button class="icon-btn field-reset" type="button" data-reset="overlayScale" title="Reset to default" data-i18n-title="common.resetToDefault"><svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
-  </div>
-</div>
-<div class="form-row">
-  <div class="label" data-i18n="common.rotation"></div>
-  <div class="field-wrap">
-    <div class="volume-control">
-      <input class="text-input volume-value" id="ovcRotationValue" type="text" inputmode="numeric" autocomplete="off" aria-label="Overlay rotation in degrees" data-i18n-aria-label="settings.overlayRotationInDegrees">
-      <div class="volume-slider-wrap"><input class="volume-slider rk-range" id="ovcRotation" type="range" data-limit="overlayRotation" step="1" aria-label="Overlay rotation slider" data-i18n-aria-label="settings.overlayRotationSlider"></div>
-    </div>
-    <button class="icon-btn field-reset" type="button" data-reset="overlayRotation" title="Reset to default" data-i18n-title="common.resetToDefault"><svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
-  </div>
-</div>
-<div class="form-row">
   <div class="label" data-i18n="settings.hueShift"></div>
   <div class="field-wrap">
     <div class="volume-control">
@@ -115,8 +95,6 @@
   var modeRow = document.getElementById("ovcModeRow");
   var sliders = {
     overlayOpacity:{ r:document.getElementById("ovcOpacity"), n:document.getElementById("ovcOpacityValue"), min:LIMITS.overlayOpacity.min, max:LIMITS.overlayOpacity.max },
-    overlayScale:{ r:document.getElementById("ovcScale"), n:document.getElementById("ovcScaleValue"), min:LIMITS.overlayScale.min, max:LIMITS.overlayScale.max },
-    overlayRotation:{ r:document.getElementById("ovcRotation"), n:document.getElementById("ovcRotationValue"), min:LIMITS.overlayRotation.min, max:LIMITS.overlayRotation.max },
     overlayHueShift:{ r:document.getElementById("ovcHue"), n:document.getElementById("ovcHueValue"), min:LIMITS.overlayHueShift.min, max:LIMITS.overlayHueShift.max },
   };
   var colors = {
@@ -206,7 +184,6 @@
       host.set(key, st[key]); refreshResets(); fire();
     };
     c.r.addEventListener("input", function () { c.commit(c.r.value); });
-    if (key === "overlayRotation") c.n.addEventListener("input", function () { c.commit(c.n.value, true); });
     c.n.addEventListener("change", function () { c.commit(c.n.value); });
   });
 
@@ -258,8 +235,8 @@
       if (v !== undefined && v !== null) st[k] = v;
     });
     st.overlayOpacity = clamp(st.overlayOpacity, sliders.overlayOpacity.min, sliders.overlayOpacity.max, DEF.overlayOpacity);
-    st.overlayScale = clamp(st.overlayScale, sliders.overlayScale.min, sliders.overlayScale.max, DEF.overlayScale);
-    st.overlayRotation = clamp(st.overlayRotation, sliders.overlayRotation.min, sliders.overlayRotation.max, DEF.overlayRotation);
+    st.overlayScale = clamp(st.overlayScale, LIMITS.overlayScale.min, LIMITS.overlayScale.max, DEF.overlayScale);
+    st.overlayRotation = clamp(st.overlayRotation, LIMITS.overlayRotation.min, LIMITS.overlayRotation.max, DEF.overlayRotation);
     st.overlayHueShift = clamp(st.overlayHueShift, sliders.overlayHueShift.min, sliders.overlayHueShift.max, DEF.overlayHueShift);
     st.overlayColorMultiply = normHex(st.overlayColorMultiply, "#ffffff");
     st.overlayColorAdd = normHex(st.overlayColorAdd, "#000000");
