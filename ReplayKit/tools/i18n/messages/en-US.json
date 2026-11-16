@@ -6127,10 +6127,6 @@
     "context": "Message the helper shows when an action fails or finishes in a ReplayKit window, sent by the background helper. Keep {error} as written.",
     "text": "Could not read monitor work areas: {error}"
   },
-  "screenshare.couldNotResolveASafeProjector": {
-    "context": "Error message in a ReplayKit window, sent by the background helper.",
-    "text": "Could not resolve a safe projector parking corner."
-  },
   "screenshare.couldNotResolveAValidProjector": {
     "context": "Message the helper shows when an action fails or finishes in a ReplayKit window, sent by the background helper.",
     "text": "Could not resolve a valid projector window size."

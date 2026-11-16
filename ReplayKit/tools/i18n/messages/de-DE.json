@@ -6126,10 +6126,6 @@
     "source": "4b4bbef33f25401d",
     "text": "Die Arbeitsbereiche der Monitore konnten nicht gelesen werden: {error}"
   },
-  "screenshare.couldNotResolveASafeProjector": {
-    "source": "c496e40882ebc804",
-    "text": "Es konnte keine sichere Ecke für den geparkten Projektor gefunden werden."
-  },
   "screenshare.couldNotResolveAValidProjector": {
     "source": "c7291913b573e05e",
     "text": "Es konnte keine gültige Fenstergröße für den Projektor ermittelt werden."

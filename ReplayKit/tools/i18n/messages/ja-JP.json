@@ -6125,10 +6125,6 @@
     "source": "4b4bbef33f25401d",
     "text": "モニターの作業領域を読み取れませんでした: {error}"
   },
-  "screenshare.couldNotResolveASafeProjector": {
-    "source": "c496e40882ebc804",
-    "text": "安全なプロジェクターの退避位置を決められませんでした。"
-  },
   "screenshare.couldNotResolveAValidProjector": {
     "source": "c7291913b573e05e",
     "text": "有効なプロジェクターのウィンドウサイズを決められませんでした。"

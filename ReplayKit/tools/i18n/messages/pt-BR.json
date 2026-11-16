@@ -6127,10 +6127,6 @@
     "source": "4b4bbef33f25401d",
     "text": "Não foi possível ler as áreas de trabalho dos monitores: {error}"
   },
-  "screenshare.couldNotResolveASafeProjector": {
-    "source": "c496e40882ebc804",
-    "text": "Não foi possível definir um canto seguro para estacionar a projeção."
-  },
   "screenshare.couldNotResolveAValidProjector": {
     "source": "c7291913b573e05e",
     "text": "Não foi possível definir um tamanho válido para a janela da projeção."

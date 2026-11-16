@@ -6127,10 +6127,6 @@
     "source": "4b4bbef33f25401d",
     "text": "Impossible de lire les zones de travail des écrans : {error}"
   },
-  "screenshare.couldNotResolveASafeProjector": {
-    "source": "c496e40882ebc804",
-    "text": "Impossible de déterminer un coin de stationnement sûr pour le projecteur."
-  },
   "screenshare.couldNotResolveAValidProjector": {
     "source": "c7291913b573e05e",
     "text": "Impossible de déterminer une taille valide pour la fenêtre du projecteur."

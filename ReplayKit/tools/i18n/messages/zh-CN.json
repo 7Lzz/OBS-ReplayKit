@@ -6125,10 +6125,6 @@
     "source": "4b4bbef33f25401d",
     "text": "无法读取显示器工作区：{error}"
   },
-  "screenshare.couldNotResolveASafeProjector": {
-    "source": "c496e40882ebc804",
-    "text": "无法找到安全的投影窗口停放位置。"
-  },
   "screenshare.couldNotResolveAValidProjector": {
     "source": "c7291913b573e05e",
     "text": "无法确定有效的投影窗口大小。"
