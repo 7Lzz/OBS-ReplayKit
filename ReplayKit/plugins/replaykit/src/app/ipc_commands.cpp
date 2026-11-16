@@ -229,9 +229,10 @@ void PipeDispatchLine(const std::string &line)
 		}, Qt::QueuedConnection);
 	} else if (line == "OPENSHAREPROJECTOR") {
 		QMetaObject::invokeMethod(g_callbacks, []() {
-			if (!OpenShareProjectorHidden())
-				blog(LOG_WARNING, "[replaykit] the share projector opened but could not be made see-through before it showed");
-			g_pipeSendShareProjectorAck.store(true);
+			const HWND opened = OpenShareProjectorHidden();
+			if (!opened)
+				blog(LOG_WARNING, "[replaykit] obs showed no projector while the share projector was being opened");
+			g_pipeShareProjectorAck.store(static_cast<long long>(reinterpret_cast<quintptr>(opened)));
 		}, Qt::QueuedConnection);
 	} else if (line == "SETTINGSAPPLIED") {
 		QMetaObject::invokeMethod(g_callbacks, []() {

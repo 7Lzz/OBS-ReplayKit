@@ -30,7 +30,7 @@ protected:
 
 } // namespace
 
-bool OpenShareProjectorHidden()
+HWND OpenShareProjectorHidden()
 {
 	SeeThroughOnShow filter;
 	const HWND focused = GetForegroundWindow();
@@ -41,7 +41,9 @@ bool OpenShareProjectorHidden()
 	// obs activates every projector it opens, which takes the keyboard from the game or app in front; this one is invisible, so the window that had the keyboard gets it back
 	if (filter.hwnd && GetForegroundWindow() == filter.hwnd && focused && focused != filter.hwnd && IsWindow(focused))
 		SetForegroundWindow(focused);
-	return filter.caught;
+	if (filter.hwnd && !filter.caught)
+		blog(LOG_WARNING, "[replaykit] the share projector opened but could not be made see-through before it showed");
+	return filter.hwnd;
 }
 
 } // namespace rk

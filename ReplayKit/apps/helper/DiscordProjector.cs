@@ -118,20 +118,25 @@ namespace ReplayKitHelper
             public List<ScreenBounds> AllScreenBounds = new List<ScreenBounds>();
         }
 
-        public static MonitorWorkArea GetProjectorMonitorWorkArea(int monitorIndex)
+        // left on automatic (index 0), the projector goes to the last monitor other than the main one that holds it whole, else to the main one: on a monitor too small for it, a vertical one, part of it would hang off the desktop, and a capture that only takes what is on the desktop would miss that part, where the overlay sits in a corner. width and height 0 mean the size of the main monitor
+        internal static int PickProjectorMonitor(List<ReplayKitShared.DisplayMonitor> screens, int monitorIndex, int width, int height)
+        {
+            if (monitorIndex > 0) return Math.Min(monitorIndex - 1, screens.Count - 1);
+            int main = screens.FindIndex(s => s.Primary);
+            int needW = width > 0 ? width : main >= 0 ? screens[main].Bounds.Width : 0;
+            int needH = height > 0 ? height : main >= 0 ? screens[main].Bounds.Height : 0;
+            int fits = screens.FindLastIndex(s => !s.Primary && s.Bounds.Width >= needW && s.Bounds.Height >= needH);
+            if (fits >= 0) return fits;
+            return main >= 0 ? main : screens.Count - 1;
+        }
+
+        public static MonitorWorkArea GetProjectorMonitorWorkArea(int monitorIndex, int width, int height)
         {
             var screens = ReplayKitShared.Monitors.List(out string listError);
             if (screens == null) return new MonitorWorkArea { Ok = false, Message = Locales.Message("screenshare.couldNotReadMonitorWorkAreas", "error", listError) };
             if (screens.Count < 1) return new MonitorWorkArea { Ok = false, Message = Locales.Message("screenshare.noRealMonitorWorkAreaWas") };
 
-            // left on automatic, the projector goes to the last monitor that is not the main one, since games open fullscreen on the main one and the order windows lists monitors in can put it last; with a single monitor that one is the only choice
-            int idx;
-            if (monitorIndex <= 0)
-            {
-                idx = screens.FindLastIndex(s => !s.Primary);
-                if (idx < 0) idx = screens.Count - 1;
-            }
-            else idx = Math.Min(Math.Max(1, monitorIndex) - 1, screens.Count - 1);
+            int idx = PickProjectorMonitor(screens, monitorIndex, width, height);
             var area = screens[idx].WorkArea;
             var bounds = screens[idx].Bounds;
             int sourceIdx = screens.FindIndex(s => s.Primary);
@@ -292,7 +297,7 @@ namespace ReplayKitHelper
                 .FirstOrDefault();
             if (best == null) throw new InvalidOperationException(Locales.Message("screenshare.couldNotResolveASafeProjector"));
 
-            // the window is anchored in a corner of its own monitor and kept off every other one, where it would be an invisible always-on-top window over whatever runs fullscreen there; one bigger than its monitor (a landscape window on a vertical monitor) hangs off the side that faces no other monitor, and the part that hangs off is still in a window capture
+            // the window is anchored in a corner of its own monitor that keeps the most of it on the desktop, since a capture that only takes what is on the desktop would miss a part that hangs off; among corners that do as well, the one that stays off the other monitors wins. a monitor picked automatically always holds the window whole, so this only matters for one set by hand
             var own = new ScreenBounds { Left = screenLeft, Top = screenTop, Right = screenRight, Bottom = screenBottom };
             var others = screenBounds.Where(b => b.Left != own.Left || b.Top != own.Top || b.Right != own.Right || b.Bottom != own.Bottom).ToList();
             var host = new[]
@@ -305,10 +310,12 @@ namespace ReplayKitHelper
                 .Select(a =>
                 {
                     var placed = new ScreenBounds { Left = a.X, Top = a.Y, Right = a.X + width, Bottom = a.Y + height };
-                    return new { a.Corner, a.X, a.Y, OnOthers = others.Sum(b => GetRectIntersectionArea(placed, b)), OnOwn = GetRectIntersectionArea(placed, own) };
+                    long onOthers = others.Sum(b => GetRectIntersectionArea(placed, b));
+                    long onOwn = GetRectIntersectionArea(placed, own);
+                    return new { a.Corner, a.X, a.Y, OffDesktop = (long)width * height - onOwn - onOthers, OnOthers = onOthers };
                 })
-                .OrderBy(a => a.OnOthers)
-                .ThenByDescending(a => a.OnOwn)
+                .OrderBy(a => a.OffDesktop)
+                .ThenBy(a => a.OnOthers)
                 .ThenBy(a => GetCornerPreference(edgeValue, a.Corner))
                 .ThenBy(a => a.Corner, StringComparer.Ordinal)
                 .First();
@@ -385,33 +392,6 @@ namespace ReplayKitHelper
             return fromPlugin == null ? null : fromPlugin.Where(ProjectorNative.IsProjectorWindow).ToList();
         }
 
-        // true only for a hwnd that appeared after baseline was captured -- a window already present in baseline is off limits no matter what it looks like, becuase it could be a projector the user opened themselves from OBSs own menu (same title pattern, no way to tell them apart except by "did it exist before a projector was asked for").
-        private static bool IsNewProjectorWindow(long hwnd, List<long> baseline) => !baseline.Contains(hwnd);
-
-        private static long GetFirstNewProjectorWindow(List<long> baseline)
-        {
-            var candidates = GetObsWindowCandidates();
-            if (candidates == null) return 0;
-            foreach (var candidate in candidates)
-            {
-                if (IsNewProjectorWindow(candidate, baseline)) return candidate;
-            }
-            return 0;
-        }
-
-        private static void CloseStrayProjectorWindows(List<long> baseline, long keepHwnd)
-        {
-            var candidates = GetObsWindowCandidates();
-            if (candidates == null) return;
-            foreach (var candidate in candidates)
-            {
-                if (candidate == keepHwnd) continue;
-                if (!IsNewProjectorWindow(candidate, baseline)) continue;
-                ProjectorNative.CloseWindow(candidate);
-                Log.Write("Closed stray Discord projector window hwnd=" + candidate + " left over from an earlier slow-to-appear attempt");
-            }
-        }
-
         public sealed class OpenProjectorResult
         {
             public bool Ok;
@@ -428,45 +408,45 @@ namespace ReplayKitHelper
             {
                 int extra = ProjectorNative.CloseDuplicateProjectorWindows(title, hwnd);
                 if (extra > 0) Log.Write("Closed " + extra + " leaked Discord projector window(s)");
-                Server.State.ReplaykitDiscordProjectorPendingBaseline = null;
+                Server.State.ReplaykitDiscordProjectorPendingHwnd = 0;
                 return new OpenProjectorResult { Ok = true, Hwnd = hwnd, Opened = false };
             }
 
-            // an earlier attempt may still be mid-create on obss side even though this gave up waiting for it last time -- if one is already pending, reuse that same baseline instead of re-snapshotting now, or its own not-yet-appeared window would be wrongly treated as "pre-existing, not ours" the moment it finally shows up. only take a fresh baseline when nothing is pending.
-            if (Server.State.ReplaykitDiscordProjectorPendingBaseline == null)
+            // a projector an earlier attempt opened but gave up waiting for is taken now instead of opening another, once; if it fails again the next attempt opens a fresh one
+            long opened = Server.State.ReplaykitDiscordProjectorPendingHwnd;
+            Server.State.ReplaykitDiscordProjectorPendingHwnd = 0;
+            bool fresh = opened == 0;
+            if (fresh)
             {
-                var candidates = GetObsWindowCandidates();
-                if (candidates == null) return new OpenProjectorResult { Ok = false, Message = Locales.Message("screenshare.obsProjectorWindowInformationIsUnavailable") };
-                Server.State.ReplaykitDiscordProjectorPendingBaseline = candidates;
-            }
-            var baseline = Server.State.ReplaykitDiscordProjectorPendingBaseline;
-
-            // the plugin opens it, since only from inside obs can it be made see-through before obs first shows it; opened over obs-websocket it sat on the screen until the poll below found it
-            Log.Write("Opening OBS Windowed Projector for title '" + title + "'");
-            if (!PipeClient.OpenShareProjectorAndWait(5000))
-            {
-                Log.Write("warn: the native plugin did not open the share projector");
-                return new OpenProjectorResult { Ok = false, Hwnd = 0, Opened = false, Message = Locales.Message("screenshare.openingObsWindowedProjectorFailedError", "error", Locales.Message("helper.thePluginDidNotAnswerIn")) };
+                // the plugin opens it, since only from inside obs can it be made see-through before obs first shows it, and it answers with the exact window it opened, so a projector the user opens in the meantime (a source projector of Game Capture shows the game without the overlay) is never taken for it
+                Log.Write("Opening OBS Windowed Projector for title '" + title + "'");
+                if (!PipeClient.OpenShareProjectorAndWait(5000, out opened))
+                {
+                    Log.Write("warn: the native plugin did not answer the share projector open");
+                    return new OpenProjectorResult { Ok = false, Hwnd = 0, Opened = false, Message = Locales.Message("screenshare.openingObsWindowedProjectorFailedError", "error", Locales.Message("helper.thePluginDidNotAnswerIn")) };
+                }
+                if (opened == 0) return new OpenProjectorResult { Ok = false, Hwnd = 0, Opened = true, Message = Locales.Message("screenshare.obsWindowedProjectorWasOpenedBut") };
             }
 
-            // 24x250ms=6s -- a slow pc that misses a shorter window would report "not found" while obs was still mid-create, leaving that projector un-renamed and un-hidden until some later cycle happened to trip over it. matching against baseline (not title text) so this works regardless of obss ui language -- a non-english install localizes the windows own title, but never localizes what obs process it belongs to or when it appeared, which is all this actually checks now.
+            // the plugin streams the projectors obs marked every 250 ms and a window is only handled once it is in that list; 24x250ms=6s for a slow pc
             for (int i = 0; i < 24; i++)
             {
-                Thread.Sleep(250);
-                long newHwnd = GetFirstNewProjectorWindow(baseline);
-                if (newHwnd != 0)
+                if (ProjectorNative.IsProjectorWindow(opened))
                 {
-                    if (!ProjectorNative.PreParkProjectorWindow(newHwnd, title))
+                    if (!ProjectorNative.PreParkProjectorWindow(opened, title))
+                    {
+                        ProjectorNative.CloseWindow(opened);
                         return new OpenProjectorResult { Ok = false, Message = Locales.Message("screenshare.theObsProjectorWindowCouldNot") };
-                    int extra = ProjectorNative.CloseDuplicateProjectorWindows(title, newHwnd);
+                    }
+                    int extra = ProjectorNative.CloseDuplicateProjectorWindows(title, opened);
                     if (extra > 0) Log.Write("Closed " + extra + " leaked Discord projector window(s)");
-                    CloseStrayProjectorWindows(baseline, newHwnd);
-                    Server.State.ReplaykitDiscordProjectorPendingBaseline = null;
-                    Log.Write("Opened OBS projector: hwnd=" + newHwnd + " after " + (i + 1) + " poll(s) (" + ((i + 1) * 250) + "ms)");
-                    return new OpenProjectorResult { Ok = true, Hwnd = newHwnd, Opened = true };
+                    Log.Write("Opened OBS projector: hwnd=" + opened + " after " + (i * 250) + "ms");
+                    return new OpenProjectorResult { Ok = true, Hwnd = opened, Opened = true };
                 }
+                Thread.Sleep(250);
             }
-            Log.Write("warn: OBS Windowed Projector opened but never appeared for title '" + title + "' after 6s (still watching -- next check will catch it late instead of opening another)");
+            if (fresh) Server.State.ReplaykitDiscordProjectorPendingHwnd = opened;
+            Log.Write("warn: OBS Windowed Projector hwnd=" + opened + " was opened but never reached the projector list after 6s" + (fresh ? " (the next check takes it instead of opening another)" : ""));
             return new OpenProjectorResult { Ok = false, Hwnd = 0, Opened = true, Message = Locales.Message("screenshare.obsWindowedProjectorWasOpenedBut") };
         }
 
@@ -543,7 +523,8 @@ namespace ReplayKitHelper
                     return new JObject { ["ok"] = false, ["message"] = open.Message, ["warnings"] = new JArray(warnings) };
                 }
 
-                var workArea = GetProjectorMonitorWorkArea(settings["discord_projector_monitor_index"]?.Value<int>() ?? 0);
+                var workArea = GetProjectorMonitorWorkArea(settings["discord_projector_monitor_index"]?.Value<int>() ?? 0,
+                    settings["discord_projector_width"]?.Value<int>() ?? 0, settings["discord_projector_height"]?.Value<int>() ?? 0);
                 if (!workArea.Ok)
                 {
                     warnings.Add(workArea.Message);
@@ -632,7 +613,8 @@ namespace ReplayKitHelper
                     return new JObject { ["ok"] = false, ["message"] = open.Message, ["warnings"] = new JArray(warnings) };
                 }
 
-                var workArea = GetProjectorMonitorWorkArea(settings["discord_projector_monitor_index"]?.Value<int>() ?? 0);
+                var workArea = GetProjectorMonitorWorkArea(settings["discord_projector_monitor_index"]?.Value<int>() ?? 0,
+                    settings["discord_projector_width"]?.Value<int>() ?? 0, settings["discord_projector_height"]?.Value<int>() ?? 0);
                 if (!workArea.Ok)
                 {
                     warnings.Add(workArea.Message);
@@ -695,8 +677,10 @@ namespace ReplayKitHelper
                 }
                 disablePending = false;
                 Server.State.ReplaykitDiscordProjectorInspectMode = false;
-                // disabling ends any open attempt still being tracked -- a stale baseline from before this disable shouldnt carry into whatever happens the next time its turned back on.
-                Server.State.ReplaykitDiscordProjectorPendingBaseline = null;
+                // disabling ends any open attempt still being tracked, and its window is closed too since it never got the share title the sweep below closes by
+                long pending = Server.State.ReplaykitDiscordProjectorPendingHwnd;
+                Server.State.ReplaykitDiscordProjectorPendingHwnd = 0;
+                if (pending != 0) ProjectorNative.CloseWindow(pending);
                 long hwnd = FindProjectorWindow(settings, title);
                 if (hwnd == 0)
                 {

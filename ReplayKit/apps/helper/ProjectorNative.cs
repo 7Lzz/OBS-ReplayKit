@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -15,7 +14,6 @@ namespace ReplayKitHelper
 
         [DllImport("user32.dll")] private static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
         [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetWindowText(IntPtr hWnd, StringBuilder text, int count);
-        [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetClassName(IntPtr hWnd, StringBuilder text, int count);
         [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern bool SetWindowText(IntPtr hWnd, string text);
         [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint pid);
         [DllImport("user32.dll")] private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
@@ -134,77 +132,23 @@ namespace ReplayKitHelper
             catch (Exception ex) when (ex is ArgumentException || ex is InvalidOperationException) { return false; }
         }
 
-        private static int ProjectorScore(string title, string processName, string titleHint)
+        // only the projector carrying the exact share title counts: replaykit opens it and names it straight away, and obs is set not to bring projectors back on start (SaveProjectors=false in the user.ini replaykit ships), so any other projector is one the user opened (a source projector of Game Capture shows the game without the overlay), and a looser match parked it as the share or closed it on turning share preview off. no visibility filter on purpose -- the parked projector is a layered alpha-0 window that has, in the past, stopped reporting itself as "visible" while still alive and still playing its own audio mix to the default device
+        public static long FindProjectorWindow(string shareTitle)
         {
-            if (string.IsNullOrWhiteSpace(title)) return 0;
-            int score = 0;
-            if (!string.IsNullOrWhiteSpace(titleHint) && title.IndexOf(titleHint, StringComparison.OrdinalIgnoreCase) >= 0) score = 100;
-            else if (title.IndexOf("Windowed Projector", StringComparison.OrdinalIgnoreCase) >= 0) score = 80;
-            else if (title.IndexOf("Projector", StringComparison.OrdinalIgnoreCase) >= 0) score = 60;
-            if (score > 0 && processName == "obs64") score += 10;
-            return score;
-        }
-
-        // no visibility filter here on purpose -- the parked/ghosted projector is a layered alpha-0 window that has, in the past, stopped reporting itself as "visible" while still alive and still playing its own audio mix to the default device; process+title scoring below is tight enough on its own.
-        public static long FindProjectorWindow(string titleHint)
-        {
-            long best = 0;
-            int bestScore = 0;
+            if (string.IsNullOrWhiteSpace(shareTitle)) return 0;
+            long found = 0;
             EnumWindows((hWnd, lParam) =>
             {
                 if (!IsProjectorWindow(hWnd.ToInt64())) return true;
                 var sb = new StringBuilder(512);
                 GetWindowText(hWnd, sb, sb.Capacity);
-                string title = sb.ToString();
+                if (!string.Equals(sb.ToString(), shareTitle, StringComparison.Ordinal)) return true;
                 GetWindowThreadProcessId(hWnd, out uint pid);
-                if (!IsObsFamilyProcess(pid, out string processName)) return true;
-                int score = ProjectorScore(title, processName, titleHint);
-                if (score > bestScore) { bestScore = score; best = hWnd.ToInt64(); }
-                return true;
+                if (!IsObsFamilyProcess(pid, out _)) return true;
+                found = hWnd.ToInt64();
+                return false;
             }, IntPtr.Zero);
-            return best;
-        }
-
-        private static bool IsObsMainProcess(uint pid, out string processName)
-        {
-            processName = "";
-            if (pid == 0) return false;
-            try
-            {
-                using (var p = Process.GetProcessById((int)pid))
-                {
-                    processName = p.ProcessName.ToLowerInvariant();
-                    return processName == "obs64" || processName == "obs32" || processName == "obs";
-                }
-            }
-            catch (Exception ex) when (ex is ArgumentException || ex is InvalidOperationException) { return false; }
-        }
-
-        // qts windows backend registers a distinct window class per top-level window, shaped "Qt" + an internal version encoding + a suffix. a real application-level window (main window, a dialog, a projector) gets a QWindowIcon/QWindowToolSaveBits-style suffix containing "QWindow"; qts OWN internal plumbing -- the tray balloon message window, theme/screen-change observer windows, and the custom-titlebar strip every dock widget carries -- gets a differently-shaped class name that never contains that substring. checked against a real running obs: real windows were "Qt6111QWindowIcon"/"Qt6111QWindowToolSaveBits", noise was "_q_titlebar" (dozens, one per dock), "Qt6111TrayIconMessageWindowClass", "Qt6111ThemeChangeObserverWindow", "Qt6111ScreenChangeObserverWindow" -- none of those four contain "QWindow". title text cant do this filtering (obs localizes every real windows title, including "Windowed Projector", so a non-english install has no english substring to match) and IsWindowVisible cant either (obss own main window reports not-visible when minimized to tray, same as this app runs by default, so a real window failing a visibility check is normal here, not a sign it isnt real).
-        //
-        // second, independent check on top of the class name: a genuinely freestanding top-level window (a projector, obss own main window) has no owner. every OTHER real dialog obs itself spawns (Stats, Output Timer, WebSocket Server Settings, input-overlays config window, ...) is owned by the main window. this catches what the class-name check alone cant: some other real obs dialog opening in the same narrow window this happens to be polling in.
-        private static bool IsRealQtTopLevelWindow(IntPtr hWnd)
-        {
-            var sb = new StringBuilder(256);
-            if (GetClassName(hWnd, sb, sb.Capacity) == 0) return false;
-            string cls = sb.ToString();
-            if (!cls.StartsWith("Qt", StringComparison.Ordinal) || cls.IndexOf("QWindow", StringComparison.Ordinal) < 0) return false;
-            return GetWindow(hWnd, GW_OWNER) == IntPtr.Zero;
-        }
-
-        // every real top-level window belonging to obss own main process (not helper processes like obs-browser-page, which the obs- prefix match in IsObsFamilyProcess would also catch, and not the dozens of internal-only windows IsRealQtTopLevelWindow filters out) -- used to snapshot "what already exists" before asking obs to open a projector, so a slow-to-appear one can later be told apart from something that was already there. deliberately not title-filtered -- see IsRealQtTopLevelWindow above for why. safety against touching something that shouldnt be touched comes from the baseline diff in DiscordProjector.OpenIfMissing, not from filtering here: a window that already existed before a projector was asked for -- the users own projector, obss main window, an open Stats/Output-Timer dialog, anything else -- is never touched regardless of what this returns, only ones that appear afterward are ever treated as candidates.
-        public static long[] FindAllObsWindows()
-        {
-            var matches = new List<long>();
-            EnumWindows((hWnd, lParam) =>
-            {
-                GetWindowThreadProcessId(hWnd, out uint pid);
-                if (!IsObsMainProcess(pid, out _)) return true;
-                if (!IsRealQtTopLevelWindow(hWnd)) return true;
-                matches.Add(hWnd.ToInt64());
-                return true;
-            }, IntPtr.Zero);
-            return matches.ToArray();
+            return found;
         }
 
         // self-healing sweep for the accumulating-hidden-projectors bug: the keep-alive tick opens a replacement whenever it cant find the parked projector, but never closed the original if it was still alive elsewhere -- only matches windows carrying the exact branded title (set by this classs own SetWindowText calls), so it can never touch a projector the user opened themselves from OBSs own menu. keepHwndValue=0 closes every match (used when disabling share preview); nonzero keeps that hwnd and closes the rest (used right after find/open, so at most one of these is ever alive between keep-alive ticks).

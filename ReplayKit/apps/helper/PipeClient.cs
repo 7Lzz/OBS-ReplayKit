@@ -11,7 +11,7 @@ using Newtonsoft.Json.Linq;
 namespace ReplayKitHelper
 {
     // client half of the ipc pipe with the native plugin (core/ipc_pipe.cpp), which is the server. replaces the old scratch-file handoff (obsreplaykit_main_window.txt / obsreplaykit_projector_windows.txt / open_clips.command / obs-allow-close). the plugin is the server because it outlives helper hot-swaps; this side just reconnects. inbound (plugin -> helper): MAINWIN <hwnd>, PROJECTORS <csv>, LOCALE <code>. outbound: OPENCLIPS, OPENSETTINGS [page], OPENSTORAGE, CLOSESTORAGE, OPENOBSSETTINGS, OPENSETUP / OPENSETUPQUIET,
-        // ALLOWCLOSE (+ ALLOWCLOSE_ACK back), LANGUAGE <code|-> (+ LANGUAGE_ACK back), OPENSHAREPROJECTOR (+ SHAREPROJECTOR_ACK back), SETICON <path|->, SETICONDOT <0|1>, RKICON <path>, CLIPSFULLSCREEN <0|1>, CLOSEVIEW <settings|setup|clips>, VIEWSHOWN <home|clips|settings|setup>, SHELLNAV <back|forward>, SHELLPONG <n>, CONFIRM <kind>. newline-delimited utf8 text, one message per line.
+        // ALLOWCLOSE (+ ALLOWCLOSE_ACK back), LANGUAGE <code|-> (+ LANGUAGE_ACK back), OPENSHAREPROJECTOR (+ SHAREPROJECTOR_ACK <hwnd> back), SETICON <path|->, SETICONDOT <0|1>, RKICON <path>, CLIPSFULLSCREEN <0|1>, CLOSEVIEW <settings|setup|clips>, VIEWSHOWN <home|clips|settings|setup>, SHELLNAV <back|forward>, SHELLPONG <n>, CONFIRM <kind>. newline-delimited utf8 text, one message per line.
     internal static class PipeClient
     {
         private const string PipeName = "OBSReplayKitIpc";
@@ -32,6 +32,7 @@ namespace ReplayKitHelper
         private static readonly ManualResetEventSlim LanguageAck = new ManualResetEventSlim(false);
         private static readonly object LanguageLock = new object();
         private static readonly ManualResetEventSlim ShareProjectorAck = new ManualResetEventSlim(false);
+        private static long shareProjectorHwnd;
         private static readonly object ShareProjectorLock = new object();
         private static volatile string obsLocale;
         // the language obs started in, as the plugin says on connecting; null while no plugin is connected
@@ -197,21 +198,29 @@ namespace ReplayKitHelper
                     LanguageAck.Set();
                     break;
                 case "SHAREPROJECTOR_ACK":
+                    Interlocked.Exchange(ref shareProjectorHwnd, long.TryParse(payload, out long opened) && opened > 0 ? opened : 0);
                     ShareProjectorAck.Set();
                     break;
             }
         }
 
-        // has the plugin open the program projector of share preview, which it makes see-through before obs shows it, and waits until it is open; false when the plugin is not connected or never answers
-        public static bool OpenShareProjectorAndWait(int timeoutMs)
+        // has the plugin open the program projector of share preview, which it makes see-through before obs shows it; false when the plugin is not connected or never answers, and opened is the window it opened, 0 when it saw no projector show
+        public static bool OpenShareProjectorAndWait(int timeoutMs, out long opened)
         {
+            opened = 0;
             lock (ShareProjectorLock)
             {
                 ShareProjectorAck.Reset();
+                Interlocked.Exchange(ref shareProjectorHwnd, 0);
                 if (!TryWrite("OPENSHAREPROJECTOR")) return false;
-                bool acked = ShareProjectorAck.Wait(timeoutMs);
-                if (!acked) Log.Write("OPENSHAREPROJECTOR: no answer from the plugin in " + timeoutMs + " ms");
-                return acked;
+                if (!ShareProjectorAck.Wait(timeoutMs))
+                {
+                    Log.Write("OPENSHAREPROJECTOR: no answer from the plugin in " + timeoutMs + " ms");
+                    return false;
+                }
+                opened = Interlocked.Read(ref shareProjectorHwnd);
+                if (opened == 0) Log.Write("OPENSHAREPROJECTOR: the plugin saw no projector show");
+                return true;
             }
         }
 

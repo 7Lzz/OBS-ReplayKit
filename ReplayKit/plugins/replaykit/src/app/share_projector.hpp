@@ -3,7 +3,7 @@
 
 namespace rk {
 
-// opens it see-through on the ui thread; false when obs opened it but it could not be made see-through before it showed
-bool OpenShareProjectorHidden();
+// opens it see-through on the ui thread and returns its window, so the helper parks that exact one; null when obs showed no projector while it was being opened
+HWND OpenShareProjectorHidden();
 
 } // namespace rk

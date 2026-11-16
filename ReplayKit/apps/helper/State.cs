@@ -263,8 +263,8 @@ namespace ReplayKitHelper
         // -- ProjectorLock --
         public readonly object ProjectorLock = new object();
         public bool ReplaykitDiscordProjectorInspectMode;
-        // null means "no open attempt pending"; non-null (even an empty list) is the hwnd snapshot taken before the current pending OpenVideoMixProjector call, reused across retries so a slow-to-appear window isnt wrongly read as pre-existing.
-        public List<long> ReplaykitDiscordProjectorPendingBaseline;
+        // the window the plugin opened for share preview that had not reached its projector list when the open gave up waiting, taken by the next attempt instead of opening another; 0 when none
+        public long ReplaykitDiscordProjectorPendingHwnd;
 
         // -- VideoApplyLock -- serializes the stop-outputs / SetVideoSettings (obs_reset_video) / restart-outputs cycle. concurrent obs_reset_video calls deadlock obss video graph -- 2026-08-28 a user hard-froze obs by rapidly re-applying the downscale resolution.
         public readonly object VideoApplyLock = new object();
