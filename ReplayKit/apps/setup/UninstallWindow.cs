@@ -76,8 +76,9 @@ namespace ReplayKitSetup
 
             int w = S(560), h = S(370);
             _outerW = w; _outerH = h;
-            int x = (Native.GetSystemMetrics(0) - w) / 2;
-            int y = (Native.GetSystemMetrics(1) - h) / 2;
+            var screen = ReplayKitShared.Monitors.Primary()?.Bounds ?? System.Drawing.Rectangle.Empty;
+            int x = screen.Left + (screen.Width - w) / 2;
+            int y = screen.Top + (screen.Height - h) / 2;
             // borderless like the update window: keep WS_THICKFRAME (dwm needs it to round the corners) + WS_SYSMENU + WS_MINIMIZEBOX, drop WS_CAPTION, and eat the whole non-client area in WM_NCCALCSIZE so no title bar draws.
             const uint style = 0x00040000 | 0x00080000 | 0x00020000; // WS_THICKFRAME | WS_SYSMENU | WS_MINIMIZEBOX
             _hwnd = Native.CreateWindowExW(0, ClassName, SetupLocale.Message("setup.uninstallTitle"), style, x, y, w, h,

@@ -5348,7 +5348,7 @@
 
   els.sidebarGithubLink.addEventListener("click", (e) => {
     e.preventDefault();
-    fetch(HELPER + "/open-url?url=" + encodeURIComponent(els.sidebarGithubLink.href)).catch(() => {});
+    fetch(HELPER + "/open-url?url=" + encodeURIComponent(els.sidebarGithubLink.href), { method:"POST" }).catch(() => {});
   });
 </script>
 </body>

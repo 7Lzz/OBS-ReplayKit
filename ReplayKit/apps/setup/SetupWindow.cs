@@ -62,8 +62,9 @@ namespace ReplayKitSetup
             Native.RegisterClassExW(ref wc);
 
             int w = S(560), h = S(370);
-            int x = (Native.GetSystemMetrics(0) - w) / 2;
-            int y = (Native.GetSystemMetrics(1) - h) / 2;
+            var screen = ReplayKitShared.Monitors.Primary()?.Bounds ?? System.Drawing.Rectangle.Empty;
+            int x = screen.Left + (screen.Width - w) / 2;
+            int y = screen.Top + (screen.Height - h) / 2;
             // a plain titled window -- WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX, no thickframe/maximize so it stays a fixed installer dialog. dwm themes + rounds the frame on its own.
             const uint style = 0x00C00000 | 0x00080000 | 0x00020000;
             _hwnd = Native.CreateWindowExW(0, ClassName, SetupLocale.Message("setup.windowTitle"), style, x, y, w, h,

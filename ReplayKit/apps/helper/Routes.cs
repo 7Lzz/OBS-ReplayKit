@@ -30,11 +30,11 @@ namespace ReplayKitHelper
             return body;
         }
 
+        // same-site is refused: for an ip address the site ignores the port, so a page served from any other local port is same-site and, through an image or a link with its referrer hidden, sends no origin to check
         internal static bool TestSettingsOrigin(HttpRequest req)
         {
             if (req.Headers.TryGetValue("sec-fetch-site", out string site) &&
                 !string.Equals(site, "same-origin", StringComparison.OrdinalIgnoreCase) &&
-                !string.Equals(site, "same-site", StringComparison.OrdinalIgnoreCase) &&
                 !string.Equals(site, "none", StringComparison.OrdinalIgnoreCase)) return false;
             if (!req.Headers.TryGetValue("origin", out string origin))
             {

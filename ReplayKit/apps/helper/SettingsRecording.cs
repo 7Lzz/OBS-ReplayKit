@@ -82,16 +82,10 @@ namespace ReplayKitHelper
 
         internal static JObject GetPrimaryMonitorCanvasSize()
         {
-            try
-            {
-                var bounds = System.Windows.Forms.Screen.PrimaryScreen.Bounds;
-                int width = bounds.Width, height = bounds.Height;
-                if (width >= 320 && height >= 240) return new JObject { ["ok"] = true, ["width"] = width, ["height"] = height };
-            }
-            catch (Exception ex) when (ex is InvalidOperationException || ex is NullReferenceException)
-            {
-                Log.Write("Primary monitor size detection failed: " + ex.Message);
-            }
+            var primary = ReplayKitShared.Monitors.Primary();
+            if (primary == null) Log.Write("Primary monitor size detection failed: windows reported no primary monitor");
+            else if (primary.Bounds.Width >= 320 && primary.Bounds.Height >= 240)
+                return new JObject { ["ok"] = true, ["width"] = primary.Bounds.Width, ["height"] = primary.Bounds.Height };
             return new JObject { ["ok"] = false, ["width"] = 1920, ["height"] = 1080 };
         }
 

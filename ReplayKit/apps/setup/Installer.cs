@@ -28,14 +28,16 @@ namespace ReplayKitSetup
             return sources.Any(s => s is JObject so && so.Value<string>("id") == "monitor_capture");
         }
 
-        private static string InstallTextSource(string src, string rel, string dst)
+        private static string InstallTextSource(string src, string rel, string dst, out bool userScene)
         {
+            userScene = false;
             if (rel == UserSceneRel && File.Exists(dst))
             {
                 try
                 {
                     string content = ReadTextFile(dst);
-                    if (LooksLikeReplaykitScene(JToken.Parse(content))) return content;
+                    userScene = LooksLikeReplaykitScene(JToken.Parse(content));
+                    if (userScene) return content;
                 }
                 catch (Exception ex) when (ex is IOException || ex is JsonException)
                 {
@@ -75,9 +77,9 @@ namespace ReplayKitSetup
             Directory.CreateDirectory(Path.GetDirectoryName(dst));
             if (Config.TEXT_EXTS.Contains(Path.GetExtension(src)))
             {
-                string content = InstallTextSource(src, rel, dst);
+                string content = InstallTextSource(src, rel, dst, out bool userScene);
                 content = PathRewrite.RewriteUserPaths(content, Config.USERNAME);
-                content = Transform.ApplyPreferences(rel, content, prefs);
+                content = Transform.ApplyPreferences(rel, content, prefs, userScene);
                 WriteWithRetry(() => File.WriteAllText(dst, content, new System.Text.UTF8Encoding(false)));
             }
             else

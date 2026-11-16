@@ -1221,13 +1221,13 @@ namespace ReplayKitSetup
             return item;
         }
 
-        private static void EnsureBongoSceneItem(JArray items, JObject settings, double canvasW, double canvasH, Preferences prefs, string sourceUuid, ContentRect? content = null)
+        private static void EnsureBongoSceneItem(JArray items, JObject settings, double canvasW, double canvasH, Preferences prefs, string sourceUuid, ContentRect? content, bool keepLayout)
         {
             foreach (var itemToken in items)
             {
                 if (itemToken is JObject item && (item.Value<string>("source_uuid") == sourceUuid || item.Value<string>("name") == BongoCatSourceName))
                 {
-                    ApplyBongoGeometry(item, canvasW, canvasH, prefs, sourceUuid, content);
+                    if (!keepLayout) ApplyBongoGeometry(item, canvasW, canvasH, prefs, sourceUuid, content);
                     return;
                 }
             }
@@ -1266,8 +1266,8 @@ namespace ReplayKitSetup
             settings["exclude"] = true;
         }
 
-        // apply user prefs to the scenes file: mic device, display id, selected overlay, display + game capture fit-to-canvas, scripts-tool replaykit entry.
-        public static string ApplyScenesJson(string text, Preferences prefs)
+        // apply user prefs to the scenes file: mic device, display id, selected overlay, display + game capture fit-to-canvas, scripts-tool replaykit entry. the scene of an existing install keeps the layout of the overlay items it already has, since obs holds where they were put and sized and the installer has nothing newer about the overlay than the settings that layout came from; only items it adds are laid out here
+        public static string ApplyScenesJson(string text, Preferences prefs, bool userScene)
         {
             var data = JObject.Parse(text);
             // only assign back when creating a fresh array -- reassigning a value already read from this same property makes newtonsoft clone it (a token cant have two parents), silently forking every later mutation onto a detached copy that never reaches the final serialized data.
@@ -1385,7 +1385,7 @@ namespace ReplayKitSetup
                             if (useInputOverlay)
                             {
                                 item["visible"] = true;
-                                ApplyInputOverlaySceneItemGeometry(item, name, canvasW, canvasH, prefs, overlayContent);
+                                if (!userScene) ApplyInputOverlaySceneItemGeometry(item, name, canvasW, canvasH, prefs, overlayContent);
                                 keptItems.Add(item);
                             }
                             continue;
@@ -1396,7 +1396,7 @@ namespace ReplayKitSetup
                             if (useInputOverlay)
                             {
                                 item["visible"] = true;
-                                ApplyInputOverlayGroupGeometry(item, canvasW, canvasH, prefs, overlayContent);
+                                if (!userScene) ApplyInputOverlayGroupGeometry(item, canvasW, canvasH, prefs, overlayContent);
                                 keptItems.Add(item);
                             }
                             continue;
@@ -1405,7 +1405,13 @@ namespace ReplayKitSetup
                         {
                             if (useBongoCat)
                             {
-                                ApplyBongoGeometry(item, canvasW, canvasH, prefs, bongoUuid, overlayContent);
+                                if (userScene)
+                                {
+                                    item["name"] = BongoCatSourceName;
+                                    item["source_uuid"] = bongoUuid;
+                                    item["visible"] = true;
+                                }
+                                else ApplyBongoGeometry(item, canvasW, canvasH, prefs, bongoUuid, overlayContent);
                                 keptItems.Add(item);
                             }
                             continue;
@@ -1445,7 +1451,7 @@ namespace ReplayKitSetup
                     }
                     MoveSceneItemAfter(keptItems, WindowCaptureSourceName, "Display Capture");
 
-                    if (useBongoCat) EnsureBongoSceneItem(keptItems, settings, canvasW, canvasH, prefs, bongoUuid, overlayContent);
+                    if (useBongoCat) EnsureBongoSceneItem(keptItems, settings, canvasW, canvasH, prefs, bongoUuid, overlayContent, userScene);
                     settings["items"] = keptItems;
                 }
             }
@@ -1482,16 +1488,16 @@ namespace ReplayKitSetup
         {
             ["basic/profiles/Untitled/basic.ini"] = ApplyBasicIni,
             ["basic/profiles/Untitled/recordEncoder.json"] = ApplyRecordEncoderJson,
-            ["basic/scenes/Untitled.json"] = ApplyScenesJson,
             ["obs-replayKit/replaykit_settings.json"] = ApplyReplaykitSettingsJson,
             ["user.ini"] = ApplyUserIni,
             ["global.ini"] = ApplyGlobalIni,
         };
 
         // rewrite content according to prefs if a transformer is registered, else return as-is.
-        public static string ApplyPreferences(string relPath, string content, Preferences prefs)
+        public static string ApplyPreferences(string relPath, string content, Preferences prefs, bool userScene = false)
         {
             string key = relPath.Replace('\\', '/');
+            if (key == "basic/scenes/Untitled.json") return ApplyScenesJson(content, prefs, userScene);
             return Dispatch.TryGetValue(key, out var transformer) ? transformer(content, prefs) : content;
         }
     }

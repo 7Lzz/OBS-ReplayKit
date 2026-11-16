@@ -289,7 +289,7 @@
   els.removePicture.addEventListener("click", () => changePicture(true));
   els.cancel.addEventListener("click", stopFlow);
   els.open.addEventListener("click", () => {
-    fetch(HELPER + "/open-url?url=" + encodeURIComponent("https://streamable.com/"), { cache:"no-store" }).catch(() => {});
+    fetch(HELPER + "/open-url?url=" + encodeURIComponent("https://streamable.com/"), { method:"POST", cache:"no-store" }).catch(() => {});
   });
   els.signOut.addEventListener("click", () => {
     auth = { signedIn:false, name:"", plan:"", retentionDays:2 };

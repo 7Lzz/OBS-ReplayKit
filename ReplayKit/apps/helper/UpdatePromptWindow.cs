@@ -194,8 +194,12 @@ namespace ReplayKitHelper
                 // WM_NCCALCSIZE zeroes the non-client area, so outer size == client size -- set Size, not ClientSize
                 Size = new Size((int)Math.Round(_cssW * scale), (int)Math.Round(_cssH * scale));
                 _sized = true;
-                var area = Screen.PrimaryScreen.WorkingArea;
-                Location = new Point(area.Left + (area.Width - Width) / 2, area.Top + (area.Height - Height) / 2);
+                var primary = ReplayKitShared.Monitors.Primary();
+                if (primary != null)
+                {
+                    var area = primary.WorkArea;
+                    Location = new Point(area.Left + (area.Width - Width) / 2, area.Top + (area.Height - Height) / 2);
+                }
             }
 
             protected override void WndProc(ref Message m)

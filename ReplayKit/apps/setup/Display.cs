@@ -29,13 +29,6 @@ namespace ReplayKitSetup
     public static class Display
     {
         private const uint EDD_GET_DEVICE_INTERFACE_NAME = 0x00000001;
-        private const uint MONITORINFOF_PRIMARY = 0x00000001;
-
-        [StructLayout(LayoutKind.Sequential)]
-        private struct RECT
-        {
-            public int Left, Top, Right, Bottom;
-        }
 
         [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
         private struct DISPLAY_DEVICEW
@@ -47,24 +40,6 @@ namespace ReplayKitSetup
             [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)] public string DeviceID;
             [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)] public string DeviceKey;
         }
-
-        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
-        private struct MONITORINFOEXW
-        {
-            public uint cbSize;
-            public RECT rcMonitor;
-            public RECT rcWork;
-            public uint dwFlags;
-            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)] public string szDevice;
-        }
-
-        private delegate bool MonitorEnumProc(IntPtr hMonitor, IntPtr hdcMonitor, ref RECT lprcMonitor, IntPtr dwData);
-
-        [DllImport("user32.dll")]
-        private static extern bool EnumDisplayMonitors(IntPtr hdc, IntPtr lprcClip, MonitorEnumProc lpfnEnum, IntPtr dwData);
-
-        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
-        private static extern bool GetMonitorInfoW(IntPtr hMonitor, ref MONITORINFOEXW lpmi);
 
         [DllImport("user32.dll", CharSet = CharSet.Unicode)]
         private static extern bool EnumDisplayDevicesW(string lpDevice, uint iDevNum, ref DISPLAY_DEVICEW lpDisplayDevice, uint dwFlags);
@@ -85,30 +60,19 @@ namespace ReplayKitSetup
         // every active display, primary first.
         public static List<DisplayInfo> ListDisplays()
         {
-            var monitors = new List<MONITORINFOEXW>();
-
-            bool Callback(IntPtr hMon, IntPtr hdc, ref RECT rect, IntPtr lparam)
-            {
-                var info = new MONITORINFOEXW { cbSize = (uint)Marshal.SizeOf<MONITORINFOEXW>() };
-                if (GetMonitorInfoW(hMon, ref info)) monitors.Add(info);
-                return true;
-            }
-
-            EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero, Callback, IntPtr.Zero);
-
             var displays = new List<DisplayInfo>();
-            foreach (var info in monitors)
+            foreach (var monitor in ReplayKitShared.Monitors.List(out _) ?? new List<ReplayKitShared.DisplayMonitor>())
             {
                 var dd = new DISPLAY_DEVICEW { cb = (uint)Marshal.SizeOf<DISPLAY_DEVICEW>() };
-                bool identified = EnumDisplayDevicesW(info.szDevice, 0, ref dd, EDD_GET_DEVICE_INTERFACE_NAME);
+                bool identified = EnumDisplayDevicesW(monitor.Device, 0, ref dd, EDD_GET_DEVICE_INTERFACE_NAME);
                 displays.Add(new DisplayInfo
                 {
-                    IsPrimary = (info.dwFlags & MONITORINFOF_PRIMARY) != 0,
-                    Adapter = info.szDevice,
-                    DeviceId = identified && !string.IsNullOrWhiteSpace(dd.DeviceID) ? dd.DeviceID : info.szDevice,
-                    FriendlyName = identified && !string.IsNullOrWhiteSpace(dd.DeviceString) ? dd.DeviceString : info.szDevice,
-                    Width = info.rcMonitor.Right - info.rcMonitor.Left,
-                    Height = info.rcMonitor.Bottom - info.rcMonitor.Top,
+                    IsPrimary = monitor.Primary,
+                    Adapter = monitor.Device,
+                    DeviceId = identified && !string.IsNullOrWhiteSpace(dd.DeviceID) ? dd.DeviceID : monitor.Device,
+                    FriendlyName = identified && !string.IsNullOrWhiteSpace(dd.DeviceString) ? dd.DeviceString : monitor.Device,
+                    Width = monitor.Bounds.Width,
+                    Height = monitor.Bounds.Height,
                 });
             }
 

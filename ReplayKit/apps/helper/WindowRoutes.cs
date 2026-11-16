@@ -48,6 +48,7 @@ namespace ReplayKitHelper
             if (path == "/open-url")
             {
                 // target=_blank inside these docks opens a bare cef popup (obs' own embedded chromium), not the users actual browser -- shelling out here hands it to whatever the os has registered for http/https instead.
+                if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
                 string target = Q("url");
                 bool ok = false;
                 if (Regex.IsMatch(target, "^https://[^\\s\"]+$"))

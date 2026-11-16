@@ -109,10 +109,14 @@ namespace ReplayKitHelper
                 // streamables login does not reliably raise NavigationCompleted -- a normal email/password submit is an xhr/fetch call that sets the session cookie, followed by a client-side route change (history.pushState) to the dashboard, never a full page navigation. HistoryChanged below catches that specific case, but rather than track every mechanism a frontend redesign might use next, this timer just re-checks on a plain interval for as long as the window is open -- it is the one check that cannot miss regardless of how the page gets the cookie set. CheckSession below is a no-op when there is nothing new to capture, so polling it costs nothing extra.
                 using (var sessionPoll = new System.Windows.Forms.Timer { Interval = 1500 })
                 {
-                    var workArea = ResolveTargetScreen().WorkingArea;
-                    form.Location = new System.Drawing.Point(
-                        workArea.Left + (workArea.Width - form.Width) / 2,
-                        workArea.Top + (workArea.Height - form.Height) / 2);
+                    var target = ResolveTargetMonitor();
+                    if (target != null)
+                    {
+                        var workArea = target.WorkArea;
+                        form.Location = new System.Drawing.Point(
+                            workArea.Left + (workArea.Width - form.Width) / 2,
+                            workArea.Top + (workArea.Height - form.Height) / 2);
+                    }
                     form.Controls.Add(browser);
 
                     // last streamable-domain cookie jar seen, so the poll timer below can skip the network round trip (InvokeStreamableMe shells out to curl.exe) when nothing has actually changed since the previous check -- GetCookiesAsync itself is a cheap local call, so checking it every tick is fine, but hitting streamables real api that often for the whole time the window sits open is not. a local function (not the previous static method) so it can close over this without a field that would need resetting between separate sign-in attempts.
@@ -208,17 +212,17 @@ namespace ReplayKitHelper
         }
 
         // the monitor to center the sign-in window on. GetForegroundWindow() used to drive this, but it reports whatever window has os-level focus at the exact instant this stas thread runs -- often not obs at all (any other app stealing focus around the click puts the window on a monitor the user isnt even looking at), which is what earlier attempts misread as "no window pops up" and "closes itself". the native plugin publishes obss own main-window hwnd over the ipc pipe specifically because its authoritative -- same read pattern as Native.CloseObsMainWindow.
-        private static Screen ResolveTargetScreen()
+        private static ReplayKitShared.DisplayMonitor ResolveTargetMonitor()
         {
             long hwndVal;
             lock (Server.State.IpcLock) hwndVal = Server.State.ObsMainWindowHwnd;
             if (hwndVal != 0)
             {
                 IntPtr hWnd = new IntPtr(hwndVal);
-                if (IsWindow(hWnd)) return Screen.FromHandle(hWnd);
+                if (IsWindow(hWnd)) return ReplayKitShared.Monitors.Nearest(hWnd);
             }
             // obs hasnt published its main window yet (helper started before the plugin connected) -- the cursor is a better guess than the system foreground window, which could be any unrelated app.
-            return Screen.FromPoint(Cursor.Position);
+            return ReplayKitShared.Monitors.Nearest(Cursor.Position);
         }
 
         // dark title bar + the active themes caption/border/text colours + app icon, same treatment every other replaykit-owned window gets. this form is created by the helper directly, so it goes straight through Native.ApplyWindowTheme on its own hwnd rather than the needle-matched /style-window route, which only ever finds obs-family windows and would never match this one (see Native.IsObsFamilyProcess).

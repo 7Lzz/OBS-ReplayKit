@@ -133,9 +133,6 @@ namespace ReplayKitSetup
         public static extern IntPtr ExtractIconW(IntPtr hInst, string exeFileName, uint iconIndex);
 
         [DllImport("user32.dll")]
-        public static extern int GetSystemMetrics(int nIndex);
-
-        [DllImport("user32.dll")]
         public static extern IntPtr SetTimer(IntPtr hWnd, IntPtr nIDEvent, uint uElapse, IntPtr lpTimerFunc);
 
         [DllImport("user32.dll")]

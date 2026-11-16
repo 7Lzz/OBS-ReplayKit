@@ -60,7 +60,7 @@ bool HoldsText(QWidget *w, const QString &needle)
 void OpenGithub()
 {
 	const QByteArray path = "/open-url?url=" + QUrl::toPercentEncoding(QString::fromLatin1(kGithubUrl));
-	RunAsync([path]() { HttpRequest("GET", path.constData(), nullptr, 3000); });
+	RunAsync([path]() { HttpRequest("POST", path.constData(), nullptr, 3000); });
 }
 
 } // namespace

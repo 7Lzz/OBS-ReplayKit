@@ -21,14 +21,6 @@ namespace ReplayKitHelper
         public struct POINT { public int X, Y; }
 
         [StructLayout(LayoutKind.Sequential)]
-        private struct MONITORINFO
-        {
-            public int cbSize;
-            public RECT rcMonitor, rcWork;
-            public uint dwFlags;
-        }
-
-        [StructLayout(LayoutKind.Sequential)]
         private struct STARTUPINFOW
         {
             public int cb;
@@ -88,7 +80,6 @@ namespace ReplayKitHelper
         [DllImport("user32.dll")] private static extern IntPtr SendMessage(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
         [DllImport("user32.dll")] private static extern bool ReleaseCapture();
         [DllImport("user32.dll")] private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
-        [DllImport("user32.dll")] private static extern int GetSystemMetrics(int nIndex);
         [DllImport("user32.dll", EntryPoint = "GetWindowLongPtr", SetLastError = true)] private static extern IntPtr GetWindowLongPtr64(IntPtr hWnd, int nIndex);
         [DllImport("user32.dll", EntryPoint = "SetWindowLongPtr", SetLastError = true)] private static extern IntPtr SetWindowLongPtr64(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
         [DllImport("user32.dll")] private static extern bool GetWindowRect(IntPtr hWnd, out RECT rect);
@@ -105,8 +96,6 @@ namespace ReplayKitHelper
         [DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
         [DllImport("user32.dll")] private static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
         [DllImport("user32.dll")] private static extern bool IsZoomed(IntPtr hWnd);
-        [DllImport("user32.dll")] private static extern IntPtr MonitorFromWindow(IntPtr hWnd, uint dwFlags);
-        [DllImport("user32.dll")] private static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
         [DllImport("user32.dll")] private static extern uint GetDpiForWindow(IntPtr hWnd);
 
         // dwmapi
@@ -141,7 +130,6 @@ namespace ReplayKitHelper
         private const int CAPTION_COLOR = 0x00261F1D;
         private const int BORDER_COLOR = 0x004D403C;
         private const int TEXT_COLOR = 0x00FFFFFF;
-        private const int SM_CXSCREEN = 0, SM_CYSCREEN = 1;
         private const int GWL_STYLE = -16, GWL_EXSTYLE = -20, GCLP_HBRBACKGROUND = -10;
         private const long WS_CAPTION = 0x00C00000L, WS_THICKFRAME = 0x00040000L, WS_MINIMIZEBOX = 0x00020000L, WS_MAXIMIZEBOX = 0x00010000L, WS_SYSMENU = 0x00080000L;
         private const uint RDW_INVALIDATE = 0x0001, RDW_UPDATENOW = 0x0100, RDW_FRAME = 0x0400;
@@ -150,7 +138,6 @@ namespace ReplayKitHelper
         private const uint SWP_NOSIZE = 0x0001, SWP_NOMOVE = 0x0002, SWP_NOZORDER = 0x0004, SWP_NOACTIVATE = 0x0010, SWP_FRAMECHANGED = 0x0020, SWP_SHOWWINDOW = 0x0040;
         private static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
         private static readonly IntPtr HWND_NOTOPMOST = new IntPtr(-2);
-        private const uint MONITOR_DEFAULTTONEAREST = 0x00000002;
         private const int VK_LBUTTON = 0x01;
         private const int SW_HIDE = 0, SW_RESTORE = 9, SW_MAXIMIZE = 3;
         private const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
@@ -829,10 +816,8 @@ namespace ReplayKitHelper
         {
             var hWnd = FindObsWindow(needle);
             if (hWnd == IntPtr.Zero || !GetWindowRect(hWnd, out RECT rect)) return false;
-            var monitor = MonitorFromWindow(hWnd, MONITOR_DEFAULTTONEAREST);
-            if (monitor == IntPtr.Zero) return false;
-            var info = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
-            if (!GetMonitorInfo(monitor, ref info)) return false;
+            var monitor = ReplayKitShared.Monitors.Nearest(hWnd);
+            if (monitor == null) return false;
             lock (FullscreenWindowsLock)
             {
                 long key = hWnd.ToInt64();
@@ -850,8 +835,7 @@ namespace ReplayKitHelper
             long style = GetWindowLongPtr64(hWnd, GWL_STYLE).ToInt64();
             style &= ~(WS_CAPTION | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_SYSMENU);
             SetWindowLongPtr64(hWnd, GWL_STYLE, new IntPtr(style));
-            return SetWindowPos(hWnd, IntPtr.Zero, info.rcMonitor.Left, info.rcMonitor.Top,
-                info.rcMonitor.Right - info.rcMonitor.Left, info.rcMonitor.Bottom - info.rcMonitor.Top,
+            return SetWindowPos(hWnd, IntPtr.Zero, monitor.Bounds.Left, monitor.Bounds.Top, monitor.Bounds.Width, monitor.Bounds.Height,
                 SWP_NOACTIVATE | SWP_FRAMECHANGED | SWP_SHOWWINDOW);
         }
 
@@ -881,10 +865,10 @@ namespace ReplayKitHelper
         public static bool SetWindowSizeCentered(string needle, int width, int height)
         {
             var hWnd = FindObsWindow(needle);
-            if (hWnd == IntPtr.Zero) return false;
-            int screenW = GetSystemMetrics(SM_CXSCREEN), screenH = GetSystemMetrics(SM_CYSCREEN);
-            int x = Math.Max(0, (screenW - width) / 2);
-            int y = Math.Max(0, (screenH - height) / 2);
+            var primary = ReplayKitShared.Monitors.Primary();
+            if (hWnd == IntPtr.Zero || primary == null) return false;
+            int x = Math.Max(0, (primary.Bounds.Width - width) / 2);
+            int y = Math.Max(0, (primary.Bounds.Height - height) / 2);
             return SetWindowPos(hWnd, IntPtr.Zero, x, y, width, height, SWP_NOZORDER | SWP_NOACTIVATE);
         }
 
@@ -945,10 +929,9 @@ namespace ReplayKitHelper
             var hWnd = new IntPtr(hwndVal);
             if (!IsWindow(hWnd) || IsZoomed(hWnd) || !GetWindowRect(hWnd, out RECT rect)) return false;
             // a window that covers its whole monitor is in fullscreen, which the edges must not undo
-            var info = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
-            var monitor = MonitorFromWindow(hWnd, MONITOR_DEFAULTTONEAREST);
-            if (monitor == IntPtr.Zero || !GetMonitorInfo(monitor, ref info)) return false;
-            if (rect.Left <= info.rcMonitor.Left && rect.Top <= info.rcMonitor.Top && rect.Right >= info.rcMonitor.Right && rect.Bottom >= info.rcMonitor.Bottom) return false;
+            var monitor = ReplayKitShared.Monitors.Nearest(hWnd);
+            if (monitor == null) return false;
+            if (rect.Left <= monitor.Bounds.Left && rect.Top <= monitor.Bounds.Top && rect.Right >= monitor.Bounds.Right && rect.Bottom >= monitor.Bounds.Bottom) return false;
             return true;
         }
 

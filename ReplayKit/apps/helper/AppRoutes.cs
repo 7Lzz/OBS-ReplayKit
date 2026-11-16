@@ -78,6 +78,7 @@ namespace ReplayKitHelper
 
             if (path == "/shutdown")
             {
+                if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
                 HttpResponse.SendText(stream, 200, "OK", "bye");
                 AppConfig.StopClipFolderWatcher();
                 MicTest.Stop();

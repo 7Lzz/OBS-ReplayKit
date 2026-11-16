@@ -18,7 +18,7 @@ namespace ReplayKitHelper
             lock (_desktopPreviewGate)
             {
                 if (_desktopPreviewJpeg != null && _desktopPreviewAge.ElapsedMilliseconds < DesktopPreviewMaxAgeMs) return _desktopPreviewJpeg;
-                var bounds = System.Windows.Forms.Screen.PrimaryScreen?.Bounds ?? System.Drawing.Rectangle.Empty;
+                var bounds = ReplayKitShared.Monitors.Primary()?.Bounds ?? System.Drawing.Rectangle.Empty;
                 if (bounds.Width <= 0 || bounds.Height <= 0) return null;
                 const int targetW = 1280;
                 double scale = Math.Min(1.0, (double)targetW / bounds.Width);

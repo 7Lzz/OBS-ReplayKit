@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using System.Threading;
 using Microsoft.Win32;
@@ -121,32 +120,29 @@ namespace ReplayKitHelper
 
         public static MonitorWorkArea GetProjectorMonitorWorkArea(int monitorIndex)
         {
-            System.Windows.Forms.Screen[] screens;
-            try { screens = System.Windows.Forms.Screen.AllScreens; }
-            catch (Exception ex) when (ex is InvalidOperationException || ex is ExternalException) { return new MonitorWorkArea { Ok = false, Message = Locales.Message("screenshare.couldNotReadMonitorWorkAreas", "error", ex.Message) }; }
-            if (screens.Length < 1) return new MonitorWorkArea { Ok = false, Message = Locales.Message("screenshare.noRealMonitorWorkAreaWas") };
+            var screens = ReplayKitShared.Monitors.List(out string listError);
+            if (screens == null) return new MonitorWorkArea { Ok = false, Message = Locales.Message("screenshare.couldNotReadMonitorWorkAreas", "error", listError) };
+            if (screens.Count < 1) return new MonitorWorkArea { Ok = false, Message = Locales.Message("screenshare.noRealMonitorWorkAreaWas") };
 
-            int idx = monitorIndex <= 0 ? screens.Length - 1 : Math.Max(1, monitorIndex) - 1;
-            if (idx >= screens.Length) idx = screens.Length - 1;
-            var area = screens[idx].WorkingArea;
-            var bounds = screens[idx].Bounds;
-            var sourceScreen = System.Windows.Forms.Screen.PrimaryScreen;
-            int sourceIdx = -1;
-            System.Drawing.Rectangle? sourceBounds = null;
-            if (sourceScreen != null)
+            // left on automatic, the projector goes to the last monitor that is not the main one, since games open fullscreen on the main one and the order windows lists monitors in can put it last; with a single monitor that one is the only choice
+            int idx;
+            if (monitorIndex <= 0)
             {
-                for (int i = 0; i < screens.Length; i++)
-                {
-                    if (screens[i].DeviceName == sourceScreen.DeviceName) { sourceIdx = i; break; }
-                }
-                if (sourceIdx >= 0) sourceBounds = sourceScreen.Bounds;
+                idx = screens.FindLastIndex(s => !s.Primary);
+                if (idx < 0) idx = screens.Count - 1;
             }
+            else idx = Math.Min(Math.Max(1, monitorIndex) - 1, screens.Count - 1);
+            var area = screens[idx].WorkArea;
+            var bounds = screens[idx].Bounds;
+            int sourceIdx = screens.FindIndex(s => s.Primary);
+            System.Drawing.Rectangle? sourceBounds = null;
+            if (sourceIdx >= 0) sourceBounds = screens[sourceIdx].Bounds;
 
             var result = new MonitorWorkArea
             {
                 Ok = true,
                 Index = idx + 1,
-                Count = screens.Length,
+                Count = screens.Count,
                 SourceIndex = sourceIdx + 1,
                 Left = area.Left,
                 Top = area.Top,
@@ -296,13 +292,31 @@ namespace ReplayKitHelper
                 .FirstOrDefault();
             if (best == null) throw new InvalidOperationException(Locales.Message("screenshare.couldNotResolveASafeProjector"));
 
-            int hostX = screenLeft;
-            int hostY = screenTop;
-            if (width <= screenWidth && best.Corner.EndsWith("_right")) hostX = screenRight - width;
-            if (height <= screenHeight && best.Corner.StartsWith("bottom_")) hostY = screenBottom - height;
+            // the window is anchored in a corner of its own monitor and kept off every other one, where it would be an invisible always-on-top window over whatever runs fullscreen there; one bigger than its monitor (a landscape window on a vertical monitor) hangs off the side that faces no other monitor, and the part that hangs off is still in a window capture
+            var own = new ScreenBounds { Left = screenLeft, Top = screenTop, Right = screenRight, Bottom = screenBottom };
+            var others = screenBounds.Where(b => b.Left != own.Left || b.Top != own.Top || b.Right != own.Right || b.Bottom != own.Bottom).ToList();
+            var host = new[]
+            {
+                new { Corner = "top_left", X = screenLeft, Y = screenTop },
+                new { Corner = "top_right", X = screenRight - width, Y = screenTop },
+                new { Corner = "bottom_left", X = screenLeft, Y = screenBottom - height },
+                new { Corner = "bottom_right", X = screenRight - width, Y = screenBottom - height },
+            }
+                .Select(a =>
+                {
+                    var placed = new ScreenBounds { Left = a.X, Top = a.Y, Right = a.X + width, Bottom = a.Y + height };
+                    return new { a.Corner, a.X, a.Y, OnOthers = others.Sum(b => GetRectIntersectionArea(placed, b)), OnOwn = GetRectIntersectionArea(placed, own) };
+                })
+                .OrderBy(a => a.OnOthers)
+                .ThenByDescending(a => a.OnOwn)
+                .ThenBy(a => GetCornerPreference(edgeValue, a.Corner))
+                .ThenBy(a => a.Corner, StringComparer.Ordinal)
+                .First();
+            int hostX = host.X;
+            int hostY = host.Y;
 
-            int clipX = best.Corner.EndsWith("_right") ? right - hostX - visible : left - hostX;
-            int clipY = best.Corner.StartsWith("bottom_") ? bottom - hostY - visible : top - hostY;
+            int clipX = host.Corner.EndsWith("_right") ? right - hostX - visible : left - hostX;
+            int clipY = host.Corner.StartsWith("bottom_") ? bottom - hostY - visible : top - hostY;
             clipX = Math.Min(Math.Max(0, clipX), Math.Max(0, width - visible));
             clipY = Math.Min(Math.Max(0, clipY), Math.Max(0, height - visible));
 
@@ -311,7 +325,7 @@ namespace ReplayKitHelper
                 X = hostX, Y = hostY, FallbackX = best.X, FallbackY = best.Y,
                 Width = width, Height = height,
                 ClipX = clipX, ClipY = clipY, ClipWidth = visible, ClipHeight = visible,
-                Edge = edgeValue, Corner = best.Corner,
+                Edge = edgeValue, Corner = host.Corner,
                 VisiblePixels = visible, VisibleArea = best.MonitorArea, WorkVisibleArea = best.WorkArea,
             };
         }
