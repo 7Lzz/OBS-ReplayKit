@@ -71,6 +71,7 @@ namespace ReplayKitHelper
         private const uint SWP_FRAMECHANGED = 0x0020;
         private const uint SWP_SHOWWINDOW = 0x0040;
         private const uint LWA_ALPHA = 0x00000002;
+        private const byte ParkedAlpha = 1;
         private static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
         private static readonly IntPtr HWND_NOTOPMOST = new IntPtr(-2);
         private static readonly IntPtr HWND_TOP = IntPtr.Zero;
@@ -132,7 +133,7 @@ namespace ReplayKitHelper
             catch (Exception ex) when (ex is ArgumentException || ex is InvalidOperationException) { return false; }
         }
 
-        // only the projector carrying the exact share title counts: replaykit opens it and names it straight away, and obs is set not to bring projectors back on start (SaveProjectors=false in the user.ini replaykit ships), so any other projector is one the user opened (a source projector of Game Capture shows the game without the overlay), and a looser match parked it as the share or closed it on turning share preview off. no visibility filter on purpose -- the parked projector is a layered alpha-0 window that has, in the past, stopped reporting itself as "visible" while still alive and still playing its own audio mix to the default device
+        // only the projector carrying the exact share title counts: replaykit opens it and names it straight away, and obs is set not to bring projectors back on start (SaveProjectors=false in the user.ini replaykit ships), so any other projector is one the user opened (a source projector of Game Capture shows the game without the overlay), and a looser match parked it as the share or closed it on turning share preview off. no visibility filter on purpose -- a layered projector has stopped reporting itself as "visible" while still alive and still playing its own audio mix to the default device
         public static long FindProjectorWindow(string shareTitle)
         {
             if (string.IsNullOrWhiteSpace(shareTitle)) return 0;
@@ -355,9 +356,10 @@ namespace ReplayKitHelper
             if (cancel.IsCancellationRequested) return false;
             ShowWindow(hWnd, SW_SHOWNOACTIVATE);
             if (cancel.IsCancellationRequested) return false;
-            // park topmost so discord lists the projector near the top of its picker -- safe becuase the window is alpha 0 layered, which is click-thru and invisible.
+            // keep it near the top of the discord picker and at alpha zero until the off-screen move is confirmed
             if (!SetWindowPos(hWnd, HWND_TOPMOST, x, y, width, height, SWP_NOACTIVATE | SWP_FRAMECHANGED | SWP_SHOWWINDOW)) return false;
-            if (cancel.IsCancellationRequested || !SetProjectorGhosted(hwndValue, true, 0)) return false;
+            if (cancel.IsCancellationRequested || !IsWindowAtRectAndTitle(hwndValue, title, x, y, width, height)) return false;
+            if (!SetProjectorGhosted(hwndValue, true, ParkedAlpha)) return false;
             return !cancel.IsCancellationRequested && IsProjectorParked(hwndValue, title, x, y, width, height, borderless);
         }
 
@@ -372,7 +374,7 @@ namespace ReplayKitHelper
             long extended = GetWindowLongPtr(hWnd, GWL_EXSTYLE).ToInt64();
             long required = WS_EX_LAYERED | WS_EX_APPWINDOW | WS_EX_TOPMOST;
             if ((extended & required) != required || (extended & WS_EX_TOOLWINDOW) != 0 || GetWindow(hWnd, GW_OWNER) != IntPtr.Zero) return false;
-            if (!GetLayeredWindowAttributes(hWnd, out _, out byte alpha, out uint flags) || alpha != 0 || (flags & LWA_ALPHA) == 0) return false;
+            if (!GetLayeredWindowAttributes(hWnd, out _, out byte alpha, out uint flags) || alpha != ParkedAlpha || (flags & LWA_ALPHA) == 0) return false;
             IntPtr region = CreateRectRgn(0, 0, 0, 0);
             if (region == IntPtr.Zero) return false;
             try { return GetWindowRgn(hWnd, region) == 0; }

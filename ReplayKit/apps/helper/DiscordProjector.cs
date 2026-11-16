@@ -370,7 +370,7 @@ namespace ReplayKitHelper
             return obj;
         }
 
-        // finds/opens/parks the projector hidden off the desktop (topmost + alpha-0 layered, so its click-thru and invisible but still discoverable in discords screen picker). runs the whole find/open/park sequence under ProjectorLock -- without it, a helper restart firing this function at the same moment as the keep-alive tick could see no projector from both, and both would open one. Inspect and Disable take the same lock for their own find/open/close sequences so none of the three can interleave with each other either.
+        // finds/opens/parks the layered projector off the desktop with nonzero alpha so discord can capture it during fullscreen gameplay. runs the whole find/open/park sequence under ProjectorLock -- without it, a helper restart firing this function at the same moment as the keep-alive tick could see no projector from both, and both would open one. Inspect and Disable take the same lock for their own find/open/close sequences so none of the three can interleave with each other either.
         public static JObject Repark(JObject settings = null, string titleOverride = "", bool force = false)
         {
             parkedWindow = null;
