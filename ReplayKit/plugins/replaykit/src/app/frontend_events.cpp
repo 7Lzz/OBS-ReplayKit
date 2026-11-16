@@ -14,6 +14,7 @@
 #include "app/main_window_filter.hpp"
 #include "app/obs_menu.hpp"
 #include "app/settings_poll.hpp"
+#include "app/share_projector.hpp"
 #include "chrome/caption_track_filter.hpp"
 #include "chrome/title_keybind_badge.hpp"
 #include "core/app_icon.hpp"
@@ -122,6 +123,7 @@ void TellHelperFileSaved(const char *path, bool clip = false)
 void OnFrontendEvent(enum obs_frontend_event event, void *)
 {
 	if (event == OBS_FRONTEND_EVENT_SCRIPTING_SHUTDOWN) {
+		StopOpeningShareProjector();
 		ClipBufferShutdown();
 		return;
 	}

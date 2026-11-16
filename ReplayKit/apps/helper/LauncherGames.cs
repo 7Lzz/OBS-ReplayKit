@@ -19,8 +19,6 @@ namespace ReplayKitHelper
             internal string Folder;
             internal string Name;
             internal string Source;
-            // a folder from the windows list of installed programs, which holds programs of every kind; it only counts for a capture that is plainly a game (see Find)
-            internal bool AnyProgram;
         }
 
         private static readonly object Gate = new object();
@@ -29,8 +27,6 @@ namespace ReplayKitHelper
         private static bool pending;
         private static string status = "not-checked";
 
-        // the publishers whose entries in the windows list are games (battle.net, the riot client, the ea app and the rest install their games there); their own launchers are left out by name
-        private static readonly string[] GamePublishers = { "Blizzard Entertainment", "Riot Games", "Electronic Arts", "Rockstar Games", "Ubisoft", "Bethesda Softworks", "Epic Games, Inc.", "GOG.com", "CD PROJEKT RED" };
         private static readonly Regex LauncherNames = new Regex(@"^(?:Battle\.net|EA app|EA Desktop|Origin|Riot Client|Riot Vanguard|Rockstar Games Launcher|Rockstar Games Social Club|Social Club|Ubisoft Connect|Uplay|Epic Games Launcher|Epic Online Services|GOG GALAXY|GOG Galaxy|Amazon Games|itch|Steam|Xbox|Bethesda\.net Launcher|Unreal Engine)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
         private static string LocalPath(string path)
@@ -84,7 +80,7 @@ namespace ReplayKitHelper
             return name;
         }
 
-        private static void Add(List<Entry> list, string folder, string name, string source, bool anyProgram = false)
+        private static void Add(List<Entry> list, string folder, string name, string source)
         {
             folder = LocalPath(folder);
             name = CleanName(name);
@@ -92,7 +88,7 @@ namespace ReplayKitHelper
             // a drive root, or a folder one step under a drive, is too broad unless it is the game's own folder name (d:\Fortnite is fine, d:\Games is not)
             if (Path.GetPathRoot(folder).TrimEnd('\\').Length == folder.Length || BroadFolders.Value.Contains(folder)) return;
             if (list.Count >= 5000 || !Directory.Exists(folder)) return;
-            list.Add(new Entry { Folder = folder + "\\", Name = name, Source = source, AnyProgram = anyProgram });
+            list.Add(new Entry { Folder = folder + "\\", Name = name, Source = source });
         }
 
         private static RegistryKey Open(RegistryHive hive, RegistryView view, string path)
@@ -240,8 +236,8 @@ namespace ReplayKitHelper
             }
         }
 
-        // the windows list of installed programs: games from the publishers above (battle.net, the riot client and the ea app install there), and every other program too, which only counts for a capture that is plainly a game
-        private static void ReadInstalledPrograms(List<Entry> list, Dictionary<string, string> names)
+        // ubisoft installs supply the game id and folder; their uninstall entries supply the display name
+        private static void ReadUninstallNames(Dictionary<string, string> names)
         {
             const string uninstall = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall";
             foreach (var hive in new[] { RegistryHive.LocalMachine, RegistryHive.CurrentUser })
@@ -250,12 +246,6 @@ namespace ReplayKitHelper
                     string name = Value(key, "DisplayName");
                     if (name == null) continue;
                     names[KeyName(key)] = name;
-                    object component = null;
-                    try { component = key.GetValue("SystemComponent"); } catch (Exception ex) when (ex is SecurityException || ex is UnauthorizedAccessException || ex is IOException) { }
-                    if (component is int c && c == 1 || Value(key, "ParentKeyName") != null || string.Equals(Value(key, "ReleaseType"), "Update", StringComparison.OrdinalIgnoreCase)) continue;
-                    string publisher = Value(key, "Publisher") ?? "";
-                    bool gamePublisher = GamePublishers.Any(p => publisher.StartsWith(p, StringComparison.OrdinalIgnoreCase));
-                    Add(list, Value(key, "InstallLocation"), name, gamePublisher ? "publisher" : "installed", anyProgram: !gamePublisher);
                 }
         }
 
@@ -264,7 +254,7 @@ namespace ReplayKitHelper
             var list = new List<Entry>();
             var uninstallNames = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             // each reader stands on its own, so one launcher with a record it cannot read leaves the others
-            foreach (Action read in new Action[] { () => ReadInstalledPrograms(list, uninstallNames), () => ReadEpic(list), () => ReadGog(list), () => ReadUbisoft(list, uninstallNames), () => ReadPublisherKeys(list), () => ReadRiot(list), () => ReadItch(list), () => ReadXbox(list) })
+            foreach (Action read in new Action[] { () => ReadUninstallNames(uninstallNames), () => ReadEpic(list), () => ReadGog(list), () => ReadUbisoft(list, uninstallNames), () => ReadPublisherKeys(list), () => ReadRiot(list), () => ReadItch(list), () => ReadXbox(list) })
             {
                 try { read(); }
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is SecurityException || ex is ArgumentException || ex is InvalidOperationException) { Log.Write("Launcher games: a launcher could not be read: " + ex.GetType().Name + ": " + ex.Message); }
@@ -291,20 +281,18 @@ namespace ReplayKitHelper
             });
         }
 
-        // the game a captured program belongs to: the launcher folder that holds it, the deepest one when folders nest; null when it is in none, or in two of the same depth that name different games. anyProgram lets the folders of the windows list of every program count, for a game capture that hooked the program or a program that fills its display
-        internal static GameCatalog.Game Find(string file, bool anyProgram)
+        // prefer the deepest matching game folder and leave conflicting names at that depth unassigned
+        internal static GameCatalog.Game Find(string file)
         {
             Refresh();
             string path = LocalPath(file);
             if (path == null || !path.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) || !GameCatalog.Playable(Path.GetFileName(path))) return null;
             List<Entry> snapshot;
             lock (Gate) snapshot = entries;
-            var matches = snapshot.Where(e => (anyProgram || !e.AnyProgram) && path.StartsWith(e.Folder, StringComparison.OrdinalIgnoreCase)).ToList();
+            var matches = snapshot.Where(e => path.StartsWith(e.Folder, StringComparison.OrdinalIgnoreCase)).ToList();
             if (matches.Count == 0) return null;
             int deepest = matches.Max(e => e.Folder.Length);
-            // the same folder is often in the record of its launcher and in the windows list under a slightly other name (a ™ more); the launcher's own record wins, then a publisher's entry, then the list of every program
-            var level = matches.Where(e => e.Folder.Length == deepest).GroupBy(e => e.Source == "installed" ? 2 : e.Source == "publisher" ? 1 : 0).OrderBy(g => g.Key).First();
-            var names = level.Select(e => e.Name).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            var names = matches.Where(e => e.Folder.Length == deepest).Select(e => e.Name).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
             if (names.Count != 1) return null;
             return GameCatalog.Known(names[0]) ?? GameCatalog.CustomGame(names[0]);
         }

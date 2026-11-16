@@ -6,6 +6,9 @@ namespace rk {
 
 namespace {
 
+// only touched on the ui thread, where both the close event and the queued open from the helper run
+bool g_obsClosing = false;
+
 // obs shows a projector inside its constructor, and qt sends a widget its show event before it asks windows to show the window, so one made see-through here never reaches the screen; the helper then parks it the way it parks any projector it finds
 class SeeThroughOnShow : public QObject {
 public:
@@ -32,6 +35,11 @@ protected:
 
 HWND OpenShareProjectorHidden()
 {
+	// the helper asks again as soon as obs deletes the projector while closing, and that request can run in the middle of the shutdown
+	if (g_obsClosing) {
+		blog(LOG_INFO, "[replaykit] the share projector was not opened because obs is closing");
+		return nullptr;
+	}
 	SeeThroughOnShow filter;
 	const HWND focused = GetForegroundWindow();
 	// installed for this one call only, since the projector is built and shown before it returns
@@ -44,6 +52,11 @@ HWND OpenShareProjectorHidden()
 	if (filter.hwnd && !filter.caught)
 		blog(LOG_WARNING, "[replaykit] the share projector opened but could not be made see-through before it showed");
 	return filter.hwnd;
+}
+
+void StopOpeningShareProjector()
+{
+	g_obsClosing = true;
 }
 
 } // namespace rk

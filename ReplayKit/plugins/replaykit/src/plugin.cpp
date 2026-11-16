@@ -13,6 +13,7 @@
 #include "core/locale.hpp"
 #include "core/main_window.hpp"
 #include "core/open_clips_hotkey.hpp"
+#include "core/power_throttling.hpp"
 #include "core/process_group.hpp"
 #include "core/state.hpp"
 #include "core/window_state.hpp"
@@ -27,6 +28,7 @@ bool obs_module_load(void)
 {
 	using namespace rk;
 	LocaleLoad();
+	OptOutOfPowerThrottling();
 	StartProcessGroup();
 	RegisterBongo();
 	g_callbacks = new QObject();

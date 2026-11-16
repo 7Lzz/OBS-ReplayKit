@@ -58,28 +58,26 @@ namespace ReplayKitHelper
                 bool launched = raw["minecraft"]?.Type == JTokenType.Boolean && raw["minecraft"].Value<bool>();
                 GameCatalog.Game game = null;
                 bool fullscreen = raw["fullscreen"]?.Type == JTokenType.Boolean && raw["fullscreen"].Value<bool>();
-                // a program obs's game capture hooked, or one that fills its display, is plainly a game, so any installed program can name it; a window or the foreground app of a display capture is named only from a launcher's own record
-                bool plainlyGame = kind == "game" || fullscreen && (kind == "window" || kind == "display");
                 if ((kind == "game" || kind == "window" || kind == "display") && path.Length > 0 && path.Length < 32768)
                 {
                     lock (Gate)
                     {
                         // an app that is no game is looked up again only once a minute, as the steam library is read again; until that first read is done a fresh game may still turn up, so it is asked every two seconds
-                        string lookup = (title.Length > 0 || launched ? path + "|" + title + (launched ? "|minecraft" : "") : path) + (plainlyGame ? "|game" : "");
+                        string lookup = title.Length > 0 || launched ? path + "|" + title + (launched ? "|minecraft" : "") : path;
                         if (!string.Equals(lookup, lastPath, StringComparison.OrdinalIgnoreCase) || lastGame == null && at - resolvedAt >= (SteamGames.Settled && LauncherGames.Settled ? 60000 : 2000))
                         {
                             lastGame = null;
                             lastPath = lookup;
                             resolvedAt = at;
                             var minecraft = GameCatalog.MinecraftJava(path, title, launched);
-                            lastGame = minecraft ?? (DesktopApps.Contains(Path.GetFileName(path)) ? null : GameCatalog.Find(path, plainlyGame));
+                            lastGame = minecraft ?? (DesktopApps.Contains(Path.GetFileName(path)) ? null : GameCatalog.Find(path));
                             if (minecraft != null) { if (GameCatalog.MinecraftIcon() is string icon) GameCatalog.CacheIcon(minecraft, icon); }
                             else if (lastGame != null) GameCatalog.CacheIcon(lastGame, path);
                         }
                         game = lastGame;
                     }
                 }
-                // a display capture of anything but a known game is the desktop; an app nobody knows that fills its display may be a game the catalog is missing, so it stays unassigned
+                // a display capture of a known desktop app or an ordinary window is desktop; an unidentified fullscreen app stays unassigned
                 string state = game != null ? "game" : kind == "display" && (path.Length == 0 || DesktopApps.Contains(Path.GetFileName(path)) || !fullscreen) ? "desktop" : "unknown";
                 DiscordPresence.Seen(game, path);
                 // the plugin says why a sample shows no capture; a capture of a program this catalog does not know is not recognised

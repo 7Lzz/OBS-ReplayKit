@@ -88,8 +88,7 @@ namespace ReplayKitHelper
             return index;
         }
 
-        // anyProgram lets a program of the windows list of installed programs count as a game, which only a capture that is plainly a game asks for (see LauncherGames.Find)
-        internal static Game Find(string path, bool anyProgram = false)
+        internal static Game Find(string path)
         {
             if (string.IsNullOrWhiteSpace(path) || path.Length > 32768) return null;
             string normalized = path.Replace('\\', '/').ToLowerInvariant(), exe = normalized.Substring(normalized.LastIndexOf('/') + 1);
@@ -101,7 +100,7 @@ namespace ReplayKitHelper
             if (explicitGames != null && explicitGames.Any(g => string.Equals(g["exeName"]?.Value<string>(), exe, StringComparison.OrdinalIgnoreCase)))
                 return Custom(Path.GetFileNameWithoutExtension(exe));
             // installed through steam, else through another launcher (epic, gog, ubisoft, ea, battle.net, riot, rockstar, itch.io, xbox)
-            var installed = SteamGames.Find(path) ?? LauncherGames.Find(path, anyProgram);
+            var installed = SteamGames.Find(path) ?? LauncherGames.Find(path);
             if (installed != null) Remember(installed);
             return installed;
         }

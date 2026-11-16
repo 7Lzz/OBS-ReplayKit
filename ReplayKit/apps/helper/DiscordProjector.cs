@@ -10,7 +10,7 @@ using Newtonsoft.Json.Linq;
 
 namespace ReplayKitHelper
 {
-    // discord "share preview" via an obs windowed projector: finds/opens/parks it hidden-but-discoverable off the desktop (so discords own screen picker lists it) when enabled, or shows it centered for a user-triggered visual check ("inspect"), or closes it when disabled. every find/open/park/close sequence runs under ProjectorLock so Repark/Inspect/Disable/the keep-alive tick can never interleave with each other -- see the comment on Repark below, which documents a real concurrency bug this fixed. ProjectorNative.cs is the win32 layer underneath.
+    // discord "share preview" via an obs windowed projector: finds/opens/parks it hidden-but-discoverable beside its monitor (so discords own screen picker lists it) when enabled, or shows it centered for a user-triggered visual check ("inspect"), or closes it when disabled. every find/open/park/close sequence runs under ProjectorLock so Repark/Inspect/Disable/the keep-alive tick can never interleave with each other -- see the comment on Repark below, which documents a real concurrency bug this fixed. ProjectorNative.cs is the win32 layer underneath.
     internal static class DiscordProjector
     {
         private static volatile bool disablePending;
@@ -186,12 +186,14 @@ namespace ReplayKitHelper
 
         public sealed class ParkedRect
         {
-            public int X, Y, Width, Height;
+            public int X, Y, Width, Height, VisiblePixels;
             public string Edge;
         }
 
-        // parked wholly past the edge of the desktop on the side the projector monitor sits from the main one, lined up with that monitor so it stays the nearest one and the window keeps away from the game: on a monitor the hidden window sits over whatever runs there, so a capture that copies the screen where the window is (discord switches to one when it leaves windows graphics capture, which some pcs do while a game is fullscreen) streams that game without the overlay, and covering the main monitor makes windows report a fullscreen app; windows graphics capture and printwindow still read a window off the desktop, and discord still lists it; with one monitor, or the main one picked, the edge setting gives the side
-        public static ParkedRect GetDiscordProjectorParkedRect(MonitorWorkArea workArea, int windowWidth, int windowHeight, string edge)
+        private static bool Overlaps(ScreenBounds a, ScreenBounds b) => a.Left < b.Right && b.Left < a.Right && a.Top < b.Bottom && b.Top < a.Bottom;
+
+        // parked outside the projector monitor on the side it sits from the main one, leaving only a visiblePixels square in that monitors outer corner (the bottom one, or the top one when it sits above): over a monitor the hidden window sits on whatever runs there, so a capture that copies the screen where the window is streams that instead of the projector, and covering the main monitor makes windows report a fullscreen app; wholly off the desktop, a discord share of it fell to a few frames a second on one pc while a share of the whole screen stayed smooth, so the square keeps it on a monitor, and a corner square instead of a strip along the edge since the window takes the clicks on what it covers; when the rest would cover another monitor it goes wholly past the desktop edge instead; with one monitor, or the main one picked, the edge setting gives the side
+        public static ParkedRect GetDiscordProjectorParkedRect(MonitorWorkArea workArea, int windowWidth, int windowHeight, string edge, int visiblePixels)
         {
             if (workArea.Right <= workArea.Left || workArea.Bottom <= workArea.Top) throw new InvalidOperationException(Locales.Message("screenshare.monitorWorkAreaIsInvalid"));
 
@@ -218,12 +220,23 @@ namespace ReplayKitHelper
             }
 
             var screens = GetScreenBoundsList(workArea, workArea.Left, workArea.Top, workArea.Right, workArea.Bottom);
+            int visible = Math.Min(Math.Max(0, visiblePixels), Math.Min(width, height));
+            if (visible > 0)
+            {
+                bool leftCorner = side == "left" || side == "top";
+                int sx = leftCorner ? workArea.BoundsLeft - width + visible : workArea.BoundsRight - visible;
+                int sy = side == "top" ? workArea.BoundsTop - height + visible : workArea.BoundsBottom - visible;
+                var corner = new ScreenBounds { Left = sx, Top = sy, Right = sx + width, Bottom = sy + height };
+                bool coversOther = screens.Any(b => !(b.Left == workArea.BoundsLeft && b.Top == workArea.BoundsTop && b.Right == workArea.BoundsRight && b.Bottom == workArea.BoundsBottom) && Overlaps(corner, b));
+                if (!coversOther) return new ParkedRect { X = sx, Y = sy, Width = width, Height = height, Edge = side, VisiblePixels = visible };
+            }
+
             int x = workArea.BoundsLeft, y = workArea.BoundsTop;
             if (side == "right") x = screens.Max(b => b.Right);
             else if (side == "left") x = screens.Min(b => b.Left) - width;
             else if (side == "top") y = screens.Min(b => b.Top) - height;
             else y = screens.Max(b => b.Bottom);
-            return new ParkedRect { X = x, Y = y, Width = width, Height = height, Edge = side };
+            return new ParkedRect { X = x, Y = y, Width = width, Height = height, Edge = side, VisiblePixels = 0 };
         }
 
         public sealed class InspectRect
@@ -341,7 +354,7 @@ namespace ReplayKitHelper
 
         private static JObject ParkedRectToJson(ParkedRect r) => new JObject
         {
-            ["x"] = r.X, ["y"] = r.Y, ["width"] = r.Width, ["height"] = r.Height, ["edge"] = r.Edge,
+            ["x"] = r.X, ["y"] = r.Y, ["width"] = r.Width, ["height"] = r.Height, ["edge"] = r.Edge, ["visible_pixels"] = r.VisiblePixels,
         };
 
         private static JObject InspectRectToJson(InspectRect r) => new JObject { ["x"] = r.X, ["y"] = r.Y, ["width"] = r.Width, ["height"] = r.Height };
@@ -370,7 +383,7 @@ namespace ReplayKitHelper
             return obj;
         }
 
-        // finds/opens/parks the layered projector off the desktop with nonzero alpha so discord can capture it during fullscreen gameplay. runs the whole find/open/park sequence under ProjectorLock -- without it, a helper restart firing this function at the same moment as the keep-alive tick could see no projector from both, and both would open one. Inspect and Disable take the same lock for their own find/open/close sequences so none of the three can interleave with each other either.
+        // finds/opens/parks the layered projector beside its monitor with nonzero alpha so discord can capture it during fullscreen gameplay. runs the whole find/open/park sequence under ProjectorLock -- without it, a helper restart firing this function at the same moment as the keep-alive tick could see no projector from both, and both would open one. Inspect and Disable take the same lock for their own find/open/close sequences so none of the three can interleave with each other either.
         public static JObject Repark(JObject settings = null, string titleOverride = "", bool force = false)
         {
             parkedWindow = null;
@@ -424,15 +437,15 @@ namespace ReplayKitHelper
                 warnings.AddRange(size.Warnings);
 
                 ParkedRect rect;
-                try { rect = GetDiscordProjectorParkedRect(workArea, size.Width, size.Height, settings["discord_projector_edge"]?.Value<string>() ?? ""); }
+                try { rect = GetDiscordProjectorParkedRect(workArea, size.Width, size.Height, settings["discord_projector_edge"]?.Value<string>() ?? "", settings["discord_projector_visible_pixels"]?.Value<int>() ?? 0); }
                 catch (InvalidOperationException ex)
                 {
                     warnings.Add(ex.Message);
                     return new JObject { ["ok"] = false, ["message"] = ex.Message, ["warnings"] = new JArray(warnings) };
                 }
 
-                Log.Write(string.Format("Parking Discord projector past the {0} edge of the desktop, window=({1},{2},{3},{4}), mode=hidden",
-                    rect.Edge, rect.X, rect.Y, rect.Width, rect.Height));
+                Log.Write(string.Format("Parking Discord projector on the {0} side, visible_pixels={1}, window=({2},{3},{4},{5}), mode=hidden",
+                    rect.Edge, rect.VisiblePixels, rect.X, rect.Y, rect.Width, rect.Height));
                 bool alreadyPlaced = !open.Opened && ProjectorNative.IsProjectorParked(open.Hwnd, title, rect.X, rect.Y, rect.Width, rect.Height, true);
                 bool parked = alreadyPlaced || ProjectorNative.RestoreResizeTitleChromeGhosted(open.Hwnd, title, rect.X, rect.Y, rect.Width, rect.Height, true);
                 if (!parked)

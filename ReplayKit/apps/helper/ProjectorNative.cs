@@ -63,6 +63,7 @@ namespace ReplayKitHelper
         private const long WS_EX_TOOLWINDOW = 0x00000080L;
         private const long WS_EX_APPWINDOW = 0x00040000L;
         private const long WS_EX_LAYERED = 0x00080000L;
+        private const long WS_EX_TRANSPARENT = 0x00000020L;
         private const long WS_EX_TOPMOST = 0x00000008L;
         private const uint SWP_NOSIZE = 0x0001;
         private const uint SWP_NOMOVE = 0x0002;
@@ -285,9 +286,10 @@ namespace ReplayKitHelper
             if (!IsProjectorWindow(hwndValue)) return false;
             long style = GetWindowLongPtr(hWnd, GWL_EXSTYLE).ToInt64();
             const long ghostMask = WS_EX_LAYERED;
+            // never click-through: discord left the projector out of its screen picker while it had WS_EX_TRANSPARENT
             long next = ghosted
-                ? ((style | ghostMask | WS_EX_APPWINDOW) & ~WS_EX_TOOLWINDOW)
-                : ((style & ~ghostMask) | WS_EX_APPWINDOW) & ~WS_EX_TOOLWINDOW;
+                ? ((style | ghostMask | WS_EX_APPWINDOW) & ~(WS_EX_TOOLWINDOW | WS_EX_TRANSPARENT))
+                : ((style & ~ghostMask) | WS_EX_APPWINDOW) & ~(WS_EX_TOOLWINDOW | WS_EX_TRANSPARENT);
             if (next != style) SetWindowLongPtr(hWnd, GWL_EXSTYLE, new IntPtr(next));
             if (ghosted)
             {
@@ -356,7 +358,7 @@ namespace ReplayKitHelper
             if (cancel.IsCancellationRequested) return false;
             ShowWindow(hWnd, SW_SHOWNOACTIVATE);
             if (cancel.IsCancellationRequested) return false;
-            // keep it near the top of the discord picker and at alpha zero until the off-screen move is confirmed
+            // keep it near the top of the discord picker and at alpha zero until the move is confirmed
             if (!SetWindowPos(hWnd, HWND_TOPMOST, x, y, width, height, SWP_NOACTIVATE | SWP_FRAMECHANGED | SWP_SHOWWINDOW)) return false;
             if (cancel.IsCancellationRequested || !IsWindowAtRectAndTitle(hwndValue, title, x, y, width, height)) return false;
             if (!SetProjectorGhosted(hwndValue, true, ParkedAlpha)) return false;
@@ -373,7 +375,7 @@ namespace ReplayKitHelper
             if (borderless && ((style & chrome) != 0 || client.Right != width || client.Bottom != height)) return false;
             long extended = GetWindowLongPtr(hWnd, GWL_EXSTYLE).ToInt64();
             long required = WS_EX_LAYERED | WS_EX_APPWINDOW | WS_EX_TOPMOST;
-            if ((extended & required) != required || (extended & WS_EX_TOOLWINDOW) != 0 || GetWindow(hWnd, GW_OWNER) != IntPtr.Zero) return false;
+            if ((extended & required) != required || (extended & (WS_EX_TOOLWINDOW | WS_EX_TRANSPARENT)) != 0 || GetWindow(hWnd, GW_OWNER) != IntPtr.Zero) return false;
             if (!GetLayeredWindowAttributes(hWnd, out _, out byte alpha, out uint flags) || alpha != ParkedAlpha || (flags & LWA_ALPHA) == 0) return false;
             IntPtr region = CreateRectRgn(0, 0, 0, 0);
             if (region == IntPtr.Zero) return false;
