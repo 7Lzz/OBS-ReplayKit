@@ -96,7 +96,8 @@
   function number(value, digits) {
     return new Intl.NumberFormat(lang, { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(value);
   }
-  window.RK_I18N = { use: use, lang: function () { return lang; }, number: number };
+  // render(root) puts the text of the bound elements under root in place now rather than at the next microtask, for a script that measures markup it has just added
+  window.RK_I18N = { use: use, lang: function () { return lang; }, number: number, render: renderMessages };
   document.documentElement.lang = lang;
   watchMessages();
 })();

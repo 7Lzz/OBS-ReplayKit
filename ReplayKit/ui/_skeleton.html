@@ -1,4 +1,4 @@
-<!-- shared partial (helper #include target: skeleton). the loading placeholder of a view, measured from the real layout of the page instead of drawn by hand, so a layout that changes takes its placeholder with it. RKSkeleton.measure(root) turns what shows under root into a map of blocks (every line of text, image, icon and control, and the panels under them), draw(layer, map) paints a map, cover(root, { view, stage }) / uncover(root) hold a part of the page under its placeholder while its first data loads, and save / load keep the map of a view for when it has nothing on screen to measure yet (the shell before a page loads, the editor before its markup is in) -->
+<!-- shared partial (helper #include target: skeleton). the loading placeholder of a view, measured from the real layout of the page instead of drawn by hand, so a layout that changes takes its placeholder with it. RKSkeleton.measure(root) turns what shows under root into a map of blocks (every line of text, image, icon and control, and the panels under them), draw(layer, map) paints a map, cover(root, { view, stage }) / uncover(root) hold a part of the page under its placeholder while its first data loads, and save / load keep the map of a view for when it has nothing on screen to measure yet (the shell before a page loads, the editor before its markup is in), one per window size. saveSettled(key, doc) keeps the map of a page only once it has settled (two measures in a row the same, at the top of its lists, nothing open over it), so a placeholder is drawn from the finished page and never from one still loading; a cover with a view draws that kept shape when there is one for its size and keeps the page shape itself once the page is in -->
 <style>
   /* a wave that runs left to right across every block at once, slow and steady, which reads as a shorter wait than a pulse; each block moves its own highlight on the compositor by where the block sits (--x), so the blocks show one wave between them, and draw() sets its length and its phase from the clock, so the placeholders of the shell and of a page line up as one wave */
   .rk-skel-layer, .rk-skel-wave { --rk-skel-band:360px; }
@@ -32,11 +32,21 @@
   var MIN_SHOWN_MS = 300;
   var FADE_MS = 200;
   var WAVE_MS = 1600;
+  // a kept shape is measured again this long after the last one until two in a row agree, and the waiting gives up after this many tries, so only a page that has settled is kept
+  var SETTLE_MS = 600;
+  var SETTLE_TRIES = 12;
+  // a few blocks of a page that has settled can still move (a spinner, an icon that turns), so two measures this close count as the same shape
+  var SETTLE_SLACK_BLOCKS = 3;
+  var SETTLE_SLACK_PX = 4;
+  // the window sizes a shape is kept for per view, newest first, so going back to an earlier size of the window finds its shape again
+  var KEPT_SIZES = 4;
+  // what is open over a page that is never part of its shape
+  var TRANSIENT = ".rk-skel-layer, .rk-skel-hidden, .modal-veil.is-open, .modal-backdrop.is-visible, .combo.is-open, .menu-dropdown.is-open, .ctx-menu.is-open";
   // a control this small reads as one block whether or not its state gives it a ground right now, so a row of icon buttons stays even
   var SMALL_CONTROL = 48;
   var STORE = "rk-skeleton:";
-  // raised whenever what measure() turns a page into changes, so a shape kept by an older release is never drawn
-  var MAP_VERSION = 3;
+  // raised whenever what measure() turns a page into or how shapes are kept changes, so a shape kept by an older release is never drawn
+  var MAP_VERSION = 4;
   var SURFACE = 1, BLOCK = 2, LINE = 3;
   var SVG_NS = "http://www.w3.org/2000/svg";
   var MEDIA = { img:1, video:1, canvas:1, svg:1, picture:1, iframe:1 };
@@ -53,6 +63,16 @@
     return parts.length < 4 ? 1 : parseFloat(parts[3]) || 0;
   }
 
+  // an element at no opacity only because it is fading in shows once it has, so it is measured; one fading out or plainly see-through is not
+  function arriving(el) {
+    if (!el.getAnimations) return false;
+    return el.getAnimations().some(function (animation) {
+      var frames = animation.effect && animation.effect.getKeyframes ? animation.effect.getKeyframes() : [];
+      var last = frames[frames.length - 1];
+      return !!last && last.opacity !== undefined && parseFloat(last.opacity) > 0;
+    });
+  }
+
   function cut(r, clip) {
     var left = Math.max(r.left, clip.left), top = Math.max(r.top, clip.top);
     var right = Math.min(r.right, clip.right), bottom = Math.min(r.bottom, clip.bottom);
@@ -62,6 +82,8 @@
   // the blocks of what shows under root, in the coordinates of its window; panels with a colour of their own come before what sits on them
   function measure(root) {
     var doc = root.ownerDocument, win = doc.defaultView;
+    // keyed text a script has just added is filled in at the next microtask, so it is put in place now or its lines would be missing
+    if (win.RK_I18N && win.RK_I18N.render) win.RK_I18N.render(root);
     var blocks = [];
     var map = { v:MAP_VERSION, w:win.innerWidth, h:win.innerHeight, bg:win.getComputedStyle(doc.body).backgroundColor, b:blocks };
     // a part of the page that is laid out out of sight (the editor while it loads) is hidden itself, and what is in it is then measured as if it showed
@@ -93,7 +115,7 @@
     function walk(el, clip) {
       if (blocks.length >= MAX_BLOCKS || el.getAttribute("data-skel") === "skip") return;
       var cs = win.getComputedStyle(el);
-      if (cs.display === "none" || (el !== root && parseFloat(cs.opacity) === 0)) return;
+      if (cs.display === "none" || (el !== root && parseFloat(cs.opacity) === 0 && !arriving(el))) return;
       if (cs.visibility === "hidden" && !hiddenRoot) return;
       if (el.localName === "input" && el.type === "hidden") return;
       var rect = el.getBoundingClientRect();
@@ -189,11 +211,11 @@
   }
   // the key the shape of a view of the obs window is kept under: the shell keeps it, and the page of that view takes it over from the shell
   function viewKey(name, variant) { return "view:" + name + (name === "settings" ? ":" + (variant || "") : ""); }
+  // a page in a window of its own has no title bar or rail of the obs window around it, so its shape is kept apart from the one of the same view inside obs
+  function pageKey(c) { return (c.embedded ? "" : "window:") + viewKey(c.view, c.variant); }
 
   function loadView(name, variant, win) {
-    win = win || window;
-    var map = load(viewKey(name, variant));
-    return map && map.b.length && map.w === win.innerWidth && map.h === win.innerHeight ? map : null;
+    return loadSized(viewKey(name, variant), win || window);
   }
 
   function loadingMap(name, variant) {
@@ -205,11 +227,17 @@
   // what goes over root: inside the obs window the shape the shell keeps for this view when it was taken at this very size, so the placeholder does not move when the page takes over from the shell; otherwise root measured with the stand-ins of stage, which puts content that is not there yet into the page and returns how to take it out again (measured and gone before anything else on the page runs)
   function drawCover(c) {
     var win = c.root.ownerDocument.defaultView;
-    var kept = c.embedded && c.view ? loadView(c.view, c.variant, win) : null;
+    var kept = c.view ? loadSized(pageKey(c), win) : null;
     if (kept) {
       var r = c.root.getBoundingClientRect();
       c.map = kept;
       draw(c.layer, kept, { left:r.left, top:r.top, right:r.right, bottom:r.bottom });
+      return;
+    }
+    // a page whose rows come from its data has nothing to stand in for them, so the first time, before it has a kept shape, it shows its plain ground until the data is in rather than a placeholder the page then moves away from
+    if (c.blankFirst) {
+      c.map = null;
+      c.layer.textContent = "";
       return;
     }
     var undo = c.stage ? c.stage() : null;
@@ -217,11 +245,11 @@
     finally { if (typeof undo === "function") undo(); }
   }
 
-  // the part of the page under root stays laid out but out of sight, with its placeholder over it. inside the obs window the shell has already shown the placeholder of the view while the page loaded, so this one takes over at once; in a window of its own it waits SHOW_DELAY_MS, so data that is quick never shows it. options: view (the view of the obs window the page is) and stage
+  // the part of the page under root stays laid out but out of sight, with its placeholder over it. inside the obs window the shell has already shown the placeholder of the view while the page loaded, so this one takes over at once; in a window of its own it waits SHOW_DELAY_MS, so data that is quick never shows it. options: view (the view of the obs window the page is), stage, and blankFirst for a page with no stand-ins
   function cover(root, options) {
     if (!root || coverOf(root)) return;
     var doc = root.ownerDocument;
-    var c = { root:root, view:options && options.view, variant:options && options.variant, stage:options && options.stage, layer:doc.createElement("div") };
+    var c = { root:root, view:options && options.view, variant:options && options.variant, stage:options && options.stage, blankFirst:!!(options && options.blankFirst), layer:doc.createElement("div") };
     c.embedded = doc.documentElement.classList.contains("rk-embedded");
     c.delay = c.embedded ? 0 : SHOW_DELAY_MS;
     c.layer.className = "rk-skel-layer";
@@ -254,6 +282,8 @@
     function finish() {
       c.layer.remove();
       c.root.ownerDocument.dispatchEvent(new Event("replaykit-skeleton-layout"));
+      // the page kept its own shape once its first data is in and it has settled; inside obs the shell keeps the same one as well
+      if (c.view) saveSettled(pageKey(c), c.root.ownerDocument);
     }
     if (!fade) { finish(); return; }
     c.root.animate([{ opacity:0 }, { opacity:1 }], { duration:FADE_MS, easing:"ease" });
@@ -265,17 +295,74 @@
     covers.forEach(drawCover);
   });
 
+  // the shapes kept under key, one per window size, newest first
+  function keptMaps(key) {
+    try {
+      var kept = JSON.parse(localStorage.getItem(STORE + key) || "null");
+      if (!kept || kept.v !== MAP_VERSION || !Array.isArray(kept.maps)) return [];
+      return kept.maps.filter(function (map) { return map && Array.isArray(map.b) && map.w > 0 && map.h > 0; });
+    } catch (_) { return []; }
+  }
   function save(key, map) {
     if (!map || !map.b || !map.b.length) return;
-    try { localStorage.setItem(STORE + key, JSON.stringify(map)); } catch (_) {}
+    var maps = keptMaps(key).filter(function (other) { return other.w !== map.w || other.h !== map.h; });
+    maps.unshift(map);
+    try { localStorage.setItem(STORE + key, JSON.stringify({ v:MAP_VERSION, maps:maps.slice(0, KEPT_SIZES) })); } catch (_) {}
   }
-  function load(key) {
-    try {
-      var map = JSON.parse(localStorage.getItem(STORE + key) || "null");
-      return map && map.v === MAP_VERSION && Array.isArray(map.b) ? map : null;
-    } catch (_) { return null; }
+  // the shape kept for this very size of the window, or none, since a page laid out at another size has other rows
+  function loadSized(key, win) {
+    var maps = keptMaps(key);
+    for (var i = 0; i < maps.length; i++) if (maps[i].b.length && maps[i].w === win.innerWidth && maps[i].h === win.innerHeight) return maps[i];
+    return null;
+  }
+  // the shape kept for this size, else the newest of any size, which draw() stretches to the width
+  function load(key, win) {
+    return loadSized(key, win || window) || keptMaps(key)[0] || null;
   }
 
-  window.RKSkeleton = { measure:measure, draw:draw, cover:cover, uncover:uncover, save:save, load:load, loadView:loadView, loadingMap:loadingMap, viewKey:viewKey, MIN_SHOWN_MS:MIN_SHOWN_MS };
+  // a page is kept only at the top of every list it scrolls and with nothing open over it, the state it loads in
+  function settledState(doc) {
+    if (doc.hidden || !doc.body || doc.querySelector(TRANSIENT)) return false;
+    var all = doc.body.getElementsByTagName("*");
+    for (var i = 0; i < all.length; i++) if (all[i].scrollTop > 0) return false;
+    return !(doc.scrollingElement && doc.scrollingElement.scrollTop > 0);
+  }
+  function sameShape(a, b) {
+    if (!a || !b || a.w !== b.w || a.h !== b.h || a.b.length !== b.b.length) return false;
+    var moved = 0;
+    for (var i = 0; i < a.b.length; i++) {
+      var p = a.b[i], q = b.b[i];
+      for (var k = 0; k < 6; k++) {
+        if (p[k] === q[k] || (k > 0 && Math.abs(p[k] - q[k]) <= SETTLE_SLACK_PX)) continue;
+        if (++moved > SETTLE_SLACK_BLOCKS) return false;
+        break;
+      }
+    }
+    return true;
+  }
+  // keeps the shape of doc under key once it has settled: it is measured again every SETTLE_MS until two measures in a row are the same shape, so a page still filling in, scrolled down or under a menu or a dialog is never what a later placeholder is drawn from; a call for the same key stops the one before, and the function it returns stops it too
+  var settling = {};
+  function saveSettled(key, doc) {
+    if (settling[key]) settling[key]();
+    var stopped = false, tries = 0, last = null;
+    function step() {
+      if (stopped) return;
+      if (++tries > SETTLE_TRIES) { stop(); return; }
+      var map = settledState(doc) ? measure(doc.body) : null;
+      if (map && sameShape(map, last)) { save(key, map); stop(); return; }
+      last = map;
+      setTimeout(step, SETTLE_MS);
+    }
+    function stop() {
+      stopped = true;
+      if (settling[key] === stop) delete settling[key];
+    }
+    settling[key] = stop;
+    var fonts = doc.fonts && doc.fonts.ready ? doc.fonts.ready : Promise.resolve();
+    fonts.then(function () { setTimeout(step, SETTLE_MS); }, function () { setTimeout(step, SETTLE_MS); });
+    return stop;
+  }
+
+  window.RKSkeleton = { measure:measure, draw:draw, cover:cover, uncover:uncover, save:save, load:load, loadView:loadView, loadingMap:loadingMap, viewKey:viewKey, saveSettled:saveSettled, MIN_SHOWN_MS:MIN_SHOWN_MS };
 })();
 </script>

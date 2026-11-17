@@ -305,19 +305,25 @@
     rememberSoon(name);
   }
 
-  // the shape of a page that has been showing for a moment is kept, and the next time that page has to load its placeholder is drawn from it; not while a dialog or the editor is over it, or while it is still under its own placeholder
-  var rememberTimer = 0;
+  // the shape of a page is kept once the page says its first data is in (window.__rkReady) and it has settled (RKSkeleton.saveSettled: the same shape twice in a row, at the top of its lists, nothing open over it), and the next time that page has to load its placeholder is drawn from it; a page that is still filling in, scrolled or under a dialog is never kept
+  var stopRemembering = null;
   function rememberSoon(name) {
-    clearTimeout(rememberTimer);
-    rememberTimer = setTimeout(function () {
-      var f = frames[name];
-      if (!windowVisible || active !== name || !f || !f.loaded) return;
+    if (stopRemembering) stopRemembering();
+    stopRemembering = null;
+    var f = frames[name];
+    if (!windowVisible || active !== name || !f || !f.loaded) return;
+    var ready = null;
+    try { ready = f.el.contentWindow.__rkReady; } catch (_) {}
+    var stopped = false, stopSettle = null;
+    stopRemembering = function () { stopped = true; if (stopSettle) stopSettle(); };
+    var settle = function () {
+      if (stopped || !windowVisible || active !== name) return;
       try {
         var doc = f.el.contentDocument;
-        if (!doc || !doc.body || doc.querySelector(".rk-skel-layer, .modal-veil.is-open, .modal-backdrop.is-visible")) return;
-        RKSkeleton.save(RKSkeleton.viewKey(name, doc.body.dataset.skelPage), RKSkeleton.measure(doc.body));
-      } catch (_) {}
-    }, 1500);
+        if (doc && doc.body) stopSettle = RKSkeleton.saveSettled(RKSkeleton.viewKey(name, doc.body.dataset.skelPage), doc);
+      } catch (e) { rkReportError(e); }
+    };
+    Promise.resolve(ready).then(settle, settle);
   }
 
   window.addEventListener("resize", function () {

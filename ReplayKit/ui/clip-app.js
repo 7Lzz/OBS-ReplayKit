@@ -3041,8 +3041,6 @@ const CLIP_HOVER_PROFILES = {
     badge.textContent = ready ? String(codec).toUpperCase() : "";
   }
 
-  // the parts of the card below without what is in them, for the loading placeholder (stageGhostCards), so it takes the size the card css gives a real one
-  const GHOST_CARD = '<div class="card"><div class="preview" data-skel></div><div class="body"><div class="title-row"><span class="name" data-i18n="clips.aClipThatIsLoading"></span><span class="icon-mini-btn edit-btn"></span></div><div class="meta"><span class="size" data-i18n="clips.n000Mb"></span><span class="dot"></span><span class="age" data-i18n="clips.n2DaysAgo"></span></div></div><div class="actions"><span class="action-link-btn" data-i18n="clips.createLink"></span></div></div>';
   function buildCard(clip) {
     const card = document.createElement("div");
     card.className = "card rk-hover-card" + (selectedClipNames.has(clip.name) ? " is-selected" : "");
@@ -5237,47 +5235,64 @@ const CLIP_HOVER_PROFILES = {
     if (homeSettled()) resolveFirstRender();
   }
 
-  // until the first list is in, the clip area is held under a placeholder measured from stand-in cards (GHOST_CARD), so it has the shape the cards will have; the stand-ins are taken out again before anything else runs, since every list of this page reads .card
+  // until the first list is in, the clip area is held under a placeholder measured from stand-in cards that buildCard makes for GHOST_CLIP, so they are the very cards the list will hold, under the heading the list will have; this is only for a page with no kept shape for its size yet (RKSkeleton keeps the finished page), and the stand-ins are taken out again before anything else runs, since every list of this page reads .card
   const GHOST_CLIP = { name: RK_M("clips.theLatestClipIsLoadingMp4"), mtime: 0, size: 0, duration: 60, width: 1920, height: 1080, fps: 60 };
   let clipsLoading = false;
 
   function stageGhostCards() {
     const added = [];
-    const put = (parent, html) => {
-      const holder = document.createElement("template");
-      holder.innerHTML = html;
-      added.push(...holder.content.children);
-      parent.appendChild(holder.content);
+    const put = (parent, count) => {
+      for (let i = 0; i < count; i++) {
+        const card = buildCard(GHOST_CLIP);
+        added.push(card);
+        parent.appendChild(card);
+      }
     };
     const emptyDisplay = emptyEl.style.display;
     emptyEl.style.display = "none";
-    let undoHome = () => {};
+    let undo = () => {};
     if (HOME_MODE) {
       const shelvesShown = homeShelvesEl.classList.contains("is-shown");
       const infoHtml = homeHeroInfoEl.innerHTML;
       const columns = homeColumns();
       homeShelvesEl.classList.add("is-shown");
-      put(homeHeroEl, GHOST_CARD);
+      put(homeHeroEl, 1);
       homeHeroInfoEl.innerHTML = homeHeroInfoHtml(GHOST_CLIP);
       homeRecentEl.style.setProperty("--home-cols", String(columns));
-      put(homeRecentEl, GHOST_CARD.repeat(columns));
-      undoHome = () => {
+      put(homeRecentEl, columns);
+      undo = () => {
         homeShelvesEl.classList.toggle("is-shown", shelvesShown);
         homeHeroInfoEl.innerHTML = infoHtml;
       };
     } else {
+      const heading = activeFilter === "all" ? FILTER_SECTION_HEADING.all : FILTER_SECTION_HEADING[activeFilter];
+      const headingShown = restHeadingEl.classList.contains("is-shown");
+      const headingIcon = restHeadingIconEl.innerHTML;
+      const headingLabel = restHeadingLabelEl.textContent;
+      if (heading) {
+        restHeadingEl.classList.add("is-shown");
+        restHeadingIconEl.innerHTML = heading.icon;
+        restHeadingLabelEl.textContent = heading.label;
+      }
       const grid = document.createElement("div");
       grid.className = "grid";
       scrollAreaEl.appendChild(grid);
       added.push(grid);
-      put(grid, GHOST_CARD);
+      put(grid, 1);
       const columns = getComputedStyle(grid).gridTemplateColumns.split(" ").length;
       const rows = Math.ceil(scrollAreaEl.clientHeight / Math.max(1, grid.firstElementChild.offsetHeight + GRID_GAP));
-      put(grid, GHOST_CARD.repeat(Math.max(0, columns * rows - 1)));
+      put(grid, Math.max(0, columns * rows - 1));
+      undo = () => {
+        restHeadingEl.classList.toggle("is-shown", headingShown);
+        restHeadingIconEl.innerHTML = headingIcon;
+        restHeadingLabelEl.textContent = headingLabel;
+      };
     }
     return () => {
       added.forEach((node) => node.remove());
-      undoHome();
+      undo();
+      // buildCard keeps the length of a clip it is given, which a stand-in must not leave behind
+      durationCache.delete(GHOST_CLIP.name);
       emptyEl.style.display = emptyDisplay;
     };
   }

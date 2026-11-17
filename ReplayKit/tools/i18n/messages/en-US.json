@@ -103,10 +103,6 @@
     "context": "Short notice that pops up in the clips library. Keep {from}, {to} as written.",
     "text": "A clip named “{from}” already exists, so this clip was renamed to “{to}”."
   },
-  "clips.aClipThatIsLoading": {
-    "context": "Text in the clips library.",
-    "text": "A clip that is loading"
-  },
   "clips.aClipWasNotSaved": {
     "context": "Title of a notification or popup in a ReplayKit window, sent by the background helper.",
     "text": "A clip was not saved"
@@ -1075,10 +1071,6 @@
     "context": "Tooltip in the clips library.",
     "text": "Mute (M)"
   },
-  "clips.n000Mb": {
-    "context": "Text in the clips library.",
-    "text": "00.0 MB"
-  },
   "clips.n0Selected": {
     "context": "Text in the toolbar of the clips library.",
     "text": "0 selected"
@@ -1102,10 +1094,6 @@
   "clips.n1SelectedClipWasSkippedBecause": {
     "context": "Text in the clips library. Text between ** shows in bold; keep the ** marks around the matching words.",
     "text": "**1** selected clip was skipped because it is already compressed or busy."
-  },
-  "clips.n2DaysAgo": {
-    "context": "Text in the clips library.",
-    "text": "2 days ago"
   },
   "clips.nameAnyExperience": {
     "context": "Text in the game picker of the clips library. Keep {name} as written.",

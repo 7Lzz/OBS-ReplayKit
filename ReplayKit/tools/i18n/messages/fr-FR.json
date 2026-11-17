@@ -103,10 +103,6 @@
     "source": "a7d5f0fded872eeb",
     "text": "Un clip nommé “{from}” existe déjà, ce clip a donc été renommé “{to}”."
   },
-  "clips.aClipThatIsLoading": {
-    "source": "1f150c8e4cc63b2b",
-    "text": "Un clip en cours de chargement"
-  },
   "clips.aClipWasNotSaved": {
     "source": "21aede787a2f472a",
     "text": "Le clip n'a pas été enregistré"
@@ -1075,10 +1071,6 @@
     "source": "3b751cc4c0769c9c",
     "text": "Couper le son (M)"
   },
-  "clips.n000Mb": {
-    "source": "33d77243bad0e1cf",
-    "text": "00.0 MB"
-  },
   "clips.n0Selected": {
     "source": "13196c0b2bff730c",
     "text": "0 sélectionné"
@@ -1102,10 +1094,6 @@
   "clips.n1SelectedClipWasSkippedBecause": {
     "source": "f2a0a1564f7eda0e",
     "text": "**1** clip sélectionné a été ignoré car il est déjà compressé ou occupé."
-  },
-  "clips.n2DaysAgo": {
-    "source": "89c1c453427fed9d",
-    "text": "il y a 2 jours"
   },
   "clips.nameAnyExperience": {
     "source": "94ad5b6bc4fd7b5a",

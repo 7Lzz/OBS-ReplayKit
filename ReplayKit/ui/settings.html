@@ -5501,11 +5501,11 @@
     if (document.getElementById("page-" + name)) activatePage(name);
   };
 
-  // the first load holds the pages under a placeholder measured from their own rows, so no control shows a value before the real one is in
+  // the first load holds the pages under the shape kept from an earlier load of this page at this size, or under the plain ground when there is none yet, so no control shows a value before the real one is in
   const requestedSettingsPage = new URLSearchParams(location.search).get("page");
   if (requestedSettingsPage) window.__rkGoToPage(requestedSettingsPage);
   const settingsMain = document.querySelector("main.main");
-  if (window.RKSkeleton) RKSkeleton.cover(settingsMain, { view: "settings", variant: document.body.dataset.skelPage });
+  if (window.RKSkeleton) RKSkeleton.cover(settingsMain, { view: "settings", variant: document.body.dataset.skelPage, blankFirst: true });
   loadSettings().finally(() => { if (window.RKSkeleton) RKSkeleton.uncover(settingsMain); });
   setInterval(refreshExternalSettings, 2000);
 

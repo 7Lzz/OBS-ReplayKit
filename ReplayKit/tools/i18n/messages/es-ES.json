@@ -103,10 +103,6 @@
     "source": "a7d5f0fded872eeb",
     "text": "Ya existe un clip llamado “{from}”, así que este clip se renombró como “{to}”."
   },
-  "clips.aClipThatIsLoading": {
-    "source": "1f150c8e4cc63b2b",
-    "text": "Un clip que se está cargando"
-  },
   "clips.aClipWasNotSaved": {
     "source": "21aede787a2f472a",
     "text": "No se guardó el clip"
@@ -1075,10 +1071,6 @@
     "source": "3b751cc4c0769c9c",
     "text": "Silenciar (M)"
   },
-  "clips.n000Mb": {
-    "source": "33d77243bad0e1cf",
-    "text": "00.0 MB"
-  },
   "clips.n0Selected": {
     "source": "13196c0b2bff730c",
     "text": "0 seleccionados"
@@ -1102,10 +1094,6 @@
   "clips.n1SelectedClipWasSkippedBecause": {
     "source": "f2a0a1564f7eda0e",
     "text": "Se omitió **1** clip seleccionado porque ya está comprimido o en uso."
-  },
-  "clips.n2DaysAgo": {
-    "source": "89c1c453427fed9d",
-    "text": "hace 2 días"
   },
   "clips.nameAnyExperience": {
     "source": "94ad5b6bc4fd7b5a",
