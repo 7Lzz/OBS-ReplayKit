@@ -92,7 +92,7 @@ namespace ReplayKitHelper
             return null;
         }
 
-        // the card of the share window: what it can use, the image and the sound picked for it, the picked image for the card editor and a showing of the card now
+        // the card of the share window: what it can use, the image, video and sound picked for it, the picked image and video for the card editor and a showing of the card now
         private static bool? HandleCover(RouteRequest r)
         {
             Stream stream = r.Stream;
@@ -109,6 +109,7 @@ namespace ReplayKitHelper
                 HttpResponse.SendFile(stream, 200, "OK", new Dictionary<string, string> { ["Content-Type"] = "image/png", ["Cache-Control"] = "no-store" }, ShareCover.ImagePath, FileShare.ReadWrite | FileShare.Delete);
                 return false;
             }
+            if (path == "/share/cover/video.mp4" && req.Method == "GET") return HttpResponse.ServeRangedFile(stream, req, File.Exists(ShareCover.VideoPath) ? ShareCover.VideoPath : null, "video/mp4");
             if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
             try
             {
@@ -126,6 +127,19 @@ namespace ReplayKitHelper
                     case "/share/cover/image/remove":
                         ShareCover.Remove(ShareCover.ImagePath);
                         result = new JObject { ["ok"] = true, ["settings"] = SetCoverSetting("share_cover_background", "theme", onlyFrom: "image") };
+                        break;
+                    case "/share/cover/video":
+                    {
+                        string picked = FilePickers.PickPath(false, FilePickers.VideoFilter, "");
+                        if (string.IsNullOrEmpty(picked)) { HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["changed"] = false }); return false; }
+                        result = ShareCover.ImportVideo(picked);
+                        if (result["ok"]?.Value<bool>() == true) result["settings"] = SetCoverSetting("share_cover_background", "video");
+                        break;
+                    }
+                    case "/share/cover/video/remove":
+                        ShareCover.Remove(ShareCover.VideoPath);
+                        ShareCover.Remove(ShareCover.VideoSoundPath);
+                        result = new JObject { ["ok"] = true, ["settings"] = SetCoverSetting("share_cover_background", "theme", onlyFrom: "video") };
                         break;
                     case "/share/cover/sound":
                     {

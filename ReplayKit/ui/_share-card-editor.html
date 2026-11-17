@@ -1,4 +1,4 @@
-<!-- shared partial (helper #include target: share-card-editor). the share card drawn live from the settings the way the plugin draws it (share_card.cpp: each item placed by its centre and turned around it, with the sizes and colours /share/cover/state names as look), with the logo and the text dragged, resized at their corners and turned by their round handle like the overlay preview; undo and redo are the history of the page. host: RKShareCardEditor.init({ get, set, onChange }) where get(key) is the setting the page shows, set(key, value) puts one into its state and onChange() records and saves the edit; .refresh(cover) redraws, with the /share/cover/state answer when there is a new one. -->
+<!-- shared partial (helper #include target: share-card-editor). the share card drawn live from the settings the way the plugin draws it (share_card.cpp: each item placed by its centre and turned around it, with the sizes and colours /share/cover/state names as look), with the logo and the text dragged, resized at their corners and turned by their round handle like the overlay preview; undo and redo are the history of the page. host: RKShareCardEditor.init({ get, set, onChange }) where get(key) is the setting the page shows, set(key, value) puts one into its state and onChange() records and saves the edit; .refresh(cover) redraws, with the /share/cover/state answer when there is a new one; .holdVideo(true) lets go of the picked video until .holdVideo(false), so the helper can replace or delete its file meanwhile. -->
 <style>
   .sce-wrap { width:100%; max-width:760px; margin:2px 0 8px; }
   .sce-hint { display:flex; justify-content:flex-end; align-items:center; gap:6px; margin-bottom:4px; }
@@ -38,6 +38,7 @@
   </div>
   <div class="sce-screen" id="sceScreen">
     <img class="sce-backdrop" id="sceBackdrop" alt="" hidden>
+    <video class="sce-backdrop" id="sceVideo" muted loop playsinline disablepictureinpicture hidden></video>
     <div class="sce-item" id="sceIcon" data-item="icon">
       <div class="sce-logo" id="sceLogo"></div>
       <div class="sce-grip" data-corner="nw"></div><div class="sce-grip" data-corner="ne"></div><div class="sce-grip" data-corner="sw"></div><div class="sce-grip" data-corner="se"></div>
@@ -56,6 +57,7 @@
 (function () {
   var screenEl = document.getElementById("sceScreen");
   var backdrop = document.getElementById("sceBackdrop");
+  var videoEl = document.getElementById("sceVideo");
   var textEl = document.getElementById("sceText");
   var items = { icon: document.getElementById("sceIcon"), text: document.getElementById("sceTextItem") };
   var readouts = { icon: document.getElementById("sceIconReadout"), text: document.getElementById("sceTextReadout") };
@@ -64,7 +66,7 @@
   var TURN = window.RK_SETTING_LIMITS.share_cover_layout_rotation;
   // the middle of the card pulls an item centre in from this many screen pixels, and a turn snaps within this many degrees of a straight angle
   var SNAP_PX = 3, SNAP_DEGREES = 5;
-  var host = null, cover = {}, layout = null, gesture = null, backdropKey = "";
+  var host = null, cover = {}, layout = null, gesture = null, backdropKey = "", videoHeld = false;
 
   function clamp(value, range) { return Math.max(range.min, Math.min(range.max, value)); }
   function copyLayout(from) {
@@ -77,13 +79,34 @@
   }
   function sameLayout(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
 
-  // the background the card is drawn on; an image background without its image draws the theme card, as the helper does
+  // the background the card is drawn on; an image or video background without its file draws the theme card, as the helper does
   function background() {
     var value = host.get("share_cover_background");
-    return value === "image" && !cover.hasImage ? "theme" : value;
+    return (value === "image" && !cover.hasImage) || (value === "video" && !cover.hasVideo) ? "theme" : value;
+  }
+
+  function releaseVideo() {
+    videoEl.pause();
+    videoEl.removeAttribute("src");
+    videoEl.load();
+    videoEl.hidden = true;
+  }
+
+  // the picked video loops muted under the items, filling the card the way the share window draws it
+  function showVideo(on) {
+    if (!on || videoHeld) { if (videoEl.hasAttribute("src")) releaseVideo(); return; }
+    videoEl.style.objectFit = host.get("share_cover_fit") === "fill" ? "cover" : "contain";
+    var src = "/share/cover/video.mp4?t=" + (cover.videoStamp || 0);
+    if (videoEl.getAttribute("src") !== src) {
+      videoEl.src = src;
+      var playing = videoEl.play();
+      if (playing && playing.catch) playing.catch(function () {});
+    }
+    videoEl.hidden = false;
   }
 
   function showBackdrop(kind) {
+    showVideo(kind === "video");
     var key = kind === "image" ? kind + "|" + host.get("share_cover_fit") + "|" + (cover.imageStamp || 0) : kind === "lastframe" ? kind + "|" + (cover.grabStamp || 0) : "";
     if (key === backdropKey) return;
     backdropKey = key;
@@ -158,11 +181,11 @@
     var width = cover.width > 0 && cover.height > 0 ? cover.width : 16, tall = cover.width > 0 && cover.height > 0 ? cover.height : 9;
     screenEl.style.aspectRatio = width + " / " + tall;
     showBackdrop(kind);
-    items.icon.hidden = kind === "image";
+    items.icon.hidden = kind === "image" || kind === "video";
     var custom = String(host.get("share_cover_text") || "").trim();
     textEl.textContent = custom || RK_M("screenshare.coverDefaultText");
     items.text.hidden = !host.get("share_cover_show_text");
-    // the logo and the text take the theme text colour on the theme card and the light text over a picture or the last frame
+    // the logo and the text take the theme text colour on the theme card and the light text over a picture, a video or the last frame
     var foreground = kind === "theme" || !cover.look ? "var(--text)" : cover.look.lightText;
     textEl.style.color = foreground;
     items.icon.style.color = foreground;
@@ -170,7 +193,7 @@
       textEl.style.fontWeight = String(cover.look.textWeight);
       document.getElementById("sceLogo").style.opacity = String(cover.look.logoOpacity);
     }
-    textEl.classList.toggle("has-plate", kind === "image");
+    textEl.classList.toggle("has-plate", kind === "image" || kind === "video");
     screenEl.classList.toggle("is-ready", !!cover.look);
     place();
   }
@@ -262,14 +285,16 @@
     init: function (given) { host = given; render(); },
     refresh: function (status) {
       if (status) {
-        var hadImage = cover.imageStamp || 0;
+        var hadImage = cover.imageStamp || 0, hadVideo = cover.videoStamp || 0;
         cover = Object.assign({}, status);
-        // a new state answer can follow a new image pick or a new look at the desktop, so both are fetched again
+        // a new state answer can follow a new image or video pick or a new look at the desktop, so all are fetched again
         cover.imageStamp = hadImage + 1;
+        cover.videoStamp = hadVideo + 1;
         cover.grabStamp = Date.now();
       }
       render();
     },
+    holdVideo: function (on) { videoHeld = !!on; render(); },
   };
 })();
 </script>

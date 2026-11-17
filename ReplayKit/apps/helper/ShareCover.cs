@@ -1,19 +1,28 @@
 using System;
 using System.Drawing;
 using System.Drawing.Imaging;
+using System.Globalization;
 using System.IO;
+using System.Linq;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using ReplayKitShared;
 
 namespace ReplayKitHelper
 {
-    // the card the share window shows while obs is away: what it says and shows comes from the share_cover settings, the theme and the language, the plugin draws it into a png (qt there has the svg, fonts and image scaling), and the window is told to show it and to loop its sound
+    // the card the share window shows while obs is away: what it says and shows comes from the share_cover settings, the theme and the language, the plugin draws it into a png (qt there has the svg, fonts and image scaling), and the window is told to show it, to loop a picked video under it and to loop its sound
     internal static class ShareCover
     {
         private const int MaxImageWidth = 3840;
         private const int MaxImageHeight = 2160;
         private const int MaxSoundSeconds = 600;
+        public const int MaxVideoSeconds = 30;
+        // a video that players show as 30 seconds can run a few frames over, so up to half a second more still counts as 30
+        private const double VideoSecondsSlack = 0.5;
+        // the converted video is at most this big and this fast, the most the share window presents the card at, and its bitrate is capped so the share window holds the whole file in memory
+        private const int MaxVideoWidth = 1920;
+        private const int MaxVideoHeight = 1080;
+        private const int MaxVideoFps = 30;
         private static readonly object Gate = new object();
         private static string appliedSignature;
         // how the card is drawn apart from the theme: the sizes at size 100 in pixels of a 1080 pixel tall card (the logo side, the text height, the plate a picked image puts behind the text), the weight of the text, how strong the outline logo shows, and the colours of that plate (opacity 0 to 255) and of the text over an image or the last frame; the plugin draws with them and the card editor of the settings page shows the same
@@ -35,6 +44,8 @@ namespace ReplayKitHelper
         };
 
         public static string ImagePath => StateLayout.PathFor(AppConfig.GetReplayKitRoot(), StateLayout.ShareCoverImageFile);
+        public static string VideoPath => StateLayout.PathFor(AppConfig.GetReplayKitRoot(), StateLayout.ShareCoverVideoFile);
+        public static string VideoSoundPath => StateLayout.PathFor(AppConfig.GetReplayKitRoot(), StateLayout.ShareCoverVideoSoundFile);
         public static string SoundPath => StateLayout.PathFor(AppConfig.GetReplayKitRoot(), StateLayout.ShareCoverSoundFile);
         public static string CardPath => StateLayout.PathFor(AppConfig.GetReplayKitRoot(), StateLayout.ShareCoverCardFile);
         // the sound the default card plays, shipped from resources/sounds once there is one; without it the default card is silent
@@ -48,6 +59,9 @@ namespace ReplayKitHelper
             {
                 ["ok"] = true,
                 ["hasImage"] = File.Exists(ImagePath),
+                ["hasVideo"] = File.Exists(VideoPath),
+                ["videoHasSound"] = File.Exists(VideoSoundPath),
+                ["maxVideoSeconds"] = MaxVideoSeconds,
                 ["hasSound"] = File.Exists(SoundPath),
                 ["hasDefaultSound"] = File.Exists(DefaultSoundPath),
                 ["hasCard"] = File.Exists(CardPath),
@@ -59,9 +73,10 @@ namespace ReplayKitHelper
 
         private static string Stamp(string path) => path != null && File.Exists(path) ? new FileInfo(path).Length + ":" + File.GetLastWriteTimeUtc(path).Ticks : "";
 
-        // the sound the card plays now, or null for none
-        private static string SoundFor(JObject settings)
+        // the sound the card plays now, or null for none; a video background plays the sound of its video while share_cover_video_sound is on and the video has one, and the card sound otherwise
+        private static string SoundFor(JObject settings, string background)
         {
+            if (background == "video" && (settings["share_cover_video_sound"]?.Value<bool>() ?? SettingDefaults.ShareCoverVideoSound) && File.Exists(VideoSoundPath)) return VideoSoundPath;
             switch (settings["share_cover_sound"]?.Value<string>() ?? SettingDefaults.ShareCoverSound)
             {
                 case "custom": return File.Exists(SoundPath) ? SoundPath : null;
@@ -91,8 +106,9 @@ namespace ReplayKitHelper
                 if (state["ok"]?.Value<bool>() != true || width < 16 || height < 16) return;
 
                 string background = settings["share_cover_background"]?.Value<string>() ?? SettingDefaults.ShareCoverBackground;
-                // an image background whose image is gone draws the theme card, since the setting alone shows nothing
+                // an image or video background whose file is gone draws the theme card, since the setting alone shows nothing
                 if (background == "image" && !File.Exists(ImagePath)) background = "theme";
+                if (background == "video" && !File.Exists(VideoPath)) background = "theme";
                 var colors = SettingsHttp.ActiveMenuColors(settings);
                 bool showText = settings["share_cover_show_text"]?.Value<bool>() ?? SettingDefaults.ShareCoverShowText;
                 string custom = (settings["share_cover_text"]?.Value<string>() ?? "").Trim();
@@ -109,17 +125,18 @@ namespace ReplayKitHelper
                     ["image"] = background == "image" ? ImagePath : "",
                     ["fit"] = settings["share_cover_fit"]?.Value<string>() ?? SettingDefaults.ShareCoverFit,
                     ["text"] = text,
-                    // the default card has the obs icon over its text; a picked image is the picture itself
-                    ["icon"] = background != "image",
+                    // the default card has the obs icon over its text; a picked image or video is the picture itself
+                    ["icon"] = background == "theme" || background == "lastframe",
                     ["layout"] = settings["share_cover_layout"] as JObject ?? ReplaykitSettings.DefaultShareCoverLayout(),
                     ["look"] = Look.DeepClone(),
                 };
-                string sound = SoundFor(settings);
+                string sound = SoundFor(settings, background);
+                string video = background == "video" ? VideoPath : null;
                 int volume = settings["share_cover_sound_volume"]?.Value<int>() ?? SettingDefaults.ShareCoverSoundVolume;
                 long obsWindow;
                 lock (Server.State.IpcLock) obsWindow = Server.State.ObsMainWindowHwnd;
                 // the plugin that draws the card only changes when obs starts again, so each obs start draws it once and a plugin update shows up on the card
-                string signature = request.ToString(Formatting.None) + "|" + Stamp(request["image"].Value<string>()) + "|" + (sound ?? "") + "|" + Stamp(sound) + "|" + volume + "|" + state["pid"] + "|" + obsWindow;
+                string signature = request.ToString(Formatting.None) + "|" + Stamp(request["image"].Value<string>()) + "|" + Stamp(video) + "|" + (sound ?? "") + "|" + Stamp(sound) + "|" + volume + "|" + state["pid"] + "|" + obsWindow;
                 if (!force && signature == appliedSignature) return;
 
                 if (!PipeClient.RenderShareCardAndWait(request.ToString(Formatting.None), 8000))
@@ -127,10 +144,12 @@ namespace ReplayKitHelper
                     Log.Write("warn: the share card could not be drawn; the share window keeps the card it had");
                     return;
                 }
-                var card = ShareWindow.Send("CARD " + (background == "lastframe" ? "over " : "full ") + CardPath);
+                // the video goes first, so a card drawn to go over it never shows over the plain ground
+                var videoReply = ShareWindow.Send(video == null ? "VIDEO none" : "VIDEO " + request["fit"].Value<string>() + " " + video);
+                var card = ShareWindow.Send("CARD " + (background == "lastframe" ? "over " : background == "video" ? "video " : "full ") + CardPath);
                 var soundReply = ShareWindow.Send(sound == null ? "SOUND none" : "SOUND " + volume + " " + sound);
-                bool ok = card["ok"]?.Value<bool>() == true && soundReply["ok"]?.Value<bool>() == true;
-                Log.Write("Share card " + width + "x" + height + " " + background + (sound == null ? " without sound" : " with " + Path.GetFileName(sound)) + (ok ? "" : ": " + (card["message"] ?? soundReply["message"])));
+                bool ok = videoReply["ok"]?.Value<bool>() == true && card["ok"]?.Value<bool>() == true && soundReply["ok"]?.Value<bool>() == true;
+                Log.Write("Share card " + width + "x" + height + " " + background + (sound == null ? " without sound" : " with " + Path.GetFileName(sound)) + (ok ? "" : ": " + (videoReply["message"] ?? card["message"] ?? soundReply["message"])));
                 if (ok) appliedSignature = signature;
             }
         }
@@ -189,6 +208,104 @@ namespace ReplayKitHelper
             {
                 try { if (File.Exists(temporary)) File.Delete(temporary); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
             }
+        }
+
+        // the picked video converted for the share window: h.264 in mp4, which media foundation on every windows decodes, no bigger or faster than the card is presented, and its sound as a wav; a picture longer than MaxVideoSeconds is refused rather than cut, while its sound may run on past the picture up to MaxSoundSeconds and then loops on its own
+        public static JObject ImportVideo(string source)
+        {
+            string ffmpeg = Compression.FindCompressionFfmpeg();
+            string ffprobe = Compression.FindCompressionFfprobe();
+            if (string.IsNullOrEmpty(ffmpeg) || !File.Exists(ffmpeg) || string.IsNullOrEmpty(ffprobe) || !File.Exists(ffprobe)) return new JObject { ["ok"] = false, ["message"] = Locales.Message("screenshare.theVideoNeedsFfmpeg") };
+            var unusable = new JObject { ["ok"] = false, ["message"] = Locales.Message("screenshare.theVideoCouldNotBeUsed") };
+            var tooLong = new JObject { ["ok"] = false, ["message"] = Locales.Message("screenshare.theVideoIsTooLong", "count", MaxVideoSeconds) };
+            double limit = MaxVideoSeconds + VideoSecondsSlack;
+
+            // the picture is a video stream that is no cover picture, the kind an audio file carries, which is what 0:V:0 picks below
+            var probe = Probe(ffprobe, source);
+            var picture = (probe?["streams"] as JArray)?.FirstOrDefault(s => s["codec_type"]?.Value<string>() == "video" && s["disposition"]?["attached_pic"]?.Value<int>() != 1);
+            if (picture == null) return unusable;
+            bool hasSound = ((JArray)probe["streams"]).Any(s => s["codec_type"]?.Value<string>() == "audio");
+            // only the picture counts, since the sound may run longer; a picture that names its length is refused before any work, one that does not is measured once converted
+            double named = Seconds(picture["duration"]);
+            if (named > limit) return tooLong;
+            double fps = FrameRate(picture["r_frame_rate"]?.Value<string>());
+
+            Directory.CreateDirectory(Path.GetDirectoryName(VideoPath));
+            string temporaryVideo = VideoPath + ".tmp.mp4";
+            string temporarySound = VideoSoundPath + ".tmp.wav";
+            string fittedSound = VideoSoundPath + ".fit.tmp.wav";
+            try
+            {
+                string filter = "scale=w='min(" + MaxVideoWidth + ",iw)':h='min(" + MaxVideoHeight + ",ih)':force_original_aspect_ratio=decrease:force_divisible_by=2:out_color_matrix=bt709,setsar=1" + (fps > MaxVideoFps ? ",fps=" + MaxVideoFps : "") + ",format=yuv420p";
+                var converted = Compression.InvokeNativeCapture(ffmpeg, new[]
+                {
+                    "-hide_banner", "-loglevel", "error", "-y", "-i", source, "-map", "0:V:0", "-an", "-sn", "-dn", "-t", limit.ToString("0.###", CultureInfo.InvariantCulture),
+                    "-vf", filter, "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-maxrate", "12M", "-bufsize", "24M",
+                    "-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709", "-color_range", "tv", "-movflags", "+faststart", temporaryVideo,
+                }, timeoutMs: 300000);
+                double seconds = File.Exists(temporaryVideo) ? Seconds(Probe(ffprobe, temporaryVideo)?["format"]?["duration"]) : 0;
+                if (converted.ExitCode != 0 || seconds <= 0)
+                {
+                    Log.Write("Share card video import failed: " + string.Join(" ", converted.Output));
+                    return unusable;
+                }
+                // a cut at the limit is as long as the limit, which only a source longer than it gives
+                if (seconds >= limit - 0.01) return tooLong;
+                double soundSeconds = 0;
+                if (hasSound)
+                {
+                    var sound = Compression.InvokeNativeCapture(ffmpeg, new[] { "-hide_banner", "-loglevel", "error", "-y", "-i", source, "-map", "0:a:0", "-vn", "-t", MaxSoundSeconds.ToString(), "-ac", "2", "-ar", "48000", "-c:a", "pcm_s16le", temporarySound }, timeoutMs: 120000);
+                    soundSeconds = File.Exists(temporarySound) ? Seconds(Probe(ffprobe, temporarySound)?["format"]?["duration"]) : 0;
+                    if (sound.ExitCode != 0 || soundSeconds <= 0)
+                    {
+                        Log.Write("Share card video sound import failed: " + string.Join(" ", sound.Output));
+                        return unusable;
+                    }
+                    // a sound about as long as the picture or shorter is made exactly as long, so the two loop together instead of drifting apart a little every loop
+                    if (soundSeconds <= seconds + VideoSecondsSlack)
+                    {
+                        string length = seconds.ToString("0.######", CultureInfo.InvariantCulture);
+                        var fitted = Compression.InvokeNativeCapture(ffmpeg, new[] { "-hide_banner", "-loglevel", "error", "-y", "-i", temporarySound, "-af", "apad=whole_dur=" + length, "-t", length, "-c:a", "pcm_s16le", fittedSound }, timeoutMs: 120000);
+                        if (fitted.ExitCode != 0 || !File.Exists(fittedSound))
+                        {
+                            Log.Write("Share card video sound fit failed: " + string.Join(" ", fitted.Output));
+                            return unusable;
+                        }
+                        Native.MoveFileReplace(fittedSound, temporarySound);
+                        soundSeconds = seconds;
+                    }
+                }
+                Native.MoveFileReplace(temporaryVideo, VideoPath);
+                if (hasSound) Native.MoveFileReplace(temporarySound, VideoSoundPath);
+                else Remove(VideoSoundPath);
+                Log.Write("Share card video imported: " + seconds.ToString("0.00", CultureInfo.InvariantCulture) + " s" + (hasSound ? " with " + soundSeconds.ToString("0.00", CultureInfo.InvariantCulture) + " s of sound" : " without sound"));
+                return new JObject { ["ok"] = true, ["hasSound"] = hasSound };
+            }
+            finally
+            {
+                foreach (string leftover in new[] { temporaryVideo, temporarySound, fittedSound })
+                    try { if (File.Exists(leftover)) File.Delete(leftover); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+            }
+        }
+
+        private static JObject Probe(string ffprobe, string path)
+        {
+            var run = Compression.InvokeNativeCapture(ffprobe, new[] { "-v", "error", "-show_entries", "stream=codec_type,r_frame_rate,duration:stream_disposition=attached_pic:format=duration", "-of", "json", path }, timeoutMs: 30000);
+            if (run.ExitCode != 0) return null;
+            try { return JObject.Parse(string.Join("\n", run.Output)); }
+            catch (JsonException) { return null; }
+        }
+
+        // a length as ffprobe writes it; zero when it names none, which some containers do for a single stream
+        private static double Seconds(JToken duration) =>
+            double.TryParse(duration?.Value<string>(), NumberStyles.Float, CultureInfo.InvariantCulture, out double seconds) && seconds > 0 ? seconds : 0;
+
+        // a frame rate as ffprobe writes it, 30000/1001 or 25/1; zero when it names none
+        private static double FrameRate(string rate)
+        {
+            string[] parts = (rate ?? "").Split('/');
+            if (parts.Length != 2 || !double.TryParse(parts[0], NumberStyles.Float, CultureInfo.InvariantCulture, out double top) || !double.TryParse(parts[1], NumberStyles.Float, CultureInfo.InvariantCulture, out double bottom) || bottom <= 0) return 0;
+            return top / bottom;
         }
 
         public static void Remove(string path)

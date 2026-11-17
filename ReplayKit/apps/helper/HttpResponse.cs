@@ -497,9 +497,12 @@ namespace ReplayKitHelper
         public static bool ServeAudioTrack(Stream stream, HttpRequest req, string key, string index) => ServeAudioFile(stream, req, ClipAudioTracks.PathFor(key, index));
 
         // any audio file the cache made, an imported one included; null is a file that is not there
-        public static bool ServeAudioFile(Stream stream, HttpRequest req, string path)
+        public static bool ServeAudioFile(Stream stream, HttpRequest req, string path) => ServeRangedFile(stream, req, path, "audio/mp4");
+
+        // a small file this helper made, with byte ranges so an audio or video element can seek and loop it; null is a file that is not there
+        public static bool ServeRangedFile(Stream stream, HttpRequest req, string path, string contentType)
         {
-            if (path == null) { SendText(stream, 404, "Not Found", "Track not found"); return false; }
+            if (path == null) { SendText(stream, 404, "Not Found", "File not found"); return false; }
             long size = new FileInfo(path).Length;
             long start = 0;
             long end = size - 1;
@@ -528,7 +531,7 @@ namespace ReplayKitHelper
             if (start < 0 || start >= size || end < start) { SendText(stream, 416, "Range Not Satisfiable", ""); return false; }
             end = Math.Min(end, size - 1);
             long length = end - start + 1;
-            var headers = GetNoStoreHeaders(new Dictionary<string, string> { ["Content-Type"] = "audio/mp4", ["Accept-Ranges"] = "bytes", ["Connection"] = "close" });
+            var headers = GetNoStoreHeaders(new Dictionary<string, string> { ["Content-Type"] = contentType, ["Accept-Ranges"] = "bytes", ["Connection"] = "close" });
             if (partial) headers["Content-Range"] = "bytes " + start + "-" + end + "/" + size;
             var head = FormatHttpResponse(partial ? 206 : 200, partial ? "Partial Content" : "OK", headers, length);
             stream.Write(head, 0, head.Length);

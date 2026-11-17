@@ -8,6 +8,7 @@
 
 #include "audio_out.hpp"
 #include "card.hpp"
+#include "card_video.hpp"
 #include "control_pipe.hpp"
 #include "renderer.hpp"
 #include "security.hpp"
@@ -34,6 +35,7 @@ private:
 	bool EnsureSharedTexture();
 	std::string Execute(const std::string &line);
 	std::string StateJson();
+	void ShowVideoFrame(ULONGLONG now);
 
 	UserOnlySecurity security;
 	ShareWindow window;
@@ -45,9 +47,17 @@ private:
 	long long keepSeconds = 0;
 	bool quit = false;
 	CardImage card;
-	bool cardOverLastFrame = false;
+	CardMode cardMode = CardMode::Full;
 	std::wstring cardPath;
 	std::wstring soundPath;
+
+	bool mediaFoundation = false;
+	CardVideo video;
+	std::wstring videoPath;
+	std::wstring videoStamp;
+	bool videoFill = false;
+	VideoFrame videoFrame;
+	uint64_t videoFramesShown = 0;
 
 	ULONGLONG lastFrameAt = 0;
 	ULONGLONG lastPresentAt = 0;

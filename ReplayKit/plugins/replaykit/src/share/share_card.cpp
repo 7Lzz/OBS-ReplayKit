@@ -207,8 +207,10 @@ bool RenderShareCard(const std::string &json)
 	if (width < 16 || height < 16 || width > kMaxSide || height > kMaxSide)
 		return Refuse("the card size is out of range");
 	const QString background = request.value(QStringLiteral("background")).toString();
-	if (background != QStringLiteral("theme") && background != QStringLiteral("image") && background != QStringLiteral("lastframe"))
+	if (background != QStringLiteral("theme") && background != QStringLiteral("image") && background != QStringLiteral("video") && background != QStringLiteral("lastframe"))
 		return Refuse("unknown background");
+	// the window draws the last frame or the video under the card, so the card leaves them clear around what it draws
+	const bool overPicture = background == QStringLiteral("lastframe") || background == QStringLiteral("video");
 	const QColor ground(request.value(QStringLiteral("ground")).toString());
 	const QColor ink(request.value(QStringLiteral("ink")).toString());
 	const QColor accent(request.value(QStringLiteral("accent")).toString());
@@ -226,8 +228,7 @@ bool RenderShareCard(const std::string &json)
 		return Refuse("the card look is not valid");
 
 	QImage card(width, height, QImage::Format_ARGB32);
-	// over the last frame the window draws the frame dimmed and this on top, so all around the text stays clear
-	card.fill(background == QStringLiteral("lastframe") ? QColor(Qt::transparent) : ground);
+	card.fill(overPicture ? QColor(Qt::transparent) : ground);
 	QPainter painter(&card);
 	painter.setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform | QPainter::TextAntialiasing);
 	const qreal unit = height / 1080.0;
@@ -244,7 +245,7 @@ bool RenderShareCard(const std::string &json)
 		painter.drawImage(QRectF((width - drawn.width()) / 2.0, (height - drawn.height()) / 2.0, drawn.width(), drawn.height()), picture);
 	}
 
-	// the logo and the text take the theme text colour on the theme card and the light text over a picture or the last frame
+	// the logo and the text take the theme text colour on the theme card and the light text over a picture, a video or the last frame
 	const QColor foreground = background == QStringLiteral("theme") ? ink : look.lightText;
 	if (icon) {
 		QSvgRenderer svg(IconPath(QStringLiteral("share/obs-logo-outline.svg")));
@@ -267,8 +268,8 @@ bool RenderShareCard(const std::string &json)
 		const qreal textHeight = metrics.height();
 		painter.save();
 		PlaceAt(painter, textAt, width, height);
-		// a picked image can be any colour under the text, so it gets a dark plate to stay readable
-		if (background == QStringLiteral("image")) {
+		// a picked image or video can be any colour under the text, so it gets a dark plate to stay readable
+		if (background == QStringLiteral("image") || background == QStringLiteral("video")) {
 			const qreal padX = look.plateX * unit * size;
 			const qreal padY = look.plateY * unit * size;
 			const qreal radius = look.plateRadius * unit * size;

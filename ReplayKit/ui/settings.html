@@ -1033,8 +1033,16 @@
           <div class="label" data-i18n="settings.shareCardImage"></div>
           <div class="field-wrap"><div class="projector-action-row"><button class="btn" type="button" id="shareCoverImagePick" data-i18n="settings.chooseImage"></button><button class="btn" type="button" id="shareCoverImageRemove" data-i18n="common.remove"></button></div></div>
         </div>
+        <div class="form-row" id="shareCoverVideoRow">
+          <div class="label"><span data-i18n="settings.shareCardVideo"></span><span class="setting-description" id="shareCoverVideoNote"></span></div>
+          <div class="field-wrap"><div class="projector-action-row"><button class="btn" type="button" id="shareCoverVideoPick" data-i18n="settings.chooseVideo"></button><button class="btn" type="button" id="shareCoverVideoRemove" data-i18n="common.remove"></button></div></div>
+        </div>
+        <div class="form-row tight" id="shareCoverVideoSoundRow">
+          <div></div>
+          <div class="check-row"><input aria-label="Play the sound of the video" id="shareCoverVideoSound" type="checkbox" data-i18n-aria-label="settings.playTheSoundOfTheVideo"/><span><span data-i18n="settings.playTheSoundOfTheVideo"></span></span></div>
+        </div>
         <div class="form-row" id="shareCoverFitRow">
-          <div class="label" data-i18n="settings.shareCardImageFit"></div>
+          <div class="label"><span id="shareCoverImageFitLabel" data-i18n="settings.shareCardImageFit"></span><span id="shareCoverVideoFitLabel" data-i18n="settings.shareCardVideoFit" hidden></span></div>
           <div class="field-wrap"><div class="combo" id="shareCoverFit" tabindex="0" role="combobox" aria-expanded="false"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button><div class="combo-menu" role="listbox"></div></div></div>
         </div>
         <div class="form-row">
@@ -1045,7 +1053,7 @@
           <div></div>
           <div class="check-row"><input aria-label="Show the text" id="shareCoverShowText" type="checkbox" data-i18n-aria-label="settings.showTheText"/><span><span data-i18n="settings.showTheText"></span></span></div>
         </div>
-        <div class="form-row">
+        <div class="form-row" id="shareCoverSoundRow">
           <div class="label"><span data-i18n="settings.shareCardSound"></span><span class="setting-description" data-i18n="settings.shareCardSoundNote"></span></div>
           <div class="field-wrap"><div class="combo" id="shareCoverSound" tabindex="0" role="combobox" aria-expanded="false"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button><div class="combo-menu" role="listbox"></div></div></div>
         </div>
@@ -2208,10 +2216,19 @@
     shareCoverImageRow: document.getElementById("shareCoverImageRow"),
     shareCoverImagePick: document.getElementById("shareCoverImagePick"),
     shareCoverImageRemove: document.getElementById("shareCoverImageRemove"),
+    shareCoverVideoRow: document.getElementById("shareCoverVideoRow"),
+    shareCoverVideoNote: document.getElementById("shareCoverVideoNote"),
+    shareCoverVideoPick: document.getElementById("shareCoverVideoPick"),
+    shareCoverVideoRemove: document.getElementById("shareCoverVideoRemove"),
+    shareCoverVideoSoundRow: document.getElementById("shareCoverVideoSoundRow"),
+    shareCoverVideoSound: document.getElementById("shareCoverVideoSound"),
+    shareCoverImageFitLabel: document.getElementById("shareCoverImageFitLabel"),
+    shareCoverVideoFitLabel: document.getElementById("shareCoverVideoFitLabel"),
     shareCoverFitRow: document.getElementById("shareCoverFitRow"),
     shareCoverFit: document.getElementById("shareCoverFit"),
     shareCoverText: document.getElementById("shareCoverText"),
     shareCoverShowText: document.getElementById("shareCoverShowText"),
+    shareCoverSoundRow: document.getElementById("shareCoverSoundRow"),
     shareCoverSound: document.getElementById("shareCoverSound"),
     shareCoverSoundFileRow: document.getElementById("shareCoverSoundFileRow"),
     shareCoverSoundPick: document.getElementById("shareCoverSoundPick"),
@@ -3670,6 +3687,7 @@
     setComboValue(els.shareCoverFit, settingOr("share_cover_fit"), false);
     els.shareCoverText.value = settingOr("share_cover_text") || "";
     els.shareCoverShowText.checked = !!settingOr("share_cover_show_text");
+    els.shareCoverVideoSound.checked = !!settingOr("share_cover_video_sound");
     setComboValue(els.shareCoverSound, settingOr("share_cover_sound"), false);
     syncVolumeControl(els.shareCoverSoundVolume, els.shareCoverSoundVolumeValue, settingOr("share_cover_sound_volume"));
     refreshFieldResetState("share_cover_sound_volume", SETTING_DEFAULTS.share_cover_sound_volume);
@@ -3792,6 +3810,7 @@
     state.share_cover_fit = comboValue(els.shareCoverFit) || SETTING_DEFAULTS.share_cover_fit;
     state.share_cover_text = els.shareCoverText.value.trim().slice(0, 80);
     state.share_cover_show_text = !!els.shareCoverShowText.checked;
+    state.share_cover_video_sound = !!els.shareCoverVideoSound.checked;
     state.share_cover_sound = comboValue(els.shareCoverSound) || SETTING_DEFAULTS.share_cover_sound;
     state.share_cover_sound_volume = clampVolume(els.shareCoverSoundVolume.value);
     state.share_window_keep = comboValue(els.shareWindowKeep) || SETTING_DEFAULTS.share_window_keep;
@@ -4405,12 +4424,10 @@
       fillCombo(els.shareCoverBackground, [
         { value:"theme", label:RK_M("settings.shareCardBackgroundTheme") },
         { value:"image", label:RK_M("settings.shareCardBackgroundImage") },
+        { value:"video", label:RK_M("settings.shareCardBackgroundVideo") },
         { value:"lastframe", label:RK_M("settings.shareCardBackgroundLastFrame") },
       ]);
-      fillCombo(els.shareCoverFit, [
-        { value:"fit", label:RK_M("settings.shareCardFitWhole") },
-        { value:"fill", label:RK_M("settings.shareCardFitFill") },
-      ]);
+      fillShareCoverFit();
       fillCombo(els.shareCoverSound, [
         { value:"default", label:RK_M("settings.shareCardSoundDefault") },
         { value:"custom", label:RK_M("settings.shareCardSoundCustom") },
@@ -4898,16 +4915,36 @@
     }
   });
   // the card of the share window: the rows that apply to the picked background and sound, the card editor, and the buttons that pick or drop an image or a sound
-  let shareCoverStatus = { hasImage:false, hasSound:false, hasDefaultSound:false, hasCard:false };
+  let shareCoverStatus = { hasImage:false, hasVideo:false, videoHasSound:false, hasSound:false, hasDefaultSound:false, hasCard:false };
+  // the fit choice serves an own image and an own video, so its words follow the one that is picked
+  function fillShareCoverFit() {
+    const video = comboValue(els.shareCoverBackground) === "video";
+    els.shareCoverImageFitLabel.hidden = video;
+    els.shareCoverVideoFitLabel.hidden = !video;
+    fillCombo(els.shareCoverFit, [
+      { value:"fit", label:video ? RK_M("settings.shareCardFitWholeVideo") : RK_M("settings.shareCardFitWhole") },
+      { value:"fill", label:RK_M("settings.shareCardFitFill") },
+    ]);
+  }
   function syncShareCoverRows() {
     const background = comboValue(els.shareCoverBackground);
     const sound = comboValue(els.shareCoverSound);
+    const video = background === "video";
     els.shareCoverImageRow.hidden = background !== "image";
-    els.shareCoverFitRow.hidden = background !== "image";
+    els.shareCoverVideoRow.hidden = !video;
+    els.shareCoverVideoNote.textContent = shareCoverStatus.maxVideoSeconds ? RK_M("settings.shareCardVideoNote", { count: shareCoverStatus.maxVideoSeconds }) : "";
+    els.shareCoverFitRow.hidden = background !== "image" && !video;
+    fillShareCoverFit();
     els.shareCoverImageRemove.disabled = !shareCoverStatus.hasImage;
-    els.shareCoverSoundFileRow.hidden = sound !== "custom";
+    els.shareCoverVideoRemove.disabled = !shareCoverStatus.hasVideo;
+    // the sound of a picked video plays in place of the card sound, the way the helper picks it, so the card sound rows only show while it does not
+    const videoHasSound = video && shareCoverStatus.hasVideo && shareCoverStatus.videoHasSound;
+    const cardSound = !(videoHasSound && els.shareCoverVideoSound.checked);
+    els.shareCoverVideoSoundRow.hidden = !videoHasSound;
+    els.shareCoverSoundRow.hidden = !cardSound;
+    els.shareCoverSoundFileRow.hidden = !cardSound || sound !== "custom";
     els.shareCoverSoundRemove.disabled = !shareCoverStatus.hasSound;
-    els.shareCoverVolumeRow.hidden = sound === "off";
+    els.shareCoverVolumeRow.hidden = cardSound && sound === "off";
     if (window.RKShareCardEditor) RKShareCardEditor.refresh();
   }
   async function refreshShareCover() {
@@ -4933,11 +4970,15 @@
     els.shareCoverStatus.classList.toggle("good", kind === "good");
     els.shareCoverStatus.classList.toggle("bad", kind === "bad");
   }
-  async function runShareCoverAction(button, path) {
+  async function runShareCoverAction(button, path, busyText) {
     button.disabled = true;
-    setShareCoverStatus("");
+    setShareCoverStatus(busyText || "");
+    // the editor lets go of the video it plays while the helper replaces or deletes the file
+    const holdsVideo = path.startsWith("share/cover/video") && !!window.RKShareCardEditor;
+    if (holdsVideo) RKShareCardEditor.holdVideo(true);
     try {
       const result = await helperJson(path, { method:"POST" });
+      if (busyText) setShareCoverStatus("");
       takeSavedCoverSettings(result.settings);
       if (result.cover) shareCoverStatus = result.cover;
       if (path === "share/cover/show") setShareCoverStatus(RK_M("settings.shareCardShown"), "good");
@@ -4946,6 +4987,7 @@
       setShareCoverStatus(error.message, "bad");
     } finally {
       button.disabled = false;
+      if (holdsVideo) RKShareCardEditor.holdVideo(false);
       syncShareCoverRows();
     }
   }
@@ -4953,9 +4995,12 @@
     combo.addEventListener("combochange", () => { readUi(); syncShareCoverRows(); markDirty(); });
   });
   els.shareCoverShowText.addEventListener("change", () => { readUi(); syncShareCoverRows(); markDirty(); });
+  els.shareCoverVideoSound.addEventListener("change", () => { readUi(); syncShareCoverRows(); markDirty(); });
   els.shareCoverText.addEventListener("input", () => { readUi(); syncShareCoverRows(); markDirty(); });
   els.shareCoverImagePick.addEventListener("click", () => runShareCoverAction(els.shareCoverImagePick, "share/cover/image"));
   els.shareCoverImageRemove.addEventListener("click", () => runShareCoverAction(els.shareCoverImageRemove, "share/cover/image/remove"));
+  els.shareCoverVideoPick.addEventListener("click", () => runShareCoverAction(els.shareCoverVideoPick, "share/cover/video", RK_M("settings.preparingTheVideo")));
+  els.shareCoverVideoRemove.addEventListener("click", () => runShareCoverAction(els.shareCoverVideoRemove, "share/cover/video/remove"));
   els.shareCoverSoundPick.addEventListener("click", () => runShareCoverAction(els.shareCoverSoundPick, "share/cover/sound"));
   els.shareCoverSoundRemove.addEventListener("click", () => runShareCoverAction(els.shareCoverSoundRemove, "share/cover/sound/remove"));
   els.shareCoverShowBtn.addEventListener("click", () => runShareCoverAction(els.shareCoverShowBtn, "share/cover/show"));

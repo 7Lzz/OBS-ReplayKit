@@ -45,11 +45,12 @@ namespace ReplayKitShared
         public const bool DiscordProjectorHideTaskbar = true;
         // how long the share window keeps showing its card once obs closed for real or crashed
         public const string ShareWindowKeep = "5m";
-        // the card of the share window: its background, how an own image fills it, its text (empty is the default be right back), whether the text shows, its sound and how loud
+        // the card of the share window: its background, how an own image or video fills it, its text (empty is the default be right back), whether the text shows, whether an own video plays its own sound in place of the card sound, the card sound and how loud
         public const string ShareCoverBackground = "theme";
         public const string ShareCoverFit = "fit";
         public const string ShareCoverText = "";
         public const bool ShareCoverShowText = true;
+        public const bool ShareCoverVideoSound = true;
         public const string ShareCoverSound = "default";
         public const int ShareCoverSoundVolume = 80;
         public const string ScreenshareCaptureMode = "hybrid_auto";

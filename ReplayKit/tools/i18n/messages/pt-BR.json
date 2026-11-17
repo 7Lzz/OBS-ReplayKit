@@ -6191,6 +6191,22 @@
     "source": "4559f79ab94267d6",
     "text": "Um som precisa do ffmpeg, que ainda não está instalado. Execute o instalador do ReplayKit novamente."
   },
+  "screenshare.theVideoIsTooLong": {
+    "source": "3d245419aed40b15",
+    "text": {
+      "one": "Esse vídeo tem mais de {count} segundo. Escolha um mais curto.",
+      "many": "Esse vídeo tem mais de {count} segundos. Escolha um mais curto.",
+      "other": "Esse vídeo tem mais de {count} segundos. Escolha um mais curto."
+    }
+  },
+  "screenshare.theVideoCouldNotBeUsed": {
+    "source": "eadbff70ac6dd77b",
+    "text": "Não foi possível usar esse vídeo. Escolha outro arquivo de vídeo."
+  },
+  "screenshare.theVideoNeedsFfmpeg": {
+    "source": "39f205a8ccbf40fa",
+    "text": "Um vídeo precisa do ffmpeg, que ainda não está instalado. Execute o instalador do ReplayKit novamente."
+  },
   "screenshare.theSoundCouldNotBeUsed": {
     "source": "9e4fb0659b9c288b",
     "text": "Não foi possível usar esse som. Escolha outro arquivo de áudio."
@@ -8703,6 +8719,10 @@
     "source": "cbff02b1de749e35",
     "text": "Minha própria imagem"
   },
+  "settings.shareCardBackgroundVideo": {
+    "source": "22e2d372c23ded94",
+    "text": "Meu próprio vídeo"
+  },
   "settings.shareCardBackgroundLastFrame": {
     "source": "97a18995a9e7d1ac",
     "text": "Último quadro do jogo, escurecido"
@@ -8711,13 +8731,33 @@
     "source": "fc6eaa65315f601d",
     "text": "Imagem"
   },
+  "settings.shareCardVideo": {
+    "source": "72bcb013ed85a48f",
+    "text": "Vídeo"
+  },
+  "settings.shareCardVideoNote": {
+    "source": "28d20feb72ee87b8",
+    "text": {
+      "one": "Até {count} segundo. Ele se repete enquanto o cartão aparece.",
+      "many": "Até {count} segundos. Ele se repete enquanto o cartão aparece.",
+      "other": "Até {count} segundos. Ele se repete enquanto o cartão aparece."
+    }
+  },
   "settings.shareCardImageFit": {
     "source": "32cc0d85750055d1",
     "text": "Ajuste da imagem"
   },
+  "settings.shareCardVideoFit": {
+    "source": "872697c2c171e6d6",
+    "text": "Ajuste do vídeo"
+  },
   "settings.shareCardFitWhole": {
     "source": "369293a21deb39b2",
     "text": "Mostrar a imagem inteira"
+  },
+  "settings.shareCardFitWholeVideo": {
+    "source": "fb3382668480d331",
+    "text": "Mostrar o vídeo inteiro"
   },
   "settings.shareCardFitFill": {
     "source": "06a81292f8359d12",
@@ -8730,6 +8770,14 @@
   "settings.showTheText": {
     "source": "d17c8c9bbb4640bc",
     "text": "Mostrar o texto"
+  },
+  "settings.playTheSoundOfTheVideo": {
+    "source": "61a5acb3c6f9c5e5",
+    "text": "Tocar o som do vídeo"
+  },
+  "settings.preparingTheVideo": {
+    "source": "c5189c7b293438a5",
+    "text": "Preparando o vídeo..."
   },
   "settings.shareCardSound": {
     "source": "4e1288ba9755d7cd",
@@ -8758,6 +8806,10 @@
   "settings.chooseSound": {
     "source": "a0ff61dc6aea6e4e",
     "text": "Escolher som"
+  },
+  "settings.chooseVideo": {
+    "source": "82083c3e0b302074",
+    "text": "Escolher vídeo"
   },
   "settings.shareCardSoundVolume": {
     "source": "25c4333eb6d1d390",

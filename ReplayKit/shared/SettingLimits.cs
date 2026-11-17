@@ -33,7 +33,7 @@ namespace ReplayKitShared
         public static readonly string[] CompressionModes = { "lower_gpu", "balanced", "smaller_files", "tiniest" };
         public static readonly string[] DiscordProjectorEdges = { "right", "left", "top", "bottom" };
         public static readonly string[] ShareWindowKeepChoices = { "off", "5m", "15m", "1h", "always" };
-        public static readonly string[] ShareCoverBackgrounds = { "theme", "image", "lastframe" };
+        public static readonly string[] ShareCoverBackgrounds = { "theme", "image", "video", "lastframe" };
         public static readonly string[] ShareCoverFits = { "fit", "fill" };
         public static readonly string[] ShareCoverSounds = { "default", "custom", "off" };
         public const int ShareCoverTextMaxLength = 80;

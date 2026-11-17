@@ -1,4 +1,4 @@
-// draws the share window: the obs program frames the plugin copies into the shared texture, or the be right back card, letterboxed into the window the way the obs projector drew it
+// draws the share window: the obs program frames the plugin copies into the shared texture, or the be right back card over its ground, letterboxed into the window the way the obs projector drew it
 #pragma once
 
 #include <windows.h>
@@ -12,6 +12,9 @@
 namespace rk::share {
 
 using Microsoft::WRL::ComPtr;
+
+// what the card is drawn over: nothing, since it has its own ground, the last frame dimmed, or the card video
+enum class CardMode { Full, OverLastFrame, OverVideo };
 
 class Renderer {
 public:
@@ -32,9 +35,14 @@ public:
 	bool TakeFrame();
 	bool HasFrame() const { return hasFrame; }
 
-	// the card from straight bgra pixels; over the last frame means it is drawn with its alpha on top of that frame, dimmed
-	bool SetCard(const std::vector<uint8_t> &pixels, uint32_t width, uint32_t height, bool overLastFrame);
+	// the card from straight bgra pixels; over the last frame or the video it is drawn with its alpha on top of them
+	bool SetCard(const std::vector<uint8_t> &pixels, uint32_t width, uint32_t height, CardMode mode);
 	void ClearCard();
+
+	// the frame of the card video as bgrx rows; filling covers the card and cuts the edges of the video, otherwise the whole video shows with bars
+	bool SetVideoFrame(const std::vector<uint8_t> &pixels, uint32_t width, uint32_t height);
+	void SetVideoFill(bool fill) { videoFill = fill; }
+	void ClearVideo();
 
 	HRESULT PresentFrame();
 	HRESULT PresentCard();
@@ -44,7 +52,8 @@ private:
 	bool CreatePipeline();
 	bool CreateTargets();
 	void BeginFrame();
-	void Draw(ID3D11ShaderResourceView *view, uint32_t width, uint32_t height, float brightness, bool blend);
+	D3D11_VIEWPORT Whole() const;
+	void Draw(ID3D11ShaderResourceView *view, const D3D11_VIEWPORT &viewport, float brightness, bool blend, const D3D11_RECT *clip = nullptr);
 	HRESULT Present();
 
 	HWND window = nullptr;
@@ -61,6 +70,7 @@ private:
 	ComPtr<ID3D11SamplerState> sampler;
 	ComPtr<ID3D11Buffer> constants;
 	ComPtr<ID3D11BlendState> blendOn;
+	ComPtr<ID3D11RasterizerState> clipOn;
 
 	ComPtr<ID3D11Texture2D> shared;
 	ComPtr<IDXGIKeyedMutex> sharedMutex;
@@ -75,7 +85,13 @@ private:
 	ComPtr<ID3D11ShaderResourceView> cardView;
 	uint32_t cardWidth = 0;
 	uint32_t cardHeight = 0;
-	bool cardOverLastFrame = false;
+	CardMode cardMode = CardMode::Full;
+
+	ComPtr<ID3D11Texture2D> video;
+	ComPtr<ID3D11ShaderResourceView> videoView;
+	uint32_t videoWidth = 0;
+	uint32_t videoHeight = 0;
+	bool videoFill = false;
 };
 
 } // namespace rk::share

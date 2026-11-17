@@ -84,6 +84,16 @@ bool ParseColor(const std::string &text, COLORREF &out)
 	return true;
 }
 
+// the size and write time of a file, which tell a video the helper made again from the one already playing
+std::wstring FileStamp(const std::wstring &path)
+{
+	WIN32_FILE_ATTRIBUTE_DATA data{};
+	if (!GetFileAttributesExW(path.c_str(), GetFileExInfoStandard, &data))
+		return {};
+	return std::to_wstring((uint64_t(data.nFileSizeHigh) << 32) | data.nFileSizeLow) + L":" +
+	       std::to_wstring((uint64_t(data.ftLastWriteTime.dwHighDateTime) << 32) | data.ftLastWriteTime.dwLowDateTime);
+}
+
 // an absolute local path to an existing file, the only kind the helper hands over
 bool UsableFile(const std::wstring &path)
 {
@@ -117,6 +127,7 @@ int ShareApp::Run(const Options &options)
 		return 1;
 	}
 	window.SetModalTick([this] { Step(false); });
+	mediaFoundation = CardVideo::Startup();
 
 	HANDLE timer = CreateWaitableTimerExW(nullptr, nullptr, CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_ALL_ACCESS);
 	if (!timer)
@@ -144,6 +155,9 @@ int ShareApp::Run(const Options &options)
 	Log("share window closing");
 	CancelWaitableTimer(timer);
 	CloseHandle(timer);
+	video.Close();
+	if (mediaFoundation)
+		CardVideo::Shutdown();
 	audio.Stop();
 	pipe.Stop();
 	renderer.Release();
@@ -166,7 +180,10 @@ bool ShareApp::RebuildRenderer(uint64_t luid)
 	if (!renderer.Init(window.Handle(), luid))
 		return false;
 	if (!card.pixels.empty())
-		renderer.SetCard(card.pixels, card.width, card.height, cardOverLastFrame);
+		renderer.SetCard(card.pixels, card.width, card.height, cardMode);
+	renderer.SetVideoFill(videoFill);
+	if (!videoFrame.pixels.empty())
+		renderer.SetVideoFrame(videoFrame.pixels, videoFrame.width, videoFrame.height);
 	// the old texture is gone with the old device, so the plugin is told to open the new one
 	shared.PublishTexture(0, 0, 0, 0, renderer.AdapterLuid());
 	return true;
@@ -232,6 +249,11 @@ void ShareApp::Tick(bool frameSignal)
 	if (showLive != live) {
 		live = showLive;
 		Log(live ? "showing live frames" : "showing the card");
+		// the video starts from its beginning each time the card comes up, the way its sound does
+		if (live)
+			video.Rewind();
+		else
+			video.Play(now);
 	}
 	audio.SetCardShowing(!live);
 
@@ -243,6 +265,8 @@ void ShareApp::Tick(bool frameSignal)
 
 	if (!(live && newFrame) && now - lastPresentAt < kRepresentMs)
 		return;
+	if (!live)
+		ShowVideoFrame(now);
 	HRESULT hr = live ? renderer.PresentFrame() : renderer.PresentCard();
 	lastPresentAt = now;
 	if (Renderer::DeviceLost(hr)) {
@@ -257,6 +281,14 @@ void ShareApp::Tick(bool frameSignal)
 		presentsThisSecond = 0;
 		secondStartedAt = now;
 	}
+}
+
+void ShareApp::ShowVideoFrame(ULONGLONG now)
+{
+	if (cardMode != CardMode::OverVideo || !video.IsOpen() || !video.TakeDue(now, videoFrame))
+		return;
+	if (renderer.SetVideoFrame(videoFrame.pixels, videoFrame.width, videoFrame.height))
+		videoFramesShown++;
 }
 
 std::string ShareApp::Execute(const std::string &line)
@@ -315,7 +347,7 @@ std::string ShareApp::Execute(const std::string &line)
 		return Ok();
 	}
 	if (verb == "CARD") {
-		// CARD none, or CARD full|over <png path>
+		// CARD none, or CARD full|over|video <png path>: a card with its own ground, or one drawn over the last frame or the card video
 		if (rest == "none") {
 			card = CardImage{};
 			cardPath.clear();
@@ -325,17 +357,52 @@ std::string ShareApp::Execute(const std::string &line)
 		size_t split = rest.find(' ');
 		std::string mode = rest.substr(0, split);
 		std::wstring path = split == std::string::npos ? std::wstring() : Widen(rest.substr(split + 1));
-		if ((mode != "full" && mode != "over") || !UsableFile(path))
-			return Fail("card takes none, or full or over and a png path");
+		if ((mode != "full" && mode != "over" && mode != "video") || !UsableFile(path))
+			return Fail("card takes none, or full, over or video and a png path");
 		CardImage image;
 		if (!LoadCardImage(path, image))
 			return Fail("the card image could not be read");
 		card = std::move(image);
 		cardPath = path;
-		cardOverLastFrame = mode == "over";
-		if (!renderer.SetCard(card.pixels, card.width, card.height, cardOverLastFrame))
+		cardMode = mode == "over" ? CardMode::OverLastFrame : mode == "video" ? CardMode::OverVideo : CardMode::Full;
+		if (!renderer.SetCard(card.pixels, card.width, card.height, cardMode))
 			return Fail("the card could not be shown");
 		Log("card %ls (%s)", path.c_str(), mode.c_str());
+		return Ok();
+	}
+	if (verb == "VIDEO") {
+		// VIDEO none, or VIDEO fit|fill <mp4 path>, the video a card drawn for it goes over
+		if (rest == "none") {
+			video.Close();
+			videoPath.clear();
+			videoStamp.clear();
+			videoFrame = VideoFrame{};
+			renderer.ClearVideo();
+			return Ok();
+		}
+		size_t split = rest.find(' ');
+		std::string fit = rest.substr(0, split);
+		std::wstring path = split == std::string::npos ? std::wstring() : Widen(rest.substr(split + 1));
+		if ((fit != "fit" && fit != "fill") || !UsableFile(path))
+			return Fail("video takes none, or fit or fill and an mp4 path");
+		videoFill = fit == "fill";
+		renderer.SetVideoFill(videoFill);
+		// the same file again only changes how it fills the card, so a video that plays is not started over
+		std::wstring stamp = FileStamp(path);
+		if (video.IsOpen() && path == videoPath && stamp == videoStamp)
+			return Ok();
+		videoPath.clear();
+		videoStamp.clear();
+		videoFrame = VideoFrame{};
+		renderer.ClearVideo();
+		if (!mediaFoundation)
+			return Fail("this windows has no media foundation, so the video cannot play");
+		if (!video.Open(path))
+			return Fail("the video could not be played");
+		videoPath = path;
+		videoStamp = stamp;
+		if (!live)
+			video.Play(NowMs());
 		return Ok();
 	}
 	if (verb == "SOUND") {
@@ -369,16 +436,18 @@ std::string ShareApp::StateJson()
 {
 	SharedState *state = shared.State();
 	const ULONGLONG now = NowMs();
-	char text[1024];
+	char text[1536];
 	snprintf(text, sizeof(text),
 		 "{\"ok\":true,\"state\":\"%s\",\"pid\":%lu,\"hwnd\":%llu,\"protocol\":%u,\"version\":\"%s\",\"generation\":%u,\"texture\":[%u,%u],"
 		 "\"adapterLuid\":\"%016llx\",\"producerPid\":%u,\"producerState\":%u,\"framesWritten\":%llu,\"framesReceived\":%llu,\"framesPresented\":%llu,"
 		 "\"cardsPresented\":%llu,\"presentsPerSecond\":%llu,\"awaySeconds\":%llu,\"holdSeconds\":%llu,\"keepSeconds\":%lld,\"card\":%s,\"cardOverLastFrame\":%s,"
-		 "\"audio\":",
+		 "\"video\":{\"open\":%s,\"fill\":%s,\"overVideo\":%s,\"decoded\":%llu,\"shown\":%llu},\"audio\":",
 		 live ? "live" : "card", GetCurrentProcessId(), static_cast<unsigned long long>(uintptr_t(window.Handle())), kShareWindowProtocolVersion, REPLAYKIT_VERSION,
 		 shared.Generation(), renderer.SharedWidth(), renderer.SharedHeight(), renderer.AdapterLuid(), state->producerPid.load(), state->producerState.load(),
 		 state->framesWritten.load(), framesReceived, framesPresented, cardsPresented, presentsPerSecond, awaySince ? (now - awaySince) / 1000 : 0ull,
-		 holdUntil > now ? (holdUntil - now) / 1000 : 0ull, keepSeconds, card.pixels.empty() ? "false" : "true", cardOverLastFrame ? "true" : "false");
+		 holdUntil > now ? (holdUntil - now) / 1000 : 0ull, keepSeconds, card.pixels.empty() ? "false" : "true", cardMode == CardMode::OverLastFrame ? "true" : "false",
+		 video.IsOpen() ? "true" : "false", videoFill ? "true" : "false", cardMode == CardMode::OverVideo ? "true" : "false", static_cast<unsigned long long>(video.FramesDecoded()),
+		 static_cast<unsigned long long>(videoFramesShown));
 	return std::string(text) + audio.StateJson() + "}";
 }
 

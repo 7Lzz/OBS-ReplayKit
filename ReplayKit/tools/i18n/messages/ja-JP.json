@@ -6189,6 +6189,20 @@
     "source": "4559f79ab94267d6",
     "text": "サウンドには ffmpeg が必要ですが、まだインストールされていません。ReplayKit のインストーラーをもう一度実行してください。"
   },
+  "screenshare.theVideoIsTooLong": {
+    "source": "3d245419aed40b15",
+    "text": {
+      "other": "その動画は {count} 秒より長いです。もっと短い動画を選んでください。"
+    }
+  },
+  "screenshare.theVideoCouldNotBeUsed": {
+    "source": "eadbff70ac6dd77b",
+    "text": "その動画は使えませんでした。別の動画ファイルを選んでください。"
+  },
+  "screenshare.theVideoNeedsFfmpeg": {
+    "source": "39f205a8ccbf40fa",
+    "text": "動画には ffmpeg が必要ですが、まだインストールされていません。ReplayKit のインストーラーをもう一度実行してください。"
+  },
   "screenshare.theSoundCouldNotBeUsed": {
     "source": "9e4fb0659b9c288b",
     "text": "そのサウンドは使えませんでした。別のオーディオファイルを選んでください。"
@@ -8701,6 +8715,10 @@
     "source": "cbff02b1de749e35",
     "text": "自分の画像"
   },
+  "settings.shareCardBackgroundVideo": {
+    "source": "22e2d372c23ded94",
+    "text": "自分の動画"
+  },
   "settings.shareCardBackgroundLastFrame": {
     "source": "97a18995a9e7d1ac",
     "text": "最後のゲーム画面（暗く）"
@@ -8709,13 +8727,31 @@
     "source": "fc6eaa65315f601d",
     "text": "画像"
   },
+  "settings.shareCardVideo": {
+    "source": "72bcb013ed85a48f",
+    "text": "動画"
+  },
+  "settings.shareCardVideoNote": {
+    "source": "28d20feb72ee87b8",
+    "text": {
+      "other": "最長 {count} 秒。カードが表示されている間、ループ再生されます。"
+    }
+  },
   "settings.shareCardImageFit": {
     "source": "32cc0d85750055d1",
     "text": "画像の合わせ方"
   },
+  "settings.shareCardVideoFit": {
+    "source": "872697c2c171e6d6",
+    "text": "動画の合わせ方"
+  },
   "settings.shareCardFitWhole": {
     "source": "369293a21deb39b2",
     "text": "画像全体を表示"
+  },
+  "settings.shareCardFitWholeVideo": {
+    "source": "fb3382668480d331",
+    "text": "動画全体を表示"
   },
   "settings.shareCardFitFill": {
     "source": "06a81292f8359d12",
@@ -8728,6 +8764,14 @@
   "settings.showTheText": {
     "source": "d17c8c9bbb4640bc",
     "text": "テキストを表示"
+  },
+  "settings.playTheSoundOfTheVideo": {
+    "source": "61a5acb3c6f9c5e5",
+    "text": "動画の音声を再生"
+  },
+  "settings.preparingTheVideo": {
+    "source": "c5189c7b293438a5",
+    "text": "動画を準備しています..."
   },
   "settings.shareCardSound": {
     "source": "4e1288ba9755d7cd",
@@ -8756,6 +8800,10 @@
   "settings.chooseSound": {
     "source": "a0ff61dc6aea6e4e",
     "text": "サウンドを選ぶ"
+  },
+  "settings.chooseVideo": {
+    "source": "82083c3e0b302074",
+    "text": "動画を選択"
   },
   "settings.shareCardSoundVolume": {
     "source": "25c4333eb6d1d390",

@@ -6191,6 +6191,21 @@
     "context": "Text in a ReplayKit window, sent by the background helper, about the card Discord viewers see while OBS is closed or restarting.",
     "text": "A sound needs ffmpeg, which isn't installed yet. Run the ReplayKit installer again."
   },
+  "screenshare.theVideoIsTooLong": {
+    "context": "Text in a ReplayKit window, sent by the background helper, about the card Discord viewers see while OBS is closed or restarting. {count} is the longest allowed length of the video in seconds.",
+    "text": {
+      "one": "That video is longer than {count} second. Pick a shorter one.",
+      "other": "That video is longer than {count} seconds. Pick a shorter one."
+    }
+  },
+  "screenshare.theVideoCouldNotBeUsed": {
+    "context": "Text in a ReplayKit window, sent by the background helper, about the card Discord viewers see while OBS is closed or restarting.",
+    "text": "That video could not be used. Pick another video file."
+  },
+  "screenshare.theVideoNeedsFfmpeg": {
+    "context": "Text in a ReplayKit window, sent by the background helper, about the card Discord viewers see while OBS is closed or restarting.",
+    "text": "A video needs ffmpeg, which isn't installed yet. Run the ReplayKit installer again."
+  },
   "screenshare.theSoundCouldNotBeUsed": {
     "context": "Text in a ReplayKit window, sent by the background helper, about the card Discord viewers see while OBS is closed or restarting.",
     "text": "That sound could not be used. Pick another audio file."
@@ -8703,6 +8718,10 @@
     "context": "On the Share Preview page of ReplayKit Settings, in the box about the card Discord viewers see while OBS is closed or restarting. Choice: an image the user picks as the card background.",
     "text": "My own image"
   },
+  "settings.shareCardBackgroundVideo": {
+    "context": "On the Share Preview page of ReplayKit Settings, in the box about the card Discord viewers see while OBS is closed or restarting. Choice: a short video the user picks as the card background, played on a loop.",
+    "text": "My own video"
+  },
   "settings.shareCardBackgroundLastFrame": {
     "context": "On the Share Preview page of ReplayKit Settings, in the box about the card Discord viewers see while OBS is closed or restarting. Choice: the last picture of the stream, frozen and darkened, as the card background.",
     "text": "Last game frame, dimmed"
@@ -8711,13 +8730,32 @@
     "context": "On the Share Preview page of ReplayKit Settings, in the box about the card Discord viewers see while OBS is closed or restarting. Label of the row with the image buttons.",
     "text": "Image"
   },
+  "settings.shareCardVideo": {
+    "context": "On the Share Preview page of ReplayKit Settings, in the box about the card Discord viewers see while OBS is closed or restarting. Label of the row with the video buttons.",
+    "text": "Video"
+  },
+  "settings.shareCardVideoNote": {
+    "context": "On the Share Preview page of ReplayKit Settings, in the box about the card Discord viewers see while OBS is closed or restarting. Note under the video label; {count} is the longest allowed length of the video in seconds.",
+    "text": {
+      "one": "Up to {count} second. It plays on a loop while the card shows.",
+      "other": "Up to {count} seconds. It plays on a loop while the card shows."
+    }
+  },
   "settings.shareCardImageFit": {
     "context": "On the Share Preview page of ReplayKit Settings, in the box about the card Discord viewers see while OBS is closed or restarting. Label of a choice of how the image fills the card.",
     "text": "Image fit"
   },
+  "settings.shareCardVideoFit": {
+    "context": "On the Share Preview page of ReplayKit Settings, in the box about the card Discord viewers see while OBS is closed or restarting. Label of a choice of how the video fills the card.",
+    "text": "Video fit"
+  },
   "settings.shareCardFitWhole": {
     "context": "On the Share Preview page of ReplayKit Settings, in the box about the card Discord viewers see while OBS is closed or restarting. Choice: the whole image shows, with bars where it does not fill the card.",
     "text": "Show the whole image"
+  },
+  "settings.shareCardFitWholeVideo": {
+    "context": "On the Share Preview page of ReplayKit Settings, in the box about the card Discord viewers see while OBS is closed or restarting. Choice: the whole video shows, with bars where it does not match the shape of the card.",
+    "text": "Show the whole video"
   },
   "settings.shareCardFitFill": {
     "context": "On the Share Preview page of ReplayKit Settings, in the box about the card Discord viewers see while OBS is closed or restarting. Choice: the image covers the whole card and its edges are cut off.",
@@ -8730,6 +8768,14 @@
   "settings.showTheText": {
     "context": "On the Share Preview page of ReplayKit Settings, in the box about the card Discord viewers see while OBS is closed or restarting. Checkbox.",
     "text": "Show the text"
+  },
+  "settings.playTheSoundOfTheVideo": {
+    "context": "On the Share Preview page of ReplayKit Settings, in the box about the card Discord viewers see while OBS is closed or restarting. Checkbox: the picked video plays its own sound on the stream in place of the card sound.",
+    "text": "Play the sound of the video"
+  },
+  "settings.preparingTheVideo": {
+    "context": "On the Share Preview page of ReplayKit Settings, in the box about the card Discord viewers see while OBS is closed or restarting. Status while ReplayKit converts the picked video.",
+    "text": "Preparing the video..."
   },
   "settings.shareCardSound": {
     "context": "On the Share Preview page of ReplayKit Settings, in the box about the card Discord viewers see while OBS is closed or restarting. Label of a choice.",
@@ -8758,6 +8804,10 @@
   "settings.chooseSound": {
     "context": "On the Share Preview page of ReplayKit Settings, in the box about the card Discord viewers see while OBS is closed or restarting. Button that opens a file picker for an audio file.",
     "text": "Choose sound"
+  },
+  "settings.chooseVideo": {
+    "context": "On the Share Preview page of ReplayKit Settings, in the box about the card Discord viewers see while OBS is closed or restarting. Button that opens a file picker for a video file.",
+    "text": "Choose video"
   },
   "settings.shareCardSoundVolume": {
     "context": "On the Share Preview page of ReplayKit Settings, in the box about the card Discord viewers see while OBS is closed or restarting. Label of the volume control of the card sound.",

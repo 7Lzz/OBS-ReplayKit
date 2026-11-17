@@ -4,6 +4,7 @@
 #include <dxgi1_4.h>
 
 #include <algorithm>
+#include <cmath>
 #include <cstring>
 
 #include "log.hpp"
@@ -57,6 +58,20 @@ ComPtr<ID3DBlob> Compile(const char *entry, const char *profile)
 		return nullptr;
 	}
 	return code;
+}
+
+// a picture of that size centred in the area: the whole of it with bars, or covering the area so its edges fall outside
+D3D11_VIEWPORT Place(uint32_t width, uint32_t height, const D3D11_VIEWPORT &area, bool cover)
+{
+	float across = area.Width / float(width), down = area.Height / float(height);
+	float scale = cover ? std::max(across, down) : std::min(across, down);
+	D3D11_VIEWPORT viewport{};
+	viewport.Width = float(width) * scale;
+	viewport.Height = float(height) * scale;
+	viewport.TopLeftX = area.TopLeftX + (area.Width - viewport.Width) / 2.0f;
+	viewport.TopLeftY = area.TopLeftY + (area.Height - viewport.Height) / 2.0f;
+	viewport.MaxDepth = 1.0f;
+	return viewport;
 }
 
 ComPtr<IDXGIAdapter1> FindAdapter(IDXGIFactory1 *factory, uint64_t luid)
@@ -134,6 +149,9 @@ void Renderer::Release()
 		context->Flush();
 	}
 	cardView.Reset();
+	videoView.Reset();
+	video.Reset();
+	videoWidth = videoHeight = 0;
 	frameView.Reset();
 	frame.Reset();
 	sharedMutex.Reset();
@@ -143,6 +161,7 @@ void Renderer::Release()
 	sharedHeight = 0;
 	hasFrame = false;
 	blendOn.Reset();
+	clipOn.Reset();
 	constants.Reset();
 	sampler.Reset();
 	pixelShader.Reset();
@@ -181,8 +200,14 @@ bool Renderer::CreatePipeline()
 	blendDesc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
 	blendDesc.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
 	blendDesc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+	// a filled video is cut to the card area so it never spills over the bars around the card
+	D3D11_RASTERIZER_DESC rasterDesc{};
+	rasterDesc.FillMode = D3D11_FILL_SOLID;
+	rasterDesc.CullMode = D3D11_CULL_NONE;
+	rasterDesc.DepthClipEnable = TRUE;
+	rasterDesc.ScissorEnable = TRUE;
 	if (FAILED(device->CreateSamplerState(&samplerDesc, &sampler)) || FAILED(device->CreateBuffer(&bufferDesc, nullptr, &constants)) ||
-	    FAILED(device->CreateBlendState(&blendDesc, &blendOn))) {
+	    FAILED(device->CreateBlendState(&blendDesc, &blendOn)) || FAILED(device->CreateRasterizerState(&rasterDesc, &clipOn))) {
 		Log("could not create the draw states");
 		return false;
 	}
@@ -301,7 +326,7 @@ bool Renderer::TakeFrame()
 	return true;
 }
 
-bool Renderer::SetCard(const std::vector<uint8_t> &pixels, uint32_t width, uint32_t height, bool overLastFrame)
+bool Renderer::SetCard(const std::vector<uint8_t> &pixels, uint32_t width, uint32_t height, CardMode mode)
 {
 	cardView.Reset();
 	if (!width || !height || pixels.size() != size_t(width) * height * 4)
@@ -323,7 +348,7 @@ bool Renderer::SetCard(const std::vector<uint8_t> &pixels, uint32_t width, uint3
 	}
 	cardWidth = width;
 	cardHeight = height;
-	cardOverLastFrame = overLastFrame;
+	cardMode = mode;
 	return true;
 }
 
@@ -331,7 +356,51 @@ void Renderer::ClearCard()
 {
 	cardView.Reset();
 	cardWidth = cardHeight = 0;
-	cardOverLastFrame = false;
+	cardMode = CardMode::Full;
+}
+
+bool Renderer::SetVideoFrame(const std::vector<uint8_t> &pixels, uint32_t width, uint32_t height)
+{
+	if (!device || !width || !height || pixels.size() != size_t(width) * height * 4)
+		return false;
+	if (!video || width != videoWidth || height != videoHeight) {
+		videoView.Reset();
+		video.Reset();
+		videoWidth = videoHeight = 0;
+		D3D11_TEXTURE2D_DESC desc{};
+		desc.Width = width;
+		desc.Height = height;
+		desc.MipLevels = 1;
+		desc.ArraySize = 1;
+		desc.Format = kViewFormat;
+		desc.SampleDesc.Count = 1;
+		desc.Usage = D3D11_USAGE_DYNAMIC;
+		desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+		desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+		if (FAILED(device->CreateTexture2D(&desc, nullptr, &video)) || FAILED(device->CreateShaderResourceView(video.Get(), nullptr, &videoView))) {
+			Log("could not create the video texture %ux%u", width, height);
+			videoView.Reset();
+			video.Reset();
+			return false;
+		}
+		videoWidth = width;
+		videoHeight = height;
+	}
+	D3D11_MAPPED_SUBRESOURCE mapped{};
+	if (FAILED(context->Map(video.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped)))
+		return false;
+	const size_t row = size_t(width) * 4;
+	for (uint32_t y = 0; y < height; ++y)
+		std::memcpy(static_cast<uint8_t *>(mapped.pData) + size_t(mapped.RowPitch) * y, pixels.data() + row * y, row);
+	context->Unmap(video.Get(), 0);
+	return true;
+}
+
+void Renderer::ClearVideo()
+{
+	videoView.Reset();
+	video.Reset();
+	videoWidth = videoHeight = 0;
 }
 
 void Renderer::BeginFrame()
@@ -342,17 +411,22 @@ void Renderer::BeginFrame()
 	context->ClearRenderTargetView(target.Get(), black);
 }
 
-void Renderer::Draw(ID3D11ShaderResourceView *view, uint32_t width, uint32_t height, float brightness, bool blend)
+// the whole window, which every picture is letterboxed into like the projector did, so a window of another shape never stretches it
+D3D11_VIEWPORT Renderer::Whole() const
 {
-	// letterboxed to the window like the projector, so a window of another shape never stretches the picture
-	float scale = std::min(float(targetWidth) / float(width), float(targetHeight) / float(height));
 	D3D11_VIEWPORT viewport{};
-	viewport.Width = float(width) * scale;
-	viewport.Height = float(height) * scale;
-	viewport.TopLeftX = (float(targetWidth) - viewport.Width) / 2.0f;
-	viewport.TopLeftY = (float(targetHeight) - viewport.Height) / 2.0f;
+	viewport.Width = float(targetWidth);
+	viewport.Height = float(targetHeight);
 	viewport.MaxDepth = 1.0f;
+	return viewport;
+}
+
+void Renderer::Draw(ID3D11ShaderResourceView *view, const D3D11_VIEWPORT &viewport, float brightness, bool blend, const D3D11_RECT *clip)
+{
 	context->RSSetViewports(1, &viewport);
+	context->RSSetState(clip ? clipOn.Get() : nullptr);
+	if (clip)
+		context->RSSetScissorRects(1, clip);
 
 	DrawConstants values{brightness, blend ? 1.0f : 0.0f, {0.0f, 0.0f}};
 	context->UpdateSubresource(constants.Get(), 0, nullptr, &values, 0, 0);
@@ -383,7 +457,7 @@ HRESULT Renderer::PresentFrame()
 {
 	BeginFrame();
 	if (hasFrame)
-		Draw(frameView.Get(), sharedWidth, sharedHeight, 1.0f, false);
+		Draw(frameView.Get(), Place(sharedWidth, sharedHeight, Whole(), false), 1.0f, false);
 	return Present();
 }
 
@@ -392,14 +466,25 @@ HRESULT Renderer::PresentCard()
 	BeginFrame();
 	if (!cardView) {
 		context->ClearRenderTargetView(target.Get(), kPlainCard);
-	} else if (cardOverLastFrame) {
+		return Present();
+	}
+	const D3D11_VIEWPORT card = Place(cardWidth, cardHeight, Whole(), false);
+	if (cardMode == CardMode::OverLastFrame) {
 		if (hasFrame)
-			Draw(frameView.Get(), sharedWidth, sharedHeight, kDimmedBrightness, false);
+			Draw(frameView.Get(), Place(sharedWidth, sharedHeight, Whole(), false), kDimmedBrightness, false);
 		else
 			context->ClearRenderTargetView(target.Get(), kPlainCard);
-		Draw(cardView.Get(), cardWidth, cardHeight, 1.0f, true);
+		Draw(cardView.Get(), card, 1.0f, true);
+	} else if (cardMode == CardMode::OverVideo) {
+		if (videoView) {
+			const D3D11_RECT area{LONG(std::floor(card.TopLeftX)), LONG(std::floor(card.TopLeftY)), LONG(std::ceil(card.TopLeftX + card.Width)), LONG(std::ceil(card.TopLeftY + card.Height))};
+			Draw(videoView.Get(), Place(videoWidth, videoHeight, card, videoFill), 1.0f, false, &area);
+		} else {
+			context->ClearRenderTargetView(target.Get(), kPlainCard);
+		}
+		Draw(cardView.Get(), card, 1.0f, true);
 	} else {
-		Draw(cardView.Get(), cardWidth, cardHeight, 1.0f, false);
+		Draw(cardView.Get(), card, 1.0f, false);
 	}
 	return Present();
 }
