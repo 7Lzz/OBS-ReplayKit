@@ -61,6 +61,9 @@ private:
 
 	ULONGLONG lastFrameAt = 0;
 	ULONGLONG lastPresentAt = 0;
+	// when the card last came up and when live frames last came back, which the fades and the motion of the card count from
+	ULONGLONG cardShownAt = 0;
+	ULONGLONG liveSince = 0;
 	ULONGLONG awaySince = 0;
 	ULONGLONG holdUntil = 0;
 	ULONGLONG showCardUntil = 0;

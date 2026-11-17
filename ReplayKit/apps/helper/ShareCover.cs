@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.Globalization;
@@ -10,7 +11,7 @@ using ReplayKitShared;
 
 namespace ReplayKitHelper
 {
-    // the card the share window shows while obs is away: what it says and shows comes from the share_cover settings, the theme and the language, the plugin draws it into a png (qt there has the svg, fonts and image scaling), and the window is told to show it, to loop a picked video under it and to loop its sound
+    // the card the share window shows while obs is away: what it says and shows comes from the share_cover settings, the theme and the language, the plugin draws its picture into a png (qt there has the svg, fonts and image scaling), and the window is told to show it, over the moving theme ground it draws itself or a picked video it loops, and to loop its sound
     internal static class ShareCover
     {
         private const int MaxImageWidth = 3840;
@@ -25,7 +26,7 @@ namespace ReplayKitHelper
         private const int MaxVideoFps = 30;
         private static readonly object Gate = new object();
         private static string appliedSignature;
-        // how the card is drawn apart from the theme: the sizes at size 100 in pixels of a 1080 pixel tall card (the logo side, the text height, the plate a picked image puts behind the text), the weight of the text, how strong the outline logo shows, and the colours of that plate (opacity 0 to 255) and of the text over an image or the last frame; the plugin draws with them and the card editor of the settings page shows the same
+        // how the card is drawn apart from the theme: the sizes at size 100 in pixels of a 1080 pixel tall card (the logo side, the text height, the plate a picked image puts behind the text), the weight of the text, how strong the outline logo shows, the colours of that plate (opacity 0 to 255) and of the text over an image or the last frame, and the moving ground of the theme card; the plugin draws the picture, the share window the ground, and the card editor of the settings page shows the same
         private static readonly JObject Look = new JObject
         {
             ["logo"] = 220, ["text"] = 120, ["textWeight"] = 700, ["logoOpacity"] = 0.85,
@@ -40,6 +41,11 @@ namespace ReplayKitHelper
                 ["rim"] = 3,
                 ["blur"] = 46,
                 ["glows"] = new JArray { new JArray(1.05, -0.5, 0.538), new JArray(0.09, 1.306, 0.392) },
+                // how it moves: every circle on an orbit of drift times the card width, one turn in the seconds of its period (shades first, then glows; a minus turns it the other way, and the circle index offsets where it starts), and the rim swinging breathe either side of half way to the accent over breatheSeconds
+                ["drift"] = 0.035,
+                ["periods"] = new JArray(-22, 18, 26, -20),
+                ["breathe"] = 0.3,
+                ["breatheSeconds"] = 5,
             },
         };
 
@@ -121,7 +127,6 @@ namespace ReplayKitHelper
                     ["background"] = background,
                     ["ground"] = colors["bg"]?.Value<string>() ?? "",
                     ["ink"] = colors["text"]?.Value<string>() ?? "",
-                    ["accent"] = colors["accent"]?.Value<string>() ?? "",
                     ["image"] = background == "image" ? ImagePath : "",
                     ["fit"] = settings["share_cover_fit"]?.Value<string>() ?? SettingDefaults.ShareCoverFit,
                     ["text"] = text,
@@ -132,11 +137,12 @@ namespace ReplayKitHelper
                 };
                 string sound = SoundFor(settings, background);
                 string video = background == "video" ? VideoPath : null;
+                string backdrop = background == "theme" ? BackdropCommand(colors) : "BACKDROP none";
                 int volume = settings["share_cover_sound_volume"]?.Value<int>() ?? SettingDefaults.ShareCoverSoundVolume;
                 long obsWindow;
                 lock (Server.State.IpcLock) obsWindow = Server.State.ObsMainWindowHwnd;
                 // the plugin that draws the card only changes when obs starts again, so each obs start draws it once and a plugin update shows up on the card
-                string signature = request.ToString(Formatting.None) + "|" + Stamp(request["image"].Value<string>()) + "|" + Stamp(video) + "|" + (sound ?? "") + "|" + Stamp(sound) + "|" + volume + "|" + state["pid"] + "|" + obsWindow;
+                string signature = request.ToString(Formatting.None) + "|" + backdrop + "|" + Stamp(request["image"].Value<string>()) + "|" + Stamp(video) + "|" + (sound ?? "") + "|" + Stamp(sound) + "|" + volume + "|" + state["pid"] + "|" + obsWindow;
                 if (!force && signature == appliedSignature) return;
 
                 if (!PipeClient.RenderShareCardAndWait(request.ToString(Formatting.None), 8000))
@@ -146,13 +152,38 @@ namespace ReplayKitHelper
                 }
                 // the video goes first, so a card drawn to go over it never shows over the plain ground
                 var videoReply = ShareWindow.Send(video == null ? "VIDEO none" : "VIDEO " + request["fit"].Value<string>() + " " + video);
-                var card = ShareWindow.Send("CARD " + (background == "lastframe" ? "over " : background == "video" ? "video " : "full ") + CardPath);
+                var backdropReply = ShareWindow.Send(backdrop);
+                var card = ShareWindow.Send("CARD " + (background == "theme" ? "theme " : background == "lastframe" ? "over " : background == "video" ? "video " : "full ") + CardPath);
                 var soundReply = ShareWindow.Send(sound == null ? "SOUND none" : "SOUND " + volume + " " + sound);
-                bool ok = videoReply["ok"]?.Value<bool>() == true && card["ok"]?.Value<bool>() == true && soundReply["ok"]?.Value<bool>() == true;
-                Log.Write("Share card " + width + "x" + height + " " + background + (sound == null ? " without sound" : " with " + Path.GetFileName(sound)) + (ok ? "" : ": " + (videoReply["message"] ?? card["message"] ?? soundReply["message"])));
+                bool ok = videoReply["ok"]?.Value<bool>() == true && backdropReply["ok"]?.Value<bool>() == true && card["ok"]?.Value<bool>() == true && soundReply["ok"]?.Value<bool>() == true;
+                Log.Write("Share card " + width + "x" + height + " " + background + (sound == null ? " without sound" : " with " + Path.GetFileName(sound)) + (ok ? "" : ": " + (videoReply["message"] ?? backdropReply["message"] ?? card["message"] ?? soundReply["message"])));
                 if (ok) appliedSignature = signature;
             }
         }
+
+        // the BACKDROP line of the share window: the theme ground and accent, then the backdrop of the look with each circle and its period
+        private static string BackdropCommand(JObject colors)
+        {
+            var backdrop = (JObject)Look["backdrop"];
+            var shades = (JArray)backdrop["shades"];
+            var glows = (JArray)backdrop["glows"];
+            var periods = (JArray)backdrop["periods"];
+            var words = new List<string> { "BACKDROP", colors["bg"]?.Value<string>() ?? "", colors["accent"]?.Value<string>() ?? "" };
+            foreach (string name in new[] { "shade", "glow", "rim", "blur", "drift", "breathe", "breatheSeconds" }) words.Add(Number(backdrop[name]));
+            words.Add(shades.Count.ToString(CultureInfo.InvariantCulture));
+            words.Add(glows.Count.ToString(CultureInfo.InvariantCulture));
+            int index = 0;
+            foreach (JToken circle in shades.Concat(glows))
+            {
+                words.Add(Number(circle[0]));
+                words.Add(Number(circle[1]));
+                words.Add(Number(circle[2]));
+                words.Add(Number(periods[index++]));
+            }
+            return string.Join(" ", words);
+        }
+
+        private static string Number(JToken value) => value.Value<double>().ToString("R", CultureInfo.InvariantCulture);
 
         // the picked image, scaled down to 4k at most and saved as a png in user-data, so the card never reads a file the user moves or deletes later
         public static JObject ImportImage(string source)

@@ -7,16 +7,13 @@
 #include <QFileInfo>
 #include <QFontMetricsF>
 #include <QImage>
-#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QPainter>
-#include <QRadialGradient>
 #include <QSvgRenderer>
 #include <QtMath>
 
 #include <cmath>
-#include <vector>
 
 namespace rk {
 
@@ -50,14 +47,7 @@ bool ReadPlacement(const QJsonObject &layout, const char *name, Placement &out)
 	return std::isfinite(out.x) && std::isfinite(out.y) && std::isfinite(out.scale) && std::isfinite(out.rotation) && out.scale > 0.0;
 }
 
-// a circle of the backdrop: its centre in fractions of the card and its radius in fractions of the card width
-struct Circle {
-	qreal x = 0.0;
-	qreal y = 0.0;
-	qreal radius = 0.0;
-};
-
-// how the helper says the card is drawn apart from the theme: sizes in pixels of a 1080 pixel tall card at size 100, the text weight, how strong the logo shows, the plate and light text colours, and the backdrop of the theme card
+// how the helper says the card is drawn apart from the theme: sizes in pixels of a 1080 pixel tall card at size 100, the text weight, how strong the logo shows, and the plate and light text colours
 struct Look {
 	qreal logo = 0.0;
 	qreal text = 0.0;
@@ -68,12 +58,6 @@ struct Look {
 	qreal logoOpacity = 0.0;
 	QColor plate;
 	QColor lightText;
-	qreal shade = 0.0;
-	qreal glow = 0.0;
-	qreal rim = 0.0;
-	qreal blur = 0.0;
-	std::vector<Circle> shades;
-	std::vector<Circle> glows;
 };
 
 bool ReadNumber(const QJsonObject &given, const char *name, qreal low, qreal high, qreal &out)
@@ -82,22 +66,6 @@ bool ReadNumber(const QJsonObject &given, const char *name, qreal low, qreal hig
 	if (!value.isDouble() || !std::isfinite(value.toDouble()) || value.toDouble() < low || value.toDouble() > high)
 		return false;
 	out = value.toDouble();
-	return true;
-}
-
-bool ReadCircles(const QJsonValue &given, std::vector<Circle> &out)
-{
-	if (!given.isArray())
-		return false;
-	for (const QJsonValue &item : given.toArray()) {
-		const QJsonArray triple = item.toArray();
-		if (triple.size() != 3 || !triple[0].isDouble() || !triple[1].isDouble() || !triple[2].isDouble())
-			return false;
-		Circle circle{triple[0].toDouble(), triple[1].toDouble(), triple[2].toDouble()};
-		if (!std::isfinite(circle.x) || !std::isfinite(circle.y) || !std::isfinite(circle.radius) || circle.radius <= 0.0)
-			return false;
-		out.push_back(circle);
-	}
 	return true;
 }
 
@@ -115,39 +83,7 @@ bool ReadLook(const QJsonObject &given, Look &out)
 	if (!out.plate.isValid() || !out.lightText.isValid())
 		return false;
 	out.plate.setAlpha(qRound(opacity));
-	const QJsonObject backdrop = given.value(QStringLiteral("backdrop")).toObject();
-	return ReadNumber(backdrop, "shade", 0.0, 1.0, out.shade) && ReadNumber(backdrop, "glow", 0.0, 1.0, out.glow) &&
-	       ReadNumber(backdrop, "rim", 0.0, kHuge, out.rim) && ReadNumber(backdrop, "blur", 0.0, kHuge, out.blur) &&
-	       ReadCircles(backdrop.value(QStringLiteral("shades")), out.shades) && ReadCircles(backdrop.value(QStringLiteral("glows")), out.glows);
-}
-
-QColor Mix(const QColor &from, const QColor &to, qreal amount)
-{
-	return QColor::fromRgbF(float(from.redF() + (to.redF() - from.redF()) * amount), float(from.greenF() + (to.greenF() - from.greenF()) * amount),
-				float(from.blueF() + (to.blueF() - from.blueF()) * amount), float(from.alphaF() + (to.alphaF() - from.alphaF()) * amount));
-}
-
-// the ground of the theme card: the shade circles, then the circles whose rim glows in the accent colour with a soft band inside it
-void DrawBackdrop(QPainter &painter, const Look &look, const QColor &ground, const QColor &accent, int width, qreal unit, int height)
-{
-	painter.save();
-	painter.setPen(Qt::NoPen);
-	painter.setBrush(Mix(ground, QColor(Qt::black), look.shade));
-	for (const Circle &circle : look.shades)
-		painter.drawEllipse(QPointF(circle.x * width, circle.y * height), circle.radius * width, circle.radius * width);
-	const QColor inner = Mix(ground, accent, look.glow);
-	for (const Circle &circle : look.glows) {
-		const QPointF centre(circle.x * width, circle.y * height);
-		const qreal radius = circle.radius * width;
-		QRadialGradient gradient(centre, radius);
-		gradient.setColorAt(0.0, inner);
-		gradient.setColorAt(qMax(0.0, 1.0 - look.blur * unit / radius), inner);
-		gradient.setColorAt(qMax(0.0, 1.0 - look.rim * unit / radius), Mix(inner, accent, 0.5));
-		gradient.setColorAt(1.0, accent);
-		painter.setBrush(gradient);
-		painter.drawEllipse(centre, radius, radius);
-	}
-	painter.restore();
+	return true;
 }
 
 // the outline logo in one colour: drawn white from its svg, then given the colour through its own alpha
@@ -209,12 +145,11 @@ bool RenderShareCard(const std::string &json)
 	const QString background = request.value(QStringLiteral("background")).toString();
 	if (background != QStringLiteral("theme") && background != QStringLiteral("image") && background != QStringLiteral("video") && background != QStringLiteral("lastframe"))
 		return Refuse("unknown background");
-	// the window draws the last frame or the video under the card, so the card leaves them clear around what it draws
-	const bool overPicture = background == QStringLiteral("lastframe") || background == QStringLiteral("video");
+	// the window draws the moving theme ground, the last frame or the video under the card, so only a picked image card has a ground of its own
+	const bool ownGround = background == QStringLiteral("image");
 	const QColor ground(request.value(QStringLiteral("ground")).toString());
 	const QColor ink(request.value(QStringLiteral("ink")).toString());
-	const QColor accent(request.value(QStringLiteral("accent")).toString());
-	if (!ground.isValid() || !ink.isValid() || !accent.isValid())
+	if (!ground.isValid() || !ink.isValid())
 		return Refuse("the theme colours are not valid colours");
 	const QString text = request.value(QStringLiteral("text")).toString().left(kMaxTextLength);
 	const bool icon = request.value(QStringLiteral("icon")).toBool();
@@ -228,13 +163,11 @@ bool RenderShareCard(const std::string &json)
 		return Refuse("the card look is not valid");
 
 	QImage card(width, height, QImage::Format_ARGB32);
-	card.fill(overPicture ? QColor(Qt::transparent) : ground);
+	card.fill(ownGround ? ground : QColor(Qt::transparent));
 	QPainter painter(&card);
 	painter.setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform | QPainter::TextAntialiasing);
 	const qreal unit = height / 1080.0;
 
-	if (background == QStringLiteral("theme"))
-		DrawBackdrop(painter, look, ground, accent, width, unit, height);
 	if (background == QStringLiteral("image")) {
 		const QImage picture(request.value(QStringLiteral("image")).toString());
 		if (picture.isNull())

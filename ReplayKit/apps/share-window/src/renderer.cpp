@@ -20,12 +20,22 @@ constexpr DXGI_FORMAT kViewFormat = DXGI_FORMAT_B8G8R8A8_UNORM;
 // how dark the last frame gets under a card drawn over it
 constexpr float kDimmedBrightness = 0.35f;
 // the plain card while no card image was given
-constexpr float kPlainCard[4] = {0.094f, 0.094f, 0.106f, 1.0f};
+constexpr float kPlainCard[3] = {0.094f, 0.094f, 0.106f};
 
+// the picture shader draws a texture; the ground shader draws the theme card ground the way the card editor draws it: the ground, the shade circles, then over them the glow circles from the inside colour thru the soft band to a rim and the accent at the edge, each edge one target pixel soft
 constexpr char kShader[] = R"(
 Texture2D image : register(t0);
 SamplerState linearSampler : register(s0);
-cbuffer DrawConstants : register(b0) { float brightness; float keepAlpha; float2 unused; };
+cbuffer DrawConstants : register(b0) { float brightness; float keepAlpha; float opacity; float unused; };
+cbuffer GroundConstants : register(b1)
+{
+	float4 ground;
+	float4 accent;
+	float4 mixes;
+	float4 band;
+	float4 origin;
+	float4 circles[8];
+};
 struct VsOut { float4 position : SV_Position; float2 uv : TEXCOORD0; };
 VsOut VsMain(uint id : SV_VertexID)
 {
@@ -38,15 +48,53 @@ VsOut VsMain(uint id : SV_VertexID)
 float4 PsMain(VsOut input) : SV_Target
 {
 	float4 color = image.Sample(linearSampler, input.uv);
-	return float4(color.rgb * brightness, keepAlpha > 0.5 ? color.a : 1.0);
+	return float4(color.rgb * brightness, (keepAlpha > 0.5 ? color.a : 1.0) * opacity);
+}
+float4 PsGround(VsOut input) : SV_Target
+{
+	float2 at = (input.position.xy - origin.xy) * band.z;
+	float3 color = ground.rgb;
+	float3 shade = lerp(ground.rgb, float3(0, 0, 0), mixes.x);
+	float3 inner = lerp(ground.rgb, accent.rgb, mixes.y);
+	float3 rim = lerp(inner, accent.rgb, mixes.z);
+	[loop] for (int i = 0; i < int(mixes.w); i++) {
+		float4 circle = circles[i];
+		float distanceIn = distance(at, circle.xy);
+		float cover = saturate((circle.z - distanceIn) / band.z + 0.5);
+		float3 fill = shade;
+		if (circle.w > 0.5) {
+			float t = distanceIn / circle.z;
+			float soft = max(0.0, 1.0 - band.y / circle.z);
+			float hard = max(soft, 1.0 - band.x / circle.z);
+			fill = t < soft ? inner : t < hard ? lerp(inner, rim, (t - soft) / max(hard - soft, 1e-5)) : lerp(rim, accent.rgb, saturate((t - hard) / max(1.0 - hard, 1e-5)));
+		}
+		color = lerp(color, fill, cover);
+	}
+	return float4(color, ground.a);
 }
 )";
 
 struct DrawConstants {
 	float brightness;
 	float keepAlpha;
-	float unused[2];
+	float opacity;
+	float unused;
 };
+
+struct GroundConstants {
+	float ground[4];
+	float accent[4];
+	// shade, glow, how far the rim goes toward the accent, and the number of circles
+	float mixes[4];
+	// rim and soft band in card pixels, then card pixels per target pixel
+	float band[4];
+	// the top left of the card in target pixels
+	float origin[4];
+	// x, y and radius in card pixels, then 1 for a glow and 0 for a shade
+	float circles[kMaxBackdropCircles][4];
+};
+
+constexpr float kTau = 6.28318530718f;
 
 ComPtr<ID3DBlob> Compile(const char *entry, const char *profile)
 {
@@ -163,6 +211,8 @@ void Renderer::Release()
 	blendOn.Reset();
 	clipOn.Reset();
 	constants.Reset();
+	groundConstants.Reset();
+	groundShader.Reset();
 	sampler.Reset();
 	pixelShader.Reset();
 	vertexShader.Reset();
@@ -176,10 +226,12 @@ bool Renderer::CreatePipeline()
 {
 	ComPtr<ID3DBlob> vs = Compile("VsMain", "vs_4_0");
 	ComPtr<ID3DBlob> ps = Compile("PsMain", "ps_4_0");
-	if (!vs || !ps)
+	ComPtr<ID3DBlob> groundPs = Compile("PsGround", "ps_4_0");
+	if (!vs || !ps || !groundPs)
 		return false;
 	if (FAILED(device->CreateVertexShader(vs->GetBufferPointer(), vs->GetBufferSize(), nullptr, &vertexShader)) ||
-	    FAILED(device->CreatePixelShader(ps->GetBufferPointer(), ps->GetBufferSize(), nullptr, &pixelShader))) {
+	    FAILED(device->CreatePixelShader(ps->GetBufferPointer(), ps->GetBufferSize(), nullptr, &pixelShader)) ||
+	    FAILED(device->CreatePixelShader(groundPs->GetBufferPointer(), groundPs->GetBufferSize(), nullptr, &groundShader))) {
 		Log("could not create the shaders");
 		return false;
 	}
@@ -191,6 +243,8 @@ bool Renderer::CreatePipeline()
 	bufferDesc.ByteWidth = sizeof(DrawConstants);
 	bufferDesc.Usage = D3D11_USAGE_DEFAULT;
 	bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+	D3D11_BUFFER_DESC groundDesc = bufferDesc;
+	groundDesc.ByteWidth = sizeof(GroundConstants);
 	D3D11_BLEND_DESC blendDesc{};
 	blendDesc.RenderTarget[0].BlendEnable = TRUE;
 	blendDesc.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
@@ -207,7 +261,8 @@ bool Renderer::CreatePipeline()
 	rasterDesc.DepthClipEnable = TRUE;
 	rasterDesc.ScissorEnable = TRUE;
 	if (FAILED(device->CreateSamplerState(&samplerDesc, &sampler)) || FAILED(device->CreateBuffer(&bufferDesc, nullptr, &constants)) ||
-	    FAILED(device->CreateBlendState(&blendDesc, &blendOn)) || FAILED(device->CreateRasterizerState(&rasterDesc, &clipOn))) {
+	    FAILED(device->CreateBuffer(&groundDesc, nullptr, &groundConstants)) || FAILED(device->CreateBlendState(&blendDesc, &blendOn)) ||
+	    FAILED(device->CreateRasterizerState(&rasterDesc, &clipOn))) {
 		Log("could not create the draw states");
 		return false;
 	}
@@ -403,6 +458,14 @@ void Renderer::ClearVideo()
 	videoWidth = videoHeight = 0;
 }
 
+void Renderer::SetBackdrop(const Backdrop &value)
+{
+	backdrop = value;
+	if (backdrop.circles.size() > kMaxBackdropCircles)
+		backdrop.circles.resize(kMaxBackdropCircles);
+	hasBackdrop = true;
+}
+
 void Renderer::BeginFrame()
 {
 	const float black[4] = {0.0f, 0.0f, 0.0f, 1.0f};
@@ -421,14 +484,15 @@ D3D11_VIEWPORT Renderer::Whole() const
 	return viewport;
 }
 
-void Renderer::Draw(ID3D11ShaderResourceView *view, const D3D11_VIEWPORT &viewport, float brightness, bool blend, const D3D11_RECT *clip)
+void Renderer::Draw(ID3D11ShaderResourceView *view, const D3D11_VIEWPORT &viewport, float brightness, bool keepAlpha, float opacity, const D3D11_RECT *clip)
 {
 	context->RSSetViewports(1, &viewport);
 	context->RSSetState(clip ? clipOn.Get() : nullptr);
 	if (clip)
 		context->RSSetScissorRects(1, clip);
 
-	DrawConstants values{brightness, blend ? 1.0f : 0.0f, {0.0f, 0.0f}};
+	const bool blend = keepAlpha || opacity < 1.0f;
+	DrawConstants values{brightness, keepAlpha ? 1.0f : 0.0f, opacity, 0.0f};
 	context->UpdateSubresource(constants.Get(), 0, nullptr, &values, 0, 0);
 	ID3D11Buffer *buffers[] = {constants.Get()};
 	ID3D11SamplerState *samplers[] = {sampler.Get()};
@@ -447,45 +511,111 @@ void Renderer::Draw(ID3D11ShaderResourceView *view, const D3D11_VIEWPORT &viewpo
 	context->PSSetShaderResources(0, 1, none);
 }
 
+// a plain ground in that colour, or the theme ground with its circles where they are after that many seconds
+void Renderer::DrawGround(const D3D11_VIEWPORT &viewport, const float rgb[3], float opacity, const Backdrop *moving, double seconds)
+{
+	GroundConstants values{};
+	values.ground[0] = rgb[0];
+	values.ground[1] = rgb[1];
+	values.ground[2] = rgb[2];
+	values.ground[3] = opacity;
+	values.band[2] = 1.0f;
+	if (moving && cardWidth && cardHeight && viewport.Width > 0.0f) {
+		const float width = float(cardWidth), height = float(cardHeight), unit = height / 1080.0f;
+		std::copy(moving->accent, moving->accent + 3, values.accent);
+		values.mixes[0] = moving->shade;
+		values.mixes[1] = moving->glow;
+		values.mixes[2] = 0.5f + moving->breathe * std::sin(kTau * float(std::fmod(seconds, double(moving->breatheSeconds))) / moving->breatheSeconds);
+		values.mixes[3] = float(moving->circles.size());
+		values.band[0] = moving->rim * unit;
+		values.band[1] = moving->blur * unit;
+		values.band[2] = width / viewport.Width;
+		values.origin[0] = viewport.TopLeftX;
+		values.origin[1] = viewport.TopLeftY;
+		for (size_t i = 0; i < moving->circles.size(); ++i) {
+			const Backdrop::Circle &circle = moving->circles[i];
+			const double period = std::fabs(double(circle.period));
+			const float turn = (circle.period < 0.0f ? -1.0f : 1.0f) * kTau * float(std::fmod(seconds, period) / period) + float(i);
+			values.circles[i][0] = circle.x * width + moving->drift * width * std::cos(turn);
+			values.circles[i][1] = circle.y * height + moving->drift * width * std::sin(turn);
+			values.circles[i][2] = circle.radius * width;
+			values.circles[i][3] = circle.glow ? 1.0f : 0.0f;
+		}
+	}
+	context->UpdateSubresource(groundConstants.Get(), 0, nullptr, &values, 0, 0);
+	context->RSSetViewports(1, &viewport);
+	context->RSSetState(nullptr);
+	ID3D11Buffer *buffers[] = {groundConstants.Get()};
+	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	context->IASetInputLayout(nullptr);
+	context->VSSetShader(vertexShader.Get(), nullptr, 0);
+	context->PSSetShader(groundShader.Get(), nullptr, 0);
+	context->PSSetConstantBuffers(1, 1, buffers);
+	const float factor[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+	context->OMSetBlendState(opacity < 1.0f ? blendOn.Get() : nullptr, factor, 0xffffffffu);
+	context->Draw(3, 0);
+}
+
+// the card and what it is drawn over, at its opacity; its picture moves by the lift, and an image card stays put since its picture is the whole card
+void Renderer::DrawCard(const CardShow &show)
+{
+	const float opacity = show.opacity;
+	if (!cardView) {
+		DrawGround(Whole(), kPlainCard, opacity, nullptr, 0.0);
+		return;
+	}
+	const D3D11_VIEWPORT card = Place(cardWidth, cardHeight, Whole(), false);
+	D3D11_VIEWPORT lifted = card;
+	lifted.TopLeftY += show.lift * card.Height / 1080.0f;
+	switch (cardMode) {
+	case CardMode::Theme:
+		DrawGround(card, hasBackdrop ? backdrop.ground : kPlainCard, opacity, hasBackdrop ? &backdrop : nullptr, show.seconds);
+		Draw(cardView.Get(), lifted, 1.0f, true, opacity);
+		break;
+	case CardMode::OverLastFrame:
+		if (hasFrame)
+			Draw(frameView.Get(), Place(sharedWidth, sharedHeight, Whole(), false), kDimmedBrightness, false, opacity);
+		else
+			DrawGround(Whole(), kPlainCard, opacity, nullptr, 0.0);
+		Draw(cardView.Get(), lifted, 1.0f, true, opacity);
+		break;
+	case CardMode::OverVideo:
+		if (videoView) {
+			const D3D11_RECT area{LONG(std::floor(card.TopLeftX)), LONG(std::floor(card.TopLeftY)), LONG(std::ceil(card.TopLeftX + card.Width)), LONG(std::ceil(card.TopLeftY + card.Height))};
+			Draw(videoView.Get(), Place(videoWidth, videoHeight, card, videoFill), 1.0f, false, opacity, &area);
+		} else {
+			DrawGround(Whole(), kPlainCard, opacity, nullptr, 0.0);
+		}
+		Draw(cardView.Get(), lifted, 1.0f, true, opacity);
+		break;
+	case CardMode::Full:
+		Draw(cardView.Get(), card, 1.0f, false, opacity);
+		break;
+	}
+}
+
 HRESULT Renderer::Present()
 {
 	// one refresh at most per present, so presenting never runs ahead of what the screen and a capture of it take
 	return swapChain->Present(1, 0);
 }
 
-HRESULT Renderer::PresentFrame()
+HRESULT Renderer::PresentFrame(const CardShow &card)
 {
 	BeginFrame();
 	if (hasFrame)
-		Draw(frameView.Get(), Place(sharedWidth, sharedHeight, Whole(), false), 1.0f, false);
+		Draw(frameView.Get(), Place(sharedWidth, sharedHeight, Whole(), false), 1.0f, false, 1.0f);
+	if (card.opacity > 0.0f)
+		DrawCard(card);
 	return Present();
 }
 
-HRESULT Renderer::PresentCard()
+HRESULT Renderer::PresentCard(const CardShow &card)
 {
 	BeginFrame();
-	if (!cardView) {
-		context->ClearRenderTargetView(target.Get(), kPlainCard);
-		return Present();
-	}
-	const D3D11_VIEWPORT card = Place(cardWidth, cardHeight, Whole(), false);
-	if (cardMode == CardMode::OverLastFrame) {
-		if (hasFrame)
-			Draw(frameView.Get(), Place(sharedWidth, sharedHeight, Whole(), false), kDimmedBrightness, false);
-		else
-			context->ClearRenderTargetView(target.Get(), kPlainCard);
-		Draw(cardView.Get(), card, 1.0f, true);
-	} else if (cardMode == CardMode::OverVideo) {
-		if (videoView) {
-			const D3D11_RECT area{LONG(std::floor(card.TopLeftX)), LONG(std::floor(card.TopLeftY)), LONG(std::ceil(card.TopLeftX + card.Width)), LONG(std::ceil(card.TopLeftY + card.Height))};
-			Draw(videoView.Get(), Place(videoWidth, videoHeight, card, videoFill), 1.0f, false, &area);
-		} else {
-			context->ClearRenderTargetView(target.Get(), kPlainCard);
-		}
-		Draw(cardView.Get(), card, 1.0f, true);
-	} else {
-		Draw(cardView.Get(), card, 1.0f, false);
-	}
+	if (card.opacity < 1.0f && hasFrame)
+		Draw(frameView.Get(), Place(sharedWidth, sharedHeight, Whole(), false), 1.0f, false, 1.0f);
+	DrawCard(card);
 	return Present();
 }
 

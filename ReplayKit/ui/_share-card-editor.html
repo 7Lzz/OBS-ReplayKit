@@ -136,21 +136,46 @@
     return "rgba(" + parseInt(hex[1], 16) + ", " + parseInt(hex[2], 16) + ", " + parseInt(hex[3], 16) + ", " + Number(look.plateOpacity) / 255 + ")";
   }
 
-  // the ground of the theme card from the backdrop of the look, the way the plugin draws it: the shade circles, then over them the circles whose rim glows in the accent colour with a soft band inside it; the first layer of a css background is the top one
-  function themeBackdrop(width, height, px) {
-    var b = cover.look.backdrop, accent = "rgb(var(--accent-rgb))";
+  var TAU = Math.PI * 2;
+  // the ground of the theme card from the backdrop of the look, the way the share window draws it that many seconds after the card came up: the shade circles, then over them the circles whose rim glows in the accent colour with a soft band inside it, each circle on its orbit and the rim swinging around half way to the accent; the first layer of a css background is the top one
+  function themeBackdrop(width, height, px, seconds) {
+    var b = cover.look.backdrop, accent = "rgb(var(--accent-rgb))", shadeCount = b.shades.length;
     var inner = "color-mix(in srgb, var(--window-solid), " + accent + " " + b.glow * 100 + "%)";
-    var rim = "color-mix(in srgb, " + inner + ", " + accent + " 50%)";
+    var rim = "color-mix(in srgb, " + inner + ", " + accent + " " + (50 + b.breathe * 100 * Math.sin(TAU * (seconds % b.breatheSeconds) / b.breatheSeconds)) + "%)";
     var shade = "color-mix(in srgb, var(--window-solid), black " + b.shade * 100 + "%)";
-    var layers = b.glows.map(function (c) {
+    function centre(c, index) {
+      var period = b.periods[index], turn = (period < 0 ? -1 : 1) * TAU * (seconds % Math.abs(period)) / Math.abs(period) + index;
+      return (c[0] * width + b.drift * width * Math.cos(turn)) + "px " + (c[1] * height + b.drift * width * Math.sin(turn)) + "px";
+    }
+    var layers = b.glows.map(function (c, i) {
       var r = c[2] * width;
-      return "radial-gradient(circle " + r + "px at " + c[0] * width + "px " + c[1] * height + "px, " + inner + " 0px, " + inner + " " + Math.max(0, r - b.blur * px) + "px, " +
+      return "radial-gradient(circle " + r + "px at " + centre(c, shadeCount + i) + ", " + inner + " 0px, " + inner + " " + Math.max(0, r - b.blur * px) + "px, " +
         rim + " " + Math.max(0, r - b.rim * px) + "px, " + accent + " " + r + "px, transparent " + (r + 0.75) + "px)";
-    }).concat(b.shades.map(function (c) {
+    }).concat(b.shades.map(function (c, i) {
       var r = c[2] * width;
-      return "radial-gradient(circle " + r + "px at " + c[0] * width + "px " + c[1] * height + "px, " + shade + " " + Math.max(0, r - 0.75) + "px, transparent " + r + "px)";
+      return "radial-gradient(circle " + r + "px at " + centre(c, i) + ", " + shade + " " + Math.max(0, r - 0.75) + "px, transparent " + r + "px)";
     }));
     return layers.concat(["var(--window-solid)"]).join(", ");
+  }
+
+  // the theme ground keeps moving while the card is on screen, about once a 60 hz frame, and stops while its tab, the page or its window is hidden
+  var motionStart = 0, motionFrame = 0, motionDrawn = 0;
+  function motionSeconds(now) {
+    if (!motionStart) motionStart = now;
+    return (now - motionStart) / 1000;
+  }
+  function onScreen() { return !!screenEl.clientHeight && !document.hidden && (!window.RKWindow || RKWindow.up()); }
+  function animate(now) {
+    motionFrame = 0;
+    if (!host || !cover.look || background() !== "theme" || !onScreen()) return;
+    if (now - motionDrawn >= 15) {
+      motionDrawn = now;
+      screenEl.style.background = themeBackdrop(screenEl.clientWidth, screenEl.clientHeight, screenEl.clientHeight / 1080, motionSeconds(now));
+    }
+    motionFrame = requestAnimationFrame(animate);
+  }
+  function startMotion() {
+    if (!motionFrame) motionFrame = requestAnimationFrame(animate);
   }
 
   // sizes follow the card height, so the preview keeps the proportions of the card at any width
@@ -158,7 +183,8 @@
     var height = screenEl.clientHeight, look = cover.look;
     if (!height || !look || !layout) return;
     var px = height / 1080;
-    screenEl.style.background = background() === "theme" ? themeBackdrop(screenEl.clientWidth, height, px) : "";
+    screenEl.style.background = background() === "theme" ? themeBackdrop(screenEl.clientWidth, height, px, motionSeconds(performance.now())) : "";
+    startMotion();
     var side = look.logo * px * layout.icon.scale / 100;
     items.icon.style.width = side + "px";
     items.icon.style.height = side + "px";
@@ -280,6 +306,8 @@
   document.getElementById("sceReset").addEventListener("click", reset);
   // everything is sized from the card box, which has no size while its tab is hidden, so the card is laid out again whenever that size changes
   new ResizeObserver(place).observe(screenEl);
+  document.addEventListener("visibilitychange", startMotion);
+  if (window.RKWindow) RKWindow.onChange(function (up) { if (up) startMotion(); });
 
   window.RKShareCardEditor = {
     init: function (given) { host = given; render(); },
