@@ -500,11 +500,11 @@ namespace ReplayKitHelper
         internal const int ShareCoverLayoutRotationMin = -180;
         internal const int ShareCoverLayoutRotationMax = 180;
 
-        // the default card: the logo over the text, the pair in the middle of the card
+        // the default card: the text in the middle and the logo in the lower left, large enough that its outline still shows on a 720p stream
         internal static JObject DefaultShareCoverLayout() => new JObject
         {
-            ["icon"] = new JObject { ["x"] = 50.0, ["y"] = 42.0, ["scale"] = 100, ["rotation"] = 0 },
-            ["text"] = new JObject { ["x"] = 50.0, ["y"] = 63.0, ["scale"] = 100, ["rotation"] = 0 },
+            ["icon"] = new JObject { ["x"] = 5.5, ["y"] = 92.0, ["scale"] = 40, ["rotation"] = 0 },
+            ["text"] = new JObject { ["x"] = 50.0, ["y"] = 50.0, ["scale"] = 100, ["rotation"] = 0 },
         };
 
         // a field that is missing, not a finite number or out of range keeps the place the default card gives it

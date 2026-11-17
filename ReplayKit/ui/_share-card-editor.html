@@ -37,6 +37,7 @@
     </button>
   </div>
   <div class="sce-screen" id="sceScreen">
+    <canvas class="sce-backdrop" id="sceMotion" aria-hidden="true" hidden></canvas>
     <img class="sce-backdrop" id="sceBackdrop" alt="" hidden>
     <video class="sce-backdrop" id="sceVideo" muted loop playsinline disablepictureinpicture hidden></video>
     <div class="sce-item" id="sceIcon" data-item="icon">
@@ -56,6 +57,11 @@
 <script>
 (function () {
   var screenEl = document.getElementById("sceScreen");
+  var motionCanvas = document.getElementById("sceMotion");
+  // the shader of the moving theme ground and its timing, the same partial the share window is built from
+  var motionSource = document.getElementById("sceMotionShader");
+  var turnSeconds = Number(motionSource.dataset.turnSeconds), shineSeconds = Number(motionSource.dataset.shineSeconds), loopSeconds = Number(motionSource.dataset.loopSeconds);
+  var maskRange = Number(motionSource.dataset.maskRange);
   var backdrop = document.getElementById("sceBackdrop");
   var videoEl = document.getElementById("sceVideo");
   var textEl = document.getElementById("sceText");
@@ -136,43 +142,129 @@
     return "rgba(" + parseInt(hex[1], 16) + ", " + parseInt(hex[2], 16) + ", " + parseInt(hex[3], 16) + ", " + Number(look.plateOpacity) / 255 + ")";
   }
 
-  var TAU = Math.PI * 2;
-  // the ground of the theme card from the backdrop of the look, the way the share window draws it that many seconds after the card came up: the shade circles, then over them the circles whose rim glows in the accent colour with a soft band inside it, each circle on its orbit and the rim swinging around half way to the accent; the first layer of a css background is the top one
-  function themeBackdrop(width, height, px, seconds) {
-    var b = cover.look.backdrop, accent = "rgb(var(--accent-rgb))", shadeCount = b.shades.length;
-    var inner = "color-mix(in srgb, var(--window-solid), " + accent + " " + b.glow * 100 + "%)";
-    var rim = "color-mix(in srgb, " + inner + ", " + accent + " " + (50 + b.breathe * 100 * Math.sin(TAU * (seconds % b.breatheSeconds) / b.breatheSeconds)) + "%)";
-    var shade = "color-mix(in srgb, var(--window-solid), black " + b.shade * 100 + "%)";
-    function centre(c, index) {
-      var period = b.periods[index], turn = (period < 0 ? -1 : 1) * TAU * (seconds % Math.abs(period)) / Math.abs(period) + index;
-      return (c[0] * width + b.drift * width * Math.cos(turn)) + "px " + (c[1] * height + b.drift * width * Math.sin(turn)) + "px";
+  function createMotion(mask) {
+    var gl = motionCanvas.getContext("webgl2", { alpha:false, antialias:false, depth:false, stencil:false });
+    if (!gl) return null;
+
+    function compile(type, code) {
+      var shader = gl.createShader(type);
+      gl.shaderSource(shader, code);
+      gl.compileShader(shader);
+      if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(shader));
+      return shader;
     }
-    var layers = b.glows.map(function (c, i) {
-      var r = c[2] * width;
-      return "radial-gradient(circle " + r + "px at " + centre(c, shadeCount + i) + ", " + inner + " 0px, " + inner + " " + Math.max(0, r - b.blur * px) + "px, " +
-        rim + " " + Math.max(0, r - b.rim * px) + "px, " + accent + " " + r + "px, transparent " + (r + 0.75) + "px)";
-    }).concat(b.shades.map(function (c, i) {
-      var r = c[2] * width;
-      return "radial-gradient(circle " + r + "px at " + centre(c, i) + ", " + shade + " " + Math.max(0, r - 0.75) + "px, transparent " + r + "px)";
-    }));
-    return layers.concat(["var(--window-solid)"]).join(", ");
+
+    var vertex = compile(gl.VERTEX_SHADER, `#version 300 es
+      out vec2 uv;
+      void main() {
+        vec2 pos = vec2(float((gl_VertexID << 1) & 2), float(gl_VertexID & 2));
+        uv = vec2(pos.x, 1.0 - pos.y);
+        gl_Position = vec4(pos * 2.0 - 1.0, 0.0, 1.0);
+      }`);
+    var fragment = compile(gl.FRAGMENT_SHADER, `#version 300 es
+      precision highp float;
+      #define float2 vec2
+      #define float3 vec3
+      #define frac fract
+      #define lerp mix
+      #define SampleSwirl(at) textureLod(swirlMask, at, 0.0).r
+      in vec2 uv;
+      uniform float aspect, seconds, shineSeed;
+      uniform vec3 ground, accent;
+      uniform sampler2D swirlMask;
+      out vec4 color;
+      const float SwirlTurnSeconds = ${turnSeconds.toFixed(1)};
+      const float ShineInterval = ${shineSeconds.toFixed(1)};
+      const float SwirlLoopSeconds = ${loopSeconds.toFixed(1)};
+      const float SwirlMaskRange = ${maskRange.toFixed(6)};
+      ${motionSource.textContent}
+      void main() { color = vec4(ShareMotion(uv, aspect, seconds, shineSeed, ground, accent), 1.0); }`);
+    var program = gl.createProgram();
+    gl.attachShader(program, vertex);
+    gl.attachShader(program, fragment);
+    gl.linkProgram(program);
+    gl.deleteShader(vertex);
+    gl.deleteShader(fragment);
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(program));
+    gl.useProgram(program);
+    var texture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    // the mask is grey, so one channel of it is kept, as the share window keeps it
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, gl.RED, gl.UNSIGNED_BYTE, mask);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    var aspect = gl.getUniformLocation(program, "aspect"), time = gl.getUniformLocation(program, "seconds");
+    var ground = gl.getUniformLocation(program, "ground"), accent = gl.getUniformLocation(program, "accent");
+    var seed = gl.getUniformLocation(program, "shineSeed");
+    return function (width, height, seconds, colors, shineSeed) {
+      if (motionCanvas.width !== width || motionCanvas.height !== height) {
+        motionCanvas.width = width;
+        motionCanvas.height = height;
+      }
+      gl.viewport(0, 0, width, height);
+      gl.uniform1f(aspect, width / height);
+      gl.uniform1f(time, seconds);
+      gl.uniform1f(seed, shineSeed);
+      gl.uniform3fv(ground, colors[0]);
+      gl.uniform3fv(accent, colors[1]);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      motionCanvas.hidden = false;
+    };
   }
 
-  // the theme ground keeps moving while the card is on screen, about once a 60 hz frame, and stops while its tab, the page or its window is hidden
-  var motionStart = 0, motionFrame = 0, motionDrawn = 0;
-  function motionSeconds(now) {
-    if (!motionStart) motionStart = now;
-    return (now - motionStart) / 1000;
+  var drawMotion, motionMask, motionStart = null, motionFrame = 0, motionNextAt = 0, motionColors, motionSeed;
+  function readMotionColors() {
+    var style = getComputedStyle(screenEl);
+    return ["--bg-rgb", "--accent-rgb"].map(function (name) {
+      return style.getPropertyValue(name).trim().split(",").map(function (channel) { return Number(channel) / 255; });
+    });
   }
   function onScreen() { return !!screenEl.clientHeight && !document.hidden && (!window.RKWindow || RKWindow.up()); }
+  // the preview draws no more often than obs records, the rate the share window draws the card at too
+  function frameMs() {
+    var rate = Number(host.get("fpsNumerator")) / Number(host.get("fpsDenominator"));
+    return Number.isFinite(rate) && rate > 0 ? 1000 / rate : Infinity;
+  }
   function animate(now) {
     motionFrame = 0;
-    if (!host || !cover.look || background() !== "theme" || !onScreen()) return;
-    if (now - motionDrawn >= 15) {
-      motionDrawn = now;
-      screenEl.style.background = themeBackdrop(screenEl.clientWidth, screenEl.clientHeight, screenEl.clientHeight / 1080, motionSeconds(now));
+    if (!host || !cover.look || background() !== "theme" || !onScreen()) {
+      motionStart = null;
+      return;
     }
-    motionFrame = requestAnimationFrame(animate);
+    if (!motionMask) {
+      motionMask = new Image();
+      motionMask.onload = motionMask.onerror = startMotion;
+      motionMask.src = "/icons/share/obs-swirl-mask.png";
+      return;
+    }
+    if (!motionMask.complete) return;
+    if (drawMotion === undefined) {
+      drawMotion = null;
+      try { if (motionMask.naturalWidth) drawMotion = createMotion(motionMask); }
+      catch (error) { drawMotion = null; console.error("Share card preview shader", error); }
+    }
+    // without webgl or the mask the preview shows the theme ground still, as the share window does without its mask
+    if (!drawMotion) {
+      motionCanvas.hidden = true;
+      screenEl.style.background = "rgb(var(--bg-rgb))";
+      return;
+    }
+    if (motionStart === null) {
+      motionStart = now;
+      motionNextAt = 0;
+      motionSeed = Math.random();
+    }
+    // each draw is due one frame of the obs rate after the last one was due, so the rate holds on average whatever the refresh of the screen; requestAnimationFrame lands a little early or late, so a draw within 3 ms of its time counts
+    var frame = frameMs();
+    if (now >= motionNextAt - 3) {
+      motionNextAt = now - motionNextAt > frame ? now + frame : motionNextAt + frame;
+      var scale = window.devicePixelRatio || 1;
+      // the motion repeats every loop, so its clock wraps there the way the share window wraps it
+      drawMotion(Math.round(screenEl.clientWidth * scale), Math.round(screenEl.clientHeight * scale), ((now - motionStart) / 1000) % loopSeconds, motionColors, motionSeed);
+    }
+    startMotion();
   }
   function startMotion() {
     if (!motionFrame) motionFrame = requestAnimationFrame(animate);
@@ -183,14 +275,21 @@
     var height = screenEl.clientHeight, look = cover.look;
     if (!height || !look || !layout) return;
     var px = height / 1080;
-    screenEl.style.background = background() === "theme" ? themeBackdrop(screenEl.clientWidth, height, px, motionSeconds(performance.now())) : "";
-    startMotion();
+    screenEl.style.background = "";
+    if (background() === "theme") {
+      motionColors = readMotionColors();
+      startMotion();
+    } else {
+      motionStart = null;
+      motionCanvas.hidden = true;
+    }
     var side = look.logo * px * layout.icon.scale / 100;
     items.icon.style.width = side + "px";
     items.icon.style.height = side + "px";
     setItem(items.icon, layout.icon);
     var size = px * layout.text.scale / 100;
-    textEl.style.fontSize = look.text * size + "px";
+    var fontSize = background() === "theme" ? look.themeText : look.text;
+    textEl.style.fontSize = fontSize * size + "px";
     var plate = textEl.classList.contains("has-plate");
     textEl.style.padding = plate ? look.plateY * size + "px " + look.plateX * size + "px" : "0";
     textEl.style.borderRadius = plate ? look.plateRadius * size + "px" : "0";
@@ -307,6 +406,15 @@
   // everything is sized from the card box, which has no size while its tab is hidden, so the card is laid out again whenever that size changes
   new ResizeObserver(place).observe(screenEl);
   document.addEventListener("visibilitychange", startMotion);
+  motionCanvas.addEventListener("webglcontextlost", function (event) {
+    event.preventDefault();
+    drawMotion = null;
+    motionCanvas.hidden = true;
+  });
+  motionCanvas.addEventListener("webglcontextrestored", function () {
+    drawMotion = undefined;
+    startMotion();
+  });
   if (window.RKWindow) RKWindow.onChange(function (up) { if (up) startMotion(); });
 
   window.RKShareCardEditor = {

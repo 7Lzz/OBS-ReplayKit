@@ -1,6 +1,7 @@
 #include <winver.h>
 
 1 ICON "replaykit.ico"
+OBS_SWIRL_MASK RCDATA "share/obs-swirl-mask.png"
 
 VS_VERSION_INFO VERSIONINFO
 FILEVERSION REPLAYKIT_VERSION_COMMA

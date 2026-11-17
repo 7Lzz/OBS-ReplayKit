@@ -52,15 +52,15 @@ namespace ReplayKitHelper
             // same-origin splash the streamable sign-in popup navigates to (see the file for why); served through ServeHtml so it picks up the active theme + a real Content-Type instead of about:blank + document.write
             if (path == "/sign-in-loader") { HttpResponse.ServeHtml(stream, "sign-in-loader.html"); return false; }
 
-            // static .svg files under icons/ -- one subfolder deep max, no traversal. used by the dock CSS (mask/background) where window.RK_ICONS (js-only) does not reach.
-            var iconFile = Regex.Match(path, @"^/icons/([A-Za-z0-9_-]+/[A-Za-z0-9_-]+\.svg)$");
+            // static .svg and .png files under icons/ -- one subfolder deep max, no traversal. used by the dock CSS (mask/background) where window.RK_ICONS (js-only) does not reach, and by the share card editor for the swirl mask its shader samples.
+            var iconFile = Regex.Match(path, @"^/icons/([A-Za-z0-9_-]+/[A-Za-z0-9_-]+\.(svg|png))$");
             if (iconFile.Success)
             {
                 string full = Path.GetFullPath(Path.Combine(Constants.APP_ICONS_DIR, iconFile.Groups[1].Value));
                 string root = Path.GetFullPath(Constants.APP_ICONS_DIR) + Path.DirectorySeparatorChar;
                 if (full.StartsWith(root, StringComparison.OrdinalIgnoreCase) && File.Exists(full))
                 {
-                    var hi = HttpResponse.GetNoStoreHeaders(new Dictionary<string, string> { ["Content-Type"] = "image/svg+xml" });
+                    var hi = HttpResponse.GetNoStoreHeaders(new Dictionary<string, string> { ["Content-Type"] = iconFile.Groups[2].Value == "png" ? "image/png" : "image/svg+xml" });
                     HttpResponse.SendBytes(stream, 200, "OK", hi, File.ReadAllBytes(full));
                 }
                 else HttpResponse.SendJson(stream, 404, new JObject { ["ok"] = false });

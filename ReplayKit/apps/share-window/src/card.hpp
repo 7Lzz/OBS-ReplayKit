@@ -15,5 +15,7 @@ struct CardImage {
 
 // straight bgra pixels of a png no larger than 8k on a side, or false when the file is missing or is not one
 bool LoadCardImage(const std::wstring &path, CardImage &out);
+// the obs swirl mask the exe carries as a resource, decoded the same way; false when it is missing or no png
+bool LoadSwirlMask(CardImage &out);
 
 } // namespace rk::share

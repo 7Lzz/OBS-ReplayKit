@@ -6,7 +6,6 @@
 #include <cstdlib>
 #include <sstream>
 #include <string>
-#include <vector>
 
 #include "app.hpp"
 #include "log.hpp"
@@ -20,16 +19,11 @@ namespace {
 constexpr ULONGLONG kFrameStaleMs = 1000;
 // the card and a frozen frame are presented again this often, since discord gives up on a window that stops presenting
 constexpr ULONGLONG kRepresentMs = 33;
-// a card that moves or fades is presented about every refresh of a 60 hz screen instead, so the motion stays smooth
-constexpr ULONGLONG kAnimateMs = 16;
 // the card fades in over the frame it replaces while its picture rises into place, and fades out over the frame that comes back
 constexpr ULONGLONG kEnterMs = 500;
 constexpr ULONGLONG kLeaveMs = 350;
-// how far the picture rises as the card fades in, and how far and how slowly the picture of the theme card floats up and down after, in pixels of a 1080 pixel tall card
+// how far the picture rises during the reveal, in pixels of a 1080 pixel tall card
 constexpr float kRise = 24.0f;
-constexpr float kFloat = 14.0f;
-constexpr double kFloatSeconds = 5.0;
-constexpr double kTau = 6.283185307179586;
 // a hold never keeps the window past this, so an update that never brings obs back cannot leave it forever
 constexpr long long kMaxHoldSeconds = 1800;
 
@@ -80,14 +74,20 @@ bool ParseInt(const std::string &text, long long low, long long high, long long 
 	return true;
 }
 
-// how far a fade has come, fast at first and settling gently
-float EaseOut(ULONGLONG elapsed, ULONGLONG length)
+// milliseconds with their fraction, which the presents of a moving card are scheduled by
+double NowExactMs()
 {
-	float rest = 1.0f - std::min(1.0f, float(elapsed) / float(length));
-	return 1.0f - rest * rest * rest;
+	static const double frequency = [] {
+		LARGE_INTEGER value;
+		QueryPerformanceFrequency(&value);
+		return double(value.QuadPart);
+	}();
+	LARGE_INTEGER counter;
+	QueryPerformanceCounter(&counter);
+	return double(counter.QuadPart) * 1000.0 / frequency;
 }
 
-bool ParseFloat(const std::string &text, double low, double high, float &out)
+bool ParseDouble(const std::string &text, double low, double high, double &out)
 {
 	if (text.empty())
 		return false;
@@ -95,8 +95,15 @@ bool ParseFloat(const std::string &text, double low, double high, float &out)
 	double value = std::strtod(text.c_str(), &end);
 	if (!end || *end != '\0' || !std::isfinite(value) || value < low || value > high)
 		return false;
-	out = float(value);
+	out = value;
 	return true;
+}
+
+// how far a fade has come, fast at first and settling gently
+float EaseOut(ULONGLONG elapsed, ULONGLONG length)
+{
+	float rest = 1.0f - std::min(1.0f, float(elapsed) / float(length));
+	return 1.0f - rest * rest * rest;
 }
 
 // a colour as #rrggbb
@@ -137,31 +144,12 @@ bool ParseColorFloats(const std::string &text, float out[3])
 	return true;
 }
 
-// the words after BACKDROP: the ground and accent colours, shade, glow, rim, blur, drift, breathe and breathe seconds, the number of shade and of glow circles, then x, y, radius and period of each circle, shades first; false for anything else
+// the words after BACKDROP: the ground and the accent colour of the theme, and nothing else
 bool ParseBackdrop(const std::string &text, Backdrop &out)
 {
 	std::istringstream stream(text);
-	std::vector<std::string> words;
-	for (std::string word; stream >> word;)
-		words.push_back(word);
-	long long shades = 0, glows = 0;
-	if (words.size() < 11 || !ParseColorFloats(words[0], out.ground) || !ParseColorFloats(words[1], out.accent) || !ParseFloat(words[2], 0.0, 1.0, out.shade) ||
-	    !ParseFloat(words[3], 0.0, 1.0, out.glow) || !ParseFloat(words[4], 0.0, 10000.0, out.rim) || !ParseFloat(words[5], 0.0, 10000.0, out.blur) ||
-	    !ParseFloat(words[6], 0.0, 1.0, out.drift) || !ParseFloat(words[7], 0.0, 0.5, out.breathe) || !ParseFloat(words[8], 0.1, 3600.0, out.breatheSeconds) ||
-	    !ParseInt(words[9], 0, static_cast<long long>(kMaxBackdropCircles), shades) || !ParseInt(words[10], 0, static_cast<long long>(kMaxBackdropCircles), glows) ||
-	    shades + glows > static_cast<long long>(kMaxBackdropCircles) || words.size() != size_t(11 + 4 * (shades + glows)))
-		return false;
-	out.circles.clear();
-	for (long long i = 0; i < shades + glows; ++i) {
-		Backdrop::Circle circle;
-		const size_t at = size_t(11 + 4 * i);
-		if (!ParseFloat(words[at], -10.0, 10.0, circle.x) || !ParseFloat(words[at + 1], -10.0, 10.0, circle.y) || !ParseFloat(words[at + 2], 0.0001, 10.0, circle.radius) ||
-		    !ParseFloat(words[at + 3], -86400.0, 86400.0, circle.period) || std::fabs(circle.period) < 0.1f)
-			return false;
-		circle.glow = i >= shades;
-		out.circles.push_back(circle);
-	}
-	return true;
+	std::string ground, accent, extra;
+	return (stream >> ground >> accent) && !(stream >> extra) && ParseColorFloats(ground, out.ground) && ParseColorFloats(accent, out.accent);
 }
 
 // an absolute local path to an existing file, the only kind the helper hands over
@@ -199,12 +187,15 @@ int ShareApp::Run(const Options &options)
 	window.SetModalTick([this] { Step(false); });
 	mediaFoundation = CardVideo::Startup();
 
+	animateEveryMs = double(kRepresentMs);
+	wakeInMs = double(kRepresentMs);
+	// a one shot timer armed after every round for when the next present or check is due, high resolution so a moving card keeps the obs frame rate
 	HANDLE timer = CreateWaitableTimerExW(nullptr, nullptr, CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_ALL_ACCESS);
 	if (!timer)
 		timer = CreateWaitableTimerW(nullptr, FALSE, nullptr);
 	LARGE_INTEGER due{};
-	due.QuadPart = -LONGLONG(kAnimateMs) * 10000;
-	SetWaitableTimer(timer, &due, LONG(kAnimateMs), nullptr, nullptr, FALSE);
+	due.QuadPart = -LONGLONG(kRepresentMs) * 10000;
+	SetWaitableTimer(timer, &due, 0, nullptr, nullptr, FALSE);
 	Log("share window ready: hwnd %p, keep %lld s", static_cast<void *>(window.Handle()), keepSeconds);
 
 	awaySince = NowMs();
@@ -222,6 +213,8 @@ int ShareApp::Run(const Options &options)
 		if (window.CloseRequested() || !window.Handle())
 			quit = true;
 		Step(result == WAIT_OBJECT_0);
+		due.QuadPart = -std::max<LONGLONG>(1, LONGLONG(wakeInMs * 10000.0));
+		SetWaitableTimer(timer, &due, 0, nullptr, nullptr, FALSE);
 	}
 	Log("share window closing");
 	CancelWaitableTimer(timer);
@@ -237,6 +230,7 @@ int ShareApp::Run(const Options &options)
 
 void ShareApp::Step(bool frameSignal)
 {
+	wakeInMs = double(kRepresentMs);
 	pipe.Drain([this](const std::string &line) { return Execute(line); });
 	if (quit)
 		return;
@@ -337,25 +331,34 @@ void ShareApp::Tick(bool frameSignal)
 		return;
 	}
 
-	const bool entering = !live && now - cardShownAt < kEnterMs;
+	// live frames are presented as obs sends them, which also carries the card fading out; a card that fades in or moves is presented on its own schedule at the obs rate, and a still one every kRepresentMs
 	const bool leaving = live && now - liveSince < kLeaveMs;
-	const bool moving = !live && cardMode == CardMode::Theme;
-	if (!(live && newFrame) && now - lastPresentAt < (entering || leaving || moving ? kAnimateMs : kRepresentMs))
+	const bool moving = !live && (now - cardShownAt < kEnterMs || cardMode == CardMode::Theme);
+	const double exact = NowExactMs();
+	const bool due = live && newFrame ? true : moving ? exact >= nextAnimateAt : now - lastPresentAt >= kRepresentMs;
+	if (!due) {
+		wakeInMs = moving ? nextAnimateAt - exact : double(kRepresentMs - (now - lastPresentAt));
 		return;
+	}
 	if (!live)
 		ShowVideoFrame(now);
 	CardShow show;
-	show.seconds = double(now - cardShownAt) / 1000.0;
+	// the motion repeats every SHARE_MOTION_LOOP_SECONDS, so its clock wraps there and keeps full float precision on a card that shows for days; it reads the exact clock, so each frame moves by the same 16.67 ms at 60 fps rather than by 16 or 17 whole milliseconds
+	show.seconds = std::fmod((exact - double(cardShownAt)) / 1000.0, SHARE_MOTION_LOOP_SECONDS);
+	show.shineSeed = float(cardShownAt % 4096) / 4096.0f;
 	if (live) {
 		show.opacity = leaving ? 1.0f - EaseOut(now - liveSince, kLeaveMs) : 0.0f;
 	} else {
 		show.opacity = EaseOut(now - cardShownAt, kEnterMs);
 		show.lift = kRise * (1.0f - show.opacity);
 	}
-	if (cardMode == CardMode::Theme)
-		show.lift += kFloat * float(std::sin(kTau * std::fmod(show.seconds, kFloatSeconds) / kFloatSeconds));
 	HRESULT hr = live ? renderer.PresentFrame(show) : renderer.PresentCard(show);
 	lastPresentAt = now;
+	if (moving) {
+		// one frame of the obs rate on from the last one, so a rate like 59.94 neither drifts nor bunches up; a schedule more than a frame behind starts again from now
+		nextAnimateAt = exact - nextAnimateAt > animateEveryMs ? exact + animateEveryMs : nextAnimateAt + animateEveryMs;
+		wakeInMs = std::max(0.0, nextAnimateAt - NowExactMs());
+	}
 	if (Renderer::DeviceLost(hr)) {
 		Log("the graphics device was lost (0x%08lx)", hr);
 		rebuildAt = now;
@@ -457,6 +460,14 @@ std::string ShareApp::Execute(const std::string &line)
 		Log("card %ls (%s)", path.c_str(), mode.c_str());
 		return Ok();
 	}
+	if (verb == "FPS") {
+		// FPS <frames a second>, the rate obs records at, which a card that fades in or moves is presented at
+		double fps = 0.0;
+		if (!ParseDouble(rest, 1.0, 1000.0, fps))
+			return Fail("fps takes the frames a second obs records at, from 1 to 1000");
+		animateEveryMs = 1000.0 / fps;
+		return Ok();
+	}
 	if (verb == "BACKDROP") {
 		// BACKDROP none, or BACKDROP and the words ParseBackdrop reads: the moving ground of the theme card
 		if (rest == "none") {
@@ -540,13 +551,13 @@ std::string ShareApp::StateJson()
 		 "{\"ok\":true,\"state\":\"%s\",\"pid\":%lu,\"hwnd\":%llu,\"protocol\":%u,\"version\":\"%s\",\"generation\":%u,\"texture\":[%u,%u],"
 		 "\"adapterLuid\":\"%016llx\",\"producerPid\":%u,\"producerState\":%u,\"framesWritten\":%llu,\"framesReceived\":%llu,\"framesPresented\":%llu,"
 		 "\"cardsPresented\":%llu,\"presentsPerSecond\":%llu,\"awaySeconds\":%llu,\"holdSeconds\":%llu,\"keepSeconds\":%lld,\"card\":%s,\"cardOverLastFrame\":%s,"
-		 "\"video\":{\"open\":%s,\"fill\":%s,\"overVideo\":%s,\"decoded\":%llu,\"shown\":%llu},\"theme\":%s,\"backdrop\":%s,\"audio\":",
+		 "\"video\":{\"open\":%s,\"fill\":%s,\"overVideo\":%s,\"decoded\":%llu,\"shown\":%llu},\"theme\":%s,\"backdrop\":%s,\"swirl\":%s,\"fps\":%.3f,\"audio\":",
 		 live ? "live" : "card", GetCurrentProcessId(), static_cast<unsigned long long>(uintptr_t(window.Handle())), kShareWindowProtocolVersion, REPLAYKIT_VERSION,
 		 shared.Generation(), renderer.SharedWidth(), renderer.SharedHeight(), renderer.AdapterLuid(), state->producerPid.load(), state->producerState.load(),
 		 state->framesWritten.load(), framesReceived, framesPresented, cardsPresented, presentsPerSecond, awaySince ? (now - awaySince) / 1000 : 0ull,
 		 holdUntil > now ? (holdUntil - now) / 1000 : 0ull, keepSeconds, card.pixels.empty() ? "false" : "true", cardMode == CardMode::OverLastFrame ? "true" : "false",
 		 video.IsOpen() ? "true" : "false", videoFill ? "true" : "false", cardMode == CardMode::OverVideo ? "true" : "false", static_cast<unsigned long long>(video.FramesDecoded()),
-		 static_cast<unsigned long long>(videoFramesShown), cardMode == CardMode::Theme ? "true" : "false", renderer.HasBackdrop() ? "true" : "false");
+		 static_cast<unsigned long long>(videoFramesShown), cardMode == CardMode::Theme ? "true" : "false", renderer.HasBackdrop() ? "true" : "false", renderer.HasSwirl() ? "true" : "false", 1000.0 / animateEveryMs);
 	return std::string(text) + audio.StateJson() + "}";
 }
 

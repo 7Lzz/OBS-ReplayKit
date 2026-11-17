@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.Globalization;
@@ -26,27 +25,12 @@ namespace ReplayKitHelper
         private const int MaxVideoFps = 30;
         private static readonly object Gate = new object();
         private static string appliedSignature;
-        // how the card is drawn apart from the theme: the sizes at size 100 in pixels of a 1080 pixel tall card (the logo side, the text height, the plate a picked image puts behind the text), the weight of the text, how strong the outline logo shows, the colours of that plate (opacity 0 to 255) and of the text over an image or the last frame, and the moving ground of the theme card; the plugin draws the picture, the share window the ground, and the card editor of the settings page shows the same
+        // how the card is drawn apart from the theme: the sizes at size 100 in pixels of a 1080 pixel tall card (the logo side, the text height, the larger text height of the theme card, the plate a picked image puts behind the text), the weight of the text, how strong the outline logo shows, and the colours of that plate (opacity 0 to 255) and of the text over an image or the last frame; the plugin draws the card with them and the card editor of the settings page shows the same, while the moving ground of the theme card is the shader in ui/_share-motion.html
         private static readonly JObject Look = new JObject
         {
-            ["logo"] = 220, ["text"] = 120, ["textWeight"] = 700, ["logoOpacity"] = 0.85,
+            ["logo"] = 220, ["text"] = 120, ["themeText"] = 148, ["textWeight"] = 700, ["logoOpacity"] = 0.85,
             ["plateX"] = 56, ["plateY"] = 28, ["plateRadius"] = 24,
             ["plateColor"] = "#000000", ["plateOpacity"] = 150, ["lightText"] = "#f2f2f2",
-            // the ground of the theme card: circles a shade darker than the ground and circles off the corners whose rim glows in the accent colour, each as x and y in fractions of the card and a radius in fractions of its width; shade and glow are how far they go toward black and toward the accent, rim and blur the bright edge and the soft band inside it in pixels of a 1080 pixel tall card
-            ["backdrop"] = new JObject
-            {
-                ["shade"] = 0.3,
-                ["shades"] = new JArray { new JArray(0.37, 0.13, 0.165), new JArray(0.71, 0.72, 0.23) },
-                ["glow"] = 0.06,
-                ["rim"] = 3,
-                ["blur"] = 46,
-                ["glows"] = new JArray { new JArray(1.05, -0.5, 0.538), new JArray(0.09, 1.306, 0.392) },
-                // how it moves: every circle on an orbit of drift times the card width, one turn in the seconds of its period (shades first, then glows; a minus turns it the other way, and the circle index offsets where it starts), and the rim swinging breathe either side of half way to the accent over breatheSeconds
-                ["drift"] = 0.035,
-                ["periods"] = new JArray(-22, 18, 26, -20),
-                ["breathe"] = 0.3,
-                ["breatheSeconds"] = 5,
-            },
         };
 
         public static string ImagePath => StateLayout.PathFor(AppConfig.GetReplayKitRoot(), StateLayout.ShareCoverImageFile);
@@ -137,12 +121,15 @@ namespace ReplayKitHelper
                 };
                 string sound = SoundFor(settings, background);
                 string video = background == "video" ? VideoPath : null;
-                string backdrop = background == "theme" ? BackdropCommand(colors) : "BACKDROP none";
+                string backdrop = background == "theme" ? $"BACKDROP {colors["bg"]} {colors["accent"]}" : "BACKDROP none";
+                // a card that fades in or moves is presented no faster than obs records
+                double fps = (settings["fpsNumerator"]?.Value<double>() ?? 0) / (settings["fpsDenominator"]?.Value<double>() ?? 0);
+                string rate = "FPS " + fps.ToString("0.###", CultureInfo.InvariantCulture);
                 int volume = settings["share_cover_sound_volume"]?.Value<int>() ?? SettingDefaults.ShareCoverSoundVolume;
                 long obsWindow;
                 lock (Server.State.IpcLock) obsWindow = Server.State.ObsMainWindowHwnd;
                 // the plugin that draws the card only changes when obs starts again, so each obs start draws it once and a plugin update shows up on the card
-                string signature = request.ToString(Formatting.None) + "|" + backdrop + "|" + Stamp(request["image"].Value<string>()) + "|" + Stamp(video) + "|" + (sound ?? "") + "|" + Stamp(sound) + "|" + volume + "|" + state["pid"] + "|" + obsWindow;
+                string signature = request.ToString(Formatting.None) + "|" + backdrop + "|" + rate + "|" + Stamp(request["image"].Value<string>()) + "|" + Stamp(video) + "|" + (sound ?? "") + "|" + Stamp(sound) + "|" + volume + "|" + state["pid"] + "|" + obsWindow;
                 if (!force && signature == appliedSignature) return;
 
                 if (!PipeClient.RenderShareCardAndWait(request.ToString(Formatting.None), 8000))
@@ -153,37 +140,14 @@ namespace ReplayKitHelper
                 // the video goes first, so a card drawn to go over it never shows over the plain ground
                 var videoReply = ShareWindow.Send(video == null ? "VIDEO none" : "VIDEO " + request["fit"].Value<string>() + " " + video);
                 var backdropReply = ShareWindow.Send(backdrop);
+                var rateReply = ShareWindow.Send(rate);
                 var card = ShareWindow.Send("CARD " + (background == "theme" ? "theme " : background == "lastframe" ? "over " : background == "video" ? "video " : "full ") + CardPath);
                 var soundReply = ShareWindow.Send(sound == null ? "SOUND none" : "SOUND " + volume + " " + sound);
-                bool ok = videoReply["ok"]?.Value<bool>() == true && backdropReply["ok"]?.Value<bool>() == true && card["ok"]?.Value<bool>() == true && soundReply["ok"]?.Value<bool>() == true;
-                Log.Write("Share card " + width + "x" + height + " " + background + (sound == null ? " without sound" : " with " + Path.GetFileName(sound)) + (ok ? "" : ": " + (videoReply["message"] ?? backdropReply["message"] ?? card["message"] ?? soundReply["message"])));
+                bool ok = videoReply["ok"]?.Value<bool>() == true && backdropReply["ok"]?.Value<bool>() == true && rateReply["ok"]?.Value<bool>() == true && card["ok"]?.Value<bool>() == true && soundReply["ok"]?.Value<bool>() == true;
+                Log.Write("Share card " + width + "x" + height + " " + background + " at " + rate.Substring(4) + " fps" + (sound == null ? " without sound" : " with " + Path.GetFileName(sound)) + (ok ? "" : ": " + (videoReply["message"] ?? backdropReply["message"] ?? rateReply["message"] ?? card["message"] ?? soundReply["message"])));
                 if (ok) appliedSignature = signature;
             }
         }
-
-        // the BACKDROP line of the share window: the theme ground and accent, then the backdrop of the look with each circle and its period
-        private static string BackdropCommand(JObject colors)
-        {
-            var backdrop = (JObject)Look["backdrop"];
-            var shades = (JArray)backdrop["shades"];
-            var glows = (JArray)backdrop["glows"];
-            var periods = (JArray)backdrop["periods"];
-            var words = new List<string> { "BACKDROP", colors["bg"]?.Value<string>() ?? "", colors["accent"]?.Value<string>() ?? "" };
-            foreach (string name in new[] { "shade", "glow", "rim", "blur", "drift", "breathe", "breatheSeconds" }) words.Add(Number(backdrop[name]));
-            words.Add(shades.Count.ToString(CultureInfo.InvariantCulture));
-            words.Add(glows.Count.ToString(CultureInfo.InvariantCulture));
-            int index = 0;
-            foreach (JToken circle in shades.Concat(glows))
-            {
-                words.Add(Number(circle[0]));
-                words.Add(Number(circle[1]));
-                words.Add(Number(circle[2]));
-                words.Add(Number(periods[index++]));
-            }
-            return string.Join(" ", words);
-        }
-
-        private static string Number(JToken value) => value.Value<double>().ToString("R", CultureInfo.InvariantCulture);
 
         // the picked image, scaled down to 4k at most and saved as a png in user-data, so the card never reads a file the user moves or deletes later
         public static JObject ImportImage(string source)

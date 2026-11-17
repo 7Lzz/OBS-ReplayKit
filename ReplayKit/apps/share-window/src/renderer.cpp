@@ -1,14 +1,17 @@
 #include <windows.h>
 #include <d3d11.h>
-#include <d3dcompiler.h>
 #include <dxgi1_4.h>
 
 #include <algorithm>
 #include <cmath>
 #include <cstring>
 
+#include "card.hpp"
 #include "log.hpp"
 #include "renderer.hpp"
+#include "shader_PsGround.h"
+#include "shader_PsMain.h"
+#include "shader_VsMain.h"
 
 namespace rk::share {
 
@@ -22,58 +25,7 @@ constexpr float kDimmedBrightness = 0.35f;
 // the plain card while no card image was given
 constexpr float kPlainCard[3] = {0.094f, 0.094f, 0.106f};
 
-// the picture shader draws a texture; the ground shader draws the theme card ground the way the card editor draws it: the ground, the shade circles, then over them the glow circles from the inside colour thru the soft band to a rim and the accent at the edge, each edge one target pixel soft
-constexpr char kShader[] = R"(
-Texture2D image : register(t0);
-SamplerState linearSampler : register(s0);
-cbuffer DrawConstants : register(b0) { float brightness; float keepAlpha; float opacity; float unused; };
-cbuffer GroundConstants : register(b1)
-{
-	float4 ground;
-	float4 accent;
-	float4 mixes;
-	float4 band;
-	float4 origin;
-	float4 circles[8];
-};
-struct VsOut { float4 position : SV_Position; float2 uv : TEXCOORD0; };
-VsOut VsMain(uint id : SV_VertexID)
-{
-	VsOut result;
-	float2 uv = float2((id << 1) & 2, id & 2);
-	result.uv = uv;
-	result.position = float4(uv * float2(2, -2) + float2(-1, 1), 0, 1);
-	return result;
-}
-float4 PsMain(VsOut input) : SV_Target
-{
-	float4 color = image.Sample(linearSampler, input.uv);
-	return float4(color.rgb * brightness, (keepAlpha > 0.5 ? color.a : 1.0) * opacity);
-}
-float4 PsGround(VsOut input) : SV_Target
-{
-	float2 at = (input.position.xy - origin.xy) * band.z;
-	float3 color = ground.rgb;
-	float3 shade = lerp(ground.rgb, float3(0, 0, 0), mixes.x);
-	float3 inner = lerp(ground.rgb, accent.rgb, mixes.y);
-	float3 rim = lerp(inner, accent.rgb, mixes.z);
-	[loop] for (int i = 0; i < int(mixes.w); i++) {
-		float4 circle = circles[i];
-		float distanceIn = distance(at, circle.xy);
-		float cover = saturate((circle.z - distanceIn) / band.z + 0.5);
-		float3 fill = shade;
-		if (circle.w > 0.5) {
-			float t = distanceIn / circle.z;
-			float soft = max(0.0, 1.0 - band.y / circle.z);
-			float hard = max(soft, 1.0 - band.x / circle.z);
-			fill = t < soft ? inner : t < hard ? lerp(inner, rim, (t - soft) / max(hard - soft, 1e-5)) : lerp(rim, accent.rgb, saturate((t - hard) / max(1.0 - hard, 1e-5)));
-		}
-		color = lerp(color, fill, cover);
-	}
-	return float4(color, ground.a);
-}
-)";
-
+// the constant buffers of share.hlsl, whose shaders fxc compiled into the shader_*.h headers at build time
 struct DrawConstants {
 	float brightness;
 	float keepAlpha;
@@ -84,28 +36,45 @@ struct DrawConstants {
 struct GroundConstants {
 	float ground[4];
 	float accent[4];
-	// shade, glow, how far the rim goes toward the accent, and the number of circles
-	float mixes[4];
-	// rim and soft band in card pixels, then card pixels per target pixel
-	float band[4];
-	// the top left of the card in target pixels
-	float origin[4];
-	// x, y and radius in card pixels, then 1 for a glow and 0 for a shade
-	float circles[kMaxBackdropCircles][4];
+	// aspect of the card, seconds the motion has run, 1 for the moving ground, and the seed of the shines
+	float motion[4];
 };
 
-constexpr float kTau = 6.28318530718f;
-
-ComPtr<ID3DBlob> Compile(const char *entry, const char *profile)
+// the swirl mask is grey, so one channel of it is kept, a quarter of the memory of the bgra it decodes to
+bool MakeMaskView(ID3D11Device *device, const CardImage &image, ID3D11ShaderResourceView **view)
 {
-	ComPtr<ID3DBlob> code;
-	ComPtr<ID3DBlob> errors;
-	HRESULT hr = D3DCompile(kShader, sizeof(kShader) - 1, "share", nullptr, nullptr, entry, profile, D3DCOMPILE_OPTIMIZATION_LEVEL3, 0, &code, &errors);
-	if (FAILED(hr)) {
-		Log("could not compile the %s shader: 0x%08lx %s", entry, hr, errors ? static_cast<const char *>(errors->GetBufferPointer()) : "");
-		return nullptr;
-	}
-	return code;
+	std::vector<uint8_t> red(size_t(image.width) * image.height);
+	for (size_t i = 0; i < red.size(); ++i)
+		red[i] = image.pixels[i * 4 + 2];
+	D3D11_TEXTURE2D_DESC desc{};
+	desc.Width = image.width;
+	desc.Height = image.height;
+	desc.MipLevels = 1;
+	desc.ArraySize = 1;
+	desc.Format = DXGI_FORMAT_R8_UNORM;
+	desc.SampleDesc.Count = 1;
+	desc.Usage = D3D11_USAGE_IMMUTABLE;
+	desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+	D3D11_SUBRESOURCE_DATA data{red.data(), image.width, 0};
+	ComPtr<ID3D11Texture2D> texture;
+	return SUCCEEDED(device->CreateTexture2D(&desc, &data, &texture)) && SUCCEEDED(device->CreateShaderResourceView(texture.Get(), nullptr, view));
+}
+
+bool MakeImageView(ID3D11Device *device, const std::vector<uint8_t> &pixels, uint32_t width, uint32_t height, ID3D11ShaderResourceView **view)
+{
+	D3D11_TEXTURE2D_DESC desc{};
+	desc.Width = width;
+	desc.Height = height;
+	desc.MipLevels = 1;
+	desc.ArraySize = 1;
+	desc.Format = kViewFormat;
+	desc.SampleDesc.Count = 1;
+	desc.Usage = D3D11_USAGE_IMMUTABLE;
+	desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+	D3D11_SUBRESOURCE_DATA data{pixels.data(), width * 4, 0};
+	ComPtr<ID3D11Texture2D> texture;
+	return SUCCEEDED(device->CreateTexture2D(&desc, &data, &texture)) &&
+	       SUCCEEDED(device->CreateShaderResourceView(texture.Get(), nullptr, view));
 }
 
 // a picture of that size centred in the area: the whole of it with bars, or covering the area so its edges fall outside
@@ -197,6 +166,11 @@ void Renderer::Release()
 		context->Flush();
 	}
 	cardView.Reset();
+	swirlView.Reset();
+	groundView.Reset();
+	groundTarget.Reset();
+	groundTexture.Reset();
+	groundWidth = groundHeight = 0;
 	videoView.Reset();
 	video.Reset();
 	videoWidth = videoHeight = 0;
@@ -224,14 +198,9 @@ void Renderer::Release()
 
 bool Renderer::CreatePipeline()
 {
-	ComPtr<ID3DBlob> vs = Compile("VsMain", "vs_4_0");
-	ComPtr<ID3DBlob> ps = Compile("PsMain", "ps_4_0");
-	ComPtr<ID3DBlob> groundPs = Compile("PsGround", "ps_4_0");
-	if (!vs || !ps || !groundPs)
-		return false;
-	if (FAILED(device->CreateVertexShader(vs->GetBufferPointer(), vs->GetBufferSize(), nullptr, &vertexShader)) ||
-	    FAILED(device->CreatePixelShader(ps->GetBufferPointer(), ps->GetBufferSize(), nullptr, &pixelShader)) ||
-	    FAILED(device->CreatePixelShader(groundPs->GetBufferPointer(), groundPs->GetBufferSize(), nullptr, &groundShader))) {
+	if (FAILED(device->CreateVertexShader(kShaderVsMain, sizeof(kShaderVsMain), nullptr, &vertexShader)) ||
+	    FAILED(device->CreatePixelShader(kShaderPsMain, sizeof(kShaderPsMain), nullptr, &pixelShader)) ||
+	    FAILED(device->CreatePixelShader(kShaderPsGround, sizeof(kShaderPsGround), nullptr, &groundShader))) {
 		Log("could not create the shaders");
 		return false;
 	}
@@ -265,6 +234,12 @@ bool Renderer::CreatePipeline()
 	    FAILED(device->CreateRasterizerState(&rasterDesc, &clipOn))) {
 		Log("could not create the draw states");
 		return false;
+	}
+	// the swirl only decorates the theme ground, so without it that ground is drawn plain rather than the window refusing to show anything
+	CardImage swirl;
+	if (!LoadSwirlMask(swirl) || !MakeMaskView(device.Get(), swirl, &swirlView)) {
+		Log("could not load the bundled obs swirl mask, so the theme ground stays still");
+		swirlView.Reset();
 	}
 	return true;
 }
@@ -386,18 +361,7 @@ bool Renderer::SetCard(const std::vector<uint8_t> &pixels, uint32_t width, uint3
 	cardView.Reset();
 	if (!width || !height || pixels.size() != size_t(width) * height * 4)
 		return false;
-	D3D11_TEXTURE2D_DESC desc{};
-	desc.Width = width;
-	desc.Height = height;
-	desc.MipLevels = 1;
-	desc.ArraySize = 1;
-	desc.Format = kViewFormat;
-	desc.SampleDesc.Count = 1;
-	desc.Usage = D3D11_USAGE_IMMUTABLE;
-	desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-	D3D11_SUBRESOURCE_DATA data{pixels.data(), width * 4, 0};
-	ComPtr<ID3D11Texture2D> texture;
-	if (FAILED(device->CreateTexture2D(&desc, &data, &texture)) || FAILED(device->CreateShaderResourceView(texture.Get(), nullptr, &cardView))) {
+	if (!MakeImageView(device.Get(), pixels, width, height, &cardView)) {
 		Log("could not create the card texture %ux%u", width, height);
 		return false;
 	}
@@ -461,8 +425,6 @@ void Renderer::ClearVideo()
 void Renderer::SetBackdrop(const Backdrop &value)
 {
 	backdrop = value;
-	if (backdrop.circles.size() > kMaxBackdropCircles)
-		backdrop.circles.resize(kMaxBackdropCircles);
 	hasBackdrop = true;
 }
 
@@ -511,39 +473,62 @@ void Renderer::Draw(ID3D11ShaderResourceView *view, const D3D11_VIEWPORT &viewpo
 	context->PSSetShaderResources(0, 1, none);
 }
 
-// a plain ground in that colour, or the theme ground with its circles where they are after that many seconds
-void Renderer::DrawGround(const D3D11_VIEWPORT &viewport, const float rgb[3], float opacity, const Backdrop *moving, double seconds)
+// the texture the moving ground is drawn into at half the size of the card, made again only when that size changes
+bool Renderer::EnsureGroundTarget(uint32_t width, uint32_t height)
+{
+	if (groundTarget && groundWidth == width && groundHeight == height)
+		return true;
+	groundView.Reset();
+	groundTarget.Reset();
+	groundTexture.Reset();
+	groundWidth = groundHeight = 0;
+	D3D11_TEXTURE2D_DESC desc{};
+	desc.Width = width;
+	desc.Height = height;
+	desc.MipLevels = 1;
+	desc.ArraySize = 1;
+	desc.Format = kViewFormat;
+	desc.SampleDesc.Count = 1;
+	desc.Usage = D3D11_USAGE_DEFAULT;
+	desc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
+	if (FAILED(device->CreateTexture2D(&desc, nullptr, &groundTexture)) || FAILED(device->CreateRenderTargetView(groundTexture.Get(), nullptr, &groundTarget)) ||
+	    FAILED(device->CreateShaderResourceView(groundTexture.Get(), nullptr, &groundView))) {
+		Log("could not create the %ux%u texture of the moving ground", width, height);
+		groundView.Reset();
+		groundTarget.Reset();
+		groundTexture.Reset();
+		return false;
+	}
+	groundWidth = width;
+	groundHeight = height;
+	return true;
+}
+
+// a plain ground in that colour, or the theme animation
+void Renderer::DrawGround(const D3D11_VIEWPORT &viewport, const float rgb[3], const CardShow &show, const Backdrop *moving)
 {
 	GroundConstants values{};
 	values.ground[0] = rgb[0];
 	values.ground[1] = rgb[1];
 	values.ground[2] = rgb[2];
-	values.ground[3] = opacity;
-	values.band[2] = 1.0f;
-	if (moving && cardWidth && cardHeight && viewport.Width > 0.0f) {
-		const float width = float(cardWidth), height = float(cardHeight), unit = height / 1080.0f;
+	values.ground[3] = show.opacity;
+	// the moving ground is soft but for its thin rims, so it is drawn at half the size of the card and scaled up into it, a quarter of the pixels of its costly shader; it is drawn opaque there, and its opacity applies where it is scaled up
+	D3D11_VIEWPORT area = viewport;
+	const bool half = moving && swirlView && viewport.Width > 0.0f && viewport.Height > 0.0f &&
+			  EnsureGroundTarget(uint32_t(std::ceil(viewport.Width / 2.0f)), uint32_t(std::ceil(viewport.Height / 2.0f)));
+	if (half) {
 		std::copy(moving->accent, moving->accent + 3, values.accent);
-		values.mixes[0] = moving->shade;
-		values.mixes[1] = moving->glow;
-		values.mixes[2] = 0.5f + moving->breathe * std::sin(kTau * float(std::fmod(seconds, double(moving->breatheSeconds))) / moving->breatheSeconds);
-		values.mixes[3] = float(moving->circles.size());
-		values.band[0] = moving->rim * unit;
-		values.band[1] = moving->blur * unit;
-		values.band[2] = width / viewport.Width;
-		values.origin[0] = viewport.TopLeftX;
-		values.origin[1] = viewport.TopLeftY;
-		for (size_t i = 0; i < moving->circles.size(); ++i) {
-			const Backdrop::Circle &circle = moving->circles[i];
-			const double period = std::fabs(double(circle.period));
-			const float turn = (circle.period < 0.0f ? -1.0f : 1.0f) * kTau * float(std::fmod(seconds, period) / period) + float(i);
-			values.circles[i][0] = circle.x * width + moving->drift * width * std::cos(turn);
-			values.circles[i][1] = circle.y * height + moving->drift * width * std::sin(turn);
-			values.circles[i][2] = circle.radius * width;
-			values.circles[i][3] = circle.glow ? 1.0f : 0.0f;
-		}
+		values.ground[3] = 1.0f;
+		values.motion[0] = viewport.Width / viewport.Height;
+		values.motion[1] = float(show.seconds);
+		values.motion[2] = 1.0f;
+		values.motion[3] = show.shineSeed;
+		area = D3D11_VIEWPORT{0.0f, 0.0f, float(groundWidth), float(groundHeight), 0.0f, 1.0f};
+		ID3D11RenderTargetView *targets[] = {groundTarget.Get()};
+		context->OMSetRenderTargets(1, targets, nullptr);
 	}
 	context->UpdateSubresource(groundConstants.Get(), 0, nullptr, &values, 0, 0);
-	context->RSSetViewports(1, &viewport);
+	context->RSSetViewports(1, &area);
 	context->RSSetState(nullptr);
 	ID3D11Buffer *buffers[] = {groundConstants.Get()};
 	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -551,9 +536,18 @@ void Renderer::DrawGround(const D3D11_VIEWPORT &viewport, const float rgb[3], fl
 	context->VSSetShader(vertexShader.Get(), nullptr, 0);
 	context->PSSetShader(groundShader.Get(), nullptr, 0);
 	context->PSSetConstantBuffers(1, 1, buffers);
+	ID3D11SamplerState *samplers[] = {sampler.Get()};
+	ID3D11ShaderResourceView *views[] = {swirlView.Get()};
+	context->PSSetSamplers(0, 1, samplers);
+	context->PSSetShaderResources(1, 1, views);
 	const float factor[4] = {0.0f, 0.0f, 0.0f, 0.0f};
-	context->OMSetBlendState(opacity < 1.0f ? blendOn.Get() : nullptr, factor, 0xffffffffu);
+	context->OMSetBlendState(!half && show.opacity < 1.0f ? blendOn.Get() : nullptr, factor, 0xffffffffu);
 	context->Draw(3, 0);
+	if (!half)
+		return;
+	ID3D11RenderTargetView *targets[] = {target.Get()};
+	context->OMSetRenderTargets(1, targets, nullptr);
+	Draw(groundView.Get(), viewport, 1.0f, false, show.opacity);
 }
 
 // the card and what it is drawn over, at its opacity; its picture moves by the lift, and an image card stays put since its picture is the whole card
@@ -561,7 +555,7 @@ void Renderer::DrawCard(const CardShow &show)
 {
 	const float opacity = show.opacity;
 	if (!cardView) {
-		DrawGround(Whole(), kPlainCard, opacity, nullptr, 0.0);
+		DrawGround(Whole(), kPlainCard, show);
 		return;
 	}
 	const D3D11_VIEWPORT card = Place(cardWidth, cardHeight, Whole(), false);
@@ -569,14 +563,14 @@ void Renderer::DrawCard(const CardShow &show)
 	lifted.TopLeftY += show.lift * card.Height / 1080.0f;
 	switch (cardMode) {
 	case CardMode::Theme:
-		DrawGround(card, hasBackdrop ? backdrop.ground : kPlainCard, opacity, hasBackdrop ? &backdrop : nullptr, show.seconds);
+		DrawGround(card, hasBackdrop ? backdrop.ground : kPlainCard, show, hasBackdrop ? &backdrop : nullptr);
 		Draw(cardView.Get(), lifted, 1.0f, true, opacity);
 		break;
 	case CardMode::OverLastFrame:
 		if (hasFrame)
 			Draw(frameView.Get(), Place(sharedWidth, sharedHeight, Whole(), false), kDimmedBrightness, false, opacity);
 		else
-			DrawGround(Whole(), kPlainCard, opacity, nullptr, 0.0);
+			DrawGround(Whole(), kPlainCard, show);
 		Draw(cardView.Get(), lifted, 1.0f, true, opacity);
 		break;
 	case CardMode::OverVideo:
@@ -584,7 +578,7 @@ void Renderer::DrawCard(const CardShow &show)
 			const D3D11_RECT area{LONG(std::floor(card.TopLeftX)), LONG(std::floor(card.TopLeftY)), LONG(std::ceil(card.TopLeftX + card.Width)), LONG(std::ceil(card.TopLeftY + card.Height))};
 			Draw(videoView.Get(), Place(videoWidth, videoHeight, card, videoFill), 1.0f, false, opacity, &area);
 		} else {
-			DrawGround(Whole(), kPlainCard, opacity, nullptr, 0.0);
+			DrawGround(Whole(), kPlainCard, show);
 		}
 		Draw(cardView.Get(), lifted, 1.0f, true, opacity);
 		break;

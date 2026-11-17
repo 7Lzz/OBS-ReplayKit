@@ -64,6 +64,11 @@ private:
 	// when the card last came up and when live frames last came back, which the fades and the motion of the card count from
 	ULONGLONG cardShownAt = 0;
 	ULONGLONG liveSince = 0;
+	// a moving card is presented once a frame of the rate obs records at, which the helper sends with FPS; Run starts it at the rate a still card is presented at
+	double animateEveryMs = 0.0;
+	double nextAnimateAt = 0.0;
+	// when the loop next needs to run, which the one shot timer is armed for after every round
+	double wakeInMs = 0.0;
 	ULONGLONG awaySince = 0;
 	ULONGLONG holdUntil = 0;
 	ULONGLONG showCardUntil = 0;

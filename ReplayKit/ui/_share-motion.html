@@ -1,0 +1,88 @@
+<!-- shared partial (helper #include target: share-motion). the moving ground of the theme card as one shader body, which the share window compiles as hlsl (cmake reads this file and fxc builds it) and the card editor as glsl, so both draw the same motion; the attributes are its timing (one turn of the swirl, the slot each corner shine falls in, and the loop both repeat in, which the clocks wrap at so they keep full precision on a card that shows for days) and the distance in mask units from black to white of resources/icons/share/obs-swirl-mask.png, which tools/share-swirl/make_mask.py makes the mask with. the host defines SwirlTurnSeconds, ShineInterval, SwirlLoopSeconds and SwirlMaskRange from them, float2 float3 frac and lerp, and SampleSwirl(at), the value of the mask at that point. -->
+<script type="x-shader/x-fragment" id="sceMotionShader" data-turn-seconds="60" data-shine-seconds="9" data-loop-seconds="180" data-mask-range="0.15">
+float Light(float2 uv, float2 position)
+{
+    return 1.0 - smoothstep(0.04, 0.57, length((uv - position) * float2(1.0, 1.22)));
+}
+
+float ShineRandom(float seed)
+{
+    float n = frac(seed * 0.1031);
+    n *= n + 33.33;
+    return frac(n * (n + n));
+}
+
+float2 CornerShine(float2 uv, float2 from, float2 across, float seconds, float seed)
+{
+    float slot = floor(seconds / ShineInterval);
+    // the bottom corner runs half a slot ahead, so its slots straddle the loop where the clock wraps; counting them round the loop gives the slot before the wrap and the one after it the same shine, so the wrap never swaps a shine halfway
+    float lap = SwirlLoopSeconds / ShineInterval;
+    float key = (slot - floor(slot / lap) * lap) * 13.735 + seed;
+    float elapsed = seconds - slot * ShineInterval - lerp(0.7, 5.1, ShineRandom(key));
+    float duration = lerp(1.1, 2.6, ShineRandom(key + 1.7));
+    float progress = clamp(elapsed / duration, 0.0, 1.0);
+    float envelope = smoothstep(0.0, 0.30, progress) * (1.0 - smoothstep(0.48, 1.0, progress));
+    float direction = lerp(-1.0, 1.0, step(0.5, ShineRandom(key + 4.3)));
+    float location = lerp(0.18, 0.82, ShineRandom(key + 9.2)) + direction * 0.40 * (progress - 0.5);
+    float radius = lerp(0.105, 0.26, ShineRandom(key + 7.6));
+    float focus = 1.0 - smoothstep(0.0, radius, length(uv - (from + across * location)));
+    float strength = lerp(0.51, 1.0, ShineRandom(key + 2.5));
+    return float2(envelope * focus * strength, ShineRandom(key + 6.1));
+}
+
+float3 ShareMotion(float2 uv, float aspect, float seconds, float seed, float3 ground, float3 accent)
+{
+    const float zoom = 3.48;
+    float phase = 6.2831853 * frac(seconds / SwirlTurnSeconds);
+    float angle = phase + 0.24;
+    float2 frame = float2(aspect, 1.0) / min(aspect, 1.0);
+    float2 p = (uv - 0.5) * frame;
+    float2 turn = float2(cos(angle), sin(angle));
+    float2 mask = float2(dot(p, turn), dot(p, float2(-turn.y, turn.x))) / zoom + 0.5;
+    // the grey midpoint of the mask marks the edge of the obs swirl
+    float distanceToEdge = (SampleSwirl(mask) - 0.5) * (SwirlMaskRange * zoom);
+    float material = smoothstep(-0.006, 0.006, distanceToEdge + 0.041);
+
+    float dark = 1.0 - smoothstep(0.32, 0.77, dot(ground, float3(0.2126, 0.7152, 0.0722)));
+    float3 ambient = lerp(ground, float3(0.0, 0.0, 0.0), 0.22 * dark);
+    float wash = Light(uv, float2(0.72, 0.24)) * 0.085 + Light(uv, float2(0.15, 0.76)) * 0.074;
+    float3 base = lerp(ambient, accent, wash);
+    base = lerp(base, ground * lerp(0.87, 0.46, dark), material * 0.89);
+
+    // two close foreground surfaces frame the oversized watermark
+    float2 lens = (uv - 0.5) * float2(1.78, 1.0);
+    float sweepTop = length(lens - float2(1.295, -1.236)) - 1.28;
+    float sweepBottom = length(lens - float2(-1.217, 1.388)) - 1.302;
+    float boundary = min(sweepTop, sweepBottom);
+    float edge = abs(boundary);
+    float pixel = max(0.0008, fwidth(boundary));
+    float surface = 1.0 - smoothstep(-pixel, pixel, boundary);
+    float2 reflection = turn * float2(0.18, 0.22);
+    float topLight = Light(uv, float2(0.82, 0.27) + reflection);
+    float bottomLight = Light(uv, float2(0.16, 0.83) - reflection);
+    float light = max(topLight, bottomLight);
+    float3 cool = lerp(accent, accent.gbr, 0.18);
+    float3 warm = lerp(accent, accent.brg, 0.30);
+    float3 tint = lerp(warm, cool, topLight / max(0.001, topLight + bottomLight));
+    float3 panel = lerp(ambient, accent, 0.15);
+    panel = lerp(panel, tint, 0.13 * light);
+    // the corner surfaces cover the ground at this opacity, so the turning swirl shows faintly through them
+    const float panelOpacity = 0.8;
+    base = lerp(base, panel, surface * panelOpacity);
+    float spill = (1.0 - smoothstep(0.0, 0.115, edge)) * 0.35;
+    float rim = 1.0 - smoothstep(pixel * 0.5, pixel * 2.0 + 0.001, edge);
+    float3 color = lerp(base, tint, light * spill);
+    float3 glint = lerp(tint, float3(1.0, 1.0, 1.0), dark * 0.34);
+    float glintLevel = rim * light * lerp(0.51, 0.92, dark);
+    color = lerp(color, glint, glintLevel);
+
+    // the shine clock keeps running across turns and gives each showing its own pattern; the corner is picked first, since a ?: of two calls runs both of them
+    bool top = sweepTop < sweepBottom;
+    float2 shine = CornerShine(uv, top ? float2(0.65, 0.02) : float2(0.02, 0.64), top ? float2(0.34, 0.44) : float2(0.32, 0.35),
+        top ? seconds : seconds + ShineInterval * 0.5, seed * 117.0 + (top ? 0.0 : 52.6));
+    float3 shineTint = lerp(cool, warm, shine.y);
+    shineTint = lerp(shineTint, float3(1.0, 1.0, 1.0), dark * 0.58);
+    float shineLevel = shine.x * (0.70 * rim + spill * 0.65);
+    return clamp(lerp(color, shineTint, shineLevel), 0.0, 1.0);
+}
+</script>

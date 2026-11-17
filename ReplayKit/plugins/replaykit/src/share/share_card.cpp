@@ -51,6 +51,7 @@ bool ReadPlacement(const QJsonObject &layout, const char *name, Placement &out)
 struct Look {
 	qreal logo = 0.0;
 	qreal text = 0.0;
+	qreal themeText = 0.0;
 	qreal textWeight = 0.0;
 	qreal plateX = 0.0;
 	qreal plateY = 0.0;
@@ -76,7 +77,8 @@ bool ReadLook(const QJsonObject &given, Look &out)
 	if (!ReadNumber(given, "logo", 1.0, kHuge, out.logo) || !ReadNumber(given, "text", 1.0, kHuge, out.text) ||
 	    !ReadNumber(given, "textWeight", 100.0, 900.0, out.textWeight) || !ReadNumber(given, "logoOpacity", 0.0, 1.0, out.logoOpacity) ||
 	    !ReadNumber(given, "plateX", 0.0, kHuge, out.plateX) || !ReadNumber(given, "plateY", 0.0, kHuge, out.plateY) ||
-	    !ReadNumber(given, "plateRadius", 0.0, kHuge, out.plateRadius) || !ReadNumber(given, "plateOpacity", 0.0, 255.0, opacity))
+	    !ReadNumber(given, "plateRadius", 0.0, kHuge, out.plateRadius) || !ReadNumber(given, "plateOpacity", 0.0, 255.0, opacity) ||
+	    !ReadNumber(given, "themeText", 1.0, kHuge, out.themeText))
 		return false;
 	out.plate = QColor(given.value(QStringLiteral("plateColor")).toString());
 	out.lightText = QColor(given.value(QStringLiteral("lightText")).toString());
@@ -194,7 +196,8 @@ bool RenderShareCard(const std::string &json)
 	if (!text.isEmpty()) {
 		const qreal size = textAt.scale / 100.0;
 		QFont font(UiFontFamily());
-		font.setPixelSize(qMax(8, qRound(look.text * unit * size)));
+		const qreal textSize = background == QStringLiteral("theme") ? look.themeText : look.text;
+		font.setPixelSize(qMax(8, qRound(textSize * unit * size)));
 		font.setWeight(QFont::Weight(qRound(look.textWeight)));
 		const QFontMetricsF metrics(font);
 		const qreal textWidth = metrics.horizontalAdvance(text);

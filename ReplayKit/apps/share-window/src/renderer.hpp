@@ -16,34 +16,18 @@ using Microsoft::WRL::ComPtr;
 // what the card is drawn over: the moving ground of the theme card, nothing since it is a picture with its own ground, the last frame dimmed, or the card video
 enum class CardMode { Theme, Full, OverLastFrame, OverVideo };
 
-constexpr size_t kMaxBackdropCircles = 8;
-
-// the moving ground of the theme card as the helper describes it: the theme ground and accent, how far the shade circles go toward black and the glow circles toward the accent, the rim and soft band of the glows in pixels of a 1080 pixel tall card, the orbit radius of every circle in fractions of the card width, how far the rim swings around half way to the accent and the seconds of one swing, and each circle (shades first) with the seconds of one turn of its orbit, the sign its direction
+// the colours of the moving theme ground, which the helper sends from the active theme
 struct Backdrop {
-	struct Circle {
-		float x = 0.0f;
-		float y = 0.0f;
-		float radius = 0.0f;
-		float period = 1.0f;
-		bool glow = false;
-	};
 	float ground[3] = {};
 	float accent[3] = {};
-	float shade = 0.0f;
-	float glow = 0.0f;
-	float rim = 0.0f;
-	float blur = 0.0f;
-	float drift = 0.0f;
-	float breathe = 0.0f;
-	float breatheSeconds = 1.0f;
-	std::vector<Circle> circles;
 };
 
-// how the card shows at one present: how much of it covers the frame under it while it fades in or out, how far its picture sits below its place in pixels of a 1080 pixel tall card, and how many seconds the theme ground has moved for
+// how the card shows at one present: how much of it covers the frame under it while it fades in or out, how far its picture sits below its place in pixels of a 1080 pixel tall card, how many seconds the theme ground has moved for, and the seed that gives each showing its own shines
 struct CardShow {
 	float opacity = 1.0f;
 	float lift = 0.0f;
 	double seconds = 0.0;
+	float shineSeed = 0.0f;
 };
 
 class Renderer {
@@ -77,6 +61,8 @@ public:
 	void SetBackdrop(const Backdrop &value);
 	void ClearBackdrop() { hasBackdrop = false; }
 	bool HasBackdrop() const { return hasBackdrop; }
+	// false when the swirl mask could not be loaded and the theme ground is drawn still
+	bool HasSwirl() const { return swirlView != nullptr; }
 
 	// the live frame, with the card over it while it fades out
 	HRESULT PresentFrame(const CardShow &card);
@@ -90,7 +76,8 @@ private:
 	void BeginFrame();
 	D3D11_VIEWPORT Whole() const;
 	void Draw(ID3D11ShaderResourceView *view, const D3D11_VIEWPORT &viewport, float brightness, bool keepAlpha, float opacity, const D3D11_RECT *clip = nullptr);
-	void DrawGround(const D3D11_VIEWPORT &viewport, const float rgb[3], float opacity, const Backdrop *moving, double seconds);
+	bool EnsureGroundTarget(uint32_t width, uint32_t height);
+	void DrawGround(const D3D11_VIEWPORT &viewport, const float rgb[3], const CardShow &show, const Backdrop *moving = nullptr);
 	void DrawCard(const CardShow &show);
 	HRESULT Present();
 
@@ -122,6 +109,12 @@ private:
 	ComPtr<ID3D11ShaderResourceView> frameView;
 	bool hasFrame = false;
 
+	ComPtr<ID3D11ShaderResourceView> swirlView;
+	ComPtr<ID3D11Texture2D> groundTexture;
+	ComPtr<ID3D11RenderTargetView> groundTarget;
+	ComPtr<ID3D11ShaderResourceView> groundView;
+	uint32_t groundWidth = 0;
+	uint32_t groundHeight = 0;
 	ComPtr<ID3D11ShaderResourceView> cardView;
 	uint32_t cardWidth = 0;
 	uint32_t cardHeight = 0;

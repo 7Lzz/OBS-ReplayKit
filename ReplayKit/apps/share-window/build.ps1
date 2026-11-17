@@ -12,12 +12,16 @@ $ProgressPreference = 'SilentlyContinue'
 if (-not $OutDir) { $OutDir = Join-Path $PSScriptRoot '..\..\dist\share-window' }
 $outExe = Join-Path $OutDir 'ReplayKitShare.exe'
 $iconDir = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\resources\icons'))
+$motion = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\ui\_share-motion.html'))
+$swirl = Join-Path $iconDir 'share\obs-swirl-mask.png'
 $versionFile = Join-Path $PSScriptRoot '..\..\version.json'
 $version = (Get-Content -LiteralPath $versionFile -Raw | ConvertFrom-Json).version
 if ($version -notmatch '^\d+(\.\d+){0,3}$') { throw "Unexpected ReplayKit version: '$version'" }
 
 # the version is stamped when the window is built but is no input, since an update ends a running window whose exe changed and a release that leaves the window alone should keep the stream
 $inputs = @(Get-ChildItem -LiteralPath $PSScriptRoot -Recurse -File | ForEach-Object { $_.FullName }) + @(
+    $motion,
+    $swirl,
     (Join-Path $iconDir 'replaykit.ico'),
     (Join-Path $PSScriptRoot '..\..\scripts\obs_versions.ps1')
 )
@@ -33,7 +37,7 @@ Remove-WorkDirectory $WorkDir $buildDir
 New-Item -ItemType Directory -Force -Path $buildDir | Out-Null
 Push-Location $buildDir
 try {
-    cmake -G Ninja "-DCMAKE_BUILD_TYPE=Release" "-DREPLAYKIT_VERSION=$version" "-DREPLAYKIT_ICON_DIR=$iconDir" "$PSScriptRoot"
+    cmake -G Ninja "-DCMAKE_BUILD_TYPE=Release" "-DREPLAYKIT_VERSION=$version" "-DREPLAYKIT_ICON_DIR=$iconDir" "-DREPLAYKIT_SHARE_MOTION=$motion" "$PSScriptRoot"
     if ($LASTEXITCODE -ne 0) { throw "share window cmake configure failed" }
     cmake --build . --config Release
     if ($LASTEXITCODE -ne 0) { throw "share window build failed" }
