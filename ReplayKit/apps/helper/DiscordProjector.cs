@@ -284,6 +284,7 @@ namespace ReplayKitHelper
                 Log.Write("warn: " + message);
                 return new OpenProjectorResult { Ok = false, Message = message };
             }
+            ShareWindow.ApplyTheme(settings);
             return new OpenProjectorResult { Ok = true, Hwnd = info.Hwnd, Opened = info.Started };
         }
 

@@ -27,6 +27,8 @@ public:
 	int Run(const Options &options);
 
 private:
+	// one round of the app after the messages: commands, a resize, then a frame or the card; the window runs it too while windows holds it in a move or its menu
+	void Step(bool frameSignal);
 	void Tick(bool frameSignal);
 	bool RebuildRenderer(uint64_t luid);
 	bool EnsureSharedTexture();

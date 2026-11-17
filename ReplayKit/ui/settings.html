@@ -621,6 +621,7 @@
 <!--#include scrollbar-->
 <!--#include interaction-states-->
 <!--#include transform-readout-->
+<!--#include shortcut-key-->
 <!--#include switch-->
 <!--#include combo-->
 <!--#include slider-->
@@ -2766,6 +2767,8 @@
       if (window.RKOverlayPreview) {
         if (positionChanged) RKOverlayPreview.restorePosition();
         else RKOverlayPreview.refresh();
+        // a step back to the place obs already holds has no save to wait for, so the preview follows obs again at once
+        if (positionChanged && !saveInFlight && sameSetting(state.overlayPosition, originalState.overlayPosition) && state.overlayStyle === originalState.overlayStyle) RKOverlayPreview.positionApplied();
       }
       markDirty();
       settingsHistory.current = settingsSnapshot();
@@ -3897,11 +3900,13 @@
 
   window.addEventListener("keydown", (e) => {
     if (!(e.ctrlKey || e.metaKey) || e.altKey || e.defaultPrevented || activeHotkeyField || hotkeyCaptureActive) return;
-    const k = (e.key || "").toLowerCase();
+    const k = RKShortcutKey(e);
     if (k !== "z" && k !== "y") return;
     if ((e.target instanceof Element && e.target.closest('input:not([type="range"]):not([type="checkbox"]):not([type="radio"]), textarea, [contenteditable="true"], .hotkey-input')) || document.querySelector('.modal-backdrop.is-visible, #cpick:not([hidden])')) return;
     e.preventDefault();
     e.stopImmediatePropagation();
+    // a drag or a held slider would go on writing over the step that was just brought back, so undo waits for the button to come up
+    if (historyGesture) return;
     restoreSettingsHistory(k === "y" || e.shiftKey);
   }, true);
 

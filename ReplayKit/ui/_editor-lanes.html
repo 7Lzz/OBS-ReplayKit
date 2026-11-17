@@ -4866,6 +4866,13 @@
       return tag === "TEXTAREA" || tag === "SELECT" || target.isContentEditable;
     }
 
+    // whether a mouse button is down anywhere on the page, which is when a drag may be going on
+    var buttonHeld = false;
+    window.addEventListener("pointerdown", function () { buttonHeld = true; }, { capture: true, signal: EDITOR_SIGNAL });
+    ["pointerup", "pointercancel", "blur"].forEach(function (name) {
+      window.addEventListener(name, function () { buttonHeld = false; }, { capture: true, signal: EDITOR_SIGNAL });
+    });
+
     // anything a key already does by itself
     function interactive(target) {
       return !!target && !!target.tagName && (target.tagName === "BUTTON" || target.tagName === "INPUT" || target.tagName === "SELECT" || target.tagName === "TEXTAREA" || target.isContentEditable);
@@ -4882,7 +4889,9 @@
       }
       if (typing(e.target)) return;
       var ctrl = e.ctrlKey || e.metaKey;
-      var key = e.key.toLowerCase();
+      var key = RKShortcutKey(e);
+      // a drag in progress would go on writing over the step that was just brought back, so undo and redo wait for the button to come up
+      if (ctrl && (key === "z" || key === "y") && buttonHeld) { e.preventDefault(); return; }
       if (ctrl && key === "z") { e.preventDefault(); if (e.shiftKey) redo(); else undo(); return; }
       if (ctrl && key === "y") { e.preventDefault(); redo(); return; }
       if (ctrl && key === "c" && st.ready) { e.preventDefault(); doCopy(); return; }

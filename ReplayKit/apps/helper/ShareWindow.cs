@@ -242,6 +242,14 @@ namespace ReplayKitHelper
             return running.Count > 0;
         }
 
+        // the title bar the window has while it is shown for a look (Show Projector) follows the theme of the app
+        public static void ApplyTheme(JObject settings)
+        {
+            var theme = Themes.Resolve(settings);
+            var reply = Send("THEME " + theme.BarColor + " " + theme.Text + " " + (theme.Dark ? "1" : "0"));
+            if (reply["ok"]?.Value<bool>() != true) Log.Write("Share window title bar colours not taken: " + reply["message"]?.Value<string>());
+        }
+
         // tells the window obs is about to close for a restart or an update and comes back, so it keeps its card whatever the keep time says
         public static void HoldForObsReturn(int seconds, string reason)
         {

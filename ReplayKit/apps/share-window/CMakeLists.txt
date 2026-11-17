@@ -48,4 +48,4 @@ set_source_files_properties(share-window.rc PROPERTIES INCLUDE_DIRECTORIES "${RE
 # the same sources make the same exe (no link time stamp, the pdb named without its folder), since an update ends a running window whose exe changed
 target_compile_options(ReplayKitShare PRIVATE $<$<COMPILE_LANGUAGE:CXX>:/W4 /permissive- /utf-8 /EHsc /Zi /Brepro>)
 target_link_options(ReplayKitShare PRIVATE /DEBUG /OPT:REF /OPT:ICF /Brepro /PDBALTPATH:%_PDB%)
-target_link_libraries(ReplayKitShare PRIVATE d3d11 dxgi d3dcompiler windowscodecs ole32 advapi32 user32 avrt winmm)
+target_link_libraries(ReplayKitShare PRIVATE d3d11 dxgi d3dcompiler windowscodecs ole32 advapi32 user32 avrt winmm dwmapi)

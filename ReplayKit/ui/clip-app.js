@@ -4774,13 +4774,14 @@ const CLIP_HOVER_PROFILES = {
       if (icon) icon.innerHTML = showCopy ? COPY_ICON : ICON.LINK;
     }
 
-    const addMetaStatus = (text, expiring) => {
+    // a status that can run long carries itself as a tooltip for when the card cuts it off; the short time left of a link does not need one
+    const addMetaStatus = (text, expiring, tooltip = true) => {
       const dot = document.createElement("span");
       dot.className = "dot link-status-dot";
       const span = document.createElement("span");
       span.className = "link-status" + (expiring ? " is-expiring" : "");
       span.textContent = text;
-      span.title = text;
+      if (tooltip) span.title = text;
       meta.appendChild(dot);
       meta.appendChild(span);
     };
@@ -4840,7 +4841,7 @@ const CLIP_HOVER_PROFILES = {
           const retSec = (clip.retention_days || 2) * 86400;
           const remaining = retSec - (Math.floor(Date.now() / 1000) - clip.uploaded_at);
           const threshold = retSec > 7 * 86400 ? 24 * 3600 : 6 * 3600;
-          addMetaStatus(RK_M("clips.linkTimeLeft", { time: expiry }), remaining < threshold);
+          addMetaStatus(RK_M("clips.linkTimeLeft", { time: expiry }), remaining < threshold, false);
         }
       }
     } else if (state === "compressing" || state === "uploading") {

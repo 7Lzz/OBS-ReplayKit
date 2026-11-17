@@ -67,6 +67,23 @@ bool ParseInt(const std::string &text, long long low, long long high, long long 
 	return true;
 }
 
+// a colour as #rrggbb
+bool ParseColor(const std::string &text, COLORREF &out)
+{
+	if (text.size() != 7 || text[0] != '#')
+		return false;
+	unsigned value = 0;
+	for (size_t i = 1; i < text.size(); ++i) {
+		char c = text[i];
+		unsigned digit = c >= '0' && c <= '9' ? unsigned(c - '0') : c >= 'a' && c <= 'f' ? unsigned(c - 'a' + 10) : c >= 'A' && c <= 'F' ? unsigned(c - 'A' + 10) : 16u;
+		if (digit > 15)
+			return false;
+		value = value * 16 + digit;
+	}
+	out = RGB((value >> 16) & 0xff, (value >> 8) & 0xff, value & 0xff);
+	return true;
+}
+
 // an absolute local path to an existing file, the only kind the helper hands over
 bool UsableFile(const std::wstring &path)
 {
@@ -99,6 +116,7 @@ int ShareApp::Run(const Options &options)
 		Log("could not start the command pipe or the audio");
 		return 1;
 	}
+	window.SetModalTick([this] { Step(false); });
 
 	HANDLE timer = CreateWaitableTimerExW(nullptr, nullptr, CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_ALL_ACCESS);
 	if (!timer)
@@ -121,12 +139,7 @@ int ShareApp::Run(const Options &options)
 		}
 		if (window.CloseRequested() || !window.Handle())
 			quit = true;
-		pipe.Drain([this](const std::string &line) { return Execute(line); });
-		if (quit)
-			break;
-		if (window.TakeResized() && !renderer.Resize())
-			rebuildAt = NowMs();
-		Tick(result == WAIT_OBJECT_0);
+		Step(result == WAIT_OBJECT_0);
 	}
 	Log("share window closing");
 	CancelWaitableTimer(timer);
@@ -135,6 +148,16 @@ int ShareApp::Run(const Options &options)
 	pipe.Stop();
 	renderer.Release();
 	return 0;
+}
+
+void ShareApp::Step(bool frameSignal)
+{
+	pipe.Drain([this](const std::string &line) { return Execute(line); });
+	if (quit)
+		return;
+	if (window.TakeResized() && !renderer.Resize())
+		rebuildAt = NowMs();
+	Tick(frameSignal);
 }
 
 bool ShareApp::RebuildRenderer(uint64_t luid)
@@ -256,6 +279,17 @@ std::string ShareApp::Execute(const std::string &line)
 		if (title.empty() || title.size() > 256)
 			return Fail("the title is empty or too long");
 		SetWindowTextW(window.Handle(), title.c_str());
+		return Ok();
+	}
+	if (verb == "THEME") {
+		// THEME <caption #rrggbb> <text #rrggbb> <dark 0|1>, the title bar the window has while the helper shows it for a look
+		size_t first = rest.find(' '), second = first == std::string::npos ? first : rest.find(' ', first + 1);
+		COLORREF caption = 0, text = 0;
+		std::string dark = second == std::string::npos ? std::string() : rest.substr(second + 1);
+		if (second == std::string::npos || !ParseColor(rest.substr(0, first), caption) || !ParseColor(rest.substr(first + 1, second - first - 1), text) || (dark != "0" && dark != "1"))
+			return Fail("theme takes a caption colour, a text colour and 0 or 1 for dark");
+		if (!window.SetTitleBarColors(caption, text, dark == "1"))
+			return Fail("windows did not take the title bar colours");
 		return Ok();
 	}
 	if (verb == "HOLD") {

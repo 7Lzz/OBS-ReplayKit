@@ -485,10 +485,11 @@
   function onHistoryKey(ev) {
     if (historyHandled) return;
     if (!(ev.ctrlKey || ev.metaKey)) return;
-    // ev.key is layout-aware (ev.code "KeyZ" is the physical QWERTY slot -- wrong on AZERTY etc.)
-    var k = (ev.key || "").toLowerCase();
-    var isZ = k === "z" || ev.code === "KeyZ";
-    var isY = k === "y" || ev.code === "KeyY";
+    var k = RKShortcutKey(ev);
+    var isZ = k === "z", isY = k === "y";
+    if (!isZ && !isY) return;
+    // a drag, resize or turn in progress would go on writing over the step that was just brought back
+    if (drag || resize || turn) { ev.preventDefault(); ev.stopPropagation(); return; }
     if (isZ && !ev.shiftKey) { ev.preventDefault(); ev.stopPropagation(); undoMove(); }
     else if ((isZ && ev.shiftKey) || isY) { ev.preventDefault(); ev.stopPropagation(); redoMove(); }
   }

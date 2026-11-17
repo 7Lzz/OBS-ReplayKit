@@ -13,7 +13,8 @@
   .sce-item.is-dragging { cursor:grabbing; }
   .sce-item::after { content:""; position:absolute; inset:-2px; border:1px dashed transparent; border-radius:2px; pointer-events:none; transition:border-color 120ms linear; }
   .sce-screen:hover .sce-item::after, .sce-item.is-active::after { border-color:var(--line2); }
-  .sce-logo { display:block; width:100%; height:100%; pointer-events:none; }
+  /* the outline logo the card draws, in the colour of the text through its own shape */
+  .sce-logo { display:block; width:100%; height:100%; pointer-events:none; background:currentColor; -webkit-mask:url("/icons/share/obs-logo-outline.svg") center / contain no-repeat; mask:url("/icons/share/obs-logo-outline.svg") center / contain no-repeat; }
   .sce-text { display:block; white-space:pre; font-family:var(--font); font-weight:600; line-height:normal; }
   .sce-grip { position:absolute; width:10px; height:10px; margin:-5px 0 0 -5px; box-sizing:border-box; border-radius:2px; border:1px solid rgb(var(--accent-rgb)); background:var(--window); opacity:0; transition:opacity 120ms linear; touch-action:none; z-index:2; }
   .sce-grip[data-corner="nw"] { left:0; top:0; cursor:nwse-resize; }
@@ -38,7 +39,7 @@
   <div class="sce-screen" id="sceScreen">
     <img class="sce-backdrop" id="sceBackdrop" alt="" hidden>
     <div class="sce-item" id="sceIcon" data-item="icon">
-      <img class="sce-logo" src="/icons/fallback/obs-icon.svg" alt="" draggable="false">
+      <div class="sce-logo" id="sceLogo"></div>
       <div class="sce-grip" data-corner="nw"></div><div class="sce-grip" data-corner="ne"></div><div class="sce-grip" data-corner="sw"></div><div class="sce-grip" data-corner="se"></div>
       <div class="sce-turn"></div>
     </div>
@@ -112,11 +113,29 @@
     return "rgba(" + parseInt(hex[1], 16) + ", " + parseInt(hex[2], 16) + ", " + parseInt(hex[3], 16) + ", " + Number(look.plateOpacity) / 255 + ")";
   }
 
+  // the ground of the theme card from the backdrop of the look, the way the plugin draws it: the shade circles, then over them the circles whose rim glows in the accent colour with a soft band inside it; the first layer of a css background is the top one
+  function themeBackdrop(width, height, px) {
+    var b = cover.look.backdrop, accent = "rgb(var(--accent-rgb))";
+    var inner = "color-mix(in srgb, var(--window-solid), " + accent + " " + b.glow * 100 + "%)";
+    var rim = "color-mix(in srgb, " + inner + ", " + accent + " 50%)";
+    var shade = "color-mix(in srgb, var(--window-solid), black " + b.shade * 100 + "%)";
+    var layers = b.glows.map(function (c) {
+      var r = c[2] * width;
+      return "radial-gradient(circle " + r + "px at " + c[0] * width + "px " + c[1] * height + "px, " + inner + " 0px, " + inner + " " + Math.max(0, r - b.blur * px) + "px, " +
+        rim + " " + Math.max(0, r - b.rim * px) + "px, " + accent + " " + r + "px, transparent " + (r + 0.75) + "px)";
+    }).concat(b.shades.map(function (c) {
+      var r = c[2] * width;
+      return "radial-gradient(circle " + r + "px at " + c[0] * width + "px " + c[1] * height + "px, " + shade + " " + Math.max(0, r - 0.75) + "px, transparent " + r + "px)";
+    }));
+    return layers.concat(["var(--window-solid)"]).join(", ");
+  }
+
   // sizes follow the card height, so the preview keeps the proportions of the card at any width
   function place() {
     var height = screenEl.clientHeight, look = cover.look;
     if (!height || !look || !layout) return;
     var px = height / 1080;
+    screenEl.style.background = background() === "theme" ? themeBackdrop(screenEl.clientWidth, height, px) : "";
     var side = look.logo * px * layout.icon.scale / 100;
     items.icon.style.width = side + "px";
     items.icon.style.height = side + "px";
@@ -143,7 +162,14 @@
     var custom = String(host.get("share_cover_text") || "").trim();
     textEl.textContent = custom || RK_M("screenshare.coverDefaultText");
     items.text.hidden = !host.get("share_cover_show_text");
-    textEl.style.color = kind === "theme" || !cover.look ? "var(--text)" : cover.look.lightText;
+    // the logo and the text take the theme text colour on the theme card and the light text over a picture or the last frame
+    var foreground = kind === "theme" || !cover.look ? "var(--text)" : cover.look.lightText;
+    textEl.style.color = foreground;
+    items.icon.style.color = foreground;
+    if (cover.look) {
+      textEl.style.fontWeight = String(cover.look.textWeight);
+      document.getElementById("sceLogo").style.opacity = String(cover.look.logoOpacity);
+    }
     textEl.classList.toggle("has-plate", kind === "image");
     screenEl.classList.toggle("is-ready", !!cover.look);
     place();

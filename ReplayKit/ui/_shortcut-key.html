@@ -1,0 +1,9 @@
+<!-- shared partial (helper #include target: shortcut-key). the letter a keyboard shortcut means: the letter the key types when that is a latin letter, else the latin letter of the key in that place, so ctrl+z undoes on a cyrillic layout too while the z of an azerty keyboard stays the z it is labelled. host: RKShortcutKey(event) returns that letter in lower case, or the key in lower case when it is no letter key. -->
+<script>
+window.RKShortcutKey = function (event) {
+  var key = (event.key || "").toLowerCase();
+  if (/^[a-z]$/.test(key)) return key;
+  var code = event.code || "";
+  return /^Key[A-Z]$/.test(code) ? code.charAt(3).toLowerCase() : key;
+};
+</script>

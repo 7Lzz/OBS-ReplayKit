@@ -16,11 +16,22 @@ namespace ReplayKitHelper
         private const int MaxSoundSeconds = 600;
         private static readonly object Gate = new object();
         private static string appliedSignature;
-        // how the card is drawn apart from the theme: the sizes at size 100 in pixels of a 1080 pixel tall card (the logo side, the text height, the plate a picked image puts behind the text) and the colours of that plate (opacity 0 to 255) and of the text over an image or the last frame; the plugin draws with them and the card editor of the settings page shows the same
+        // how the card is drawn apart from the theme: the sizes at size 100 in pixels of a 1080 pixel tall card (the logo side, the text height, the plate a picked image puts behind the text), the weight of the text, how strong the outline logo shows, and the colours of that plate (opacity 0 to 255) and of the text over an image or the last frame; the plugin draws with them and the card editor of the settings page shows the same
         private static readonly JObject Look = new JObject
         {
-            ["logo"] = 220, ["text"] = 84, ["plateX"] = 56, ["plateY"] = 28, ["plateRadius"] = 24,
+            ["logo"] = 220, ["text"] = 120, ["textWeight"] = 700, ["logoOpacity"] = 0.85,
+            ["plateX"] = 56, ["plateY"] = 28, ["plateRadius"] = 24,
             ["plateColor"] = "#000000", ["plateOpacity"] = 150, ["lightText"] = "#f2f2f2",
+            // the ground of the theme card: circles a shade darker than the ground and circles off the corners whose rim glows in the accent colour, each as x and y in fractions of the card and a radius in fractions of its width; shade and glow are how far they go toward black and toward the accent, rim and blur the bright edge and the soft band inside it in pixels of a 1080 pixel tall card
+            ["backdrop"] = new JObject
+            {
+                ["shade"] = 0.3,
+                ["shades"] = new JArray { new JArray(0.37, 0.13, 0.165), new JArray(0.71, 0.72, 0.23) },
+                ["glow"] = 0.06,
+                ["rim"] = 3,
+                ["blur"] = 46,
+                ["glows"] = new JArray { new JArray(1.05, -0.5, 0.538), new JArray(0.09, 1.306, 0.392) },
+            },
         };
 
         public static string ImagePath => StateLayout.PathFor(AppConfig.GetReplayKitRoot(), StateLayout.ShareCoverImageFile);
@@ -94,6 +105,7 @@ namespace ReplayKitHelper
                     ["background"] = background,
                     ["ground"] = colors["bg"]?.Value<string>() ?? "",
                     ["ink"] = colors["text"]?.Value<string>() ?? "",
+                    ["accent"] = colors["accent"]?.Value<string>() ?? "",
                     ["image"] = background == "image" ? ImagePath : "",
                     ["fit"] = settings["share_cover_fit"]?.Value<string>() ?? SettingDefaults.ShareCoverFit,
                     ["text"] = text,

@@ -1,4 +1,5 @@
 #include <windows.h>
+#include <dwmapi.h>
 
 #include "log.hpp"
 #include "share_window_values.hpp"
@@ -13,6 +14,9 @@ constexpr int kStartX = -32000;
 constexpr int kStartY = -32000;
 constexpr int kStartWidth = 1280;
 constexpr int kStartHeight = 720;
+// the timer that keeps the window drawing while windows holds it in a move, a resize or its menu, at the pace of the presents of the app
+constexpr UINT_PTR kModalTimer = 1;
+constexpr UINT kModalTimerMs = 16;
 
 } // namespace
 
@@ -57,6 +61,17 @@ bool ShareWindow::MakeSeeThrough()
 	return true;
 }
 
+bool ShareWindow::SetTitleBarColors(COLORREF caption, COLORREF text, bool dark)
+{
+	const BOOL darkMode = dark ? TRUE : FALSE;
+	// dark mode is the one windows 10 has; the colours are windows 11 only and are refused on older windows, which keeps the dark or light bar
+	HRESULT hr = DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &darkMode, sizeof(darkMode));
+	DwmSetWindowAttribute(hwnd, DWMWA_CAPTION_COLOR, &caption, sizeof(caption));
+	DwmSetWindowAttribute(hwnd, DWMWA_BORDER_COLOR, &caption, sizeof(caption));
+	DwmSetWindowAttribute(hwnd, DWMWA_TEXT_COLOR, &text, sizeof(text));
+	return SUCCEEDED(hr);
+}
+
 void ShareWindow::Show()
 {
 	// the first show of a process takes the show state its starter asked for (the helper starts it hidden), so the second one is the one that counts
@@ -95,6 +110,21 @@ LRESULT ShareWindow::OnMessage(UINT message, WPARAM wparam, LPARAM lparam)
 	case WM_DPICHANGED:
 		// the helper sizes and places the window itself, so the size windows suggests for the new dpi is not applied
 		return 0;
+	case WM_ENTERSIZEMOVE:
+	case WM_ENTERMENULOOP:
+		SetTimer(hwnd, kModalTimer, kModalTimerMs, nullptr);
+		return DefWindowProcW(hwnd, message, wparam, lparam);
+	case WM_EXITSIZEMOVE:
+	case WM_EXITMENULOOP:
+		KillTimer(hwnd, kModalTimer);
+		return DefWindowProcW(hwnd, message, wparam, lparam);
+	case WM_TIMER:
+		if (wparam == kModalTimer) {
+			if (modalTick)
+				modalTick();
+			return 0;
+		}
+		return DefWindowProcW(hwnd, message, wparam, lparam);
 	case WM_CLOSE:
 		Log("the share window was asked to close");
 		closeRequested = true;
