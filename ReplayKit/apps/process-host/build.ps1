@@ -5,13 +5,14 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot '../../scripts/obs_versions.ps1')
+& (Join-Path $PSScriptRoot '..\..\scripts\sync_shared.ps1')
 if (-not $OutDir) { $OutDir = Join-Path $PSScriptRoot '../../dist/process-host' }
 $lines = @((Read-ObsVersions).lines)
 if ($Version) {
     $lines = @($lines | Where-Object tested -eq $Version)
     if ($lines.Count -ne 1) { throw 'The requested host version is not in obs-versions.json.' }
 }
-$inputs = @(Get-ChildItem -LiteralPath $PSScriptRoot -File | Where-Object { $_.Extension -in '.cpp', '.cmake', '.manifest', '.ps1' } | Sort-Object Name)
+$inputs = @(Get-ChildItem -LiteralPath $PSScriptRoot -File | Where-Object { $_.Extension -in '.cpp', '.hpp', '.cmake', '.manifest', '.ps1' } | Sort-Object Name)
 $fingerprint = ($inputs | ForEach-Object { $_.Name + ':' + (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash }) -join '|'
 foreach ($line in $lines) {
     $version = $line.tested

@@ -1,14 +1,22 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+// mscoree.h also defines eAll, so the one of the audio flow enum is renamed
+#define eAll eAllAudioFlows
+#include <mmdeviceapi.h>
+#undef eAll
+#include <audiopolicy.h>
 #include <shellapi.h>
 #include <shlobj.h>
 #include <metahost.h>
+
+#include "obs_audio_group.hpp"
 #include <wrl/client.h>
 
 #include <filesystem>
 #include <cstdio>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <vector>
 
 using Microsoft::WRL::ComPtr;
@@ -102,6 +110,31 @@ int Helper()
     return int(result);
 }
 
+// puts the pages and the helper under the grouping id the plugin gives obs, so the windows mixer shows them as one slider; a thread of its own holds the sessions for the life of the process, since windows drops a default session nobody holds and the helper needs its main thread free of the multithreaded apartment
+void GroupAudioWithObs()
+{
+    std::thread([] {
+        if (FAILED(CoInitializeEx(nullptr, COINIT_MULTITHREADED))) return;
+        std::vector<ComPtr<IAudioSessionControl>> held;
+        ComPtr<IMMDeviceEnumerator> enumerator;
+        ComPtr<IMMDeviceCollection> devices;
+        UINT count = 0;
+        if (SUCCEEDED(CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL, IID_PPV_ARGS(&enumerator))) &&
+            SUCCEEDED(enumerator->EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE, &devices)) && SUCCEEDED(devices->GetCount(&count))) {
+            for (UINT i = 0; i < count; i++) {
+                ComPtr<IMMDevice> device;
+                ComPtr<IAudioSessionManager> manager;
+                ComPtr<IAudioSessionControl> session;
+                if (SUCCEEDED(devices->Item(i, &device)) &&
+                    SUCCEEDED(device->Activate(__uuidof(IAudioSessionManager), CLSCTX_ALL, nullptr, reinterpret_cast<void **>(manager.GetAddressOf()))) &&
+                    SUCCEEDED(manager->GetAudioSessionControl(nullptr, 0, &session)) && SUCCEEDED(session->SetGroupingParam(&kObsAudioGroup, nullptr)))
+                    held.push_back(session);
+            }
+        }
+        Sleep(INFINITE);
+    }).detach();
+}
+
 int Run(const fs::path &directory, const std::vector<std::wstring> &arguments)
 {
     if (arguments.size() == 2 && arguments[1] == L"--version") {
@@ -133,10 +166,14 @@ int Run(const fs::path &directory, const std::vector<std::wstring> &arguments)
     }
     if (helper) {
         ProcessGroup group;
+        GroupAudioWithObs();
         return Helper();
     }
     if (browser) {
         ProcessGroup group;
+        // only the audio service plays sound, so the other browser processes leave the sessions alone
+        for (const auto &argument : arguments)
+            if (argument.find(L"audio.mojom.AudioService") != std::wstring::npos) GroupAudioWithObs();
         HMODULE module = Load(directory / OBS_BROWSER_ROLE_PATH);
         auto run = reinterpret_cast<int (*)(HINSTANCE)>(GetProcAddress(module, "RunBrowser"));
         if (!run) throw std::runtime_error("The browser host component is incompatible.");

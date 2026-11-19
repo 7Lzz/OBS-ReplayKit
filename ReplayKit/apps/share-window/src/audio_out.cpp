@@ -89,7 +89,8 @@ struct AudioOut::Stream {
 		format.dwChannelMask = ChannelMask(channels);
 		format.SubFormat = KSDATAFORMAT_SUBTYPE_IEEE_FLOAT;
 		// windows converts to the format of the device, so the source format and rate go in as they are
-		const DWORD flags = AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM | AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY;
+		// the session stays out of the windows mixer, since the share audio is only for discord and a second obs slider there was confusing
+		const DWORD flags = AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM | AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY | AUDCLNT_SESSIONFLAGS_DISPLAY_HIDE;
 		if (SUCCEEDED(hr))
 			hr = client->Initialize(AUDCLNT_SHAREMODE_SHARED, flags, kBufferDuration, 0, &format.Format, &kSessionGuid);
 		if (SUCCEEDED(hr))

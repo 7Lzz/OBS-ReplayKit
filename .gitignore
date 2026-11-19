@@ -18,6 +18,7 @@ ReplayKit/publish_tmp/
 # written from ReplayKit/shared/HelperEndpoint.cs and StateLayout.cs by scripts/sync_shared.ps1 on every build, so those values are only ever edited there
 /ReplayKit/plugins/replaykit/src/core/shared_values.hpp
 /ReplayKit/apps/share-window/protocol/share_window_values.hpp
+/ReplayKit/apps/process-host/obs_audio_group.hpp
 /ReplayKit/lua/shared_values.lua
 /ReplayKit/ui/helper-endpoint.js
 

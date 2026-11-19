@@ -45,6 +45,7 @@ set(REPLAYKIT_SOURCES
     src/core/main_window.cpp
     src/core/open_clips_hotkey.cpp
     src/core/power_throttling.cpp
+    src/core/audio_group.cpp
     src/core/process_group.cpp
     src/core/state.cpp
     src/core/state_files.cpp
@@ -112,6 +113,7 @@ target_include_directories(replaykit PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/third_party/obs-browser"
     # the layout of the state shared with the share window, which owns it, and the generated names both use
     "${CMAKE_CURRENT_SOURCE_DIR}/../../apps/share-window/protocol"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../apps/process-host"
     "${OBS_HEADERS_DIR}/libobs"
     "${OBS_HEADERS_DIR}/frontend/api"
 )
