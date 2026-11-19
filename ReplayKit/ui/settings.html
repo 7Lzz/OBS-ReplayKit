@@ -3029,8 +3029,9 @@
   window.addEventListener("resize", () => document.querySelectorAll(".combo.is-open:not([data-self-wired])").forEach(positionCombo));
   document.querySelector(".main").addEventListener("scroll", () => closeCombos());
 
-  let hotkeyCaptureActive = false;
-  let hotkeyCapturePending = null;
+  const setHotkeyCapture = RKHotkeys.captureClient(HELPER);
+  let hotkeyCaptureReady = false;
+  let hotkeyCaptureGeneration = 0;
   let activeHotkeyField = null;
   let hotkeyCaptureTimer = null;
   const HOTKEY_CAPTURE_TIMEOUT_MS = 10000;
@@ -3059,50 +3060,22 @@
     if (hotkeyCaptureTimer) { clearTimeout(hotkeyCaptureTimer); hotkeyCaptureTimer = null; }
   }
 
-  function setHotkeyCapture(active, keepalive) {
-    if (!active && hotkeyCapturePending) {
-      return hotkeyCapturePending.finally(() => setHotkeyCapture(false, keepalive));
-    }
-    if (active && hotkeyCaptureActive) return Promise.resolve(true);
-    if (!active && !hotkeyCaptureActive && !hotkeyCapturePending) return Promise.resolve(true);
-    const url = HELPER + "/settings/hotkey-capture?active=" + (active ? "1" : "0") + "&t=" + Date.now();
-    const request = fetch(url, {
-      method:"POST",
-      cache:"no-store",
-      keepalive:!!keepalive,
-    }).then((res) => res.json()).then((body) => {
-      if (!body || body.ok !== true) throw new Error((body && body.message) || RK_M("common.hotkeyCaptureFailed"));
-      // what the helper now holds, even when the field was left meanwhile: the release queued behind this request only goes out while this says active, and skipping it left the obs hotkeys blanked until obs restarted
-      hotkeyCaptureActive = !!active;
-      return true;
-    }).catch(() => false).finally(() => {
-      if (hotkeyCapturePending === request) hotkeyCapturePending = null;
-    });
-    hotkeyCapturePending = request;
-    return request;
-  }
-
   function beginHotkeyCapture(fieldName) {
     const field = hotkeyFields[fieldName];
     if (!field) return;
+    const generation = ++hotkeyCaptureGeneration;
+    hotkeyCaptureReady = false;
     activeHotkeyField = fieldName;
-    const labelBeforeCapture = comboToLabel(state[fieldName]);
     field.el.textContent = RK_M("settings.connecting");
     field.el.classList.add("is-empty");
     clearHotkeyCaptureTimer();
     setHotkeyCapture(true, false).then((ok) => {
-      if (document.activeElement !== field.el || activeHotkeyField !== fieldName) return;
-      // state[fieldName] already held the existing binding before this call even started, so comparing against the pre-capture label (not just checking truthiness) is what tells "a key landed mid-flight" apart from "nothing happened yet, this is still the old value".
-      if (comboToLabel(state[fieldName]) !== labelBeforeCapture) {
-        syncHotkeyField(fieldName);
-        return;
-      }
+      if (generation !== hotkeyCaptureGeneration || document.activeElement !== field.el) return;
+      hotkeyCaptureReady = ok;
       if (!ok) {
         field.el.textContent = RK_M("common.couldNotPauseObsHotkey");
-        field.el.classList.add("is-empty");
         return;
       }
-      // ok only comes back true once obs itself has confirmed (via the obs-websocket requestresponse) that both native hotkey bindings are blanked, so this is the first moment its actually true -- showing "Listening..." any earlier would be telling the user its safe to press before it is.
       field.el.textContent = RK_M("settings.listening");
       field.el.classList.add("is-empty");
       hotkeyCaptureTimer = setTimeout(() => {
@@ -3113,9 +3086,10 @@
   }
 
   function releaseHotkeyCapture(keepalive) {
+    ++hotkeyCaptureGeneration;
     activeHotkeyField = null;
+    hotkeyCaptureReady = false;
     clearHotkeyCaptureTimer();
-    if (!hotkeyCaptureActive && !hotkeyCapturePending) return Promise.resolve(true);
     return setHotkeyCapture(false, keepalive !== false);
   }
 
@@ -3918,7 +3892,7 @@
   });
 
   window.addEventListener("keydown", (e) => {
-    if (!(e.ctrlKey || e.metaKey) || e.altKey || e.defaultPrevented || activeHotkeyField || hotkeyCaptureActive) return;
+    if (!(e.ctrlKey || e.metaKey) || e.altKey || e.defaultPrevented || activeHotkeyField) return;
     const k = RKShortcutKey(e);
     if (k !== "z" && k !== "y") return;
     if ((e.target instanceof Element && e.target.closest('input:not([type="range"]):not([type="checkbox"]):not([type="radio"]), textarea, [contenteditable="true"], .hotkey-input')) || document.querySelector('.modal-backdrop.is-visible, #cpick:not([hidden])')) return;
@@ -4336,7 +4310,6 @@
 
   function attachHotkeyField(fieldName) {
     const field = hotkeyFields[fieldName];
-    field.el.addEventListener("pointerdown", () => { setHotkeyCapture(true, false); });
     field.el.addEventListener("focus", () => beginHotkeyCapture(fieldName));
     field.el.addEventListener("blur", () => {
       releaseHotkeyCapture(true);
@@ -4345,18 +4318,13 @@
       syncHotkeyField(fieldName);
     });
     field.el.addEventListener("keydown", (e) => {
+      if (e.key === "Tab" && !e.ctrlKey && !e.altKey && !e.metaKey) return;
       e.preventDefault();
       e.stopPropagation();
       if (typeof e.stopImmediatePropagation === "function") e.stopImmediatePropagation();
-      if (activeHotkeyField !== fieldName) {
-        activeHotkeyField = fieldName;
-      }
-      if (!hotkeyCaptureActive && !hotkeyCapturePending) {
-        setHotkeyCapture(true, false);
-      }
+      if (activeHotkeyField !== fieldName || !hotkeyCaptureReady || e.repeat) return;
       const obsKey = obsKeyFromEvent(e);
       if (!obsKey) return;
-      clearHotkeyCaptureTimer();
       const combo = { key:obsKey };
       if (e.ctrlKey) combo.control = true;
       if (e.altKey) combo.alt = true;
@@ -4468,7 +4436,7 @@
   }
   // a drag, a hotkey being set or a field being typed in finishes first, so a number the helper would clamp is not rewritten halfway through
   function editInProgress() {
-    return !!((typingIn && typingIn === document.activeElement) || historyGesture || activeHotkeyField || hotkeyCaptureActive || hotkeyCapturePending);
+    return !!((typingIn && typingIn === document.activeElement) || historyGesture || activeHotkeyField);
   }
   function autoSave() {
     autoSaveTimer = 0;
@@ -4527,7 +4495,8 @@
         else delete body[key];
       });
     }
-    if (!settingsDiffer(body, before)) {
+    const changes = Object.fromEntries(Object.entries(body).filter(([key, value]) => !sameSetting(value, before[key])));
+    if (!Object.keys(changes).length) {
       saveNote = { text:"", bad:false };
       return true;
     }
@@ -4537,7 +4506,7 @@
       data = await helperJson("settings", {
         method:"POST",
         headers:{ "Content-Type":"application/json" },
-        body:JSON.stringify(body),
+        body:JSON.stringify(changes),
       });
     } catch (e) {
       saveNote = { text:RK_M("settings.couldNotSaveTheSettingsError", { error: e.message || e }), bad:true };
@@ -5471,7 +5440,11 @@
         res = await fetch(HELPER + "/import-session?source=owned" + (isStart ? "&start=1" : ""), { method:"POST", cache:"no-store" });
         data = await res.json().catch(() => ({}));
       } catch (e) { return; }
-      if (!loginFlowActive || !res.ok) return;
+      if (!loginFlowActive) return;
+      if (!res.ok) {
+        if (data.message) { finishLoginFlow(); setStatus(data.message, "bad"); }
+        return;
+      }
       if (data.signedIn) { applyAuthData(data); finishLoginFlow(); return; }
       if (data.pending === true) { sawWindowOpen = true; renderAuth(RK_M("common.signInInTheStreamableWindow")); return; }
       if (sawWindowOpen) { finishLoginFlow(); return; }

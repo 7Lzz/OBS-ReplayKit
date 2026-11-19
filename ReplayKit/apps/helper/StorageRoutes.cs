@@ -90,7 +90,7 @@ namespace ReplayKitHelper
                             HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("storage.compressionModeMustBeAString") });
                             return false;
                         }
-                        var started = Storage.StartCompress(body["names"] as JArray, body["mode"]?.Value<string>());
+                        var started = Storage.StartCompress(body["clips"] as JArray, body["mode"]?.Value<string>());
                         HttpResponse.SendJson(stream, started["ok"]?.Value<bool>() == true ? 200 : 409, started);
                     }
                 }

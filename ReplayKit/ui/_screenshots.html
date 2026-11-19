@@ -67,7 +67,8 @@ window.RKScreenshots = {
     const fullscreen = dialog.querySelector(".screenshot-fullscreen");
     let fullscreenActive = false;
     let rows = [], shown = [], mode = "", active = false, loaded = false, query = "", sort = "newest", epoch = 0, selected = "", signature = "", rowsSignature = "";
-    const url = (row, what) => options.helper + kind.base + "/" + (what || "file") + "?file=" + encodeURIComponent(row.name) + "&v=" + encodeURIComponent(row.size + "-" + row.mtime);
+    const rowKey = row => row.version || row.name + "\n" + row.size + "\n" + row.mtime;
+    const url = (row, what) => options.helper + kind.base + "/" + (what || "file") + "?file=" + encodeURIComponent(row.name) + "&v=" + encodeURIComponent(row.version || row.size + "-" + row.mtime);
     // the list is read every few seconds while it is on screen, and now and then otherwise for the count of its tab
     const IDLE_REFRESH_MS = 30000;
     let refreshedAt = 0;
@@ -106,7 +107,7 @@ window.RKScreenshots = {
       fullscreen.setAttribute("aria-label", fullscreen.dataset.tooltip);
     }
     function preview(row) {
-      selected = row.name;
+      selected = rowKey(row);
       title.textContent = row.name;
       details(row, detailsEl);
       image.alt = row.name;
@@ -117,7 +118,7 @@ window.RKScreenshots = {
       }
     }
     function step(direction) {
-      const index = shown.findIndex(row => row.name === selected) + direction;
+      const index = shown.findIndex(row => rowKey(row) === selected) + direction;
       if (index >= 0 && index < shown.length) preview(shown[index]);
     }
     // the cards are kept by name and the state of their file, so a list read again only builds the cards of what changed and moves the rest, and their pictures are not loaded again
@@ -127,7 +128,7 @@ window.RKScreenshots = {
       const abort = new AbortController();
       const timer = setTimeout(() => abort.abort(), 20000);
       let response;
-      try { response = await fetch(options.helper + kind.base + "/" + action + "?file=" + encodeURIComponent(row.name) + (extra || "") + "&t=" + Date.now(), {method:"POST", cache:"no-store", signal:abort.signal}); }
+      try { response = await fetch(url(row, action) + (extra || "") + "&t=" + Date.now(), {method:"POST", cache:"no-store", signal:abort.signal}); }
       catch (error) { throw new Error(error && error.name === "AbortError" ? RK_M("clips.replaykitTookTooLongToAnswer") : RK_M("clips.replaykitCouldNotBeReached")); }
       finally { clearTimeout(timer); }
       const data = await response.json().catch(() => ({}));
@@ -329,7 +330,7 @@ window.RKScreenshots = {
         signature = current;
         const keep = new Set();
         shown.forEach((row, index) => {
-          const id = row.name + "\n" + row.size + "\n" + row.mtime;
+          const id = rowKey(row);
           keep.add(id);
           let card = cards.get(id);
           if (!card) { card = buildCard(row); cards.set(id, card); }
@@ -341,21 +342,25 @@ window.RKScreenshots = {
       empty.hidden = collapsed || shown.length > 0;
       empty.textContent = !loaded ? say(RK_M("clips.loadingScreenshots"), RK_M("clips.loadingGifs")) : rows.length ? (query.trim() ? say(RK_M("clips.noScreenshotsMatchYourSearch"), RK_M("clips.noGifsMatchYourSearch")) : say(RK_M("clips.noScreenshotsMatchTheseFilters"), RK_M("clips.noGifsMatchTheseFilters"))) : kind.none;
       if (dialog.open) {
-        const row = shown.find(item => item.name === selected);
+        const row = shown.find(item => rowKey(item) === selected);
         if (!row) dialog.close();
       }
     }
+    let refreshing = null, refreshQueued = false;
     async function refresh() {
       if (document.hidden) return;
+      if (refreshing) { refreshQueued = true; return; }
+      const request = new AbortController();
+      refreshing = request;
       refreshedAt = Date.now();
       const run = ++epoch;
       try {
-        const response = await fetch(options.helper + kind.base + "?t=" + Date.now(), {cache:"no-store"});
+        const response = await fetch(options.helper + kind.base + "?t=" + Date.now(), {cache:"no-store", signal:request.signal});
         if (!response.ok) throw new Error("Could not load " + kind.plural);
         const data = await response.json();
         if (!Array.isArray(data[kind.list])) throw new Error("Invalid " + kind.noun + " list");
         if (run !== epoch) return;
-        const next = data[kind.list].filter(row => row && typeof row.name === "string" && Number.isFinite(row.size) && Number.isFinite(row.mtime));
+        const next = data[kind.list].filter(row => row && typeof row.name === "string" && Number.isFinite(row.size) && Number.isFinite(row.mtime) && (!kind.games || typeof row.version === "string"));
         // the clips page draws itself again only when the list or its count changed, not on every read
         const listed = JSON.stringify(next);
         if (loaded && listed === rowsSignature) return;
@@ -373,6 +378,9 @@ window.RKScreenshots = {
         empty.hidden = options.collapsed();
         empty.textContent = say(RK_M("clips.theScreenshotsCouldNotBeLoaded"), RK_M("clips.theGifsCouldNotBeLoaded"));
         options.changed();
+      } finally {
+        refreshing = null;
+        if (refreshQueued) { refreshQueued = false; refresh(); }
       }
     }
     closeButton.addEventListener("click", () => dialog.close());
@@ -397,7 +405,7 @@ window.RKScreenshots = {
     });
     window.addEventListener(kind.saved, refresh);
     document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
-    setInterval(() => { if (active || Date.now() - refreshedAt >= IDLE_REFRESH_MS) refresh(); }, 5000);
+    setInterval(() => { if (!refreshing && (active || Date.now() - refreshedAt >= IDLE_REFRESH_MS)) refresh(); }, 5000);
     return {
       refresh: refresh,
       paint: paint,
@@ -421,6 +429,7 @@ window.RKScreenshots = {
       },
       reset: function () {
         ++epoch; rows = []; loaded = false; signature = ""; rowsSignature = ""; grid.replaceChildren(); cards.clear();
+        if (refreshing) refreshing.abort();
         if (dialog.open) dialog.close();
         paint(); refresh();
       },

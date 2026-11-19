@@ -25,6 +25,7 @@ namespace ReplayKitHelper
         {
             public string Path;
             public bool IsDir;
+            public bool Import;
             public long Bytes;
             public DateTime LastUse;
             public bool Busy;
@@ -81,6 +82,7 @@ namespace ReplayKitHelper
             var list = new List<Entry>();
             DateTime now = DateTime.UtcNow;
             var referenced = EditDrafts.ReferencedAssets();
+            bool editorOpen = JobCoordinator.HasOpenEditor();
             foreach (var kind in SafeDirs(Constants.CACHE_DIR))
             {
                 foreach (var dir in SafeDirs(kind))
@@ -88,8 +90,8 @@ namespace ReplayKitHelper
                     DateTime last = Directory.GetLastWriteTimeUtc(dir);
                     bool done = File.Exists(Path.Combine(dir, DoneMarker));
                     bool import = Path.GetFileName(kind) == "imports" || Path.GetFileName(kind) == "media" || Path.GetFileName(kind) == "videos";
-                    bool inDraft = import && (referenced == null || referenced.Contains(dir));
-                    list.Add(new Entry { Path = dir, IsDir = true, Bytes = BytesOf(SafeFiles(dir, SearchOption.AllDirectories)), LastUse = last, Busy = inDraft || !done && now - last < UnfinishedGrace });
+                    bool held = import && (editorOpen || referenced == null || referenced.Contains(dir));
+                    list.Add(new Entry { Path = dir, IsDir = true, Import = import, Bytes = BytesOf(SafeFiles(dir, SearchOption.AllDirectories)), LastUse = last, Busy = held || !done && now - last < UnfinishedGrace });
                 }
                 foreach (var file in SafeFiles(kind))
                 {
@@ -100,7 +102,9 @@ namespace ReplayKitHelper
             return list;
         }
 
-        private static bool Remove(Entry entry)
+        private static bool Remove(Entry entry) => entry.Import ? JobCoordinator.RemoveUnusedImport(() => Delete(entry)) : Delete(entry);
+
+        private static bool Delete(Entry entry)
         {
             try
             {

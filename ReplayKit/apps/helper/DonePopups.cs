@@ -4,7 +4,7 @@ using Newtonsoft.Json.Linq;
 
 namespace ReplayKitHelper
 {
-    // the popup that says a job is done (a gif exported, clips compressed, a driver to update): a form of notification of its own, apart from the bell. the plugin shows it on a card over the obs window from any view, and waits for the window to be back when it is minimized; what it shows is kept here only for the session, never in the list of the bell
+    // the popup that says a job is done; callers can leave a persistent notice when the plugin cannot show a card
     internal static class DonePopups
     {
         private const int MaxKept = 20;

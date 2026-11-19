@@ -129,6 +129,7 @@
     </ItemGroup>
     <Error Condition="'$(BangoCatZipPrefix)' == '' Or '$(ShaderfilterZip)' == ''" Text="Bundle.props is missing or incomplete -- scripts/sync_shared.ps1 writes it, and build.bat runs that first." />
     <Error Condition="!Exists('$(RepoDir)dist\version.json') Or !Exists('$(RepoDir)dist\replaykit.dll') Or !Exists('$(RepoDir)dist\helper\OBSReplayKit.exe')" Text="A built part of the payload is missing from dist\ -- run build.bat so the release exe does not ship without it." />
+    <Error Condition="!Exists('$(RepoDir)dist\input-overlay\input-overlay.dll') Or !Exists('$(RepoDir)dist\input-overlay\SDL3.dll') Or !Exists('$(RepoDir)dist\input-overlay\uiohook.dll')" Text="The input-overlay build is missing its plugin or runtime dependencies." />
     <RemoveDir Directories="$(AssetBundleStageDir)" />
     <Copy SourceFiles="@(AssetBundleFile)" DestinationFiles="@(AssetBundleFile->'$(AssetBundleStageDir)%(BundleDir)%(RecursiveDir)%(Filename)%(Extension)')" />
     <Exec Command="python -B &quot;$(RepoDir)tools\i18n\messages.py&quot; --output &quot;$(AssetBundleStageDir)obs-studio\obs-replayKit\locale\messages&quot; --dock &quot;$(AssetBundleStageDir)obs-studio\obs-replayKit\obs-custom-dock&quot;" />

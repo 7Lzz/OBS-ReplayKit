@@ -194,13 +194,19 @@ namespace ReplayKitHelper
         internal static string GetCurrentProfileDir()
         {
             string profilesRoot = Path.Combine(Environment.GetEnvironmentVariable("APPDATA") ?? "", "obs-studio", "basic", "profiles");
-            string profileName = "Untitled";
             var profileList = ObsWebSocket.InvokeRequest("GetProfileList", null, 3000);
-            if (profileList.Ok && !string.IsNullOrEmpty(profileList.Data?["currentProfileName"]?.Value<string>()))
-                profileName = profileList.Data["currentProfileName"].Value<string>();
+            string profileName = profileList.Ok ? profileList.Data?["currentProfileName"]?.Value<string>() : null;
+            string folder = ObsUserIni.Read("Basic", "ProfileDir");
+            string savedProfile = ObsUserIni.Read("Basic", "Profile");
+            if (string.IsNullOrEmpty(profileName) || !string.Equals(profileName, savedProfile, StringComparison.Ordinal) ||
+                string.IsNullOrEmpty(folder) || folder == "." || folder == ".." ||
+                folder.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+                throw new InvalidOperationException(profileList.Message ?? Locales.Message("settings.obsProfilePathResolvedOutsideThe"));
             string rootFull = Path.GetFullPath(profilesRoot).TrimEnd('\\');
-            string profileDir = Path.GetFullPath(Path.Combine(profilesRoot, profileName));
-            if (!profileDir.StartsWith(rootFull + "\\", StringComparison.OrdinalIgnoreCase))
+            string profileDir = Path.GetFullPath(Path.Combine(profilesRoot, folder));
+            if (!string.Equals(Path.GetDirectoryName(profileDir), rootFull, StringComparison.OrdinalIgnoreCase) ||
+                !File.Exists(Path.Combine(profileDir, "basic.ini")) ||
+                (File.GetAttributes(profileDir) & FileAttributes.ReparsePoint) != 0)
                 throw new InvalidOperationException(Locales.Message("settings.obsProfilePathResolvedOutsideThe"));
             return profileDir;
         }
@@ -210,7 +216,6 @@ namespace ReplayKitHelper
             try
             {
                 string profileDir = GetCurrentProfileDir();
-                if (!Directory.Exists(profileDir)) Directory.CreateDirectory(profileDir);
                 string path = Path.Combine(profileDir, "recordEncoder.json");
                 AppConfig.WriteUtf8(path, encoder["settings"].ToString(Formatting.None));
                 return new JObject { ["ok"] = true, ["path"] = path };

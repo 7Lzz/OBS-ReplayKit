@@ -131,9 +131,8 @@ namespace ReplayKitHelper
             try { code = Locales.Current(); }
             catch (Exception ex) { Log.Write("HttpResponse.InjectLocale: " + ex.Message); }
             var sb = new StringBuilder();
-            sb.Append("<script>window.RK_LANG=").Append(JsonConvert.SerializeObject(code)).Append(";</script>");
-            sb.Append("<script src=\"/locale/messages.js?lang=").Append(Uri.EscapeDataString(code))
-                .Append("&amp;v=").Append(Locales.BundleVersion(code)).Append("\"></script>");
+            sb.Append("<script>window.RK_LANG=").Append(JsonConvert.SerializeObject(code))
+                .Append(";window.RK_MESSAGES=").Append(Locales.InlineCatalog(code)).Append(";</script>");
             sb.Append("<!--#include page-errors--><!--#include i18n-->");
             return html.Insert(head.Index + head.Length, sb.ToString());
         }

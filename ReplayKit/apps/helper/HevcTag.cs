@@ -17,10 +17,10 @@ namespace ReplayKitHelper
         internal static bool Enabled() => ReplaykitSettings.ReadSettings()["hevcFixEnabled"]?.Value<bool>() == true;
 
         // true when the first video track is hevc under the hev1 name; read from the header of the file, so no tool runs for a clip that needs nothing
-        internal static bool NeedsFix(string path)
+        internal static bool NeedsFix(string path, bool reportReadFailure = false)
         {
             if (!RetagExtensions.Contains(Path.GetExtension(path))) return false;
-            var video = Mp4Tracks.ReadFile(path)?.FirstOrDefault(track => track.Video);
+            var video = Mp4Tracks.ReadFile(path, reportReadFailure)?.FirstOrDefault(track => track.Video);
             return video != null && video.SampleEntry == "hev1";
         }
 

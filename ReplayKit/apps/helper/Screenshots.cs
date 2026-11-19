@@ -10,6 +10,7 @@ namespace ReplayKitHelper
 {
     internal static class Screenshots
     {
+        internal const int MaxNameLength = 255;
         private const int ThumbWidth = 480;
         private static readonly object ThumbGate = new object();
         public static string Folder(string clipFolder = null, bool create = false)
@@ -28,23 +29,22 @@ namespace ReplayKitHelper
 
         // a name a screenshot can have: a plain png file name, not one of the temporary files of a save
         internal static bool ValidName(string name) =>
-            !string.IsNullOrWhiteSpace(name) && name.Length <= 200 && name.IndexOfAny(Path.GetInvalidFileNameChars()) < 0 && name == Path.GetFileName(name) && name.Trim() == name &&
+            !string.IsNullOrWhiteSpace(name) && name.Length <= MaxNameLength && name.IndexOfAny(Path.GetInvalidFileNameChars()) < 0 && name == Path.GetFileName(name) && name.Trim() == name &&
             string.Equals(Path.GetExtension(name), ".png", StringComparison.OrdinalIgnoreCase) && !name.StartsWith("_replaykit_", StringComparison.OrdinalIgnoreCase);
 
-        public static string Resolve(string name)
+        public static string Resolve(string name, string version)
         {
-            if (!ValidName(name)) return null;
+            if (!ValidName(name) || string.IsNullOrEmpty(version)) return null;
             string path = Path.Combine(Folder(), name);
-            if (!File.Exists(path) || (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0) return null;
-            return path;
+            return ClipRenames.Version(new FileInfo(path)) == version ? path : null;
         }
 
         // a small jpeg of the screenshot (or the first frame of a gif) for the cards of the grid, made once for each state of the file and kept in the clip cache, so the grid never decodes the full png; the viewer still shows the png itself
-        public static string Thumb(string path, string cacheKind = "shots", string what = "screenshot")
+        public static string Thumb(string path, string cacheKind = "shots", string what = "screenshot", string version = null)
         {
             var info = new FileInfo(path);
             string dir = ClipCache.KindDir(cacheKind);
-            string thumb = Path.Combine(dir, ClipCache.KeyFor(info.Name, info, "thumb" + ThumbWidth) + ".jpg");
+            string thumb = Path.Combine(dir, ClipCache.KeyFor(info.Name, info, "thumb" + ThumbWidth + version) + ".jpg");
             lock (ThumbGate)
             {
                 if (File.Exists(thumb))
@@ -140,18 +140,22 @@ namespace ReplayKitHelper
 
         public static JArray List()
         {
-            string folder = Folder();
+            string root = AppConfig.GetClipDir();
+            string folder = Folder(root);
             if (!Directory.Exists(folder)) return new JArray();
-            var metadata = Clips.ReadClipsDb();
+            var metadata = Clips.ReadClipsDb(root);
             return new JArray(new DirectoryInfo(folder).EnumerateFiles("*.png", SearchOption.TopDirectoryOnly)
-                .Where(file => (file.Attributes & FileAttributes.ReparsePoint) == 0 && !file.Name.StartsWith("_replaykit_", StringComparison.OrdinalIgnoreCase))
+                .Where(file => ValidName(file.Name))
                 .OrderByDescending(file => file.LastWriteTimeUtc)
-                .Select(file => new JObject
+                .Select(file => new { File = file, Version = ClipRenames.Version(file) })
+                .Where(item => item.Version != null)
+                .Select(item => new JObject
                 {
-                    ["name"] = file.Name,
-                    ["size"] = file.Length,
-                    ["mtime"] = new DateTimeOffset(file.LastWriteTimeUtc).ToUnixTimeSeconds(),
-                    ["capture"] = ClipGames.Public(metadata["@screenshots/" + file.Name]?["capture"] as JObject, file),
+                    ["name"] = item.File.Name,
+                    ["size"] = item.File.Length,
+                    ["mtime"] = new DateTimeOffset(item.File.LastWriteTimeUtc).ToUnixTimeSeconds(),
+                    ["version"] = item.Version,
+                    ["capture"] = ClipGames.Public(metadata["@screenshots/" + item.File.Name]?["capture"] as JObject, item.File),
                 }));
         }
     }

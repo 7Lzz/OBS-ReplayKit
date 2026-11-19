@@ -32,7 +32,7 @@ private:
 	void Step(bool frameSignal);
 	void Tick(bool frameSignal);
 	bool RebuildRenderer(uint64_t luid);
-	bool EnsureSharedTexture();
+	bool EnsureSharedTexture(bool replace);
 	std::string Execute(const std::string &line);
 	std::string StateJson();
 	void ShowVideoFrame(ULONGLONG now);
@@ -70,10 +70,12 @@ private:
 	// when the loop next needs to run, which the one shot timer is armed for after every round
 	double wakeInMs = 0.0;
 	ULONGLONG awaySince = 0;
+	ULONGLONG firstProducerDeadline = 0;
 	ULONGLONG holdUntil = 0;
 	ULONGLONG showCardUntil = 0;
 	ULONGLONG rebuildAt = 0;
 	uint64_t lastFramesWritten = 0;
+	uint32_t previousProducer = 0;
 	bool live = false;
 
 	uint64_t framesReceived = 0;

@@ -414,7 +414,7 @@
   }
 
   // words of the speech engine to cues: a cue ends at a pause, at the end of a sentence, or once it would be too long to read; what the engine writes for sounds that are not words ([music], (laughs)) is left out. every cue keeps the times of its words, one per word of its text, for the word that lights up as it is spoken
-  function groupWords(words, mapTime, length, alternatives) {
+  function groupWords(words, mapRange, length, alternatives) {
     var lim = LENGTHS[length] || LENGTHS.normal;
     var cues = [];
     var cur = null;
@@ -427,9 +427,11 @@
       var total = parts.reduce(function (sum, part) { return sum + part.length; }, 0);
       var offset = 0;
       parts.forEach(function (part) {
-        var a = mapTime(w[0] + (w[1] - w[0]) * offset / total);
+        var from = w[0] + (w[1] - w[0]) * offset / total;
         offset += part.length;
-        var b = mapTime(w[0] + (w[1] - w[0]) * offset / total);
+        var range = mapRange(from, w[0] + (w[1] - w[0]) * offset / total);
+        if (!range) return;
+        var a = range[0], b = range[1];
         if (!Number.isFinite(a) || !Number.isFinite(b) || b < a) return;
         timed.push([a, Math.min(b, a + Math.max(3, lim.dur)), part, typeof w[3] === "number" && w[3] > 0 ? w[3] : 0]);
       });
@@ -535,7 +537,7 @@
     var root = o.root;
     var els = {};
     var built = false;
-    var job = { run: 0, id: "", timer: 0, busy: false, listenAt: 0, listenTau: 0 };
+    var job = { run: 0, id: "", timer: 0, busy: false, waitingForInstall: false, listenAt: 0, listenTau: 0 };
     var rec = { on: false, starting: false, timer: 0, startT: 0, t0: 0, lag: 0, idle: 0, peaks: [] };
     var clip = null;
     var refreshQueued = 0;
@@ -552,7 +554,11 @@
     function helperJson(path, method) {
       return fetch(o.helper + path, { method: method || "GET", cache: "no-store" }).then(function (res) {
         return res.json().catch(function () { return {}; }).then(function (data) {
-          if (!res.ok || data.ok === false) throw new Error(data.message || ("HTTP " + res.status));
+          if (!res.ok || data.ok === false) {
+            var error = new Error(data.message || ("HTTP " + res.status));
+            error.permanent = res.status < 500 && res.status !== 429;
+            throw error;
+          }
           return data;
         });
       });
@@ -1831,6 +1837,9 @@
       var on = text != null;
       els.generate.classList.toggle("is-working", on);
       els.generate.setAttribute("aria-busy", on ? "true" : "false");
+      var stopLabel = job.waitingForInstall ? RK_M("editor.stopWaitingForSpeech") : RK_M("editor.stopGenerating");
+      els.genCancel.setAttribute("aria-label", stopLabel);
+      els.genCancel.dataset.tooltip = job.waitingForInstall ? stopLabel : RK_M("common.stop");
       if (!on) {
         els.genFill.style.width = "0%";
         els.genLabel.textContent = RK_M("editor.generateSubtitles");
@@ -1851,6 +1860,7 @@
       job.timer = 0;
       job.id = "";
       job.busy = false;
+      job.waitingForInstall = false;
       job.listenAt = 0;
       setProgress(null);
       refresh();
@@ -1875,7 +1885,9 @@
       helperJson("/speech/status?model=" + model).then(function (st) {
         if (run !== job.run) return null;
         if (st.installed) return transcribe(run, model);
-        // the first time the engine and the model of the chosen accuracy are fetched, which the progress says
+        job.waitingForInstall = true;
+        setProgress(RK_M("editor.downloadingSizeMb", { size: st.downloadMb }), st.percent);
+        if (st.installing) return waitInstall(run, model);
         return helperJson("/speech/install?model=" + model, "POST").then(function () { return waitInstall(run, model); });
       }).catch(function (err) {
         if (run !== job.run) return;
@@ -1895,6 +1907,7 @@
     }
 
     function transcribe(run, model) {
+      job.waitingForInstall = false;
       var range = subs.sourceRange();
       var tracks = els.listenRow.hidden ? "0" : els.listen.value() || "0";
       var names = tracks.split(",").map(function (v) { var t = (clip.tracks || []).find(function (x) { return String(x.index) === v; }); return t ? t.label : ""; });
@@ -1919,7 +1932,7 @@
           setProgress(j.state === "preparing" || j.state === "queued" ? RK_M("editor.gettingTheAudio") : j.state === "checking" ? RK_M("editor.checkingUnclearWords") : RK_M("editor.listening"), j.percent);
           return new Promise(function (resolve, reject) { poll(function () { waitJob(run, title).then(resolve, reject); }, 400); });
         }
-        var cues = groupWords(j.words || [], function (t) { return subs.sourceToTimeline(t); }, prefs.length, j.alternatives);
+        var cues = groupWords(j.words || [], subs.sourceToTimeline, prefs.length, j.alternatives);
         endJob();
         var rowId = cues.length ? subs.addRow(title, cues) : "";
         if (!rowId) {
@@ -1933,6 +1946,10 @@
         var check = unsure === 1 ? " " + RK_M("editor.oneMightBeMisheardItIs") : unsure > 1 ? " " + RK_M("editor.countMightBeMisheardTheyAre", { count: unsure }) : "";
         o.notify(RK_M("editor.countSubtitlesAddedInANew", { count: cues.length }) + check + (j.warning ? " " + j.warning : ""), "info");
         return null;
+      }, function (error) {
+        if (run !== job.run) return null;
+        if (error.permanent) throw error;
+        return new Promise(function (resolve, reject) { poll(function () { waitJob(run, title).then(resolve, reject); }, 800); });
       });
     }
 
@@ -1964,10 +1981,11 @@
       if (!lanes.importState().ready) { o.notify(RK_M("editor.audioCannotBeAddedToThis2"), "bad", RK_M("common.record")); return; }
       rec.starting = true;
       paintRecord();
+      var owner = clip;
       var device = els.mic.value();
       helperJson("/voiceover/start" + (device ? "?device=" + encodeURIComponent(device) : ""), "POST").then(function () {
         rec.starting = false;
-        if (!clip) { helperJson("/voiceover/stop?keep=0", "POST").catch(function () {}); paintRecord(); return; }
+        if (clip !== owner) { helperJson("/voiceover/stop?keep=0", "POST").catch(function () {}); paintRecord(); return; }
         rec.on = true;
         rec.idle = 0;
         rec.peaks = [];
@@ -2017,11 +2035,14 @@
       paintWave();
       paintTime(0);
       paintRecord();
-      var at = Math.max(0, rec.startT - rec.lag);
+      var owner = clip;
+      var at = rec.startT;
+      var lead = rec.lag;
       helperJson("/voiceover/stop?keep=" + (keep && clip ? "1" : "0"), "POST").then(function (r) {
-        if (!r.kept || !clip) return;
-        return lanes.placeImportAt(r.import.id, at);
+        if (!r.kept || !owner || clip !== owner) return;
+        return lanes.placeImportAt(r.import.id, at, null, lead);
       }).catch(function (err) {
+        if (clip !== owner) return;
         o.notify((err && err.message) || RK_M("editor.theRecordingCouldNotBeAdded2"), "bad", RK_M("common.record"));
       });
     }
@@ -2055,8 +2076,9 @@
       clip = info;
       // everything the clip hears is the default; a clip with tracks of its own can be listened to one track at a time, which helps when the game drowns out the voice
       var tracks = (info.tracks || []).map(function (t) { return [String(t.index), t.name || t.label]; });
-      els.listen.setOptions([["0", RK_M("editor.allAudio")]].concat(tracks), "0");
-      els.listenRow.hidden = tracks.length < 2;
+      if (!tracks.some(function (track) { return track[0] === "0"; })) tracks.unshift(["0", RK_M("editor.allAudio")]);
+      els.listen.setOptions(tracks, "0");
+      els.listenRow.hidden = (info.tracks || []).length < 2;
       lastTrack = null;
       loadMics();
       refresh();

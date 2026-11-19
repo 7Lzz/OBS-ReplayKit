@@ -17,6 +17,7 @@ namespace ReplayKitHelper
 
         private static readonly object Gate = new object();
         private static MicLoopback _session;
+        private static string _sessionId;
 
         private static JObject Fail(string message) => new JObject { ["ok"] = false, ["message"] = message };
 
@@ -69,7 +70,8 @@ namespace ReplayKitHelper
                     var session = MicLoopback.Start(deviceId, AudioVolume.ToGain(volumePercent), noiseSuppression, sensitivityDb, playback, out string error);
                     if (session == null) return Fail(error);
                     _session = session;
-                    return new JObject { ["ok"] = true };
+                    _sessionId = Guid.NewGuid().ToString("N");
+                    return new JObject { ["ok"] = true, ["session"] = _sessionId };
                 }
             }
             catch (Exception ex)
@@ -80,25 +82,26 @@ namespace ReplayKitHelper
         }
 
         // the page pushes its current (possibly unsaved) values here, so the preview follows the controls the moment they move.
-        public static JObject SetParams(int volumePercent, bool noiseSuppression, int sensitivityDb)
+        public static JObject SetParams(string id, int volumePercent, bool noiseSuppression, int sensitivityDb)
         {
             if (volumePercent < 0 || volumePercent > VolumeMax) return Fail(Locales.Message("settings.volumeMustBeBetween0And", "VolumeMax", VolumeMax));
             if (sensitivityDb < SensitivityMin || sensitivityDb > SensitivityMax) return Fail(Locales.Message("settings.inputSensitivityMustBeBetweenSensitivitymin", "SensitivityMin", SensitivityMin, "SensitivityMax", SensitivityMax));
             lock (Gate)
             {
-                if (_session == null || !_session.IsRunning) return Fail(Locales.Message("settings.theMicrophoneTestIsNotRunning"));
+                if (!IsCurrent(id) || !_session.IsRunning) return Fail(Locales.Message("settings.theMicrophoneTestIsNotRunning"));
                 _session.SetParams(AudioVolume.ToGain(volumePercent), noiseSuppression, sensitivityDb);
                 return new JObject { ["ok"] = true };
             }
         }
 
         // ok with active=false is a normal answer -- the test ended (stopped, idle, or a device error) and message says why when it was not a plain stop.
-        public static JObject ReadLevel()
+        public static JObject ReadLevel(string id)
         {
             lock (Gate)
             {
                 var session = _session;
                 if (session == null) return Level(false, false, 0, 0, 0, "");
+                if (!IsCurrent(id)) return Level(false, false, 0, 0, 0, Locales.Message("settings.theMicrophoneTestIsNotRunning"));
                 if (!session.IsRunning)
                 {
                     _session = null;
@@ -114,16 +117,25 @@ namespace ReplayKitHelper
             }
         }
 
-        public static JObject Stop()
+        public static void Stop()
         {
             lock (Gate) StopLocked();
+        }
+
+        public static JObject Stop(string id)
+        {
+            lock (Gate)
+                if (IsCurrent(id)) StopLocked();
             return new JObject { ["ok"] = true };
         }
+
+        private static bool IsCurrent(string id) => _session != null && string.Equals(id, _sessionId, StringComparison.Ordinal);
 
         private static void StopLocked()
         {
             var session = _session;
             _session = null;
+            _sessionId = null;
             if (session != null) session.Stop();
         }
 

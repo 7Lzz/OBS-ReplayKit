@@ -111,7 +111,7 @@ namespace ReplayKitHelper
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
                 HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["message"] = Locales.Message("helper.obsIsClosing") });
                 // the installer says when the close is for an update
-                ObsProcess.StopObsForRestart("/exit-obs", Q("reason") == "update" || Update.InstallerRunning());
+                ObsProcess.StopObsForRestart("/exit-obs", Q("reason") == "update");
                 return false;
             }
 

@@ -80,6 +80,8 @@ namespace ReplayKitHelper
                 // the one extra binding each hotkey may have (the + of the hotkeys page)
                 ["clipKeybindExtra"] = new JObject(),
                 ["recordingKeybindExtra"] = new JObject(),
+                ["recordingStopKeybind"] = JValue.CreateNull(),
+                ["recordingStopKeybindExtra"] = JValue.CreateNull(),
                 ["openClipsKeybindExtra"] = new JObject(),
                 ["screenshotKeybindExtra"] = new JObject(),
                 ["overlayStyle"] = SettingDefaults.OverlayStyle,
@@ -631,6 +633,8 @@ namespace ReplayKitHelper
                 ["openClipsKeybind"] = NormalizeOpenClipsKeybind(data["openClipsKeybind"]),
                 ["clipKeybindExtra"] = NormalizeExtraKeybind(data["clipKeybindExtra"], "extra clip keybind"),
                 ["recordingKeybindExtra"] = NormalizeExtraKeybind(data["recordingKeybindExtra"], "extra recording keybind"),
+                ["recordingStopKeybind"] = data["recordingStopKeybind"] is JObject ? (JToken)NormalizeRecordingKeybind(data["recordingStopKeybind"]) : JValue.CreateNull(),
+                ["recordingStopKeybindExtra"] = data["recordingStopKeybindExtra"] is JObject ? (JToken)NormalizeExtraKeybind(data["recordingStopKeybindExtra"], "extra stop recording keybind") : JValue.CreateNull(),
                 ["openClipsKeybindExtra"] = NormalizeExtraKeybind(data["openClipsKeybindExtra"], "extra open clips keybind"),
                 ["screenshotKeybind"] = NormalizeExtraKeybind(data["screenshotKeybind"], "screenshot keybind"),
                 ["screenshotKeybindExtra"] = NormalizeExtraKeybind(data["screenshotKeybindExtra"], "extra screenshot keybind"),
@@ -1082,8 +1086,7 @@ namespace ReplayKitHelper
             try
             {
                 if (Server.State.Config == null) return;
-                string clipDir = settings?["clipDir"]?.Value<string>();
-                if (string.IsNullOrWhiteSpace(clipDir)) return;
+                string clipDir = settings?["clipDir"]?.Value<string>() ?? "";
                 if (string.Equals(Server.State.Config["clipDir"]?.Value<string>(), clipDir, StringComparison.Ordinal)) return;
                 Server.State.Config["clipDir"] = clipDir;
             }
@@ -1168,8 +1171,9 @@ namespace ReplayKitHelper
         internal static JObject StopObsOutputIfActive(string statusRequest, string stopRequest)
         {
             var status = ObsWebSocket.InvokeRequest(statusRequest, null, 3000);
-            if (!status.Ok) return new JObject { ["ok"] = true, ["wasActive"] = false, ["warning"] = Locales.Message("settings.outputReadStateFailed", "output", OutputName(statusRequest), "error", status.Message) };
-            if (!(status.Data?["outputActive"]?.Value<bool>() ?? false)) return new JObject { ["ok"] = true, ["wasActive"] = false };
+            var active = status.Data?["outputActive"];
+            if (!status.Ok || active?.Type != JTokenType.Boolean) return new JObject { ["ok"] = false, ["wasActive"] = false, ["warning"] = Locales.Message("settings.outputReadStateFailed", "output", OutputName(statusRequest), "error", status.Message) };
+            if (!active.Value<bool>()) return new JObject { ["ok"] = true, ["wasActive"] = false };
             var stop = ObsWebSocket.InvokeRequest(stopRequest, null, 8000);
             if (!stop.Ok) return new JObject { ["ok"] = false, ["wasActive"] = true, ["warning"] = Locales.Message("settings.outputStopFailed", "output", OutputName(statusRequest), "error", stop.Message) };
             var wait = WaitObsOutputState(statusRequest, false, 8000);
@@ -1189,7 +1193,8 @@ namespace ReplayKitHelper
             do
             {
                 var status = ObsWebSocket.InvokeRequest(statusRequest, null, 3000);
-                if (status.Ok && (status.Data?["outputActive"]?.Value<bool>() ?? false) == desiredActive) return new JObject { ["ok"] = true };
+                var active = status.Data?["outputActive"];
+                if (status.Ok && active?.Type == JTokenType.Boolean && active.Value<bool>() == desiredActive) return new JObject { ["ok"] = true };
                 // a status read over the cached socket costs a few ms, and every poll gap is time the clip buffer stays stopped
                 Thread.Sleep(50);
             } while (DateTime.UtcNow < deadline);

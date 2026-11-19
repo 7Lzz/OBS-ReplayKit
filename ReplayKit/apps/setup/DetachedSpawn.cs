@@ -40,16 +40,21 @@ namespace ReplayKitSetup
         // the flag the relaunched copy carries so it knows it is already detached and does the work instead of relaunching again.
         public const string DetachedFlag = "--detached";
 
-        // where the detached copy records its own pid. the helper watches THIS rather than the process it started, because the process it started is only the launcher and exits within a second of handing off.
-        public static string PidFilePath() => Path.Combine(ReplayKitShared.TempLayout.Logs, ReplayKitShared.TempLayout.UpdatePidFile);
+        // the helper watches the detached worker, which may outlive the launcher.
+        public static void WritePid(int pid, string attemptId)
 
-        public static void WriteOwnPid()
         {
             try
             {
-                string path = PidFilePath();
+                string path = Path.Combine(ReplayKitShared.TempLayout.Logs, ReplayKitShared.TempLayout.UpdateFile(ReplayKitShared.TempLayout.UpdatePidFile, attemptId));
                 Directory.CreateDirectory(Path.GetDirectoryName(path));
-                File.WriteAllText(path, System.Diagnostics.Process.GetCurrentProcess().Id.ToString(), new UTF8Encoding(false));
+                string temporary = path + "." + Guid.NewGuid().ToString("N");
+                try
+                {
+                    File.WriteAllText(temporary, pid.ToString(), new UTF8Encoding(false));
+                    File.Move(temporary, path, true);
+                }
+                finally { File.Delete(temporary); }
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
         }

@@ -37,7 +37,7 @@ namespace ReplayKitHelper
             public string State = "ok";
             public long Size;
             public string Version = "";
-            // whether the sidecar vouched for the file; a copy made by a setup exe from before the sidecar existed is accepted but unverified
+            // whether the cached file passed its sidecar integrity check
             public bool Verified;
         }
 
@@ -47,7 +47,7 @@ namespace ReplayKitHelper
             if (!File.Exists(exe)) return new Inspection { State = "missing" };
             long size = new FileInfo(exe).Length;
             if (size < MinBytes) return new Inspection { State = "incomplete", Size = size };
-            if (!File.Exists(MetaPath)) return new Inspection { Valid = true, Size = size };
+            if (!File.Exists(MetaPath)) return new Inspection { State = "damaged", Size = size };
             try
             {
                 var meta = JObject.Parse(File.ReadAllText(MetaPath));

@@ -206,7 +206,6 @@ namespace ReplayKitHelper
 
         private static string Pick(string value, string fallback, params string[] allowed) => Array.IndexOf(allowed, value) >= 0 ? value : fallback;
 
-        // control characters go, and the two characters that start ass commands are swapped for look-alikes so a subtitle can never restyle itself
         private static string Clean(string text)
         {
             var sb = new StringBuilder();
@@ -214,12 +213,15 @@ namespace ReplayKitHelper
             {
                 if (sb.Length >= MaxTextLength) break;
                 if (char.IsControl(ch)) continue;
-                if (ch == '{') sb.Append('(');
-                else if (ch == '}') sb.Append(')');
-                else if (ch == '\\') sb.Append('＼');
-                else sb.Append(ch);
+                sb.Append(ch);
             }
             return Regex.Replace(sb.ToString(), @"\s+", " ").Trim();
+        }
+
+        private static string EscapeText(string text)
+        {
+            // libass escapes braces, and a word joiner keeps a literal backslash from starting an escape
+            return text.Replace("\\", "\\\u2060").Replace("{", "\\{").Replace("}", "\\}");
         }
 
         private static int CountWords(List<string> lines)
@@ -269,8 +271,8 @@ namespace ReplayKitHelper
                 for (int j = 0; j < parts.Length; j++, word++)
                 {
                     if (j > 0) sb.Append(' ');
-                    if (word == lit) sb.Append("{\\1c").Append(Bgr(style.Word)).Append("\\1a").Append(AssAlpha(style.Word)).Append('}').Append(parts[j]).Append("{\\r}");
-                    else sb.Append(parts[j]);
+                    if (word == lit) sb.Append("{\\1c").Append(Bgr(style.Word)).Append("\\1a").Append(AssAlpha(style.Word)).Append('}').Append(EscapeText(parts[j])).Append("{\\r}");
+                    else sb.Append(EscapeText(parts[j]));
                 }
             }
             return sb.ToString();
@@ -291,11 +293,11 @@ namespace ReplayKitHelper
                 {
                     string gap = i > 0 && j == 0 ? "\\N" : j > 0 ? " " : "";
                     double from = cue.Words[word], to = cue.Ends[word];
-                    if (to <= a + 1e-6) { sb.Append(gap).Append(parts[j]); continue; }
+                    if (to <= a + 1e-6) { sb.Append(gap).Append(EscapeText(parts[j])); continue; }
                     long wait = Math.Max(spent, (long)Math.Round((Math.Max(from, a) - a) * 100));
                     long done = Math.Max(wait, (long)Math.Round((to - a) * 100));
                     sb.Append("{\\k").Append(wait - spent).Append('}').Append(gap);
-                    sb.Append("{\\kf").Append(done - wait).Append('}').Append(parts[j]);
+                    sb.Append("{\\kf").Append(done - wait).Append('}').Append(EscapeText(parts[j]));
                     spent = done;
                 }
             }

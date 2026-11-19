@@ -101,6 +101,7 @@
 
   // the page states what it wants the helper to be doing (desired) and reconcile() walks the real state (mode) toward it one request at a time: off, a silent level monitor that feeds the sensitivity bar, or the playback test
   var mode = "off", desired = "off";
+  var session = "";
   var opening = false, restartPending = false, polling = false, blocked = false, visible = !("IntersectionObserver" in window);
   var failures = 0, recoveries = 0, noteError = "";
   var pollTimer = 0, meterTimer = 0, paramsTimer = 0, sentSig = "";
@@ -366,33 +367,39 @@
     restartPending = false;
     syncTestUi();
     sentSig = paramQuery();
-    api("POST", sessionUrl(playback)).then(function () {
+    api("POST", sessionUrl(playback)).then(function (data) {
+      session = data.session || "";
+      if (!session) throw new Error(RK_M("settings.theMicrophoneTestIsNotRunning"));
       mode = playback ? "test" : "monitor";
       failures = 0;
       startPolling();
     }).catch(function (e) {
       // the helper drops the running session before it tries the new one, so a failed open leaves nothing running
       mode = "off";
+      session = "";
       stopPolling();
       target = 0;
       senseTarget = 0;
       noteError = (e && e.message) || RK_M("settings.couldNotOpenTheMicrophone");
       // a test that cannot play still leaves the level monitor worth trying; a monitor that cannot open is given up on until the user acts
-      desired = playback ? "monitor" : "off";
+      if (desired !== "off") desired = playback ? "monitor" : "off";
       blocked = !playback;
       kickMeter();
     }).then(function () { opening = false; syncTestUi(); reconcile(); pushParams(); });
   }
   function closeSession(keepalive) {
+    var id = session;
+    session = "";
     mode = "off";
     stopPolling();
     target = 0;
     senseTarget = 0;
     syncTestUi();
     kickMeter();
-    return api("POST", "mic/test/stop", keepalive).catch(function () {});
+    if (id) return api("POST", "mic/test/stop?session=" + encodeURIComponent(id), keepalive).catch(function () {});
   }
   function sessionEnded(message) {
+    session = "";
     mode = "off";
     stopPolling();
     target = 0;
@@ -410,17 +417,20 @@
     reconcile();
   }
   function poll() {
-    if (mode === "off" || polling) return;
+    if (!session || mode === "off" || polling) return;
     // a hidden window keeps its timers, so it has to notice and stop itself or the microphone would stay open behind a closed window
     if (!RKWindow.up()) { applyVisibility(); return; }
     polling = true;
-    api("GET", "mic/test/level?t=" + Date.now()).then(function (d) {
+    var id = session;
+    api("GET", "mic/test/level?session=" + encodeURIComponent(id) + "&t=" + Date.now()).then(function (d) {
+      if (session !== id) return;
       failures = 0;
       if (!d.active) { sessionEnded(d.message || ""); return; }
       recoveries = 0;
       senseTarget = senseFraction(d.gatePeak);
       target = mode === "test" ? levelFraction(d.peak) : 0;
     }).catch(function () {
+      if (session !== id) return;
       if (++failures < 3) return;
       mode = "off";
       desired = "off";
@@ -461,10 +471,7 @@
   }
   window.addEventListener("pagehide", function () {
     desired = "off";
-    if (mode === "off" && !opening) return;
-    mode = "off";
-    stopPolling();
-    api("POST", "mic/test/stop", true).catch(function () {});
+    if (session) closeSession(true);
   });
 
   testBtn.addEventListener("click", function () {
@@ -480,9 +487,12 @@
     clearTimeout(paramsTimer);
     paramsTimer = setTimeout(function () {
       var sig = paramQuery();
-      if (mode === "off" || sig === sentSig) return;
+      var id = session;
+      if (!id || mode === "off" || sig === sentSig) return;
       sentSig = sig;
-      api("POST", "mic/test/params?" + sig).catch(function () { sentSig = ""; });
+      api("POST", "mic/test/params?session=" + encodeURIComponent(id) + "&" + sig).catch(function () {
+        if (session === id && sentSig === sig) sentSig = "";
+      });
     }, 40);
   }
 

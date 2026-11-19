@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using ReplayKitShared;
 
 namespace ReplayKitSetup
 {
@@ -60,13 +61,12 @@ namespace ReplayKitSetup
             System.Threading.Thread.Sleep(120);
         }
 
-        // build + run every apply step against the given progress sink. rethrows if a step throws; otherwise returns the accumulated non-fatal issues. discordScreenshare is the one user choice -- null means "leave it as loaded" (the live settings for an update; the default after cleanInstall wiped them). cleanInstall drops the preserved ReplayKit settings/prefs first so the run rebuilds from the bundle + defaults, like a first install.
+        // clean setup uses the defaults and clears old settings only after prerequisites and backup succeed.
         public static List<string> RunInstallFlow(bool? discordScreenshare, IInstallProgress progress, bool cleanInstall = false)
         {
+            using var transaction = RuntimeTransaction.Open();
             Transform.CleanReinstall = cleanInstall;
-            if (cleanInstall) WipePreservedReplaykitState(progress);
-
-            var prefs = Prefs.LoadPrefs();
+            var prefs = Prefs.LoadPrefs(cleanInstall);
             // the setup checkbox turns the whole Share Preview feature on or off: turning it on from off also switches Share Preview on, turning it off switches it off, and an update that leaves it on keeps the Share Preview state saved in the settings. null (headless) leaves whatever was loaded.
             if (discordScreenshare.HasValue)
             {
@@ -76,7 +76,7 @@ namespace ReplayKitSetup
             if (!prefs.DiscordScreenshareEnabled) prefs.DiscordProjectorEnabled = false;
 
             // capture before any step runs -- a genuine first install has no runtime settings file yet, and that is the only case that should arm the in-obs first-run wizard. a clean re-install just deleted it, so it counts too.
-            bool firstInstall = !File.Exists(Prefs.RUNTIME_SETTINGS_FILE);
+            bool firstInstall = cleanInstall || !File.Exists(Prefs.RUNTIME_SETTINGS_FILE);
 
             var steps = new List<(SetupLocale.Text Title, SetupLocale.Text Detail, Func<object> Action)>();
             void Add(SetupLocale.Text title, SetupLocale.Text detail, Func<object> action) => steps.Add((title, detail, action));
@@ -84,6 +84,9 @@ namespace ReplayKitSetup
             // hard prerequisite: every step after this writes into the OBS install. a failed download used to fall through as a soft "issue" and the flow kept going, scattering plugins into a dead folder and still showing "Done".
             Add(SetupLocale.Pair("setup.installObsStudio"), SetupLocale.Pair("setup.installsObsOrUpdatesItTo"), () =>
             {
+                Installer.ValidateRuntimeAssets();
+                if (transaction.Pending) Obs.CloseObs(progress.LogLine);
+                transaction.Recover(progress.LogLine);
                 ObsDownloader.EnsureObsVersion(progress);
                 if (Obs.FindObsExe() == null)
                 {
@@ -102,8 +105,7 @@ namespace ReplayKitSetup
             Add(SetupLocale.Pair("setup.closeObs"), SetupLocale.Pair("setup.stopsObsToWriteSettings"), () => (object)Obs.CloseObs(progress.LogLine));
             Add(SetupLocale.Pair("setup.lockObsUpdates"), SetupLocale.Pair("setup.keepsObsOnAVersionReplaykit"), () => (object)ObsUpdateLock.Lock(progress.LogLine));
             Add(SetupLocale.Pair("setup.installObsProcessRoles"), SetupLocale.Pair("setup.preparesObsBrowserAndReplaykitHelper"), () => { ProcessHost.Install(progress.LogLine); return (object)true; });
-            Add(SetupLocale.Pair("setup.clearOldObsFiles"), SetupLocale.Pair("setup.removesFilesAnObsUpdateLeft"), () => { ObsDownloader.RemoveReplacedCoreModules(progress.LogLine); return (object)true; });
-            Add(SetupLocale.Pair("setup.backUpCurrentObsSettings"), SetupLocale.Pair("setup.savesARestoreCopyFirst"), () => { Installer.BackupExistingConfig(progress.LogLine); return (object)true; });
+            Add(SetupLocale.Pair("setup.backUpCurrentObsSettings"), SetupLocale.Pair("setup.savesARestoreCopyFirst"), () => { Installer.BackupExistingConfig(progress.LogLine, cleanInstall); return (object)true; });
             Add(SetupLocale.Pair("setup.prepareObsSettingsFolder"), SetupLocale.Pair("setup.createsTheConfigFolder"), () => { Directory.CreateDirectory(Config.OBS_CONFIG); Obs.CleanupCrashFlags(progress.LogLine); return (object)true; });
             // no helper means no dock, no clips, no settings ui -- throw so RunApplyStep stops the flow instead of the old behaviour where a false here only added a "needs attention" line while the rest ran anyway.
             Add(SetupLocale.Pair("setup.buildReplaykitHelper"), SetupLocale.Pair("setup.preparesTheLocalHelper"), () =>
@@ -129,6 +131,7 @@ namespace ReplayKitSetup
                 Add(SetupLocale.Pair("setup.skipDiscordScreenshare"), SetupLocale.Pair("setup.sharePreviewStaysOff"), () => (object)true);
             Add(SetupLocale.Pair("setup.writeReplaykitObsProfile"), SetupLocale.Pair("setup.writesTheReplaykitObsProfile"), () =>
             {
+                if (cleanInstall) WipePreservedReplaykitState(progress);
                 bool ok = Installer.InstallObsConfig(prefs, progress.LogLine) > 0;
                 if (ok && firstInstall) Installer.MarkSetupWizardPending(progress.LogLine);
                 return (object)ok;
@@ -183,32 +186,16 @@ namespace ReplayKitSetup
         // clean re-install: drop the ReplayKit settings + prefs the normal flow would preserve, so everything is rebuilt from the bundle and defaults and the in-obs first-run wizard re-arms. clip history (clips_db/index) is left alone.
         private static void WipePreservedReplaykitState(IInstallProgress progress)
         {
-            var targets = new[]
+            var targets = new HashSet<string>(StateLayout.Paths(Config.REPLAYKIT_CONFIG, StateLayout.SettingsFile), StringComparer.OrdinalIgnoreCase)
             {
-                Prefs.RUNTIME_SETTINGS_FILE,
                 Prefs.PREFS_FILE,
                 Prefs.SETUP_CACHE_PREFS_FILE,
-                DefaultsMigration.MarkerPath,
             };
+            targets.UnionWith(StateLayout.Paths(Config.REPLAYKIT_CONFIG, StateLayout.DefaultsAppliedFile));
             foreach (var path in targets)
             {
-                try { if (File.Exists(path)) { File.Delete(path); progress.LogLine("clean re-install: removed " + path); } }
-                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
-                {
-                    progress.LogLine("warn: could not remove " + path + ": " + ex.Message);
-                }
-            }
-            try
-            {
-                if (Directory.Exists(Config.REPLAYKIT_USER_STATE_CACHE))
-                {
-                    Directory.Delete(Config.REPLAYKIT_USER_STATE_CACHE, true);
-                    progress.LogLine("clean re-install: cleared saved settings cache");
-                }
-            }
-            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
-            {
-                progress.LogLine("warn: could not clear " + Config.REPLAYKIT_USER_STATE_CACHE + ": " + ex.Message);
+                try { File.Delete(path); }
+                catch (DirectoryNotFoundException) { }
             }
         }
     }

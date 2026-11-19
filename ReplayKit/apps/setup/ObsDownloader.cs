@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Runtime.InteropServices;
@@ -73,43 +72,6 @@ namespace ReplayKitSetup
             if (installed == target) return true;
             progress.LogLine("warn: OBS " + target + " was installed but OBS reports version " + (installed?.ToString() ?? "(none)"));
             return false;
-        }
-
-        // obs updated in place keeps the first-party plugins and browser of its old version in obs-plugins\64bit and data\obs-plugins (about 300 MB), which obs 33 and later skip since they live in core\ now; only names core\ has too are removed, so third-party plugins in the legacy folders stay. obs is closed when this runs
-        public static void RemoveReplacedCoreModules(Action<string> log)
-        {
-            string root = Config.PROGRAMFILES_OBS_DIR, core = Path.Combine(root, "core");
-            if (!Directory.Exists(core)) return;
-            var coreNames = new HashSet<string>(Directory.EnumerateFiles(core, "*", SearchOption.AllDirectories).Select(Path.GetFileName), StringComparer.OrdinalIgnoreCase);
-            int removed = 0, failed = 0;
-            long bytes = 0;
-            string bin = Path.Combine(root, "obs-plugins", "64bit");
-            if (Directory.Exists(bin))
-            {
-                foreach (string file in Directory.EnumerateFiles(bin, "*", SearchOption.AllDirectories).ToList())
-                {
-                    if (!coreNames.Contains(Path.GetFileName(file))) continue;
-                    try { long size = new FileInfo(file).Length; File.Delete(file); removed++; bytes += size; }
-                    catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { failed++; }
-                }
-                foreach (string dir in Directory.EnumerateDirectories(bin, "*", SearchOption.AllDirectories).OrderByDescending(d => d.Length).ToList())
-                {
-                    try { if (!Directory.EnumerateFileSystemEntries(dir).Any()) Directory.Delete(dir); }
-                    catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
-                }
-            }
-            string data = Path.Combine(root, "data", "obs-plugins");
-            if (Directory.Exists(data))
-            {
-                foreach (string dir in Directory.EnumerateDirectories(data).ToList())
-                {
-                    if (!Directory.Exists(Path.Combine(core, Path.GetFileName(dir)))) continue;
-                    try { bytes += Directory.EnumerateFiles(dir, "*", SearchOption.AllDirectories).Sum(f => new FileInfo(f).Length); Directory.Delete(dir, true); removed++; }
-                    catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { failed++; }
-                }
-            }
-            if (removed > 0) log?.Invoke($"removed {removed} file(s) and folder(s) of the old OBS version that OBS no longer loads ({bytes / (1024 * 1024)} MB)");
-            if (failed > 0) log?.Invoke($"{failed} old OBS file(s) were in use and stay until the next update");
         }
 
         // why the installed obs can never be put on the supported version by this installer, or null: steam decides the version of its own copy, and going back across majors can break the settings of obs

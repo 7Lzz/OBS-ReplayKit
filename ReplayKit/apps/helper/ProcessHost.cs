@@ -9,8 +9,18 @@ namespace ReplayKitHelper
 {
     internal static class ProcessHost
     {
+        [DllImport("kernel32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool IsProcessInJob(IntPtr process, IntPtr job, [MarshalAs(UnmanagedType.Bool)] out bool grouped);
+
         internal static bool Hosted;
         internal static string HelperExecutable => typeof(Program).Assembly.Location;
+
+        internal static bool Grouped()
+        {
+            using (var process = Process.GetCurrentProcess())
+                return IsProcessInJob(process.Handle, IntPtr.Zero, out bool grouped) && grouped;
+        }
 
         internal static string CommandLine(IEnumerable<string> arguments)
         {

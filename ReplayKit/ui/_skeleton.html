@@ -281,9 +281,10 @@
     c.root.removeAttribute("aria-busy");
     function finish() {
       c.layer.remove();
-      c.root.ownerDocument.dispatchEvent(new Event("replaykit-skeleton-layout"));
+      var doc = c.root.ownerDocument;
+      doc.dispatchEvent(new Event("replaykit-skeleton-layout"));
       // the page kept its own shape once its first data is in and it has settled; inside obs the shell keeps the same one as well
-      if (c.view) saveSettled(pageKey(c), c.root.ownerDocument);
+      if (c.view && c.variant === doc.body.dataset.skelPage) saveSettled(pageKey(c), doc);
     }
     if (!fade) { finish(); return; }
     c.root.animate([{ opacity:0 }, { opacity:1 }], { duration:FADE_MS, easing:"ease" });
@@ -344,10 +345,11 @@
   var settling = {};
   function saveSettled(key, doc) {
     if (settling[key]) settling[key]();
+    var variant = doc.body.dataset.skelPage;
     var stopped = false, tries = 0, last = null;
     function step() {
       if (stopped) return;
-      if (++tries > SETTLE_TRIES) { stop(); return; }
+      if (variant !== doc.body.dataset.skelPage || ++tries > SETTLE_TRIES) { stop(); return; }
       var map = settledState(doc) ? measure(doc.body) : null;
       if (map && sameShape(map, last)) { save(key, map); stop(); return; }
       last = map;

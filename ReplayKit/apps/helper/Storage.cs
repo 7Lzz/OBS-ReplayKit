@@ -182,6 +182,7 @@ namespace ReplayKitHelper
             public Clips.SafeClipPath Path;
             public long Size;
             public DateTime WriteTime;
+            public string Version;
         }
 
         private static SelectedClip SelectClip(string name, string folder, long size)
@@ -190,7 +191,9 @@ namespace ReplayKitHelper
             if (selected == null) throw new IOException(Locales.Message("storage.theSelectedClipIsNoLonger"));
             var file = new FileInfo(selected.Full);
             if (!file.Exists || file.Length != size) throw new IOException(Locales.Message("common.theSelectedClipChangedReviewThe"));
-            return new SelectedClip { Path = selected, Size = size, WriteTime = file.LastWriteTimeUtc };
+            string version = ClipRenames.Version(file);
+            if (version == null) throw new IOException(Locales.Message("common.theSelectedClipChangedReviewThe"));
+            return new SelectedClip { Path = selected, Size = size, WriteTime = file.LastWriteTimeUtc, Version = version };
         }
 
         private sealed class TrimPlan
@@ -201,6 +204,7 @@ namespace ReplayKitHelper
             // the favourites hold the rest: even with every other clip gone the library would still be over the limit
             public bool Insufficient;
             public string Token = "";
+            public string Folder;
         }
 
         // the oldest clips first, favourites never, until the library is back under the limit
@@ -208,15 +212,16 @@ namespace ReplayKitHelper
         {
             var plan = new TrimPlan();
             string folder = Path.GetFullPath(AppConfig.GetClipDir());
+            plan.Folder = folder;
             long limitBytes = ReplaykitSettings.GetStorageLimitGb() * BytesPerGb;
             if (limitBytes <= 0) return plan;
-            var clips = Clips.GetClipsList();
+            var clips = Clips.GetClipsList(folder);
             long total = 0;
             foreach (var clip in clips) total += clip["size"]?.Value<long>() ?? 0;
             plan.Over = Math.Max(0, total - limitBytes);
             if (plan.Over == 0) return plan;
 
-            var favorites = FavoriteNames();
+            var favorites = FavoriteNames(folder);
 
             var candidates = clips
                 .Where(c => !string.IsNullOrEmpty(c["name"]?.Value<string>()) && !favorites.Contains(c["name"].Value<string>()))
@@ -235,7 +240,7 @@ namespace ReplayKitHelper
             using (var sha = SHA256.Create())
             {
                 var text = folder.ToUpperInvariant() + "|" + limitBytes.ToString(CultureInfo.InvariantCulture) + "\n" +
-                    string.Join("\n", plan.Victims.Select(v => v.Path.Full.ToUpperInvariant() + "|" + v.Size.ToString(CultureInfo.InvariantCulture) + "|" + v.WriteTime.Ticks.ToString(CultureInfo.InvariantCulture)));
+                    string.Join("\n", plan.Victims.Select(v => v.Version));
                 plan.Token = BitConverter.ToString(sha.ComputeHash(Encoding.UTF8.GetBytes(text))).Replace("-", "").ToLowerInvariant();
             }
             return plan;
@@ -266,23 +271,23 @@ namespace ReplayKitHelper
                 return new JObject { ["ok"] = false, ["changed"] = true, ["message"] = Locales.Message("storage.yourLibraryChangedWhileYouWere") };
             int deleted = 0, failed = 0;
             long freed = 0;
+            string warning = "";
             foreach (var victim in plan.Victims)
             {
-                var result = Clips.DeleteClip(victim.Path, victim.Size, victim.WriteTime, keep: false);
-                if (result.Status == 200) { deleted++; freed += victim.Size; }
+                var result = Clips.DeleteClip(victim.Path, victim.Size, victim.WriteTime, keep: false, protectFavoritesIn: plan.Folder, expectedVersion: victim.Version);
+                if (result.Status == 200)
+                {
+                    deleted++;
+                    freed += victim.Size;
+                    if (!string.IsNullOrEmpty(result.Warning)) warning = result.Warning;
+                }
                 else failed++;
             }
             RefreshFolderSizes(true);
-            return new JObject { ["ok"] = true, ["deleted"] = deleted, ["failed"] = failed, ["freedBytes"] = freed, ["freedText"] = FormatBytes(freed) };
+            return new JObject { ["ok"] = true, ["deleted"] = deleted, ["failed"] = failed, ["freedBytes"] = freed, ["freedText"] = FormatBytes(freed), ["warning"] = warning };
         }
 
-        private static HashSet<string> FavoriteNames()
-        {
-            var favorites = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            var favoriteList = Clips.GetClipUiStatePayload()["state"]?["favorites"] as JArray;
-            if (favoriteList != null) foreach (var f in favoriteList) favorites.Add(f.Value<string>() ?? "");
-            return favorites;
-        }
+        private static HashSet<string> FavoriteNames(string folder) => Clips.WithFavorites(folder, favorites => favorites);
 
         // -- compressing clips from the card: the biggest clips are offered, and the ones ticked are compressed one after the other with the worker of the clips page
 
@@ -306,6 +311,7 @@ namespace ReplayKitHelper
             public int CurrentPercent;
             public bool Running, Cancelled;
             public string Error = "";
+            public string Warning = "";
             // tells the card one run from another, and how long ago this one ended, so a result that is days old is not shown as news
             public readonly long Id = DateTime.UtcNow.Ticks;
             public DateTime FinishedAt = DateTime.MinValue;
@@ -319,8 +325,7 @@ namespace ReplayKitHelper
 
         private sealed class VerifiedMarker
         {
-            public long Size;
-            public DateTime WriteTime;
+            public string Version;
             public Compression.CompressMarker Marker;
         }
 
@@ -332,14 +337,14 @@ namespace ReplayKitHelper
             lock (MarkerGate)
             {
                 if (!fresh && Markers.TryGetValue(selected.Path.Full, out var cached) &&
-                    cached.Size == selected.Size && cached.WriteTime == selected.WriteTime) return cached.Marker;
+                    cached.Version == selected.Version) return cached.Marker;
                 var marker = Compression.GetCompressMarker(selected.Path.Full);
                 if (!marker.Ok) throw new IOException(Locales.Message("storage.theClipCompressionHistoryCouldNot"));
                 var after = new FileInfo(selected.Path.Full);
-                if (!after.Exists || after.Length != selected.Size || after.LastWriteTimeUtc != selected.WriteTime)
+                if (ClipRenames.Version(after) != selected.Version)
                     throw new IOException(Locales.Message("storage.theClipChangedWhileItsCompression"));
                 if (Markers.Count >= 256) Markers.Clear();
-                Markers[selected.Path.Full] = new VerifiedMarker { Size = selected.Size, WriteTime = selected.WriteTime, Marker = marker };
+                Markers[selected.Path.Full] = new VerifiedMarker { Version = selected.Version, Marker = marker };
                 return marker;
             }
         }
@@ -348,18 +353,18 @@ namespace ReplayKitHelper
         {
             if (limit <= 0) limit = OfferedClips;
             limit = Math.Min(limit, MaxBatchClips);
-            var everything = Clips.GetClipsList();
+            string folder = Path.GetFullPath(AppConfig.GetClipDir());
+            var everything = Clips.GetClipsList(folder);
             string mode = ReplaykitSettings.GetStorageCompressionType();
             var history = CompressionHistory.GetEstimate(mode);
             double savedFraction = history.SavedFraction;
-            var favorites = includeFavorites ? new HashSet<string>(StringComparer.OrdinalIgnoreCase) : FavoriteNames();
+            var favorites = includeFavorites ? new HashSet<string>(StringComparer.OrdinalIgnoreCase) : FavoriteNames(folder);
             var candidates = everything.Where(c =>
             {
                 string name = c["name"]?.Value<string>();
                 if (string.IsNullOrEmpty(name) || favorites.Contains(name)) return false;
                 return (c["size"]?.Value<long>() ?? 0) >= MinCompressBytes;
             }).OrderByDescending(c => c["size"]?.Value<long>() ?? 0).ToList();
-            string folder = Path.GetFullPath(AppConfig.GetClipDir());
             string ffprobe = Compression.GetToolPaths()["ffprobe"]?.Value<string>();
             if (string.IsNullOrEmpty(ffprobe) || !File.Exists(ffprobe))
                 throw new IOException(Locales.Message("storage.ffprobeMissing"));
@@ -371,10 +376,11 @@ namespace ReplayKitHelper
                 if (offered.Count >= limit) break;
                 scanned++;
                 long size = c["size"]?.Value<long>() ?? 0;
+                SelectedClip selected;
                 Compression.CompressMarker marker;
                 try
                 {
-                    var selected = SelectClip(c["name"].Value<string>(), folder, size);
+                    selected = SelectClip(c["name"].Value<string>(), folder, size);
                     if (JobCoordinator.IsEditorSource(selected.Path.Full)) continue;
                     marker = VerifyMarker(selected);
                 }
@@ -383,7 +389,7 @@ namespace ReplayKitHelper
                 string compressedMode = marker.Mode;
                 eligibleBytes += size;
                 long estimate = (long)(size * savedFraction);
-                offered.Add(new JObject { ["name"] = c["name"], ["size"] = size, ["sizeText"] = FormatBytes(size), ["compressed"] = compressedMode, ["estimateBytes"] = estimate });
+                offered.Add(new JObject { ["name"] = c["name"], ["version"] = selected.Version, ["size"] = size, ["sizeText"] = FormatBytes(size), ["compressed"] = compressedMode, ["estimateBytes"] = estimate });
             }
             return new JObject
             {
@@ -395,30 +401,32 @@ namespace ReplayKitHelper
             };
         }
 
-        public static JObject StartCompress(JArray names, string expectedMode = null)
+        public static JObject StartCompress(JArray selections, string expectedMode)
         {
-            if (names == null || names.Count == 0)
+            if (selections == null || selections.Count == 0)
                 return new JObject { ["ok"] = false, ["message"] = Locales.Message("storage.pickAtLeastOneClip") };
-            if (names.Count > MaxBatchClips)
+            if (selections.Count > MaxBatchClips)
                 return new JObject { ["ok"] = false, ["message"] = Locales.Message("storage.selectUpToCountClipsAt", "count", MaxBatchClips) };
             string mode = ReplaykitSettings.GetStorageCompressionType();
-            if (expectedMode != null && expectedMode != mode)
+            if (expectedMode != mode)
                 return new JObject { ["ok"] = false, ["changed"] = true, ["message"] = Locales.Message("storage.theStorageCompressionTypeChangedReview") };
             string folder = Path.GetFullPath(AppConfig.GetClipDir());
             string ffprobe = Compression.GetToolPaths()["ffprobe"]?.Value<string>();
             if (string.IsNullOrEmpty(ffprobe) || !File.Exists(ffprobe))
                 return new JObject { ["ok"] = false, ["message"] = Locales.Message("storage.theClipCompressionHistoryCouldNot2") };
             var known = new Dictionary<string, JObject>(StringComparer.OrdinalIgnoreCase);
-            foreach (var clip in Clips.GetClipsList())
+            foreach (var clip in Clips.GetClipsList(folder))
             {
                 string name = clip["name"]?.Value<string>();
                 if (!string.IsNullOrEmpty(name)) known[name] = clip;
             }
             var batch = new CompressBatch(mode);
-            foreach (var token in names)
+            foreach (var token in selections)
             {
-                string name = token?.Type == JTokenType.String ? token.Value<string>() : null;
-                if (string.IsNullOrEmpty(name) || !known.TryGetValue(name, out var clip) ||
+                var choice = token as JObject;
+                string name = choice?["name"]?.Type == JTokenType.String ? choice.Value<string>("name") : null;
+                string version = choice?["version"]?.Type == JTokenType.String ? choice.Value<string>("version") : null;
+                if (string.IsNullOrEmpty(name) || version?.Length != 64 || !known.TryGetValue(name, out var clip) ||
                     batch.Clips.Any(c => string.Equals(c.Path.Name, name, StringComparison.OrdinalIgnoreCase)))
                     return new JObject { ["ok"] = false, ["changed"] = true, ["message"] = Locales.Message("storage.theSelectedClipsChangedReviewThe") };
                 long size = clip["size"]?.Value<long>() ?? 0;
@@ -427,6 +435,8 @@ namespace ReplayKitHelper
                 try
                 {
                     selected = SelectClip(clip["name"].Value<string>(), folder, size);
+                    if (selected.Version != version)
+                        return new JObject { ["ok"] = false, ["changed"] = true, ["message"] = Locales.Message("storage.theSelectedClipsChangedReviewThe") };
                     marker = VerifyMarker(selected, true);
                 }
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
@@ -484,7 +494,7 @@ namespace ReplayKitHelper
                     ["finishedAgo"] = b.Running || b.FinishedAt == DateTime.MinValue ? -1 : (int)(DateTime.UtcNow - b.FinishedAt).TotalSeconds,
                     ["total"] = b.Clips.Count, ["done"] = b.Done, ["failed"] = b.Failed, ["current"] = b.Current,
                     ["percent"] = (int)Math.Round(Math.Max(0, Math.Min(1, fraction)) * 100),
-                    ["savedBytes"] = b.SavedBytes, ["savedText"] = FormatBytes(b.SavedBytes), ["error"] = b.Error ?? "",
+                    ["savedBytes"] = b.SavedBytes, ["savedText"] = FormatBytes(b.SavedBytes), ["error"] = b.Error, ["warning"] = b.Warning,
                 };
             }
         }
@@ -542,14 +552,14 @@ namespace ReplayKitHelper
         // one clip through the worker of the clips page, waiting for its job to end. true when it was compressed
         private static bool CompressOne(CompressBatch batch, SelectedClip entry)
         {
-            var selected = Clips.GetSafeClipPath(entry.Path.Name, Path.GetDirectoryName(entry.Path.Full));
-            if (selected == null || !File.Exists(selected.Full)) return false;
+            var selected = Clips.GetSafeClipPath(entry.Path.Name, entry.Path.Root);
+            if (selected == null || !string.Equals(selected.Full, entry.Path.Full, StringComparison.OrdinalIgnoreCase) || !File.Exists(selected.Full)) return false;
             JObject started = null;
             // another job can hold a slot for a moment, so the clip waits for it a little instead of failing
             for (int attempt = 0; attempt < 30; attempt++)
             {
                 lock (CompressGate) { if (batch.Cancelled) return false; }
-                started = CompressOverwrite.StartCompressOverwriteFile(selected, batch.Mode, 0, entry.Size, entry.WriteTime);
+                started = CompressOverwrite.StartCompressOverwriteFile(selected, batch.Mode, 0, entry.Size, entry.WriteTime, entry.Version);
                 if (started["ok"]?.Value<bool>() == true || started["busy"]?.Value<bool>() != true) break;
                 lock (CompressGate) { if (batch.Cancelled) return false; }
                 Thread.Sleep(2000);
@@ -560,7 +570,7 @@ namespace ReplayKitHelper
                 return false;
             }
             string requestId = started["requestId"]?.Value<string>() ?? "";
-            string state = "", error = "";
+            string state = "", error = "", warning = "";
             bool cancelSent = false;
             while (true)
             {
@@ -574,6 +584,7 @@ namespace ReplayKitHelper
                         percent = job.Percent;
                         state = job.State ?? "";
                         error = job.Error ?? "";
+                        warning = job.Message ?? "";
                     }
                 }
                 bool cancel;
@@ -590,16 +601,18 @@ namespace ReplayKitHelper
                 }
                 Thread.Sleep(500);
             }
-            bool cancelled;
-            lock (CompressGate) cancelled = batch.Cancelled;
-            if (cancelled || state == "error" || !File.Exists(selected.Full))
+            if (state != "done" && state != "idle")
             {
                 if (state == "error") lock (CompressGate) batch.Error = error;
                 return false;
             }
             long after = entry.Size;
             try { after = new FileInfo(selected.Full).Length; } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
-            lock (CompressGate) batch.SavedBytes += Math.Max(0, entry.Size - after);
+            lock (CompressGate)
+            {
+                batch.SavedBytes += Math.Max(0, entry.Size - after);
+                if (warning.Length > 0) batch.Warning = warning;
+            }
             return true;
         }
 
@@ -611,8 +624,8 @@ namespace ReplayKitHelper
                 int done, failed;
                 long saved;
                 bool cancelled;
-                string error;
-                lock (CompressGate) { done = batch.Done; failed = batch.Failed; saved = batch.SavedBytes; cancelled = batch.Cancelled; error = batch.Error; }
+                string error, warning;
+                lock (CompressGate) { done = batch.Done; failed = batch.Failed; saved = batch.SavedBytes; cancelled = batch.Cancelled; error = batch.Error; warning = batch.Warning; }
                 string failedText = failed <= 0 ? ""
                     : string.IsNullOrEmpty(error) ? Locales.Message("storage.compressFailed", "count", failed)
                     : Locales.Message("storage.compressFailedWithError", "count", failed, "error", error);
@@ -621,9 +634,10 @@ namespace ReplayKitHelper
                 string title = nothing ? Locales.Message("storage.compressionDidNotFinish") : cancelled ? Locales.Message("storage.compressionStopped") : Locales.Message("storage.compressionFinished");
                 string body = nothing ? (string.IsNullOrEmpty(error) ? Locales.Message("storage.theClipsCouldNotBeCompressed") : error)
                     : (cancelled ? Locales.Message("storage.compressedFreedStopped", "count", done, "size", FormatBytes(saved)) : Locales.Message("storage.compressedFreed", "count", done, "size", FormatBytes(saved))) + (failedText.Length > 0 ? " " + failedText : "");
+                if (warning.Length > 0) body += " " + warning;
                 var popup = nothing
                     ? new JObject { ["icon"] = "warning", ["text"] = Locales.Message("storage.nothingWasCompressed"), ["detail"] = body }
-                    : new JObject { ["icon"] = "check", ["text"] = Locales.Message("storage.spaceFreed"), ["big"] = FormatBytes(saved), ["detail"] = (Locales.Message("storage.compressed", "count", done) + " " + failedText).Trim() };
+                    : new JObject { ["icon"] = "check", ["text"] = Locales.Message("storage.spaceFreed"), ["big"] = FormatBytes(saved), ["detail"] = (Locales.Message("storage.compressed", "count", done) + " " + failedText + " " + warning).Trim() };
                 // the result is told in the popup, not the bell; only when the plugin cannot be reached is it left in the bell so it is not lost
                 if (!DonePopups.Show(nothing ? "warning" : "done", title, popup))
                     Notifications.Add(nothing ? "warning" : "info", "compress-batch", title, body);

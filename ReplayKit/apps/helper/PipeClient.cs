@@ -1,9 +1,11 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Pipes;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Newtonsoft.Json.Linq;
@@ -28,11 +30,12 @@ namespace ReplayKitHelper
         private static readonly ManualResetEventSlim AllowCloseAck = new ManualResetEventSlim(false);
         private static readonly ManualResetEventSlim OutputsReleasedAck = new ManualResetEventSlim(false);
         private static readonly object ReleaseOutputsLock = new object();
-        private static readonly ManualResetEventSlim LanguageAck = new ManualResetEventSlim(false);
+        private static readonly object DonePopupGate = new object();
+        private static readonly Dictionary<string, TaskCompletionSource<bool>> DonePopupAcks = new Dictionary<string, TaskCompletionSource<bool>>();
+        private static readonly ConcurrentDictionary<string, TaskCompletionSource<bool>> ConfigReplies = new ConcurrentDictionary<string, TaskCompletionSource<bool>>(StringComparer.Ordinal);
         private static readonly ManualResetEventSlim ShareCardAck = new ManualResetEventSlim(false);
         private static readonly object ShareCardLock = new object();
         private static int shareCardResult;
-        private static readonly object LanguageLock = new object();
         private static volatile string obsLocale;
         // the language obs started in, as the plugin says on connecting; null while no plugin is connected
         internal static string ObsLocale => obsLocale;
@@ -169,6 +172,17 @@ namespace ReplayKitHelper
                         lock (Server.State.IpcLock) Server.State.ObsMainWindowHwnd = hwnd;
                     DiscordProjector.StartAtStartup();
                     break;
+                case "DONEPOPUP_ACK":
+                {
+                    if (!capturePeer) break;
+                    var pieces = payload.Split(' ');
+                    if (pieces.Length == 2)
+                    {
+                        lock (DonePopupGate)
+                            if (DonePopupAcks.TryGetValue(pieces[0], out var pending)) pending.TrySetResult(pieces[1] == "1");
+                    }
+                    break;
+                }
                 case "ALLOWCLOSE_ACK":
                     AllowCloseAck.Set();
                     break;
@@ -178,8 +192,12 @@ namespace ReplayKitHelper
                 case "LOCALE":
                     obsLocale = ReplayKitShared.LanguageMatch.IsCode(payload) ? payload : null;
                     break;
-                case "LANGUAGE_ACK":
-                    LanguageAck.Set();
+                case "CONFIG_ACK":
+                    if (!capturePeer) break;
+                    int separator = payload.IndexOf(' ');
+                    if (separator == 32 && payload.Length == 34 && (payload[33] == '0' || payload[33] == '1') &&
+                        ConfigReplies.TryGetValue(payload.Substring(0, separator), out var configReply))
+                        configReply.TrySetResult(payload[33] == '1');
                     break;
                 case "SHARECARD_ACK":
                     Interlocked.Exchange(ref shareCardResult, payload.Trim() == "1" ? 1 : 0);
@@ -205,17 +223,20 @@ namespace ReplayKitHelper
             }
         }
 
-        // has the plugin set the language obs starts in next (a code, or - to follow windows) and waits until it has saved it; false when the plugin is not connected or never answers
-        public static bool SetObsLanguageAndWait(string value, int timeoutMs)
+        internal static bool ApplyObsConfig(string command, string value, int timeoutMs)
         {
-            lock (LanguageLock)
+            if (!capturePeer) return false;
+            string id = Guid.NewGuid().ToString("N");
+            var reply = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            if (!ConfigReplies.TryAdd(id, reply)) return false;
+            try
             {
-                LanguageAck.Reset();
-                if (!TryWrite("LANGUAGE " + value)) return false;
-                bool acked = LanguageAck.Wait(timeoutMs);
-                if (!acked) Log.Write("LANGUAGE: no answer from the plugin in " + timeoutMs + " ms");
-                return acked;
+                if (!TryWrite(command + " " + id + " " + value)) return false;
+                if (reply.Task.Wait(timeoutMs)) return reply.Task.Result;
+                Log.Write(command + ": no answer from the plugin in " + timeoutMs + " ms");
+                return false;
             }
+            finally { ConfigReplies.TryRemove(id, out _); }
         }
 
         // tells the plugins close-to-tray filter the next OBS WM_CLOSE is a real restart/exit. waits for the ack so the close cant beat the message; returns false if the plugin isnt connected or never acks, in which case the caller proceeds anyway (older bundle without the pipe -- same as before this signal existed).
@@ -301,10 +322,17 @@ namespace ReplayKitHelper
 
         // the settings page has unsaved edits or not, and its answer to the prompt the plugin raised when another view was picked meanwhile
         // the id is checked by the route already, the plugin checks it again before it reaches a script
-        public static void SendNotificationReader(string id) => TryWrite("NOTIFYREADER " + id);
+        public static bool SendNotificationReader(string id) => TryWrite("NOTIFYREADER " + id);
         public static void SendNotificationReaderClose() => TryWrite("NOTIFYREADERCLOSE");
         // the popup of a finished job, over the obs window; the id is a notification id the helper made itself
-        public static bool SendDonePopup(string id) => !string.IsNullOrEmpty(id) && TryWrite("DONEPOPUP " + id);
+        public static bool SendDonePopup(string id)
+        {
+            if (!capturePeer) return false;
+            var pending = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            lock (DonePopupGate) DonePopupAcks.Add(id, pending);
+            try { return TryWrite("DONEPOPUP " + id) && pending.Task.Wait(1500) && pending.Task.Result; }
+            finally { lock (DonePopupGate) DonePopupAcks.Remove(id); }
+        }
         public static void SendDonePopupClose() => TryWrite("DONEPOPUPCLOSE");
 
         public static void SendSettingsDirty(bool dirty) => TryWrite("SETTINGSDIRTY " + (dirty ? "1" : "0"));

@@ -108,10 +108,6 @@ namespace ReplayKitHelper
                 settings = SyncMicFromObs(settings);
                 settings = SyncAudioVolumesFromObs(settings);
                 settings = SyncCaptureDisplayFromObs(settings);
-                if (string.IsNullOrWhiteSpace(settings["clipDir"]?.Value<string>()) && !string.IsNullOrWhiteSpace(Server.State.Config?["clipDir"]?.Value<string>()))
-                {
-                    settings["clipDir"] = ResolveClipDirSetting(Server.State.Config["clipDir"]?.Value<string>());
-                }
                 var overlayOpacity = GetLiveOverlayOpacityPercent(settings);
                 if (overlayOpacity["ok"]?.Value<bool>() != true) overlayOpacity = GetSceneFileOverlayOpacityPercent(settings);
                 if (overlayOpacity["ok"]?.Value<bool>() == true && settings["overlayOpacity"]?.Value<int>() != overlayOpacity["opacity"]?.Value<int>())
@@ -362,39 +358,44 @@ namespace ReplayKitHelper
             {
                 try
                 {
-                    string clipDir;
-                    try { clipDir = Normalize(ReadSettings())["clipDir"]?.Value<string>(); }
-                    catch (InvalidOperationException ex) { Log.Write("EnsureObsRecordingFolder settings: " + ex.Message); clipDir = null; }
-                    string resolved = string.IsNullOrWhiteSpace(clipDir) ? AppConfig.GetDefaultClipDir() : clipDir;
-                    try { resolved = Path.GetFullPath(resolved); }
-                    catch (Exception ex) when (ex is ArgumentException || ex is NotSupportedException || ex is PathTooLongException || ex is System.Security.SecurityException) { Log.Write("EnsureObsRecordingFolder path: " + ex.Message); }
-                    // heals installs whose helper_config predates the folder being settable in Settings, so the clip listing stops walking the default folder
-                    SyncClipDirToRuntimeConfig(new JObject { ["clipDir"] = resolved });
-                    try { Directory.CreateDirectory(resolved); } catch (Exception ex) { Log.Write("EnsureObsRecordingFolder mkdir: " + ex.Message); }
-
                     for (int i = 0; i < 30; i++)
                     {
                         var cur = GetObsProfileParameterValue("AdvOut", "RecFilePath");
                         if (cur["ok"]?.Value<bool>() == true)
                         {
-                            string curPath = cur["value"]?.Value<string>() ?? "";
-                            string curNorm; try { curNorm = Path.GetFullPath(curPath); } catch { curNorm = curPath; }
-                            if (!string.Equals(curNorm.TrimEnd('\\', '/'), resolved.TrimEnd('\\', '/'), StringComparison.OrdinalIgnoreCase))
+                            lock (SettingsStore.Gate)
                             {
-                                SetObsProfileParameterSafe("SimpleOutput", "FilePath", resolved);
-                                SetObsProfileParameterSafe("AdvOut", "RecFilePath", resolved);
-                                SetObsProfileParameterSafe("AdvOut", "FFFilePath", resolved);
-                                // the already-running Replay Buffer output caches its dir from init -- update it live too.
-                                try
+                                var settings = ReadSettings();
+                                string clipDir = settings["clipDir"]?.Value<string>();
+                                string resolved = Path.GetFullPath(string.IsNullOrWhiteSpace(clipDir) ? AppConfig.GetDefaultClipDir() : clipDir);
+                                var parameters = new[] { new[] { "SimpleOutput", "FilePath" }, new[] { "AdvOut", "RecFilePath" }, new[] { "AdvOut", "FFFilePath" } };
+                                var paths = parameters.Select(pair => GetObsProfileParameterSafe(pair[0], pair[1])).ToArray();
+                                if (paths.Any(path => !path.Ok))
                                 {
-                                    var rbEx = ObsWebSocket.InvokeRequest("GetOutputSettings", new JObject { ["outputName"] = "Replay Buffer" }, 3000);
-                                    JObject rbSet = rbEx.Ok && rbEx.Data?["outputSettings"] is JObject e ? (JObject)e.DeepClone() : new JObject();
-                                    rbSet["directory"] = resolved;
-                                    rbSet["path"] = resolved;
-                                    ObsWebSocket.InvokeRequest("SetOutputSettings", new JObject { ["outputName"] = "Replay Buffer", ["outputSettings"] = rbSet }, 5000);
+                                    Log.Write("EnsureObsRecordingFolder: could not confirm all OBS output paths.");
+                                    return;
                                 }
-                                catch (Exception ex) { Log.Write("EnsureObsRecordingFolder live output: " + ex.Message); }
-                                Log.Write("EnsureObsRecordingFolder: OBS recording folder was '" + curPath + "', pinned to '" + resolved + "'");
+                                SyncClipDirToRuntimeConfig(settings);
+                                bool changed = false;
+                                for (int index = 0; index < paths.Length; index++)
+                                {
+                                    string current = paths[index].Data?["parameterValue"]?.Value<string>() ?? "";
+                                    if (string.Equals(current.Replace('/', '\\').TrimEnd('\\'), resolved.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase)) continue;
+                                    Directory.CreateDirectory(resolved);
+                                    var written = SetObsProfileParameterSafe(parameters[index][0], parameters[index][1], resolved);
+                                    if (!written.Ok) Log.Write("EnsureObsRecordingFolder: could not set " + string.Join("/", parameters[index]) + ": " + written.Message);
+                                    else changed = true;
+                                }
+                                if (!changed) return;
+                                // the already-running Replay Buffer output caches its dir from init -- update it live too.
+                                var rb = ObsWebSocket.InvokeRequest("GetOutputSettings", new JObject { ["outputName"] = "Replay Buffer" }, 3000);
+                                if (rb.Ok && rb.Data?["outputSettings"] is JObject rbSettings)
+                                {
+                                    var next = (JObject)rbSettings.DeepClone();
+                                    next["directory"] = resolved;
+                                    next["path"] = resolved;
+                                    ObsWebSocket.InvokeRequest("SetOutputSettings", new JObject { ["outputName"] = "Replay Buffer", ["outputSettings"] = next }, 5000);
+                                }
                             }
                             return;
                         }
@@ -719,19 +720,11 @@ namespace ReplayKitHelper
                 if (string.IsNullOrWhiteSpace(body)) throw new InvalidOperationException(Locales.Message("settings.missingSettingsBody"));
                 var incoming = JObject.Parse(body);
                 string language = TakeLanguage(incoming);
-                var result = SaveSettings(incoming);
-                if (language != null && language != Locales.Picked())
+                var result = SaveSettings(incoming, language, out bool restartLanguage);
+                if (restartLanguage && result["ok"]?.Value<bool>() == true)
                 {
-                    if (!Locales.ApplyToObs(language))
-                    {
-                        if (!(result["warnings"] is JArray warnings)) result["warnings"] = warnings = new JArray();
-                        warnings.Add(Locales.Message("settings.languageNotSaved"));
-                    }
-                    else if (language != Locales.Current())
-                    {
-                        result["restartRequired"] = true;
-                        if (string.IsNullOrEmpty(result["restartReason"]?.Value<string>())) result["restartReason"] = "Changing the language requires OBS to restart.";
-                    }
+                    result["restartRequired"] = true;
+                    if (string.IsNullOrEmpty(result["restartReason"]?.Value<string>())) result["restartReason"] = "Changing the language requires OBS to restart.";
                 }
                 if (result["settings"] is JObject saved) saved["language"] = Locales.Picked();
                 return result;
@@ -744,12 +737,13 @@ namespace ReplayKitHelper
             if (token == null) return null;
             incoming.Remove("language");
             string code = token.Type == JTokenType.String ? token.Value<string>() : null;
-            if (!Locales.IsAvailable(code)) throw new InvalidOperationException("Invalid option for language: " + code);
+            if (!Locales.CanSelect(code)) throw new InvalidOperationException(Locales.Message("common.unknownLanguage"));
             return code;
         }
 
-        private static JObject SaveSettings(JObject incoming)
+        private static JObject SaveSettings(JObject incoming, string language, out bool restartLanguage)
         {
+            restartLanguage = false;
             lock (SettingsStore.Gate)
             {
                 var current = ReadSettings();
@@ -760,6 +754,19 @@ namespace ReplayKitHelper
                     current[prop.Name] = prop.Value;
                 }
                 var settings = Normalize(current);
+                bool recordingChanged = !JToken.DeepEquals(previous["recordingKeybind"], settings["recordingKeybind"]) ||
+                    !JToken.DeepEquals(previous["recordingKeybindExtra"], settings["recordingKeybindExtra"]);
+                if (recordingChanged)
+                {
+                    settings["recordingStopKeybind"] = JValue.CreateNull();
+                    settings["recordingStopKeybindExtra"] = JValue.CreateNull();
+                }
+                bool openClipsChanged = !JToken.DeepEquals(previous["openClipsKeybind"], settings["openClipsKeybind"]) ||
+                    !JToken.DeepEquals(previous["openClipsKeybindExtra"], settings["openClipsKeybindExtra"]);
+                if (openClipsChanged && !SettingsHotkeys.ApplyOpenClipsHotkeys(settings))
+                    return new JObject { ["ok"] = false, ["message"] = Locales.Message("controls.couldNotSaveTheHotkey") };
+                if (language != null && !Locales.ApplyToObs(language, out restartLanguage))
+                    throw new InvalidOperationException(Locales.Message("settings.languageNotSaved"));
                 // a fresh "custom" pick -> convert + file it as a saved preset, then carry on as if the user had selected that preset. subsequent saves send the "user/..." id directly and skip this.
                 if ((settings["appIcon"]?.Value<string>() ?? "") == "custom")
                 {
@@ -773,7 +780,7 @@ namespace ReplayKitHelper
                 }
                 // takes effect on this already-running helper the moment settings are saved, not just after the next reload -- Log.Write gates on this flag on every call, so flipping it here is what actually lets someone enable logging, reproduce a bug, and have it show up without restarting obs.
                 Server.State.LogEnabled = DevelopmentFlag(settings, "debugLoggingEnabled");
-                var hotkeyRelease = EnsureHotkeyCaptureReleased(settings);
+                var hotkeyRelease = EnsureHotkeyCaptureReleased(HotkeySignature(previous) != HotkeySignature(settings));
                 if (!TestIncomingSettingsChanged(incoming, previous, settings))
                 {
                     if (TestOverlayColorRequest(incoming))
@@ -907,7 +914,7 @@ namespace ReplayKitHelper
                 }
                 if (TestOnlyMicChanged(previous, settings))
                 {
-                    var live = ApplyMicLive(settings);
+                    var live = ApplyMicLive(settings, previous);
                     return new JObject
                     {
                         ["ok"] = true, ["settings"] = settings,
@@ -1007,7 +1014,7 @@ namespace ReplayKitHelper
                     hotkeyRelease["applied"] = ConcatArrays(hotkeyRelease["applied"] as JArray, display["applied"] as JArray);
                     hotkeyRelease["warnings"] = ConcatArrays(hotkeyRelease["warnings"] as JArray, display["warnings"] as JArray);
                 }
-                var liveResult = ApplyLiveSettings(settings, restartObs, applyOverlay, recreateBongo, motionBlurChanged, applyRuntimeOutputs, applyVideoSettings, applyReplayBufferOutput, MicKeysChanged(previous, settings), AudioVolumeKeysChanged(previous, settings), inputOverlayLayoutChanged && settings["overlayStyle"]?.Value<string>() == "input_overlay",
+                var liveResult = ApplyLiveSettings(settings, restartObs, applyOverlay, recreateBongo, motionBlurChanged, applyRuntimeOutputs, applyVideoSettings, applyReplayBufferOutput, MicKeysChanged(previous, settings) ? previous : null, AudioVolumeKeysChanged(previous, settings), inputOverlayLayoutChanged && settings["overlayStyle"]?.Value<string>() == "input_overlay",
                     previous["allowSleepWhileActive"]?.Value<bool>() != settings["allowSleepWhileActive"]?.Value<bool>());
                 if (previous["appIcon"]?.Value<string>() != settings["appIcon"]?.Value<string>() ||
                     previous["appIconCustomPath"]?.Value<string>() != settings["appIconCustomPath"]?.Value<string>() ||

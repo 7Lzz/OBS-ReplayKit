@@ -178,14 +178,14 @@ namespace ReplayKitHelper
             return tracks;
         }
 
-        internal static List<Track> ReadFile(string path)
+        internal static List<Track> ReadFile(string path, bool reportReadFailure = false)
         {
             try
             {
                 using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
                     return Read(fs);
             }
-            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+            catch (Exception ex) when (!reportReadFailure && (ex is IOException || ex is UnauthorizedAccessException))
             {
                 return null;
             }

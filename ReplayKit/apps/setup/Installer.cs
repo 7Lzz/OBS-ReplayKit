@@ -17,15 +17,19 @@ namespace ReplayKitSetup
 
         // scene path inside %appdata%\obs-studio\ transformed on fresh installs and patched on runtime updates -- when it already exists, the full installer uses that live file as the transform input so user-added filters and source state survive reinstall/repair installs.
         private static readonly string UserSceneRel = Path.Combine("basic", "scenes", "Untitled.json");
+        private const string RuntimeVersionFile = "version.json";
 
         private static string ReadTextFile(string path) => Config.ReadTextFileFlexible(path);
 
-        // true if this scene json has replaykits own monitor_capture (display capture) source in it -- a bare scene obs auto-creates on its own first launch is valid json too, but ApplyScenesJson only patches sources that already exist (it creates window_capture and the overlays, nothing else), so treating a non-replaykit scene as the reinstall base silently drops display capture, game capture, mic, and desktop audio. monitor_capture id must stay in sync with transform.py.
-        private static bool LooksLikeReplaykitScene(JToken data)
+        private static bool IsEmptyDefaultScene(JObject data)
         {
-            if (!(data is JObject obj)) return false;
-            if (!(obj["sources"] is JArray sources)) return false;
-            return sources.Any(s => s is JObject so && so.Value<string>("id") == "monitor_capture");
+            return data["sources"] is JArray sources && sources.Count == 1 &&
+                sources[0] is JObject scene && scene.Value<string>("id") == "scene" && scene.Value<string>("name") == "Scene" &&
+                scene["settings"] is JObject settings && (settings["items"] == null || settings["items"] is JArray items && items.Count == 0) &&
+                (scene["filters"] == null || scene["filters"] is JArray filters && filters.Count == 0) &&
+                (data["groups"] == null || data["groups"] is JArray groups && groups.Count == 0) &&
+                (data["transitions"] == null || data["transitions"] is JArray transitions && transitions.Count == 0) &&
+                (data["modules"] is not JObject modules || modules["scripts-tool"] == null || modules["scripts-tool"] is JArray scripts && scripts.Count == 0);
         }
 
         private static string InstallTextSource(string src, string rel, string dst, out bool userScene)
@@ -33,16 +37,9 @@ namespace ReplayKitSetup
             userScene = false;
             if (rel == UserSceneRel && File.Exists(dst))
             {
-                try
-                {
-                    string content = ReadTextFile(dst);
-                    userScene = LooksLikeReplaykitScene(JToken.Parse(content));
-                    if (userScene) return content;
-                }
-                catch (Exception ex) when (ex is IOException || ex is JsonException)
-                {
-                    // fall through to the bundled default.
-                }
+                string content = ReadTextFile(dst);
+                userScene = !IsEmptyDefaultScene(JObject.Parse(content));
+                if (userScene) return content;
             }
             return ReadTextFile(src);
         }
@@ -91,18 +88,21 @@ namespace ReplayKitSetup
         // write the installed ReplayKit runtime version used by the updater.
         public static string WriteReplaykitVersion(Action<string> log = null)
         {
-            string path = Path.Combine(Config.REPLAYKIT_CONFIG, "version.json");
+            string path = Path.Combine(Config.REPLAYKIT_CONFIG, RuntimeVersionFile);
             Directory.CreateDirectory(Path.GetDirectoryName(path));
             string temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
             try
             {
-                File.WriteAllText(temporary, JsonConvert.SerializeObject(new JObject { ["version"] = VersionInfo.Version }, Formatting.Indented) + "\n", new System.Text.UTF8Encoding(false));
+                WriteVersion(temporary);
                 File.Move(temporary, path, true);
             }
             finally { if (File.Exists(temporary)) File.Delete(temporary); }
             log?.Invoke($"ReplayKit version -> {VersionInfo.Version}");
             return path;
         }
+
+        private static void WriteVersion(string path) =>
+            File.WriteAllText(path, JsonConvert.SerializeObject(new JObject { ["version"] = VersionInfo.Version }, Formatting.Indented) + "\n", new System.Text.UTF8Encoding(false));
 
         // arm the in-obs first-run wizard by flipping setupWizardPending in the runtime settings file. the installer calls this only on a genuine first install; an update or a re-run leaves whatever the user already has, so a completed wizard never comes back.
         public static void MarkSetupWizardPending(Action<string> log = null)
@@ -204,9 +204,6 @@ namespace ReplayKitSetup
             Path.Combine("obs-replayKit", "icons", "nav", "tab-general.svg"),
         };
 
-        // the clip state that is kept across an uninstall and put back by a reinstall
-        private static readonly string[] RuntimeStateFiles = { StateLayout.ClipsDbFile, StateLayout.ClipsIndexFile, StateLayout.CompressionHistoryFile };
-
         // installs made before the streamable/ -> helper/ rename: source name (in the old directory) -> new relative path.
         private static readonly string LegacyStreamableDirRel = Path.Combine("obs-replayKit", "scripts", "streamable");
         private static readonly Dictionary<string, string> LegacyStreamableStateRels = new Dictionary<string, string>
@@ -237,30 +234,39 @@ namespace ReplayKitSetup
             }
         }
 
-        // one-time migration for installs made before the streamable/ directory was renamed to helper/: carries the live clip db/index/helper-config forward to their new path, then removes the old directory tree. no-ops once the old directory is gone, so its safe to call on every install.
+        // keep older state until each destination contains a verified copy.
         private static void MigrateLegacyStreamableState(Action<string> log = null)
         {
             string oldDir = Path.Combine(Config.OBS_CONFIG, LegacyStreamableDirRel);
             if (!Directory.Exists(oldDir)) return;
 
+            bool canRemove = true;
             foreach (var kv in LegacyStreamableStateRels)
             {
                 string oldFile = Path.Combine(oldDir, kv.Key);
                 string newFile = Path.Combine(Config.OBS_CONFIG, kv.Value);
-                if (File.Exists(oldFile) && !File.Exists(StateLayout.Resolve(Config.REPLAYKIT_CONFIG, kv.Key)))
+                if (!File.Exists(oldFile)) continue;
+                try
                 {
-                    try
+                    string existing = StateLayout.Resolve(Config.REPLAYKIT_CONFIG, kv.Key);
+                    if (File.Exists(existing))
                     {
-                        Directory.CreateDirectory(Path.GetDirectoryName(newFile));
-                        File.Copy(oldFile, newFile, true);
-                        log?.Invoke($"migrated legacy state: {kv.Key} -> {kv.Value.Replace('\\', '/')}");
+                        if (!FileMatches(existing, new FileInfo(oldFile).Length, FileSha256(oldFile)))
+                        {
+                            log?.Invoke($"retained distinct legacy state: {oldFile}");
+                            canRemove = false;
+                        }
+                        continue;
                     }
-                    catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
-                    {
-                        log?.Invoke($"warn: could not migrate legacy {kv.Key}: {ex.Message}");
-                    }
+                    ReplaceFile(oldFile, newFile, Guid.NewGuid().ToString("N"));
+                    log?.Invoke($"migrated legacy state: {kv.Key} -> {kv.Value.Replace('\\', '/')}");
+                }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+                {
+                    throw new IOException($"could not migrate legacy {kv.Key}; the original was kept", ex);
                 }
             }
+            if (!canRemove) return;
             try
             {
                 Directory.Delete(oldDir, true);
@@ -334,7 +340,7 @@ namespace ReplayKitSetup
         public static int RestoreReplaykitUserState(Action<string> log = null)
         {
             int restored = 0;
-            foreach (var file in RuntimeStateFiles)
+            foreach (var file in Cleanup.ReplaykitRuntimeStateFiles)
             {
                 string source = Path.Combine(Config.REPLAYKIT_USER_STATE_CACHE, file);
                 // a file that is still in the old place counts as present: it is the real one and gets moved
@@ -443,13 +449,6 @@ namespace ReplayKitSetup
             }
         }
 
-        private sealed class RuntimeChange
-        {
-            public string Target;
-            public string Backup;
-            public bool Existed;
-        }
-
         private static bool StageRuntimeFile(string src, string staged, string target)
         {
             byte[] text = null;
@@ -493,17 +492,26 @@ namespace ReplayKitSetup
             }
         }
 
-        private static void VerifyFile(string expected, string actual)
+        internal static bool FilesMatch(string expected, string actual) =>
+            FileMatches(actual, new FileInfo(expected).Length, FileSha256(expected));
+
+        internal static void VerifyFile(string expected, string actual)
         {
-            if (!FileMatches(actual, new FileInfo(expected).Length, FileSha256(expected)))
+            if (!FilesMatch(expected, actual))
                 throw new IOException("File verification failed: " + actual);
+        }
+
+        internal static void FlushFile(string path)
+        {
+            using var file = new FileStream(path, FileMode.Open, FileAccess.Write, FileShare.Read, 4096, FileOptions.WriteThrough);
+            file.Flush(true);
         }
 
         // a copy in an old location still counts as present, so the bundle never seeds a second state file
         private static bool PreservesRuntimeFile(string relative) =>
             RuntimePreserveRels.Contains(relative) && File.Exists(StateLayout.Resolve(Config.REPLAYKIT_CONFIG, Path.GetFileName(relative)));
 
-        private static void ReplaceFile(string source, string target, string transactionId)
+        internal static void ReplaceFile(string source, string target, string transactionId)
         {
             Directory.CreateDirectory(Path.GetDirectoryName(target));
             string incoming = target + ".replaykit-" + transactionId + ".tmp";
@@ -515,6 +523,7 @@ namespace ReplayKitSetup
                     File.Copy(source, incoming, false);
                 });
                 VerifyFile(source, incoming);
+                FlushFile(incoming);
                 WriteWithRetry(() =>
                 {
                     if (File.Exists(target)) File.Replace(incoming, target, null, true);
@@ -528,43 +537,25 @@ namespace ReplayKitSetup
             }
         }
 
-        private static void RollbackRuntimeChanges(List<RuntimeChange> changes, string transactionId, Action<string> log)
-        {
-            var failures = new List<string>();
-            for (int i = changes.Count - 1; i >= 0; i--)
-            {
-                RuntimeChange change = changes[i];
-                try
-                {
-                    if (change.Existed)
-                    {
-                        // a failed swap can leave the original intact but still locked
-                        if (!CanSkipRuntimeFile(change.Target, new FileInfo(change.Backup).Length, FileSha256(change.Backup)))
-                            ReplaceFile(change.Backup, change.Target, transactionId + "-rollback");
-                    }
-                    else WriteWithRetry(() => { if (File.Exists(change.Target)) File.Delete(change.Target); });
-                }
-                catch (Exception ex)
-                {
-                    failures.Add(Path.GetFileName(change.Target) + ": " + ex.Message);
-                }
-            }
-            if (failures.Count > 0)
-                throw new IOException("Update rollback was incomplete: " + string.Join("; ", failures));
-            log?.Invoke("runtime file transaction rolled back cleanly");
-        }
-
         // the runtime tree an update installs from. exposed so the updater can preflight it before it closes obs, against the same path InstallReplaykitRuntimeUpdate walks.
         public static string GetRuntimeAssetsDir() => Path.Combine(Config.OBS_ASSETS_DIR, "obs-replayKit");
 
-        // refresh changed ReplayKit-managed runtime files while preserving user obs config/state, then apply migrations and refresh tools and plugins.
-        public static int InstallReplaykitRuntimeUpdate(Action<string> log = null, List<string> problems = null)
+        public static string ValidateRuntimeAssets()
         {
             string runtimeSrc = GetRuntimeAssetsDir();
-            if (!Directory.Exists(runtimeSrc)) throw new DirectoryNotFoundException($"ReplayKit runtime assets not found: {runtimeSrc}");
+            if (!Directory.Exists(runtimeSrc))
+                throw new DirectoryNotFoundException($"ReplayKit runtime assets not found: {runtimeSrc}. " +
+                    (AssetBundle.LastError ?? "This OBSReplayKit.exe was built without its bundled ReplayKit files."));
             string helperSource = Path.Combine(runtimeSrc, "scripts", "helper", "OBSReplayKit.exe");
             if (!File.Exists(helperSource) || new FileInfo(helperSource).Length < 256 * 1024)
                 throw new InvalidDataException(SetupLocale.Message("setup.theBundledReplaykitHelperIsMissing"));
+            return runtimeSrc;
+        }
+
+        // refresh changed ReplayKit-managed runtime files while preserving user obs config/state, then apply migrations and refresh tools and plugins.
+        internal static int InstallReplaykitRuntimeUpdate(RuntimeTransaction transaction, Action<string> log = null, List<string> problems = null)
+        {
+            string runtimeSrc = ValidateRuntimeAssets();
             // obs is brought to the one supported version before any file is copied: the plugins and the process host of this release are made for it, so an obs that cannot get there leaves the old replaykit as it was
             ObsDownloader.EnsureObsVersion(log);
             if (!ObsVersions.IsInstalledSupported())
@@ -574,93 +565,61 @@ namespace ReplayKitSetup
             }
 
             string transactionId = Guid.NewGuid().ToString("N");
-            string transactionRoot = Path.Combine(TempLayout.Root, "runtime-update-" + transactionId);
-            string stageRoot = Path.Combine(transactionRoot, "stage");
-            string backupRoot = Path.Combine(transactionRoot, "backup");
             var files = Directory.EnumerateFiles(runtimeSrc, "*", SearchOption.AllDirectories)
                 .OrderBy(path => path, StringComparer.OrdinalIgnoreCase).ToList();
             if (files.Count == 0) throw new InvalidDataException(SetupLocale.Message("setup.theBundledReplaykitRuntimeIsEmpty"));
 
             int count = 0, unchanged = 0;
-            var stagedFiles = new List<(string FileRel, string Rel, string Staged, string Target)>();
-            var changes = new List<RuntimeChange>();
-            bool recoveryComplete = false;
+            var stagedFiles = new List<string>();
             try
             {
-                Directory.CreateDirectory(stageRoot);
                 foreach (string src in files)
                 {
-                    string fileRel = src.Substring(runtimeSrc.Length).TrimStart('\\', '/');
+                    string fileRel = Path.GetRelativePath(runtimeSrc, src);
                     string rel = Path.Combine("obs-replayKit", fileRel);
                     // the share window can be running thru the update, which only the install of its own handles
-                    if (ShareWindowInstall.IsShareWindowFile(rel)) continue;
+                    if (ShareWindowInstall.IsShareWindowFile(rel) || string.Equals(fileRel, RuntimeVersionFile, StringComparison.OrdinalIgnoreCase)) continue;
                     if (PreservesRuntimeFile(rel))
                     {
                         log?.Invoke("preserve: " + rel.Replace('\\', '/'));
                         continue;
                     }
-                    string staged = Path.Combine(stageRoot, fileRel);
-                    string target = InstallTarget(rel);
+                    string targetRel = Path.GetRelativePath(Config.REPLAYKIT_CONFIG, InstallTarget(rel));
+                    string staged = transaction.Stage(targetRel);
+                    string target = transaction.Target(targetRel);
                     if (!StageRuntimeFile(src, staged, target))
                     {
                         unchanged++;
                         continue;
                     }
-                    stagedFiles.Add((fileRel, rel, staged, target));
+                    if (!PreservesRuntimeFile(rel)) stagedFiles.Add(targetRel);
                 }
                 log?.Invoke($"staged and verified {stagedFiles.Count} runtime file(s)");
 
-                foreach (var (fileRel, rel, staged, dst) in stagedFiles)
+                string stagedVersion = transaction.Stage(RuntimeVersionFile);
+                Directory.CreateDirectory(Path.GetDirectoryName(stagedVersion));
+                WriteVersion(stagedVersion);
+                stagedFiles.Add(RuntimeVersionFile);
+                transaction.Prepare(stagedFiles);
+                foreach (string relative in stagedFiles)
                 {
-                    if (PreservesRuntimeFile(rel))
-                    {
-                        log?.Invoke("preserve: " + rel.Replace('\\', '/'));
-                        continue;
-                    }
-                    var change = new RuntimeChange { Target = dst, Existed = File.Exists(dst) };
-                    if (change.Existed)
-                    {
-                        change.Backup = Path.Combine(backupRoot, fileRel);
-                        Directory.CreateDirectory(Path.GetDirectoryName(change.Backup));
-                        WriteWithRetry(() => File.Copy(dst, change.Backup, true));
-                        VerifyFile(dst, change.Backup);
-                    }
-                    changes.Add(change);
-                    var recovery = new JObject
-                    {
-                        ["target"] = change.Target, ["backup"] = change.Backup, ["existed"] = change.Existed,
-                    };
-                    string manifest = Path.Combine(transactionRoot, "recovery.jsonl");
-                    using (var journal = new FileStream(manifest, FileMode.Append, FileAccess.Write, FileShare.Read, 4096, FileOptions.WriteThrough))
-                    {
-                        byte[] bytes = System.Text.Encoding.UTF8.GetBytes(recovery.ToString(Newtonsoft.Json.Formatting.None) + "\n");
-                        journal.Write(bytes, 0, bytes.Length);
-                        journal.Flush(true);
-                    }
-                    ReplaceFile(staged, dst, transactionId);
-                    log?.Invoke("-> " + rel.Replace('\\', '/'));
-                    count++;
+                    ReplaceFile(transaction.Stage(relative), transaction.Target(relative), transactionId);
+                    log?.Invoke("-> obs-replayKit/" + relative.Replace('\\', '/'));
                 }
 
+                count = stagedFiles.Count - 1;
                 log?.Invoke($"skipped {unchanged} unchanged runtime file(s)");
-                WriteReplaykitVersion(log);
-                recoveryComplete = true;
+                transaction.Complete(log);
             }
             catch (Exception installError)
             {
-                try { RollbackRuntimeChanges(changes, transactionId, log); recoveryComplete = true; }
+                try { transaction.Recover(log); }
                 catch (Exception rollbackError)
                 {
-                    throw new IOException("Runtime update failed: " + installError.Message + " " + rollbackError.Message + " Recovery files retained at: " + transactionRoot, installError);
+                    throw new IOException("Runtime update failed: " + installError.Message + " " + rollbackError.Message + " ReplayKit kept its recovery files.", installError);
                 }
                 throw new IOException("Runtime update failed and was rolled back: " + installError.Message, installError);
             }
-            finally
-            {
-                try { if (recoveryComplete && Directory.Exists(transactionRoot)) Directory.Delete(transactionRoot, true); }
-                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { log?.Invoke("warn: update staging cleanup failed: " + ex.Message); }
-            }
-
             if (!ShareWindowInstall.Install(log)) problems?.Add("the Share Preview window");
             // after the copy has gone through, never before: a copy that is rolled back puts the old helper and scripts back, and those look for the settings in the old places
             MigrateStateLayout(log);
@@ -718,10 +677,6 @@ namespace ReplayKitSetup
                 log?.Invoke($"warn: OBS process roles not installed: {ex.Message}");
                 problems.Add("the OBS process roles");
             }
-            // after the process host, whose files for the new obs are in core\ by then, so the ones for the old obs are seen as replaced too
-            try { ObsDownloader.RemoveReplacedCoreModules(log); }
-            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { log?.Invoke($"warn: old OBS files were left: {ex.Message}"); }
-
             try
             {
                 if (!InstallObsFfmpeg(log)) problems.Add(SetupLocale.Message("setup.ffmpegAndFfprobe"));
@@ -786,30 +741,25 @@ namespace ReplayKitSetup
         }
 
         // copy the users current obs config to obs-studio.bak.<timestamp>. returns the backup path, or null if there was nothing to back up.
-        public static string BackupExistingConfig(Action<string> log = null)
+        public static string BackupExistingConfig(Action<string> log = null, bool includeInstallerPrefs = false)
         {
-            if (!Directory.Exists(Config.OBS_CONFIG)) return null;
-
             var present = BackupTargets.Select(name => Path.Combine(Config.OBS_CONFIG, name)).Where(p => Directory.Exists(p) || File.Exists(p)).ToList();
-            if (present.Count == 0) return null;
+            bool prefs = includeInstallerPrefs && File.Exists(Prefs.PREFS_FILE);
+            bool cachePrefs = includeInstallerPrefs && File.Exists(Prefs.SETUP_CACHE_PREFS_FILE);
+            if (present.Count == 0 && !prefs && !cachePrefs) return null;
 
-            string stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
+            string stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss-fffffff");
             string backupDir = Path.Combine(Path.GetDirectoryName(Config.OBS_CONFIG), $"obs-studio.bak.{stamp}");
             Directory.CreateDirectory(backupDir);
 
             foreach (var src in present)
             {
                 string dst = Path.Combine(backupDir, Path.GetFileName(src));
-                try
-                {
-                    if (Directory.Exists(src)) CopyDirectory(src, dst);
-                    else File.Copy(src, dst, true);
-                }
-                catch (Exception ex)
-                {
-                    log?.Invoke($"warn: backup of {Path.GetFileName(src)} failed: {ex.Message}");
-                }
+                if (Directory.Exists(src)) CopyDirectory(src, dst);
+                else File.Copy(src, dst);
             }
+            if (prefs) File.Copy(Prefs.PREFS_FILE, Path.Combine(backupDir, "installer-prefs.json"));
+            if (cachePrefs) File.Copy(Prefs.SETUP_CACHE_PREFS_FILE, Path.Combine(backupDir, "cached-installer-prefs.json"));
 
             log?.Invoke($"backed up existing config -> {backupDir}");
             return backupDir;

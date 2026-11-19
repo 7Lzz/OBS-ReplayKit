@@ -90,14 +90,14 @@ namespace ReplayKitHelper
             if (path == "/update/install-result")
             {
                 if (req.Method != "GET" && req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "GET or POST required"); return false; }
-                HttpResponse.SendJson(stream, 200, Update.GetInstallResult());
+                HttpResponse.SendJson(stream, 200, Update.GetInstallResult(Q("attempt")));
                 return false;
             }
 
             if (path == "/update/install-result/ack")
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
-                HttpResponse.SendJson(stream, 200, Update.MarkInstallResultSeen());
+                HttpResponse.SendJson(stream, 200, Update.MarkInstallResultSeen(Q("attempt")));
                 return false;
             }
 

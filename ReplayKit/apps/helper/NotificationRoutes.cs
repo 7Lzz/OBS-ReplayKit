@@ -56,8 +56,8 @@ namespace ReplayKitHelper
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
                 string id = Q("id");
                 if (string.IsNullOrEmpty(id) || !Regex.IsMatch(id, "^[A-Za-z0-9_-]{1,64}$")) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("notifications.invalidId") }); return false; }
-                PipeClient.SendNotificationReader(id);
-                HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true });
+                bool sent = PipeClient.SendNotificationReader(id);
+                HttpResponse.SendJson(stream, sent ? 200 : 503, new JObject { ["ok"] = sent });
                 return false;
             }
 

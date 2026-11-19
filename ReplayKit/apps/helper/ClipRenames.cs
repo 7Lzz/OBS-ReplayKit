@@ -4,6 +4,8 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
+using System.Text;
 using Microsoft.Win32.SafeHandles;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -13,6 +15,7 @@ namespace ReplayKitHelper
     internal static class ClipRenames
     {
         private const string FilesKey = "@files";
+        internal const string LinkIdentityKey = "link_identity";
         private const uint ReadAttributes = 0x80;
         private const uint OpenReparsePoint = 0x00200000;
         private const int FileIdInfo = 18;
@@ -39,7 +42,7 @@ namespace ReplayKitHelper
 
         // guarded by ClipsMetaLock; a clip whose file attributes stayed put needs no new handle
         private static Dictionary<string, Observed> observed = new Dictionary<string, Observed>(StringComparer.Ordinal);
-        private static string savedRoot, savedDb;
+        private static string savedRoot, savedDb, savedSignature;
         private static JObject savedFiles;
 
         internal static string Identity(FileInfo file)
@@ -51,6 +54,15 @@ namespace ReplayKitHelper
                 (id.Low == 0 && id.High == 0)) return null;
             return string.Format(CultureInfo.InvariantCulture, "{0:x16}:{1:x16}{2:x16}:{3:x16}",
                 id.Volume, id.High, id.Low, file.CreationTimeUtc.Ticks);
+        }
+
+        internal static string Version(FileInfo file)
+        {
+            string identity = Identity(file);
+            if (identity == null) return null;
+            string state = string.Format(CultureInfo.InvariantCulture, "{0}\n{1}:{2}:{3}", file.FullName.ToUpperInvariant(), identity, file.Length, file.LastWriteTimeUtc.Ticks);
+            using (var sha = SHA256.Create())
+                return BitConverter.ToString(sha.ComputeHash(Encoding.UTF8.GetBytes(state))).Replace("-", "");
         }
 
         private static string Resolve(string root, string relative)
@@ -100,6 +112,68 @@ namespace ReplayKitHelper
             .Where(group => group.Count() == 1)
             .ToDictionary(group => group.Key, group => group.First().Name, StringComparer.Ordinal);
 
+        internal static HashSet<string> MissingIdentities(string root, JObject entries)
+        {
+            var ids = new HashSet<string>(StringComparer.Ordinal);
+            if (!(entries[FilesKey] is JObject files)) return ids;
+            foreach (var item in UniqueIds(files))
+            {
+                string path = Resolve(root, item.Value);
+                if (path != null && !File.Exists(path)) ids.Add(item.Key);
+            }
+            return ids;
+        }
+
+        private static bool BindLegacyLinks(JObject db, JObject previous, JObject filesOnDisk)
+        {
+            var byName = previous.Properties().GroupBy(p => Path.GetFileName(p.Name), StringComparer.OrdinalIgnoreCase)
+                .Where(group => group.Count() == 1).ToDictionary(group => group.Key, group => group.First().Value, StringComparer.OrdinalIgnoreCase);
+            bool changed = false;
+            foreach (var file in filesOnDisk.Properties())
+            {
+                string name = Path.GetFileName(file.Name);
+                if (!(db[name] is JObject entry) || entry["url"]?.Type != JTokenType.String || entry[LinkIdentityKey] != null) continue;
+                var prior = previous[file.Name] ?? (byName.TryGetValue(name, out var old) ? old : file.Value);
+                string identity = prior.Type == JTokenType.String ? prior.Value<string>() : null;
+                if (string.IsNullOrEmpty(identity)) continue;
+                entry[LinkIdentityKey] = identity;
+                changed = true;
+            }
+            return changed;
+        }
+
+        internal static bool FollowLink(string root, string path, string previousIdentity)
+        {
+            if (string.IsNullOrEmpty(previousIdentity)) return true;
+            try
+            {
+                string prefix = Prefix(Path.GetFullPath(root));
+                if (!path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) return true;
+                string current = Identity(new FileInfo(path));
+                if (current == null) return false;
+                return FollowLinkRecord(root, path, prefix, previousIdentity, current);
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is JsonException)
+            {
+                Log.Write("Clip link update: " + ex.GetType().Name);
+                return false;
+            }
+        }
+
+        private static bool FollowLinkRecord(string root, string path, string prefix, string previousIdentity, string current)
+        {
+            string name = Path.GetFileName(path);
+            Clips.UpdateLibraryDb(db =>
+            {
+                if (!(db[name] is JObject entry) || entry["url"]?.Type != JTokenType.String) return false;
+                var known = entry[LinkIdentityKey] ?? (db[FilesKey] as JObject)?[path.Substring(prefix.Length)];
+                if (known != null && (known.Type != JTokenType.String || known.Value<string>() != previousIdentity)) return false;
+                entry[LinkIdentityKey] = current;
+                return true;
+            }, root);
+            return true;
+        }
+
         internal static bool Reconcile(string root, List<FileInfo> files)
         {
             lock (Server.State.ClipsMetaLock)
@@ -108,8 +182,9 @@ namespace ReplayKitHelper
                 {
                     root = Path.GetFullPath(root);
                     string dbPath = AppConfig.GetDbPath();
+                    string signature = Clips.GetClipsDbCacheSignature(root);
                     var filesOnDisk = Scan(root, files);
-                    if (root == savedRoot && dbPath == savedDb && File.Exists(dbPath) && JToken.DeepEquals(savedFiles, filesOnDisk))
+                    if (root == savedRoot && dbPath == savedDb && signature == savedSignature && File.Exists(dbPath) && JToken.DeepEquals(savedFiles, filesOnDisk))
                         return true;
                     var entries = ClipStore.ReadFolder(dbPath, root, db => db);
                     var previous = entries[FilesKey] as JObject ?? new JObject();
@@ -137,10 +212,16 @@ namespace ReplayKitHelper
                         if (moved.Contains(old.Name) || current[old.Name] != null || Resolve(root, old.Name) == null) continue;
                         if (entries[Path.GetFileName(old.Name)] is JObject) current[old.Name] = old.Value.DeepClone();
                     }
-                    if (!JToken.DeepEquals(previous, current))
-                        Clips.UpdateDb(db => { db[FilesKey] = current; return true; }, root);
+                    Clips.UpdateLibraryDb(db =>
+                    {
+                        bool changed = BindLegacyLinks(db, previous, filesOnDisk);
+                        if (JToken.DeepEquals(previous, current)) return changed;
+                        db[FilesKey] = current;
+                        return true;
+                    }, root);
                     savedRoot = root;
                     savedDb = dbPath;
+                    savedSignature = Clips.GetClipsDbCacheSignature(root);
                     savedFiles = filesOnDisk;
                     return true;
                 }
@@ -162,7 +243,7 @@ namespace ReplayKitHelper
                 {
                     if (!EditDrafts.Rename(from, to)) return false;
                     if (oldName != newName) Clips.RenameFavorite(root, oldName, newName);
-                    Clips.UpdateDb(db =>
+                    Clips.UpdateLibraryDb(db =>
                     {
                         bool changed = false;
                         if (oldName != newName && db[oldName] is JObject source)

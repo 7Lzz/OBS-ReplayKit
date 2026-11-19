@@ -114,12 +114,12 @@ namespace ReplayKitSetup
             return true;
         }
 
-        // the open clips hotkey had no key before, so an install that never set one gets alt + z; a key someone picked stays
+        // only an absent hotkey gets the default; an empty object is an explicitly cleared binding
         private static bool SetOpenClipsHotkey()
         {
             if (!File.Exists(Prefs.RUNTIME_SETTINGS_FILE)) return true;
             var settings = JObject.Parse(File.ReadAllText(Prefs.RUNTIME_SETTINGS_FILE));
-            if (settings["openClipsKeybind"] is JObject current && !string.IsNullOrWhiteSpace(current.Value<string>("key"))) return true;
+            if (settings.Property("openClipsKeybind") != null) return true;
             settings["openClipsKeybind"] = new JObject { ["alt"] = true, ["key"] = "OBS_KEY_Z" };
             WriteText(Prefs.RUNTIME_SETTINGS_FILE, settings.ToString(Formatting.Indented) + "\n");
             return true;

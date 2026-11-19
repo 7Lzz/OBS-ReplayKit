@@ -2195,6 +2195,10 @@
     "source": "643687bc3adaac76",
     "text": "Durée"
   },
+  "common.libraryMetadataNotSaved": {
+    "source": "eacdd6020bcafe24",
+    "text": "L’opération sur le fichier a réussi, mais ReplayKit n’a pas pu enregistrer les métadonnées de la bibliothèque."
+  },
   "common.microphone": {
     "source": "a0b39d22329a3057",
     "text": "Microphone"
@@ -4931,6 +4935,10 @@
     "source": "154539677af96fde",
     "text": "Arrêter la génération"
   },
+  "editor.stopWaitingForSpeech": {
+    "source": "755a025356331703",
+    "text": "Arrêter d’attendre"
+  },
   "editor.stopping": {
     "source": "24a54b7783c68b9d",
     "text": "Arrêt en cours"
@@ -6911,10 +6919,6 @@
     "source": "1ef347e11e320e77",
     "text": "Impossible de régler l'opacité de {name} : {error}"
   },
-  "settings.couldNotSetObsMonitoringDevice": {
-    "source": "7a59e2250afe7e65",
-    "text": "Impossible de régler le périphérique de surveillance d'OBS sur {device} après {attempts} tentatives. {error}"
-  },
   "settings.couldNotSetTheInputSensitivity": {
     "source": "14a78e615b5856e2",
     "text": "Impossible de régler la sensibilité d'entrée : {error}"
@@ -7071,10 +7075,6 @@
     "source": "dc224b7bdacd7452",
     "text": "L'audio du bureau n'est pas la source de capture audio de ReplayKit."
   },
-  "settings.desktopAudioMixerStateCouldNot": {
-    "source": "a6cb6a37c3f32ec3",
-    "text": "L'état du mélangeur de l'audio du bureau n'a pas pu être modifié : {error}"
-  },
   "settings.desktopAudioMonitoringStateCouldNot": {
     "source": "8b4f905e314f933e",
     "text": "L'état de la surveillance de l'audio du bureau n'a pas pu être vérifié : {error}"
@@ -7138,18 +7138,6 @@
   "settings.discordOutputModeWasSavedBut": {
     "source": "cf54892ef94981cc",
     "text": "Le mode de sortie Discord a été enregistré, mais {message}"
-  },
-  "settings.discordOutputModeWasSavedBut2": {
-    "source": "b2e1e3c1f61824da",
-    "text": "Le mode de sortie Discord a été enregistré, mais l'état de la caméra virtuelle n'a pas pu être lu : {error}"
-  },
-  "settings.discordOutputModeWasSavedBut3": {
-    "source": "d4b6c910b24f583c",
-    "text": "Le mode de sortie Discord a été enregistré, mais l'ancienne caméra virtuelle n'a pas pu être lancée : {error}"
-  },
-  "settings.discordOutputModeWasSavedBut4": {
-    "source": "a8734d0c4437f133",
-    "text": "Le mode de sortie Discord a été enregistré, mais la caméra virtuelle n'a pas pu être arrêtée : {error}"
   },
   "settings.discordRichPresence": {
     "source": "6257e038f7a60bdc",
@@ -7234,6 +7222,18 @@
   "settings.dragToPosition": {
     "source": "43ddd66cdc6eb3f4",
     "text": "Faites glisser pour positionner"
+  },
+  "settings.followWindowsLanguage": {
+    "source": "4611df7bceeadea6",
+    "text": "Utiliser la langue de Windows"
+  },
+  "settings.micSettingsReverted": {
+    "source": "8090a6cb1a20a12d",
+    "text": "Les modifications du microphone qu’OBS n’a pas pu appliquer ont été annulées."
+  },
+  "settings.monitoringDeviceNotConfirmed": {
+    "source": "3ebdf5a7cab0f4b6",
+    "text": "OBS n’a pas confirmé {device} comme périphérique de contrôle audio actif."
   },
   "settings.resetOverlaySizeAndRotation": {
     "source": "910d03d1f3f121c3",
@@ -7815,10 +7815,6 @@
     "source": "fba79278f18f924b",
     "text": "Niveau du microphone"
   },
-  "settings.microphoneSettingsWereSavedButObs": {
-    "source": "6f14c78637164845",
-    "text": "Les paramètres du microphone ont été enregistrés, mais OBS est injoignable ou n'a pas d'entrée \"{MicInputName}\". Redémarrez OBS et réessayez."
-  },
   "settings.microphoneTestFailedError": {
     "source": "50c8f789e3a910a5",
     "text": "Échec du test du microphone : {error}"
@@ -8198,10 +8194,6 @@
   "settings.obsStartsInTheSystemTray": {
     "source": "f20d594c5c35b559",
     "text": "OBS démarre dans la zone de notification au lieu d'ouvrir sa fenêtre."
-  },
-  "settings.obsStillReportsMonitoringDevice": {
-    "source": "fbf08ec8489ae7d3",
-    "text": "OBS indique toujours le périphérique d’écoute '{name}' ({id})."
   },
   "settings.obsStudioItselfWillAlsoBe": {
     "source": "bb2ea21750848284",
@@ -9535,10 +9527,6 @@
     "source": "a5a22c78e84a093d",
     "text": "Afficher (V)"
   },
-  "settings.virtualCameraIsLegacyDeprecatedFor": {
-    "source": "b1ce52f88717759e",
-    "text": "La caméra virtuelle est un mode ancien et obsolète pour la sortie Discord."
-  },
   "settings.volumeMustBeBetween0And": {
     "source": "815edf45de52ca90",
     "text": "Le volume doit être compris entre 0 et {VolumeMax}."
@@ -9678,10 +9666,6 @@
   "setup.cleanupComplete": {
     "source": "aca630d212306171",
     "text": "Nettoyage terminé"
-  },
-  "setup.clearOldObsFiles": {
-    "source": "bcb2b555e88da7f9",
-    "text": "Supprimer les anciens fichiers d'OBS"
   },
   "setup.clearTheSetupCache": {
     "source": "9e44cd91060a45b7",
@@ -10062,10 +10046,6 @@
   "setup.removeWindowsStartup": {
     "source": "e5147babfcd16e35",
     "text": "Supprimer le démarrage avec Windows"
-  },
-  "setup.removesFilesAnObsUpdateLeft": {
-    "source": "b82245e09590bef7",
-    "text": "Supprime les fichiers laissés par une mise à jour d'OBS."
   },
   "setup.removesStreamableLoginDataAndSchedules": {
     "source": "7c1b2590789a2f8f",
@@ -11318,10 +11298,6 @@
   "update.startupUpdateCheckAlreadyRan": {
     "source": "b521777f902946bb",
     "text": "La vérification de mise à jour au démarrage a déjà été effectuée."
-  },
-  "update.theInstallerDidNotFinishWithin": {
-    "source": "e8064abfffb78ac5",
-    "text": "L'installateur ne s'est pas terminé en 3 minutes."
   },
   "update.theInstallerDidNotStart": {
     "source": "351d29af6f6c787b",

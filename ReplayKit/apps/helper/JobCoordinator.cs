@@ -112,6 +112,16 @@ namespace ReplayKitHelper
             lock (Gate) return Editors.Values.Any(e => e.Paths.Contains(path));
         }
 
+        internal static bool HasOpenEditor()
+        {
+            lock (Gate) return Editors.Values.Any(e => e.Paths.Count > 0);
+        }
+
+        internal static bool RemoveUnusedImport(Func<bool> remove)
+        {
+            lock (Gate) return !HasOpenEditor() && remove();
+        }
+
         public static void RenameEditorSource(string from, string to, string view)
         {
             lock (Gate)

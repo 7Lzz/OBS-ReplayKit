@@ -28,6 +28,7 @@ namespace ReplayKitHelper
         {
             public string Name;
             public string Full;
+            public string Root;
         }
 
         public static SafeClipPath GetSafeClipPath(string raw, string folder = null)
@@ -42,7 +43,7 @@ namespace ReplayKitHelper
             string prefix = root.EndsWith(Path.DirectorySeparatorChar.ToString()) ? root : root + Path.DirectorySeparatorChar;
             if (!full.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) return null;
             if (File.Exists(full) && (File.GetAttributes(full) & FileAttributes.ReparsePoint) != 0) return null;
-            return new SafeClipPath { Name = name, Full = full };
+            return new SafeClipPath { Name = name, Full = full, Root = root };
         }
 
         // every clip is filed in a folder of the clip folder named after its game (Unassigned, Desktop and Mixed for the others) and keeps its plain file name as its id; the folders that hold clips are listed in the clips db, so a folder the user made in the clip folder for something else never joins the library
@@ -232,6 +233,7 @@ namespace ReplayKitHelper
             // the clip went into deleted history rather than being deleted for good
             public bool Kept;
             public string Message = "";
+            public string Warning = "";
         }
 
         // deletes one clip for good, the way the clips page does, so the storage card can delete a list of them with the same checks: the name has to resolve inside the clip folder, and a clip that an upload, trim or compression holds is left alone
@@ -241,10 +243,10 @@ namespace ReplayKitHelper
         }
 
         // keep false is for the deletes whose point is the space they free, which a clip kept in deleted history would not give back
-        internal static DeleteResult DeleteClip(SafeClipPath selected, long? size = null, DateTime? writeTime = null, bool keep = true)
+        internal static DeleteResult DeleteClip(SafeClipPath selected, long? size = null, DateTime? writeTime = null, bool keep = true, string protectFavoritesIn = null, string expectedVersion = null)
         {
             if (selected == null || !File.Exists(selected.Full)) return new DeleteResult { Status = 404, Message = Locales.Message("common.clipNotFound") };
-            string root = LibraryRoot(Path.GetDirectoryName(selected.Full));
+            string root = selected.Root ?? LibraryRoot(Path.GetDirectoryName(selected.Full));
             bool kept = false;
             string requestId = UploadState.NewRequestId();
             using (var reservation = JobCoordinator.TryReserve(requestId, selected.Name, selected.Full, "delete", out string busy))
@@ -263,21 +265,40 @@ namespace ReplayKitHelper
                         // its row of the clips db goes with it, so a restore gets back its link, game and compression marker
                         var record = keep ? ClipStore.ReadFolder(AppConfig.GetDbPath(), root, db => (db[selected.Name] as JObject)?.DeepClone() as JObject) : null;
                         kept = keep && DeletedHistory.Keep(selected.Full, "clip", root, record);
-                        if (!kept) ClipFiles.DeleteWhenFree(selected.Full);
+                        if (!kept && protectFavoritesIn == null) ClipFiles.DeleteWhenFree(selected.Full);
+                        else if (!kept)
+                        {
+                            WithFavorites(protectFavoritesIn, favorites =>
+                            {
+                                if (favorites.Contains(selected.Name) || string.IsNullOrEmpty(expectedVersion) ||
+                                    ClipRenames.Version(new FileInfo(selected.Full)) != expectedVersion)
+                                    throw new IOException(Locales.Message("common.theSelectedClipChangedReviewThe"));
+                                File.Delete(selected.Full);
+                                return true;
+                            });
+                        }
                     });
-                    UpdateDb(db => db.Remove(selected.Name), Path.GetDirectoryName(selected.Full));
-                    EditDrafts.Forget(selected.Full);
-                    return new DeleteResult { Status = 200, Name = selected.Name, Kept = kept };
                 }
                 catch (IOException ex) when (ClipFiles.InUse(ex)) { return new DeleteResult { Status = 409, Name = selected.Name, Message = ClipFiles.InUseMessage }; }
                 catch (Exception ex) { return new DeleteResult { Status = 500, Name = selected.Name, Message = ex.Message }; }
+
+                string warning = "";
+                try { UpdateLibraryDb(db => db.Remove(selected.Name), root); }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is JsonException)
+                {
+                    Log.Write("Clip deletion metadata: " + ex.GetType().Name);
+                    InvalidateCache();
+                    warning = Locales.Message("common.libraryMetadataNotSaved");
+                }
+                EditDrafts.Forget(selected.Full);
+                return new DeleteResult { Status = 200, Name = selected.Name, Kept = kept, Warning = warning };
             }
         }
 
         // clips db (filename -> {url, uploaded_at, ...}) with retention expiry.
-        public static string GetClipsDbCacheSignature()
+        public static string GetClipsDbCacheSignature(string folder = null)
         {
-            var parts = new List<string> { "folder:" + AppConfig.GetClipDir().ToUpperInvariant(), "minute:" + (long)Math.Floor(DateTimeOffset.UtcNow.ToUnixTimeSeconds() / 60.0) };
+            var parts = new List<string> { "folder:" + (folder ?? AppConfig.GetClipDir()).ToUpperInvariant(), "minute:" + (long)Math.Floor(DateTimeOffset.UtcNow.ToUnixTimeSeconds() / 60.0) };
             string p = AppConfig.GetDbPath();
             try
             {
@@ -292,11 +313,12 @@ namespace ReplayKitHelper
         }
 
         // read-ClipsDb/Save-ClipsDb lock their whole body, not just the file i/o -- a cache-hit read returns the live cached JObject, so two callers touching it at once would be concurrent unsynchronized mutation, not just a stale-read risk.
-        public static JObject ReadClipsDb()
+        public static JObject ReadClipsDb(string folder = null)
         {
             lock (Server.State.ClipsMetaLock)
             {
-                string sig = GetClipsDbCacheSignature();
+                folder = folder ?? AppConfig.GetClipDir();
+                string sig = GetClipsDbCacheSignature(folder);
                 if (Server.State.ClipsDbCache != null && Server.State.ClipsDbCacheSig == sig) return (JObject)Server.State.ClipsDbCache.DeepClone();
 
                 long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
@@ -304,7 +326,7 @@ namespace ReplayKitHelper
                 var db = new JObject();
                 try
                 {
-                    var parsed = ClipStore.ReadFolder(path, AppConfig.GetClipDir(), data => data);
+                    var parsed = ClipStore.ReadFolder(path, folder, data => data);
                     foreach (var prop in parsed.Properties())
                     {
                         if (!(prop.Value is JObject v)) continue;
@@ -337,6 +359,7 @@ namespace ReplayKitHelper
                                 if (v["retention_days"] != null) entry["retention_days"] = v["retention_days"].Value<int>();
                                 // preserve transcode-state fields the background poller writes. without this theyd be dropped on read and the dock would never show the "processing on streamable" badge.
                                 if (v["shortcode"] != null) entry["shortcode"] = v["shortcode"].Value<string>();
+                                if (v[ClipRenames.LinkIdentityKey]?.Type == JTokenType.String) entry[ClipRenames.LinkIdentityKey] = v[ClipRenames.LinkIdentityKey].Value<string>();
                                 if (v["ready"] != null) entry["ready"] = v["ready"].Value<bool>();
                                 if (v["transcode_status"] != null) entry["transcode_status"] = v["transcode_status"].Value<int>();
                                 if (v["transcode_percent"] != null) entry["transcode_percent"] = v["transcode_percent"].Value<int>();
@@ -376,11 +399,14 @@ namespace ReplayKitHelper
             }
         }
 
-        public static bool UpdateDb(Func<JObject, bool> change, string folder = null)
+        public static bool UpdateDb(Func<JObject, bool> change, string folder = null) =>
+            UpdateLibraryDb(change, LibraryRoot(folder ?? AppConfig.GetClipDir()));
+
+        internal static bool UpdateLibraryDb(Func<JObject, bool> change, string root)
         {
             lock (Server.State.ClipsMetaLock)
             {
-                bool result = ClipStore.UpdateFolder(AppConfig.GetDbPath(), LibraryRoot(folder ?? AppConfig.GetClipDir()), change);
+                bool result = ClipStore.UpdateFolder(AppConfig.GetDbPath(), root, change);
                 Server.State.ClipsDbCache = null;
                 Server.State.ClipsDbCacheSig = "";
                 AppConfig.ClearClipsCache();
@@ -389,15 +415,16 @@ namespace ReplayKitHelper
         }
 
         // the transcode fields are optional so an upload records its url and the initial still-processing state in one write, keeping the cmp_* fields
-        public static void MarkUploaded(string name, string url, string shortcode = null, bool? ready = null, int? transcodeStatus = null, int? transcodePercent = null, string sourcePath = null, int? retentionDays = null)
+        public static void MarkUploaded(string root, string name, string url, string fileIdentity, string shortcode = null, bool? ready = null, int? transcodeStatus = null, int? transcodePercent = null, int? retentionDays = null)
         {
             // UpdateDb coordinates this mutation with detached pollers as well as helper requests.
-            UpdateDb(db =>
+            UpdateLibraryDb(db =>
             {
                 // tag entries with the retention that applied at upload time so filtering doesnt change retroactively when signing in/out later. anonymous uploads stay short-retention even after signing in.
                 var entry = new JObject
                 {
                     ["url"] = url,
+                    [ClipRenames.LinkIdentityKey] = fileIdentity,
                     ["uploaded_at"] = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
                     ["retention_days"] = retentionDays ?? Constants.GetEffectiveRetentionDays(),
                 };
@@ -419,15 +446,15 @@ namespace ReplayKitHelper
                 db[name] = entry;
 
                 return true;
-            }, sourcePath == null ? null : Path.GetDirectoryName(sourcePath));
+            }, root);
         }
 
         // called once the compress-overwrite encode + atomic replace succeeds. stores the new mode + the freshly-written files mtime as the cache key, plus the timestamp + pre-compress size for ui purposes, so later /clips polls dont need to re-probe the file.
-        public static void MarkCompressed(string name, string mode, long mtimeTicks, long preBytes, string sourcePath = null)
+        public static void MarkCompressed(string root, string name, string mode, long mtimeTicks, long preBytes, string sourcePath)
         {
             if (string.IsNullOrWhiteSpace(name)) return;
             if (mode != "fast" && mode != "slow") return;
-            UpdateDb(db =>
+            UpdateLibraryDb(db =>
             {
                 var entry = db[name] as JObject ?? new JObject();
                 entry["cmp_mode"] = mode;
@@ -438,14 +465,13 @@ namespace ReplayKitHelper
                 entry["cmp_ver"] = 2;
                 if (entry["capture"] is JObject capture)
                 {
-                    string file = sourcePath ?? LocateClip(name);
-                    if (ClipGames.PriorIdentity(capture, preBytes, mtimeTicks, File.GetCreationTimeUtc(file).Ticks)) ClipGames.Stamp(capture, file);
+                    if (ClipGames.PriorIdentity(capture, preBytes, mtimeTicks, File.GetCreationTimeUtc(sourcePath).Ticks)) ClipGames.Stamp(capture, sourcePath);
                     else entry.Remove("capture");
                 }
                 db[name] = entry;
 
                 return true;
-            }, sourcePath == null ? null : Path.GetDirectoryName(sourcePath));
+            }, root);
         }
 
         // a clip replaced by a fresh encode of an edit is no longer the compressed file, though its restored mtime would still match the cached marker
@@ -622,9 +648,11 @@ namespace ReplayKitHelper
         }
 
         // claims ClipIndexRepairRunning under the lock before doing any slow work (ffprobe resolution, which can hit Get-HelperCapabilitiess multi-second cold-cache probe), then does that slow work lock-free so it cant hold up every other ClipsMetaLock user. the Task.ContinueWith below resets the claim on completion, so a bail-out before the task actually starts must reset it directly.
-        public static void StartClipIndexRepairIfNeeded(List<FileInfo> files, JObject index)
+        private static void StartClipIndexRepairIfNeeded(string clipDir, List<FileInfo> files, JObject index)
         {
+            if (!string.Equals(clipDir, AppConfig.GetClipDir(), StringComparison.OrdinalIgnoreCase)) return;
             DateTime now = DateTime.UtcNow;
+            int maxFiles = Constants.MAX_CLIPS > 0 ? Constants.MAX_CLIPS : 20000;
             bool claimed = false;
             lock (Server.State.ClipsMetaLock)
             {
@@ -633,7 +661,7 @@ namespace ReplayKitHelper
                 bool needsRepair = Server.State.ClipIndexRepairQueued;
                 if (!needsRepair)
                 {
-                    foreach (var file in files)
+                    foreach (var file in ClipIndexWorker.Candidates(files, maxFiles))
                     {
                         if (TestClipNeedsIndexRepair(file, index)) { needsRepair = true; break; }
                     }
@@ -656,9 +684,7 @@ namespace ReplayKitHelper
                 return;
             }
 
-            string clipDir = AppConfig.GetClipDir();
             string indexPath = AppConfig.GetClipIndexPath();
-            int maxFiles = Constants.MAX_CLIPS > 0 ? Math.Max(Constants.MAX_CLIPS, 1) : 20000;
 
             Task.Run(() => ClipIndexWorker.Run(clipDir, indexPath, ffprobe, Constants.ALLOWED_EXTS, maxFiles))
                 .ContinueWith(t =>
@@ -671,7 +697,7 @@ namespace ReplayKitHelper
                         AppConfig.ClearClipsCache();
                     }
                     // only the freshest few -- an old backlog doesnt need proactive warming (nobody is about to edit a clip from last week the moment it gets reindexed), and capping this keeps a first-ever big clip folder from firing a burst of ffprobe/shell-thumbnail work all at once.
-                    if (t.Status == TaskStatus.RanToCompletion)
+                    if (t.Status == TaskStatus.RanToCompletion && string.Equals(clipDir, AppConfig.GetClipDir(), StringComparison.OrdinalIgnoreCase))
                         foreach (var name in t.Result.Take(3)) WarmClipMetadata(name);
                 });
         }
@@ -765,6 +791,18 @@ namespace ReplayKitHelper
                 Log.Write("Read-ClipUiState error: " + ex.Message);
             }
             return state;
+        }
+
+        internal static T WithFavorites<T>(string folder, Func<HashSet<string>, T> read)
+        {
+            return ClipStore.ReadFolder(AppConfig.GetClipUiStatePath(), folder, state =>
+            {
+                var favorites = state["favorites"];
+                if (favorites != null && favorites.Type != JTokenType.Null && favorites.Type != JTokenType.String &&
+                    (!(favorites is JArray entries) || entries.Any(entry => entry.Type != JTokenType.String)))
+                    throw new JsonException(Locales.Message("clips.invalidClipState"));
+                return read(new HashSet<string>(NormalizeFavoriteClipNames(favorites), StringComparer.OrdinalIgnoreCase));
+            });
         }
 
         internal static void RenameFavorite(string folder, string from, string to)
@@ -952,21 +990,21 @@ namespace ReplayKitHelper
         }
 
         // holds ClipsMetaLock across the whole enumeration, not just the ReadClipsDb/ReadClipIndex calls -- both return live cached objects and this walks the folder doing many scattered reads into them, so a concurrent MarkUploaded/SaveClipsDb writing to that same live object mid-enumeration would be real corruption, not just staleness. only runs on a clips-cache miss, so its not the hot per-poll path.
-        public static List<JObject> GetClipsListUncached()
+        public static List<JObject> GetClipsListUncached(string root = null)
         {
             List<JObject> items;
             List<FileInfo> eligibleFiles;
             JObject index;
             lock (Server.State.ClipsMetaLock)
             {
-                string root = AppConfig.GetClipDir();
+                root = root ?? AppConfig.GetClipDir();
                 if (!Directory.Exists(root)) return new List<JObject>();
                 long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
                 items = new List<JObject>();
                 try { eligibleFiles = LibraryFiles(root).Where(IsLibraryClip).ToList(); }
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { return new List<JObject>(); }
                 ClipRenames.Reconcile(root, eligibleFiles);
-                var db = ReadClipsDb();
+                var db = ReadClipsDb(root);
                 index = ReadClipIndex();
 
                 foreach (var fi in eligibleFiles)
@@ -1001,7 +1039,8 @@ namespace ReplayKitHelper
                         if (cmpPre > 0) item["cmp_pre"] = cmpPre;
                     }
 
-                    if (entry != null && entry["url"] != null && entry["uploaded_at"] != null)
+                    string linkIdentity = entry?[ClipRenames.LinkIdentityKey]?.Value<string>();
+                    if (entry?["url"] != null && entry["uploaded_at"] != null && !string.IsNullOrEmpty(linkIdentity) && ClipRenames.Identity(fi) == linkIdentity)
                     {
                         if ((now - entry["uploaded_at"].Value<long>()) < Constants.GetEntryRetentionSec(entry))
                         {
@@ -1019,7 +1058,7 @@ namespace ReplayKitHelper
             } // ClipsMetaLock released here
 
             // called after ClipsMetaLock is released -- the lock is reentrant, so calling this inside the block above would keep every other thread waiting while it resolves ffprobe and starts the repair
-            StartClipIndexRepairIfNeeded(eligibleFiles, index);
+            StartClipIndexRepairIfNeeded(root, eligibleFiles, index);
 
             var sorted = items.OrderByDescending(i => i["mtime"].Value<long>()).ThenBy(i => i["name"].Value<string>(), NameComparer).ToList();
             if (Constants.MAX_CLIPS > 0 && sorted.Count > Constants.MAX_CLIPS) sorted = sorted.Take(Constants.MAX_CLIPS).ToList();
@@ -1065,12 +1104,12 @@ namespace ReplayKitHelper
             lock (Server.State.ClipsMetaLock) { generation++; cached = null; }
         }
 
-        private static Snapshot GetSnapshot()
+        private static Snapshot GetSnapshot(string clipDir = null)
         {
             // only readers take this gate; invalidation can hold ClipsMetaLock without waiting for a build
             lock (SnapshotGate)
             {
-                string clipDir = AppConfig.GetClipDir();
+                clipDir = clipDir ?? AppConfig.GetClipDir();
                 string signature = GetClipsCacheSignature(clipDir);
                 long observed;
                 lock (Server.State.ClipsMetaLock)
@@ -1079,7 +1118,7 @@ namespace ReplayKitHelper
                         (DateTime.UtcNow - cached.Created).TotalMilliseconds < Constants.CLIPS_CACHE_MAX_AGE_MS) return cached;
                     observed = generation;
                 }
-                var snapshot = new Snapshot(GetClipsListUncached(), signature, FolderId(clipDir));
+                var snapshot = new Snapshot(GetClipsListUncached(clipDir), signature, FolderId(clipDir));
                 lock (Server.State.ClipsMetaLock)
                 {
                     if (observed == generation) cached = snapshot;
@@ -1096,7 +1135,7 @@ namespace ReplayKitHelper
                 return BitConverter.ToString(sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes(normalized))).Replace("-", "").Substring(0, 12).ToLowerInvariant();
         }
 
-        public static List<JObject> GetClipsList() => GetSnapshot().Body;
+        public static List<JObject> GetClipsList(string folder = null) => GetSnapshot(folder).Body;
         public static string GetClipsListJson() => GetSnapshot().Json;
 
         public static string GetClipsPageJson(int offset, int limit, string sort = "newest", string game = "all", bool linkedOnly = false)
@@ -1173,21 +1212,11 @@ namespace ReplayKitHelper
             return payload.ToString(Formatting.None);
         }
 
-        public sealed class LatestClip
+        public static SafeClipPath FindLatestClip()
         {
-            public string Name;
-            public string Full;
-            public long Size;
-        }
-
-        public static LatestClip FindLatestClip()
-        {
-            var clips = GetClipsListUncached();
-            if (clips == null || clips.Count == 0) return null;
-            var selected = GetSafeClipPath(clips[0]["name"]?.Value<string>());
-            if (selected == null) return null;
-            var fi = new FileInfo(selected.Full);
-            return new LatestClip { Name = selected.Name, Full = selected.Full, Size = fi.Length };
+            string root = AppConfig.GetClipDir();
+            var clips = GetClipsListUncached(root);
+            return clips.Count == 0 ? null : GetSafeClipPath(clips[0]["name"]?.Value<string>(), root);
         }
     }
 }

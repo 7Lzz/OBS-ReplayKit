@@ -774,11 +774,13 @@ const CLIP_HOVER_PROFILES = {
 
   // draft writes reach the helper one after another, so a save still on its way cannot land after the delete that followed it and bring the draft back
   let draftWrites = Promise.resolve();
+  let draftWritesPending = 0;
   let draftEpoch = 0;
   let draftReadSeq = 0;
   function queueDraftWrite(send) {
     draftEpoch++;
-    const run = draftWrites.then(send, send);
+    draftWritesPending++;
+    const run = draftWrites.then(send, send).finally(() => { draftWritesPending--; });
     draftWrites = run.then(() => {}, () => {});
     return run;
   }
@@ -2463,12 +2465,7 @@ const CLIP_HOVER_PROFILES = {
     return merged.filter(Boolean);
   }
 
-  async function fetchClips() {
-    const forceRefresh = clipsRefreshCounter++ % CLIPS_FORCE_REFRESH_EVERY === 0;
-    const requestSort = activeSort;
-    const requestGames = gameFilters ? gameFilters.key : "";
-    const page = await fetchClipsPage(0, forceRefresh, requestSort);
-    if (requestSort !== activeSort || requestGames !== (gameFilters ? gameFilters.key : "")) return null;
+  function applyClipsPage(page) {
     if (page.paged && page.folder && page.folder !== clipsFolder) {
       const switched = clipsFolder !== "";
       clipsFolder = page.folder;
@@ -2633,22 +2630,6 @@ const CLIP_HOVER_PROFILES = {
       localState.delete(name);
     }
     return { active, jobs, newErrors, completed };
-  }
-
-  function applyCompletedUploadLinks(clips, completed) {
-    const urlsByName = new Map();
-    for (const job of completed) {
-      if (job && job.clipName && job.url) urlsByName.set(job.clipName, job.url);
-    }
-    if (!urlsByName.size) return clips;
-    const applyLink = (clip) => {
-      const url = clip && urlsByName.get(clip.name);
-      if (!url || clip.streamable_url === url) return clip;
-      // stamp the same initial transcode state the helpers MarkUploaded writes, so the card goes straight to the amber "processing" bar instead of flashing "Copy Link" + "link NaNm left" before the next /clips lands.
-      return { ...clip, streamable_url: url, ready: false, transcode_status: 1, transcode_percent: 0 };
-    };
-    resolvedFavoriteClips = resolvedFavoriteClips.map(applyLink);
-    return clips.map(applyLink);
   }
 
   // what the helper is doing with a clip right now (compressing or uploading, empty when idle): a file that is being uploaded or compressed is refused when the edit is saved, or is replaced under the editor
@@ -5362,22 +5343,28 @@ const CLIP_HOVER_PROFILES = {
     if (pollInFlight) return;
     pollInFlight = true;
     const identityRevision = clipIdentityRevision;
+    const requestSort = activeSort;
+    const requestGames = gameFilters ? gameFilters.key : "";
+    let uploadCompleted = false;
     try {
-      let clips = await fetchClips();
-      if (!clips) return;
+      const forceRefresh = clipsRefreshCounter++ % CLIPS_FORCE_REFRESH_EVERY === 0;
+      const page = await fetchClipsPage(0, forceRefresh, requestSort);
       helperFailures = 0;
       closeErrorPopup("helper-offline");
       let uploadStatus = null;
       try { uploadStatus = await fetchUploadStatus(); } catch {}
-      if (identityRevision !== clipIdentityRevision) return;
+      if (identityRevision !== clipIdentityRevision || requestSort !== activeSort || requestGames !== (gameFilters ? gameFilters.key : "")) return;
+      if (isFullscreenOrHostTransition()) {
+        deferVirtualRenderUntilFullscreenSettles(true);
+        return;
+      }
+      const clips = applyClipsPage(page);
       lastUploadStatus = uploadStatus;
       syncClipSave(uploadStatus && uploadStatus.clipSave);
       syncClipFolders(uploadStatus && uploadStatus.clipFolders);
       const jobSync = syncUploadJobState(uploadStatus);
-      if (jobSync.completed.length) {
-        clips = applyCompletedUploadLinks(clips, jobSync.completed);
-        if (jobSync.completed.some(job => isFavorite(job.clipName))) refreshFavoriteClips();
-      }
+      uploadCompleted = jobSync.completed.length > 0;
+      if (jobSync.completed.some(job => isFavorite(job.clipName))) refreshFavoriteClips();
       const byName = new Map();
       for (const c of clips) byName.set(c.name, c);
       lastClipsByName = byName;
@@ -5424,10 +5411,6 @@ const CLIP_HOVER_PROFILES = {
       }
       // the placeholder goes with the first list and with nothing before it: the drafts, the clip state and the favorites draw the list again as they come in, and an empty list drawn by them is not the library being empty
       endClipsLoading();
-      if (isFullscreenOrHostTransition()) {
-        deferVirtualRenderUntilFullscreenSettles(true);
-        return;
-      }
       renderLoadedClips(clips);
     } catch (e) {
       endClipsLoading();
@@ -5453,7 +5436,7 @@ const CLIP_HOVER_PROFILES = {
       pollInFlight = false;
       const hasActiveStreamableUpload = Array.from(lastUploadJobsByName.values()).some((job) =>
         job && job.active && job.state === "uploading");
-      scheduleNextPoll(hasActiveStreamableUpload ? POLL_UPLOAD_MS : pendingClipSave ? SAVE_GHOST_POLL_MS : (anyUploading ? POLL_FAST_MS : POLL_IDLE_MS));
+      scheduleNextPoll(uploadCompleted || hasActiveStreamableUpload ? POLL_UPLOAD_MS : pendingClipSave ? SAVE_GHOST_POLL_MS : (anyUploading ? POLL_FAST_MS : POLL_IDLE_MS));
     }
   }
 
@@ -6876,7 +6859,7 @@ const CLIP_HOVER_PROFILES = {
 
   // Keep client-owned work. Accepted helper jobs continue without this page and restore their status when it opens again.
   window.__rkCanUnload = function () {
-    if (trimSaving || editorHeldAway || clipStateSaveTimer || favoriteSaving) return false;
+    if (trimSaving || editorHeldAway || clipStateSaveTimer || favoriteSaving || draftWritesPending) return false;
     if (trimVeil.classList.contains("is-open") || trimProcessingVeil.classList.contains("is-open") || document.querySelector(".modal-veil.is-open")) return false;
     if (compressAllRunning || bulkUploadRunning || bulkUploadQueued.size > 0) return false;
     if (linkTransitionBusy.size > 0 || inFlightCancels.size > 0) return false;

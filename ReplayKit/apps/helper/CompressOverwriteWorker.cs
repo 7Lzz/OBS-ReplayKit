@@ -28,9 +28,9 @@ namespace ReplayKitHelper
         }
 
         public static CompressOverwriteResult Run(
-            string requestId, string ffmpeg, string sourcePath, string tempPath,
+            string requestId, string ffmpeg, string sourcePath, string root, string tempPath,
             double durationSec, string mode, long preBytes, JObject caps, string fastEncoder, string smallerEncoder,
-            int scaleHeight = 0, DateTime? expectedWriteTime = null)
+            int scaleHeight = 0, DateTime? expectedWriteTime = null, string expectedVersion = null)
         {
             var token = JobCoordinator.Token(requestId);
             token.ThrowIfCancellationRequested();
@@ -46,13 +46,13 @@ namespace ReplayKitHelper
             try
             {
                 token.ThrowIfCancellationRequested();
-                return Encode(requestId, ffmpeg, sourcePath, tempPath, durationSec, mode, preBytes, caps, pickedEncoder, scaleHeight, expectedWriteTime);
+                return Encode(requestId, ffmpeg, sourcePath, root, tempPath, durationSec, mode, preBytes, caps, pickedEncoder, scaleHeight, expectedWriteTime, expectedVersion);
             }
             finally { slot.Release(); }
         }
 
-        private static CompressOverwriteResult Encode(string requestId, string ffmpeg, string sourcePath, string tempPath,
-            double durationSec, string mode, long preBytes, JObject caps, string pickedEncoder, int scaleHeight, DateTime? expectedWriteTime)
+        private static CompressOverwriteResult Encode(string requestId, string ffmpeg, string sourcePath, string root, string tempPath,
+            double durationSec, string mode, long preBytes, JObject caps, string pickedEncoder, int scaleHeight, DateTime? expectedWriteTime, string expectedVersion)
         {
             var token = JobCoordinator.Token(requestId);
             var resources = CompressionProfile.Limits(pickedEncoder == "libx265");
@@ -64,7 +64,8 @@ namespace ReplayKitHelper
             {
                 var srcInfo = new FileInfo(sourcePath);
                 if (!srcInfo.Exists || srcInfo.Length != preBytes ||
-                    (expectedWriteTime.HasValue && srcInfo.LastWriteTimeUtc != expectedWriteTime.Value))
+                    (expectedWriteTime.HasValue && srcInfo.LastWriteTimeUtc != expectedWriteTime.Value) ||
+                    (expectedVersion != null && ClipRenames.Version(srcInfo) != expectedVersion))
                     return new CompressOverwriteResult { Ok = false, Message = Locales.Message("storage.theSelectedClipChangedSelectIt") };
                 if (srcInfo.Exists) { origLastWrite = srcInfo.LastWriteTimeUtc; origCreation = srcInfo.CreationTimeUtc; }
             }
@@ -179,9 +180,10 @@ namespace ReplayKitHelper
             }
 
             UploadState.SetUploadState(requestId: requestId, state: "compressing", phase: "replacing", percent: 98);
+            string previousIdentity;
             try
             {
-                ClipFiles.Replace(requestId, tempPath, sourcePath, preBytes, origLastWrite.GetValueOrDefault());
+                previousIdentity = ClipFiles.Replace(requestId, tempPath, sourcePath, preBytes, origLastWrite.GetValueOrDefault(), expectedVersion);
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is System.ComponentModel.Win32Exception)
             {
@@ -217,8 +219,19 @@ namespace ReplayKitHelper
                 newMtimeTicks = 0;
                 try { newMtimeTicks = new FileInfo(sourcePath).LastWriteTimeUtc.Ticks; } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
             }
-            Clips.MarkCompressed(clipName, tagMode, newMtimeTicks, preBytes, sourcePath);
-            Log.Write("marker written: name=" + clipName + " mode=" + tagMode + " mtime=" + newMtimeTicks, "compress", requestId);
+            string metadataWarning = root != null && !ClipRenames.FollowLink(root, sourcePath, previousIdentity)
+                ? Locales.Message("common.libraryMetadataNotSaved") : null;
+            try
+            {
+                Clips.MarkCompressed(root ?? Clips.LibraryRoot(Path.GetDirectoryName(sourcePath)), clipName, tagMode, newMtimeTicks, preBytes, sourcePath);
+                Log.Write("marker written: name=" + clipName + " mode=" + tagMode + " mtime=" + newMtimeTicks, "compress", requestId);
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is Newtonsoft.Json.JsonException)
+            {
+                Log.Write("Compression marker: " + ex.GetType().Name, "compress", requestId);
+                Clips.InvalidateCache();
+                metadataWarning = Locales.Message("common.libraryMetadataNotSaved");
+            }
 
             string historyWarning = null;
             try { CompressionHistory.Record(requestId, mode, preBytes, outBytes, scaleHeight); }
@@ -232,7 +245,7 @@ namespace ReplayKitHelper
             }
             Log.Write("done", "compress", requestId);
             UploadState.SetUploadState(requestId: requestId, state: "done", phase: "done", percent: 100);
-            return new CompressOverwriteResult { Ok = true, Message = historyWarning };
+            return new CompressOverwriteResult { Ok = true, Message = metadataWarning ?? historyWarning };
         }
     }
 }

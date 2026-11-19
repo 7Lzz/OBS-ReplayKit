@@ -34,23 +34,74 @@ namespace ReplayKitHelper
         };
 
         public static string ImagePath => StateLayout.PathFor(AppConfig.GetReplayKitRoot(), StateLayout.ShareCoverImageFile);
-        public static string VideoPath => StateLayout.PathFor(AppConfig.GetReplayKitRoot(), StateLayout.ShareCoverVideoFile);
-        public static string VideoSoundPath => StateLayout.PathFor(AppConfig.GetReplayKitRoot(), StateLayout.ShareCoverVideoSoundFile);
+        private static string VideoPath => StateLayout.PathFor(AppConfig.GetReplayKitRoot(), StateLayout.ShareCoverVideoFile);
+        private static string VideoSoundPath => StateLayout.PathFor(AppConfig.GetReplayKitRoot(), StateLayout.ShareCoverVideoSoundFile);
+        private static string VideoSelectionPath => StateLayout.PathFor(AppConfig.GetReplayKitRoot(), StateLayout.ShareCoverVideoSelectionFile);
         public static string SoundPath => StateLayout.PathFor(AppConfig.GetReplayKitRoot(), StateLayout.ShareCoverSoundFile);
         public static string CardPath => StateLayout.PathFor(AppConfig.GetReplayKitRoot(), StateLayout.ShareCoverCardFile);
         // the sound the default card plays, shipped from resources/sounds once there is one; without it the default card is silent
         public static string DefaultSoundPath => Path.GetFullPath(Path.Combine(Constants.HelperRoot, "..", "..", "sounds", "share-card-default.wav"));
 
+        private const string NoVideo = "none";
+
+        private static string VersionPath(string path, string revision) =>
+            Path.Combine(Path.GetDirectoryName(path), Path.GetFileNameWithoutExtension(path) + "." + revision + Path.GetExtension(path));
+
+        private static (string Video, string Sound) SelectedVideo()
+        {
+            var selection = new FileInfo(VideoSelectionPath);
+            if (!selection.Exists) return (VideoPath, VideoSoundPath);
+            if (selection.Length > 32) throw new IOException("Invalid share cover video selection.");
+            string value = File.ReadAllText(selection.FullName);
+            if (value == NoVideo) return (null, null);
+            if (!Guid.TryParseExact(value, "N", out var revision)) throw new IOException("Invalid share cover video selection.");
+            string token = revision.ToString("N");
+            return (VersionPath(VideoPath, token), VersionPath(VideoSoundPath, token));
+        }
+
+        private static void SelectVideo(string revision)
+        {
+            lock (Gate)
+            {
+                var previous = SelectedVideo();
+                AppConfig.WriteUtf8(VideoSelectionPath, revision);
+                Remove(previous.Video);
+                Remove(previous.Sound);
+            }
+        }
+
+        public static string CurrentVideoPath()
+        {
+            lock (Gate)
+            {
+                string path = SelectedVideo().Video;
+                return File.Exists(path) ? path : null;
+            }
+        }
+
+        public static void RemoveVideo()
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(VideoSelectionPath));
+            SelectVideo(NoVideo);
+        }
+
         public static JObject Status()
         {
             // the size the card is drawn at, so the card editor has its shape; zero while no share window has a texture
             var state = ShareWindow.KnownWindowAlive() ? ShareWindow.Send("STATE") : null;
+            bool hasVideo, videoHasSound;
+            lock (Gate)
+            {
+                var selected = SelectedVideo();
+                hasVideo = File.Exists(selected.Video);
+                videoHasSound = hasVideo && File.Exists(selected.Sound);
+            }
             return new JObject
             {
                 ["ok"] = true,
                 ["hasImage"] = File.Exists(ImagePath),
-                ["hasVideo"] = File.Exists(VideoPath),
-                ["videoHasSound"] = File.Exists(VideoSoundPath),
+                ["hasVideo"] = hasVideo,
+                ["videoHasSound"] = videoHasSound,
                 ["maxVideoSeconds"] = MaxVideoSeconds,
                 ["hasSound"] = File.Exists(SoundPath),
                 ["hasDefaultSound"] = File.Exists(DefaultSoundPath),
@@ -64,9 +115,9 @@ namespace ReplayKitHelper
         private static string Stamp(string path) => path != null && File.Exists(path) ? new FileInfo(path).Length + ":" + File.GetLastWriteTimeUtc(path).Ticks : "";
 
         // the sound the card plays now, or null for none; a video background plays the sound of its video while share_cover_video_sound is on and the video has one, and the card sound otherwise
-        private static string SoundFor(JObject settings, string background)
+        private static string SoundFor(JObject settings, string videoSound)
         {
-            if (background == "video" && (settings["share_cover_video_sound"]?.Value<bool>() ?? SettingDefaults.ShareCoverVideoSound) && File.Exists(VideoSoundPath)) return VideoSoundPath;
+            if ((settings["share_cover_video_sound"]?.Value<bool>() ?? SettingDefaults.ShareCoverVideoSound) && File.Exists(videoSound)) return videoSound;
             switch (settings["share_cover_sound"]?.Value<string>() ?? SettingDefaults.ShareCoverSound)
             {
                 case "custom": return File.Exists(SoundPath) ? SoundPath : null;
@@ -96,9 +147,10 @@ namespace ReplayKitHelper
                 if (state["ok"]?.Value<bool>() != true || width < 16 || height < 16) return;
 
                 string background = settings["share_cover_background"]?.Value<string>() ?? SettingDefaults.ShareCoverBackground;
+                var selected = background == "video" ? SelectedVideo() : (Video: (string)null, Sound: (string)null);
                 // an image or video background whose file is gone draws the theme card, since the setting alone shows nothing
                 if (background == "image" && !File.Exists(ImagePath)) background = "theme";
-                if (background == "video" && !File.Exists(VideoPath)) background = "theme";
+                if (background == "video" && !File.Exists(selected.Video)) background = "theme";
                 var colors = SettingsHttp.ActiveMenuColors(settings);
                 bool showText = settings["share_cover_show_text"]?.Value<bool>() ?? SettingDefaults.ShareCoverShowText;
                 string custom = (settings["share_cover_text"]?.Value<string>() ?? "").Trim();
@@ -119,8 +171,8 @@ namespace ReplayKitHelper
                     ["layout"] = settings["share_cover_layout"] as JObject ?? ReplaykitSettings.DefaultShareCoverLayout(),
                     ["look"] = Look.DeepClone(),
                 };
-                string sound = SoundFor(settings, background);
-                string video = background == "video" ? VideoPath : null;
+                string sound = SoundFor(settings, background == "video" ? selected.Sound : null);
+                string video = background == "video" ? selected.Video : null;
                 string backdrop = background == "theme" ? $"BACKDROP {colors["bg"]} {colors["accent"]}" : "BACKDROP none";
                 // a card that fades in or moves is presented no faster than obs records
                 double fps = (settings["fpsNumerator"]?.Value<double>() ?? 0) / (settings["fpsDenominator"]?.Value<double>() ?? 0);
@@ -226,9 +278,11 @@ namespace ReplayKitHelper
             double fps = FrameRate(picture["r_frame_rate"]?.Value<string>());
 
             Directory.CreateDirectory(Path.GetDirectoryName(VideoPath));
-            string temporaryVideo = VideoPath + ".tmp.mp4";
-            string temporarySound = VideoSoundPath + ".tmp.wav";
-            string fittedSound = VideoSoundPath + ".fit.tmp.wav";
+            string revision = Guid.NewGuid().ToString("N");
+            string temporaryVideo = VersionPath(VideoPath, revision);
+            string temporarySound = VersionPath(VideoSoundPath, revision);
+            string fittedSound = VersionPath(VideoSoundPath, revision + ".fit");
+            bool published = false;
             try
             {
                 string filter = "scale=w='min(" + MaxVideoWidth + ",iw)':h='min(" + MaxVideoHeight + ",ih)':force_original_aspect_ratio=decrease:force_divisible_by=2:out_color_matrix=bt709,setsar=1" + (fps > MaxVideoFps ? ",fps=" + MaxVideoFps : "") + ",format=yuv420p";
@@ -270,16 +324,19 @@ namespace ReplayKitHelper
                         soundSeconds = seconds;
                     }
                 }
-                Native.MoveFileReplace(temporaryVideo, VideoPath);
-                if (hasSound) Native.MoveFileReplace(temporarySound, VideoSoundPath);
-                else Remove(VideoSoundPath);
+                SelectVideo(revision);
+                published = true;
                 Log.Write("Share card video imported: " + seconds.ToString("0.00", CultureInfo.InvariantCulture) + " s" + (hasSound ? " with " + soundSeconds.ToString("0.00", CultureInfo.InvariantCulture) + " s of sound" : " without sound"));
                 return new JObject { ["ok"] = true, ["hasSound"] = hasSound };
             }
             finally
             {
-                foreach (string leftover in new[] { temporaryVideo, temporarySound, fittedSound })
-                    try { if (File.Exists(leftover)) File.Delete(leftover); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+                Remove(fittedSound);
+                if (!published)
+                {
+                    Remove(temporaryVideo);
+                    Remove(temporarySound);
+                }
             }
         }
 

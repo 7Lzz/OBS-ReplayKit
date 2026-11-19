@@ -2195,6 +2195,10 @@
     "context": "Name of a setting in the toolbar of the clips library. Also used in the clips library, the timeline of the clip editor, the tools panel of the clip editor (subtitles, elements, audio).",
     "text": "Length"
   },
+  "common.libraryMetadataNotSaved": {
+    "context": "Warning shown after a delete or compression successfully changed the file but the library database could not be saved.",
+    "text": "The file operation succeeded, but ReplayKit could not save the library metadata."
+  },
   "common.microphone": {
     "context": "Text in a ReplayKit window, sent by the background helper. Also used in the Settings window, the first-run setup wizard, the microphone settings.",
     "text": "Microphone"
@@ -4931,6 +4935,10 @@
     "context": "Screen reader label in the tools panel of the clip editor (subtitles, elements, audio).",
     "text": "Stop generating"
   },
+  "editor.stopWaitingForSpeech": {
+    "context": "Tooltip and accessibility label for leaving automatic subtitle setup while the shared speech download continues.",
+    "text": "Stop waiting"
+  },
   "editor.stopping": {
     "context": "Text in the clip editor.",
     "text": "Stopping"
@@ -6910,10 +6918,6 @@
     "context": "Warning shown after settings are applied in a ReplayKit window, sent by the background helper. Keep {error}, {name} as written.",
     "text": "Could not set {name} opacity: {error}"
   },
-  "settings.couldNotSetObsMonitoringDevice": {
-    "context": "Message the helper shows when an action fails or finishes in a ReplayKit window, sent by the background helper. Keep {attempts}, {device}, {error} as written.",
-    "text": "Could not set OBS monitoring device to {device} after {attempts} attempts. {error}"
-  },
   "settings.couldNotSetTheInputSensitivity": {
     "context": "Warning shown after settings are applied in a ReplayKit window, sent by the background helper. Keep {error} as written.",
     "text": "Could not set the input sensitivity: {error}"
@@ -7070,10 +7074,6 @@
     "context": "Message the helper shows when an action fails or finishes in a ReplayKit window, sent by the background helper.",
     "text": "Desktop Audio is not the ReplayKit audio capture source."
   },
-  "settings.desktopAudioMixerStateCouldNot": {
-    "context": "Message the helper shows when an action fails or finishes in a ReplayKit window, sent by the background helper. Keep {error} as written.",
-    "text": "Desktop Audio mixer state could not be changed: {error}"
-  },
   "settings.desktopAudioMonitoringStateCouldNot": {
     "context": "Message the helper shows when an action fails or finishes in a ReplayKit window, sent by the background helper. Keep {error} as written.",
     "text": "Desktop Audio monitoring state could not be verified: {error}"
@@ -7137,18 +7137,6 @@
   "settings.discordOutputModeWasSavedBut": {
     "context": "Warning shown after settings are applied in a ReplayKit window, sent by the background helper. Keep {message} as written.",
     "text": "Discord output mode was saved, but {message}"
-  },
-  "settings.discordOutputModeWasSavedBut2": {
-    "context": "Warning shown after settings are applied in a ReplayKit window, sent by the background helper. Keep {error} as written.",
-    "text": "Discord output mode was saved, but virtual camera state could not be read: {error}"
-  },
-  "settings.discordOutputModeWasSavedBut3": {
-    "context": "Warning shown after settings are applied in a ReplayKit window, sent by the background helper. Keep {error} as written.",
-    "text": "Discord output mode was saved, but legacy virtual camera could not be started: {error}"
-  },
-  "settings.discordOutputModeWasSavedBut4": {
-    "context": "Warning shown after settings are applied in a ReplayKit window, sent by the background helper. Keep {error} as written.",
-    "text": "Discord output mode was saved, but virtual camera could not be stopped: {error}"
   },
   "settings.discordRichPresence": {
     "context": "Switch label in Settings. Rich Presence is Discord's name for the activity card on a profile.",
@@ -7233,6 +7221,18 @@
   "settings.dragToPosition": {
     "context": "Explanatory text in Settings > Overlay.",
     "text": "Drag to position"
+  },
+  "settings.followWindowsLanguage": {
+    "context": "Choice in the OBS and ReplayKit language picker that follows the Windows display language.",
+    "text": "Follow Windows language"
+  },
+  "settings.micSettingsReverted": {
+    "context": "Warning after trying to apply microphone settings to OBS.",
+    "text": "Microphone changes OBS could not apply were reverted."
+  },
+  "settings.monitoringDeviceNotConfirmed": {
+    "context": "Warning when the native OBS plugin did not confirm the new live monitoring device. Keep {device} as written.",
+    "text": "OBS did not confirm {device} as its live monitoring device."
   },
   "settings.resetOverlaySizeAndRotation": {
     "context": "Tooltip of the reset button above the overlay preview in Settings > Overlay. It puts the overlay size and rotation back to their defaults; the preview is the only place they are set.",
@@ -7814,10 +7814,6 @@
     "context": "Screen reader label in the microphone settings.",
     "text": "Microphone level"
   },
-  "settings.microphoneSettingsWereSavedButObs": {
-    "context": "Warning shown after settings are applied in a ReplayKit window, sent by the background helper. Keep {MicInputName} as written.",
-    "text": "Microphone settings were saved, but OBS could not be reached or has no \"{MicInputName}\" input. Restart OBS and try again."
-  },
   "settings.microphoneTestFailedError": {
     "context": "Message the helper shows when an action fails or finishes in a ReplayKit window, sent by the background helper. Keep {error} as written.",
     "text": "Microphone test failed: {error}"
@@ -8197,10 +8193,6 @@
   "settings.obsStartsInTheSystemTray": {
     "context": "Description under a setting in Settings > Windows OS > Startup.",
     "text": "OBS starts in the system tray instead of opening its window."
-  },
-  "settings.obsStillReportsMonitoringDevice": {
-    "context": "Warning shown after settings are applied in a ReplayKit window, sent by the background helper. Keep {name} and {id} as written; they identify an audio device.",
-    "text": "OBS still reports the monitoring device '{name}' ({id})."
   },
   "settings.obsStudioItselfWillAlsoBe": {
     "context": "Text in Settings > Appearance > Interface.",
@@ -9533,10 +9525,6 @@
     "context": "Button label in Settings > Advanced > OBS menu.",
     "text": "View"
   },
-  "settings.virtualCameraIsLegacyDeprecatedFor": {
-    "context": "Warning shown after settings are applied in a ReplayKit window, sent by the background helper.",
-    "text": "Virtual Camera is legacy/deprecated for Discord output."
-  },
   "settings.volumeMustBeBetween0And": {
     "context": "Message the helper shows when an action fails or finishes in a ReplayKit window, sent by the background helper. Keep {VolumeMax} as written.",
     "text": "Volume must be between 0 and {VolumeMax}."
@@ -9676,10 +9664,6 @@
   "setup.cleanupComplete": {
     "context": "Progress text of the installer in the installer and uninstaller.",
     "text": "Cleanup complete"
-  },
-  "setup.clearOldObsFiles": {
-    "context": "Title or description of an installer step in the installer and uninstaller.",
-    "text": "Clear old OBS files"
   },
   "setup.clearTheSetupCache": {
     "context": "Title or description of an installer step in the installer and uninstaller.",
@@ -10060,10 +10044,6 @@
   "setup.removeWindowsStartup": {
     "context": "Title or description of an installer step in the installer and uninstaller.",
     "text": "Remove Windows startup"
-  },
-  "setup.removesFilesAnObsUpdateLeft": {
-    "context": "Title or description of an installer step in the installer and uninstaller.",
-    "text": "Removes files an OBS update left behind."
   },
   "setup.removesStreamableLoginDataAndSchedules": {
     "context": "Title or description of an installer step in the installer and uninstaller.",
@@ -11311,10 +11291,6 @@
   "update.startupUpdateCheckAlreadyRan": {
     "context": "Message the helper shows when an action fails or finishes in a ReplayKit window, sent by the background helper.",
     "text": "Startup update check already ran."
-  },
-  "update.theInstallerDidNotFinishWithin": {
-    "context": "Text in the update prompt.",
-    "text": "The installer did not finish within 3 minutes."
   },
   "update.theInstallerDidNotStart": {
     "context": "Error message in a ReplayKit window, sent by the background helper.",

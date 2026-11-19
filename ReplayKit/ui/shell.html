@@ -110,13 +110,18 @@
 
   function ensure(name) {
     var f = frames[name];
-    if (f) return f;
+    if (f && !f.failed) return f;
+    if (f) f.el.remove();
     var el = document.createElement("iframe");
     el.setAttribute("title", name);
     el.inert = true;
     f = frames[name] = { name: name, el: el, loaded: false, waiters: [] };
     mark(name + "Requested");
     el.addEventListener("load", function () {
+      if (frames[name] !== f) return;
+      try { f.failed = typeof el.contentWindow.__rkCanUnload !== "function"; }
+      catch (_) { f.failed = true; }
+      if (f.failed) return;
       f.loaded = true;
       watchEditor(f);
       var doc = el.contentDocument;
@@ -223,14 +228,18 @@
   // the very first reveal of a page waits for the page to say its first round of data is in (window.__rkReady), so what shows first is the finished page and not its loading state; later reveals flip at once
   function apply(name) {
     var f = frames[name];
+    if (f.revealed) { reveal(name); return; }
+    if (f.readyWait) return;
     var ready = null;
-    if (!f.revealed) {
-      f.revealed = true;
-      try { ready = f.el.contentWindow.__rkReady; } catch (_) {}
-    }
+    try { ready = f.el.contentWindow.__rkReady; } catch (_) {}
     if (!ready) { reveal(name); return; }
+    f.readyWait = true;
     var patience = new Promise(function (resolve) { setTimeout(resolve, 1500); });
-    Promise.race([ready, patience]).then(function () { if (wanted === name) reveal(name); });
+    function readyToReveal() {
+      f.readyWait = false;
+      if (frames[name] === f && wanted === name) reveal(name);
+    }
+    Promise.race([ready, patience]).then(readyToReveal, readyToReveal);
   }
 
   function settle(el) {
@@ -287,6 +296,7 @@
     mark(name + "Shown");
     dispatchAll();
     var f = frames[name];
+    f.revealed = true;
     if (comingBack && !covered) {
       // the preview or the obs settings were on top, so this browser is under them: the page stays out of sight until enter() says it is on top, since a fade nobody can see is no fade. the timer only exists so a plugin that never says it cannot leave the page invisible
       f.el.style.opacity = "0";
@@ -337,19 +347,23 @@
     if (name === "settings" && page) settingsPage = String(page);
     var f = frames[name];
     if (f && f.loaded) { apply(name); return; }
+    function load() {
+      var g = ensure(name);
+      if (g.loaded) apply(name);
+      else g.waiters.push(function () { if (wanted === name) apply(name); });
+    }
     // asked again while its placeholder is up and its page is on its way: that is already in hand, and only needs saying again once it is on screen
     if (skelFor === name) {
       if (name === "settings" && page) paintSkeleton(name);
       if (skelOnAt) ack(name);
+      if (f && f.failed) load();
       return;
     }
     // the page is still on its way: its placeholder answers the click, and the browser is lifted over the preview or the curtain with it. the page only starts loading once the placeholder has been painted, since the shell and its pages share one thread, and a page that is being parsed and run keeps anything from being painted until it is done
     showSkeleton(name, function () {
       if (wanted !== name) return;
       ack(name);
-      var g = ensure(name);
-      if (g.loaded) apply(name);
-      else g.waiters.push(function () { if (wanted === name) apply(name); });
+      load();
     });
   }
 
@@ -428,6 +442,7 @@
   function canSleep() {
     return Object.keys(frames).every(function (k) {
       var f = frames[k];
+      if (f.failed) return true;
       if (!f.loaded) return false;
       try {
         var w = f.el.contentWindow;
@@ -456,6 +471,7 @@
   // the rail was pressed on the page that already shows: the page may have a way back of its own, and the editor of the clips view takes it
   function reselect(name) {
     var f = frames[name];
+    if (f && f.failed && wanted === name) { show(name); return; }
     if (!f || !f.loaded || name !== active) return;
     try {
       var w = f.el.contentWindow;
@@ -463,9 +479,9 @@
     } catch (e) { rkReportError(e); }
   }
 
-  // the plugin asks now and then whether this page still runs, and the answer goes through the helper; a page whose renderer died stays silent, and the plugin reloads it
+  // use the browser title signal so a broken helper connection is not mistaken for a stalled renderer
   function ping(n) {
-    fetch(HELPER + "/shell/ping?n=" + encodeURIComponent(n), { method: "POST", cache: "no-store" }).catch(function () {});
+    document.title = "rk-shell-pong:" + n;
   }
 
   // the window is leaving fullscreen on its own (another view, a close), so a clip playing fullscreen inside a page is told too

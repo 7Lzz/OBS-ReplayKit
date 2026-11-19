@@ -330,12 +330,24 @@
     applyHovers(listEl);
   }
 
+  let noticeWrites = Promise.resolve();
+  function queueItemWrite(path) {
+    const write = noticeWrites.then(() => helperJson(path, { method:"POST" }));
+    const settled = write.catch(() => {});
+    noticeWrites = settled;
+    write.catch(() => { if (noticeWrites === settled) load(); });
+  }
+
   async function load() {
+    const pending = noticeWrites;
     try {
+      await pending;
       const data = await helperJson("notifications?t=" + Date.now());
+      if (noticeWrites !== pending) return;
       items = Array.isArray(data.items) ? data.items : [];
       render();
     } catch (e) {
+      if (noticeWrites !== pending) return;
       listEl.innerHTML = '<div class="empty" data-i18n="notifications.couldNotLoadNotifications"></div>';
     }
   }
@@ -359,14 +371,14 @@
     const row = rowFor(id);
     if (row) { row.classList.toggle("is-read", read); row.classList.toggle("is-unread", !read); }
     renderCounts();
-    helperJson("notifications/" + (read ? "read" : "unread") + "?id=" + encodeURIComponent(id), { method:"POST" }).catch(load);
+    queueItemWrite("notifications/" + (read ? "read" : "unread") + "?id=" + encodeURIComponent(id));
   }
 
   function deleteItem(id) {
     items = items.filter((i) => i.id !== id);
     if (openId === id) openId = "";
     render();
-    helperJson("notifications/dismiss?id=" + encodeURIComponent(id), { method:"POST" }).catch(load);
+    queueItemWrite("notifications/dismiss?id=" + encodeURIComponent(id));
   }
 
   // two-click delete, same pattern as clips.html armDeleteButton/resetDeleteButton -- first click arms (widens to show "Delete?"), a second click while armed actually deletes, and an unattended arm disarms itself after 3s

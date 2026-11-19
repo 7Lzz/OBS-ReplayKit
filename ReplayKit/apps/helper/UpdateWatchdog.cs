@@ -15,6 +15,8 @@ namespace ReplayKitHelper
             int launcherPid = IntArg(args, "-LauncherPid");
             string pidFile = StringArg(args, "-PidFile");
             string resultPath = StringArg(args, "-Result");
+            string legacyPidFile = StringArg(args, "-LegacyPidFile");
+            string legacyResultPath = StringArg(args, "-LegacyResult");
             string obsPath = StringArg(args, "-ObsPath");
             string targetVersion = StringArg(args, "-TargetVersion");
             string releaseUrl = StringArg(args, "-ReleaseUrl");
@@ -25,28 +27,15 @@ namespace ReplayKitHelper
             while (DateTime.UtcNow < handoff && !File.Exists(resultPath))
             {
                 installerPid = ReadPid(pidFile);
+                if (installerPid <= 0) installerPid = ReadPid(legacyPidFile);
                 if (installerPid > 0) break;
                 Thread.Sleep(IsRunning(launcherPid) ? 1000 : 3000);
             }
             if (installerPid <= 0) installerPid = launcherPid;
 
-            DateTime deadline = DateTime.UtcNow.AddMinutes(15);
-            while (DateTime.UtcNow < deadline && IsRunning(installerPid)) Thread.Sleep(3000);
+            while (!File.Exists(resultPath) && IsRunning(installerPid)) Thread.Sleep(3000);
             if (File.Exists(resultPath)) return 0;
-
-            if (!IsObsRunning() && File.Exists(obsPath))
-            {
-                try
-                {
-                    Process.Start(new ProcessStartInfo(obsPath)
-                    {
-                        Arguments = ReplayKitShared.ObsLaunch.Arguments,
-                        UseShellExecute = true,
-                        WorkingDirectory = Path.GetDirectoryName(obsPath),
-                    })?.Dispose();
-                }
-                catch (Exception ex) { Log.Write("Update watchdog could not relaunch OBS: " + ex.Message); }
-            }
+            if (!File.Exists(pidFile) && CopyLegacyResult(legacyResultPath, resultPath, targetVersion, releaseUrl)) return 0;
 
             // A version file cannot confirm completion, especially during a same-version repair.
             var result = new JObject
@@ -60,15 +49,60 @@ namespace ReplayKitHelper
             };
             try
             {
-                Directory.CreateDirectory(Path.GetDirectoryName(resultPath));
-                File.WriteAllText(resultPath, result.ToString(Formatting.None));
+                PublishResult(resultPath, result.ToString(Formatting.None));
             }
             catch (Exception ex) { Log.Write("Update watchdog could not write result: " + ex.Message); }
+            if (!IsObsRunning() && File.Exists(obsPath))
+            {
+                try
+                {
+                    Process.Start(new ProcessStartInfo(obsPath)
+                    {
+                        Arguments = ReplayKitShared.ObsLaunch.Arguments,
+                        UseShellExecute = true,
+                        WorkingDirectory = Path.GetDirectoryName(obsPath),
+                    })?.Dispose();
+                }
+                catch (Exception ex) { Log.Write("Update watchdog could not relaunch OBS: " + ex.Message); }
+            }
             return 1;
         }
 
+        private static bool CopyLegacyResult(string source, string target, string version, string releaseUrl)
+        {
+            if (string.IsNullOrEmpty(source) || !File.Exists(source)) return false;
+            try
+            {
+                string text = File.ReadAllText(source);
+                var result = JObject.Parse(text);
+                if (result["ok"]?.Type != JTokenType.Boolean || result.Value<string>("stage") == "busy" ||
+                    Update.NormalizeVersion(result.Value<string>("version")) != Update.NormalizeVersion(version) ||
+                    !string.Equals(result.Value<string>("releaseUrl"), releaseUrl, StringComparison.OrdinalIgnoreCase))
+                    return false;
+                PublishResult(target, text);
+                return true;
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is JsonException)
+            {
+                Log.Write("Update watchdog could not read the previous installer protocol: " + ex.Message);
+                return false;
+            }
+        }
+
+        private static void PublishResult(string path, string text)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(path));
+            string temporary = path + "." + Guid.NewGuid().ToString("N");
+            try
+            {
+                File.WriteAllText(temporary, text);
+                File.Move(temporary, path);
+            }
+            finally { File.Delete(temporary); }
+        }
+
         // the installer runs elevated, and Process.HasExited asks for rights a process of the user never gets on it, which threw and ended the watchdog before it could write a result; limited query rights work across integrity levels
-        private static bool IsRunning(int pid)
+        internal static bool IsRunning(int pid)
         {
             IntPtr handle = Native.OpenParentForSync((uint)pid);
             if (handle == IntPtr.Zero) return System.Runtime.InteropServices.Marshal.GetLastWin32Error() == 5;
@@ -87,8 +121,9 @@ namespace ReplayKitHelper
             return false;
         }
 
-        private static int ReadPid(string path)
+        internal static int ReadPid(string path)
         {
+            if (string.IsNullOrEmpty(path)) return 0;
             try { return int.TryParse(File.ReadAllText(path).Trim(), out int pid) ? pid : 0; }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { return 0; }
         }

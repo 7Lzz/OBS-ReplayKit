@@ -2,7 +2,10 @@
 #include "prelude.hpp"
 #include "core/open_clips_hotkey.hpp"
 
+#include <array>
+
 #include "core/json_lite.hpp"
+#include "core/state.hpp"
 #include "windows/clips_window.hpp"
 
 namespace rk {
@@ -10,10 +13,18 @@ namespace rk {
 namespace {
 
 // the saved binding and the one extra binding of the settings page, each its own windows hotkey
-constexpr int kOpenClipsHotkeyIds[2] = {0x524B, 0x524C};
-bool g_openClipsHotkeyRegistered[2] = {false, false};
+constexpr int kFirstHotkeyId = 0x524B;
+struct Binding {
+	UINT key = 0;
+	UINT modifiers = 0;
+	bool operator==(const Binding &other) const { return key == other.key && modifiers == other.modifiers; }
+};
+std::array<Binding, 4> bindings;
 QAbstractNativeEventFilter *g_openClipsHotkeyFilter = nullptr;
 std::string g_openClipsHotkeyBinding;
+std::vector<std::pair<obs_hotkey_id, obs_data_array_t *>> savedHotkeys;
+std::atomic<bool> capturing{false};
+unsigned captureGeneration = 0;
 // the key of a press that is still held: its auto-repeats are taken as hotkeys and dropped, since with no-repeat they went to the window in front, where an alt combo with no menu behind it sounds the windows default beep
 UINT g_openClipsHeldKey = 0;
 QPointer<QTimer> g_openClipsReleaseTimer;
@@ -65,9 +76,10 @@ public:
 	bool nativeEventFilter(const QByteArray &, void *message, qintptr *) override
 	{
 		MSG *msg = static_cast<MSG *>(message);
-		if (!msg || msg->message != WM_HOTKEY || (msg->wParam != (WPARAM)kOpenClipsHotkeyIds[0] && msg->wParam != (WPARAM)kOpenClipsHotkeyIds[1]))
+		if (!msg || msg->message != WM_HOTKEY || msg->wParam < kFirstHotkeyId || msg->wParam >= kFirstHotkeyId + bindings.size())
 			return false;
-		if (g_openClipsHeldKey)
+		const Binding &binding = bindings[msg->wParam - kFirstHotkeyId];
+		if (capturing.load() || binding.key != HIWORD(msg->lParam) || binding.modifiers != LOWORD(msg->lParam) || g_openClipsHeldKey)
 			return true;
 		ToggleClips();
 		WatchOpenClipsRelease(HIWORD(msg->lParam));
@@ -75,63 +87,134 @@ public:
 	}
 };
 
-void RegisterOneOpenClipsHotkey(int slot, const std::string &binding)
+bool ParseBinding(const std::string &json, Binding &binding)
 {
-	std::string keyName = ExtractJsonStringField(binding, "key");
+	std::string keyName = ExtractJsonStringField(json, "key");
 	if (keyName.empty())
-		return;
-	UINT key = OpenClipsVirtualKey(keyName);
-	if (key == 0) {
-		blog(LOG_WARNING, "[replaykit] Open Clips hotkey uses an unsupported key");
-		return;
-	}
-	UINT modifiers = 0;
-	if (JsonBoolField(binding, "control", false)) modifiers |= MOD_CONTROL;
-	if (JsonBoolField(binding, "alt", false)) modifiers |= MOD_ALT;
-	if (JsonBoolField(binding, "shift", false)) modifiers |= MOD_SHIFT;
-	if (JsonBoolField(binding, "command", false)) modifiers |= MOD_WIN;
-	if (!RegisterHotKey(nullptr, kOpenClipsHotkeyIds[slot], modifiers, key)) {
-		blog(LOG_WARNING, "[replaykit] Could not register Open Clips hotkey %d (error=%lu)", slot + 1, GetLastError());
-		return;
-	}
-	g_openClipsHotkeyRegistered[slot] = true;
-	blog(LOG_INFO, "[replaykit] Open Clips hotkey %d registered", slot + 1);
+		return true;
+	binding.key = OpenClipsVirtualKey(keyName);
+	if (JsonBoolField(json, "control", false)) binding.modifiers |= MOD_CONTROL;
+	if (JsonBoolField(json, "alt", false)) binding.modifiers |= MOD_ALT;
+	if (JsonBoolField(json, "shift", false)) binding.modifiers |= MOD_SHIFT;
+	if (JsonBoolField(json, "command", false)) binding.modifiers |= MOD_WIN;
+	return binding.key != 0;
 }
 
-void UnregisterOpenClipsHotkeys()
+bool InstallBinding(size_t slot, const Binding &binding)
 {
-	for (int slot = 0; slot < 2; slot++) {
-		if (g_openClipsHotkeyRegistered[slot])
-			UnregisterHotKey(nullptr, kOpenClipsHotkeyIds[slot]);
-		g_openClipsHotkeyRegistered[slot] = false;
-	}
+	if (RegisterHotKey(nullptr, kFirstHotkeyId + int(slot), binding.modifiers, binding.key))
+		return true;
+	blog(LOG_WARNING, "[replaykit] could not register Open Clips hotkey (error=%lu)", GetLastError());
+	return false;
+}
+
+void RemoveBinding(size_t slot)
+{
+	UnregisterHotKey(nullptr, kFirstHotkeyId + int(slot));
+}
+
+void CaptureState(void *, calldata_t *cd)
+{
+	calldata_set_bool(cd, "active", capturing.load());
 }
 
 } // namespace
 
 QPointer<QTimer> g_openClipsHotkeyTimer;
 
-void RegisterOpenClipsHotkey(const std::string &settingsBody)
+bool RegisterOpenClipsHotkey(const std::string &settingsBody)
 {
+	if (capturing.load())
+		return false;
 	std::string binding = ExtractJsonObjectField(settingsBody, "openClipsKeybind");
 	std::string extra = ExtractJsonObjectField(settingsBody, "openClipsKeybindExtra");
 	if (binding.empty() && extra.empty())
-		return;
+		return false;
 	std::string signature = binding + "|" + extra;
 	if (signature == g_openClipsHotkeyBinding)
-		return;
+		return true;
+	std::array<Binding, 2> wanted{};
+	if (!ParseBinding(binding, wanted[0]) || !ParseBinding(extra, wanted[1]))
+		return false;
+	auto staged = bindings;
+	for (const auto &combo : wanted) {
+		if (!combo.key || std::find(staged.begin(), staged.end(), combo) != staged.end())
+			continue;
+		auto slot = std::find(staged.begin(), staged.end(), Binding{});
+		if (slot == staged.end() || !InstallBinding(size_t(slot - staged.begin()), combo)) {
+			for (size_t i = 0; i < staged.size(); ++i)
+				if (staged[i].key && !bindings[i].key)
+					RemoveBinding(i);
+			return false;
+		}
+		*slot = combo;
+	}
+	for (size_t i = 0; i < staged.size(); ++i) {
+		if (staged[i].key && std::find(wanted.begin(), wanted.end(), staged[i]) == wanted.end()) {
+			RemoveBinding(i);
+			staged[i] = {};
+		}
+	}
+	bindings = staged;
 	g_openClipsHotkeyBinding = signature;
+	return true;
+}
 
-	UnregisterOpenClipsHotkeys();
-	RegisterOneOpenClipsHotkey(0, binding);
-	// the same combo twice would only fail the second registration
-	if (extra != binding)
-		RegisterOneOpenClipsHotkey(1, extra);
+bool SetHotkeyCapture(bool active)
+{
+	const unsigned generation = ++captureGeneration;
+	if (!active) {
+		if (!capturing.load())
+			return true;
+		for (const auto &entry : savedHotkeys) {
+			obs_hotkey_load(entry.first, entry.second);
+			obs_data_array_release(entry.second);
+		}
+		savedHotkeys.clear();
+		for (size_t i = 0; i < bindings.size(); ++i) {
+			if (bindings[i].key && !InstallBinding(i, bindings[i])) {
+				bindings[i] = {};
+				g_openClipsHotkeyBinding.clear();
+			}
+		}
+		capturing.store(false);
+		return true;
+	}
+	if (!g_callbacks || !g_openClipsHotkeyFilter)
+		return false;
+	if (!capturing.exchange(true)) {
+		std::vector<obs_hotkey_id> ids;
+		obs_enum_hotkeys([](void *data, obs_hotkey_id id, obs_hotkey_t *hotkey) {
+			const char *raw = obs_hotkey_get_name(hotkey);
+			if (!raw)
+				return true;
+			const std::string name(raw);
+			if (name == "ReplayBuffer.Save" || name == "OBSBasic.SaveReplayBuffer" || name == "ReplayKit.SaveClip" ||
+			    name == "OBSBasic.StartRecording" || name == "OBSBasic.StopRecording" || name == "OBSBasic.Screenshot")
+				static_cast<std::vector<obs_hotkey_id> *>(data)->push_back(id);
+			return true;
+		}, &ids);
+		for (const auto id : ids)
+			savedHotkeys.emplace_back(id, obs_hotkey_save(id));
+		obs_data_array_t *empty = obs_data_array_create();
+		for (const auto &entry : savedHotkeys)
+			obs_hotkey_load(entry.first, empty);
+		obs_data_array_release(empty);
+		for (size_t i = 0; i < bindings.size(); ++i)
+			if (bindings[i].key)
+				RemoveBinding(i);
+	}
+	QTimer::singleShot(15000, g_callbacks, [generation]() {
+		if (generation == captureGeneration)
+			SetHotkeyCapture(false);
+	});
+	return true;
 }
 
 // puts the native filter in place that turns the registered hotkey into a clips toggle
 void InstallOpenClipsHotkeyFilter()
 {
+	proc_handler_add(obs_get_proc_handler(), "void replaykit_hotkey_capture_active(out bool active)", CaptureState, nullptr);
 	g_openClipsHotkeyFilter = new OpenClipsHotkeyFilter();
 	qApp->installNativeEventFilter(g_openClipsHotkeyFilter);
 }
@@ -143,7 +226,12 @@ void RemoveOpenClipsHotkey()
 		g_openClipsHotkeyTimer->stop();
 	delete g_openClipsReleaseTimer;
 	g_openClipsHeldKey = 0;
-	UnregisterOpenClipsHotkeys();
+	SetHotkeyCapture(false);
+	for (size_t i = 0; i < bindings.size(); ++i)
+		if (bindings[i].key)
+			RemoveBinding(i);
+	bindings = {};
+	g_openClipsHotkeyBinding.clear();
 	if (g_openClipsHotkeyFilter) {
 		qApp->removeNativeEventFilter(g_openClipsHotkeyFilter);
 		delete g_openClipsHotkeyFilter;

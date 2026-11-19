@@ -36,6 +36,7 @@ namespace ReplayKitHelper
         private static readonly Regex TextWords = new Regex(@"\S+", RegexOptions.Compiled);
         private static readonly Regex Sound = new Regex(@"^(\[.*\]|\(.*\)|<\|.*\|>)$", RegexOptions.Compiled);
         private static readonly Regex Terms = new Regex(@"[\p{L}\p{N}]+", RegexOptions.Compiled);
+        private static readonly Regex Han = new Regex(@"[\p{IsCJKUnifiedIdeographs}\p{IsCJKUnifiedIdeographsExtensionA}\p{IsCJKCompatibilityIdeographs}]", RegexOptions.Compiled);
 
         private static double Number(JToken value)
         {
@@ -78,7 +79,7 @@ namespace ReplayKitHelper
                 heard = Math.Max(from, Math.Min(to, heard));
                 foreach (Match match in TextWords.Matches(piece))
                 {
-                    if (current == null || match.Index > 0)
+                    if (current == null || match.Index > 0 || (!silent && (Han.IsMatch(match.Value) || Han.IsMatch(current.Text))))
                     {
                         current = new Word { Text = "", First = double.NaN, Last = double.NaN };
                         words.Add(current);

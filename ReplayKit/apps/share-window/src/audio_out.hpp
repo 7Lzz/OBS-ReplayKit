@@ -63,8 +63,8 @@ private:
 	ULONGLONG retryAt = 0;
 	std::unique_ptr<Stream> slots[kAudioSlots];
 	std::unique_ptr<Stream> card;
+	std::shared_ptr<const CardSound> playingSound;
 	size_t cardPosition = 0;
-	bool cardWasShowing = false;
 
 	std::atomic<uint64_t> underruns{0};
 	std::atomic<uint64_t> dropped{0};

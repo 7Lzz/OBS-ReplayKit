@@ -49,11 +49,14 @@ function Remove-WorkDirectory([string]$workDir, [string]$path) {
 }
 
 # the dlls of bin\64bit of a lines tested obs, which is all an import library or an import check needs
+$ObsImportDlls = @('obs.dll', 'obs-frontend-api.dll')
+
 function Get-ObsBinaries($line) {
     $version = $line.tested
     $dir = Join-Path $ObsVersionsCache "$version\bin\64bit"
     $marker = Join-Path $ObsVersionsCache "$version\.replaykit-binaries"
-    if ((Test-Path -LiteralPath $marker) -and ((Get-Content -LiteralPath $marker -Raw).Trim() -eq $line.portable.sha256) -and (Test-Path -LiteralPath (Join-Path $dir 'obs.dll'))) { return $dir }
+    if ((Test-Path -LiteralPath $marker -PathType Leaf) -and ((Get-Content -LiteralPath $marker -Raw).Trim() -eq $line.portable.sha256) -and
+        -not ($ObsImportDlls | Where-Object { -not (Test-Path -LiteralPath (Join-Path $dir $_) -PathType Leaf) })) { return $dir }
 
     New-Item -ItemType Directory -Force -Path $ObsVersionsCache | Out-Null
     $zip = Join-Path $ObsVersionsCache ([IO.Path]::GetFileName($line.portable.url))
@@ -71,14 +74,19 @@ function Get-ObsBinaries($line) {
 
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     New-Item -ItemType Directory -Force -Path $dir | Out-Null
+    if (Test-Path -LiteralPath $marker -PathType Leaf) { Remove-Item -LiteralPath $marker -Force }
+    $archiveFileNames = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
     $archive = [IO.Compression.ZipFile]::OpenRead($zip)
     try {
         foreach ($entry in $archive.Entries) {
             if ($entry.FullName -notmatch '^bin/64bit/[^/]+\.dll$') { continue }
             [IO.Compression.ZipFileExtensions]::ExtractToFile($entry, (Join-Path $dir $entry.Name), $true)
+            [void]$archiveFileNames.Add($entry.Name)
         }
     } finally { $archive.Dispose() }
-    if (-not (Test-Path -LiteralPath (Join-Path $dir 'obs.dll'))) { throw "The OBS $version zip has no bin\64bit\obs.dll." }
+    foreach ($name in $ObsImportDlls) {
+        if (-not $archiveFileNames.Contains($name)) { throw "The OBS $version zip has no bin\64bit\$name." }
+    }
     Set-Content -LiteralPath $marker -Value $hash -Encoding ascii
     return $dir
 }
@@ -179,8 +187,9 @@ function Get-ObsSdk($line, [string]$workDir) {
     $implibs = Join-Path $workDir "implibs-$version"
     New-Item -ItemType Directory -Force -Path $implibs | Out-Null
     Write-Host "generating obs.lib / obs-frontend-api.lib from the OBS $version dlls..."
-    New-ImportLib (Join-Path $bin 'obs.dll') 'obs.dll' $implibs 'obs'
-    New-ImportLib (Join-Path $bin 'obs-frontend-api.dll') 'obs-frontend-api.dll' $implibs 'obs-frontend-api'
+    foreach ($name in $ObsImportDlls) {
+        New-ImportLib (Join-Path $bin $name) $name $implibs ([IO.Path]::GetFileNameWithoutExtension($name))
+    }
 
     return @{ Version = $version; Headers = $headers; Qt = $qt; Implibs = $implibs; Bin = $bin }
 }

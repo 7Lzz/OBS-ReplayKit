@@ -27,8 +27,7 @@ namespace ReplayKitHelper
                 lock (Server.State.AuthLock)
                 {
                     if (!Server.State.Auth.SignedIn) return (403, Locales.Message("common.signInToStreamable"));
-                    string sessionJar = AuthCore.GetAuthCookieJarPath();
-                    cookies = File.Exists(sessionJar) ? File.ReadAllText(sessionJar) : "";
+                    cookies = AuthCore.CaptureCookies();
                 }
                 if (string.IsNullOrWhiteSpace(cookies)) return (403, Locales.Message("share.signedInStreamableSessionIsUnavailable"));
 

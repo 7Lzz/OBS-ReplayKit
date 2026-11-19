@@ -30,7 +30,7 @@ namespace ReplayKitHelper
             lock (Server.State.AuthLock)
             {
                 bool required = Server.State.Auth.SignedIn;
-                string cookies = required ? File.ReadAllText(AuthCore.GetAuthCookieJarPath()) : "";
+                string cookies = required ? AuthCore.CaptureCookies() : "";
                 if (required && string.IsNullOrWhiteSpace(cookies))
                     throw new InvalidOperationException(Locales.Message("share.signedInStreamableSessionIsUnavailable"));
                 return new UploadAuth(cookies, required, Constants.GetEffectiveUploadCap(), SubjectToStreamableDurationLimit(), Constants.GetEffectiveRetentionDays());
@@ -75,12 +75,7 @@ namespace ReplayKitHelper
             AppConfig.LoadConfig();
             string requestId = UploadState.NewRequestId();
 
-            var clip = selected;
-            if (clip == null)
-            {
-                var latest = Clips.FindLatestClip();
-                if (latest != null) clip = new Clips.SafeClipPath { Name = latest.Name, Full = latest.Full };
-            }
+            var clip = selected ?? Clips.FindLatestClip();
             if (clip == null)
             {
                 UploadState.SetUploadState(requestId: requestId, state: "error", active: false, error: Locales.Message("share.noMp4MkvMovClipFound"));
@@ -109,6 +104,8 @@ namespace ReplayKitHelper
                 }
 
                 var fi = new FileInfo(uploadFull);
+                string fileIdentity = ClipRenames.Identity(new FileInfo(clip.Full));
+                if (fileIdentity == null) return new JObject { ["ok"] = false, ["message"] = Locales.Message("storage.theSelectedClipChangedSelectIt") };
                 long effCap = auth.SizeCap;
                 if (effCap > 0 && fi.Length > effCap)
                 {
@@ -131,14 +128,14 @@ namespace ReplayKitHelper
                 var token = JobCoordinator.Token(requestId);
 
                 reservation.Start(() => UploadWorker.Run(requestId, uploadFull, auth.Cookies, auth.Required, 0, 100, quiet, token),
-                    t => HandleUploadCompletion(t, requestId, clipName, quiet, clip.Full, auth));
+                    t => HandleUploadCompletion(t, requestId, clipName, clip.Root, fileIdentity, quiet, auth));
 
                 return new JObject { ["ok"] = true, ["state"] = "uploading", ["clip"] = clipName, ["requestId"] = requestId };
             }
         }
 
         // runs once an upload task finishes, for a plain upload and for the tail of a compress-then-upload: on success it records the clips_db entry (url + still-processing transcode state) and starts the transcode poller, on failure it resolves the job to error
-        public static void HandleUploadCompletion(Task<UploadOutcome> task, string requestId, string clipName, bool quiet = false, string sourcePath = null, UploadAuth auth = null)
+        public static void HandleUploadCompletion(Task<UploadOutcome> task, string requestId, string clipName, string libraryRoot, string fileIdentity, bool quiet = false, UploadAuth auth = null)
         {
             bool workerThrew = task.IsFaulted;
             string workerThrewMessage = workerThrew ? (task.Exception?.InnerException?.Message ?? task.Exception?.Message) : null;
@@ -177,7 +174,7 @@ namespace ReplayKitHelper
             // the transcode step just triggered streamables encode; the video isnt watchable until streamable finishes processing it. mark ready=false and let the background poller flip it once streamables api reports status=2.
             JobCoordinator.Commit(requestId, () =>
             {
-                Clips.MarkUploaded(clipName, result, shortcode, ready: false, transcodeStatus: 1, transcodePercent: 0, sourcePath: sourcePath, retentionDays: auth?.RetentionDays);
+                Clips.MarkUploaded(libraryRoot, clipName, result, fileIdentity, shortcode, ready: false, transcodeStatus: 1, transcodePercent: 0, retentionDays: auth?.RetentionDays);
 
                 UploadState.SetUploadState(requestId: requestId, state: "done", active: false, url: result, error: "", phase: "done", percent: 100);
             });
@@ -277,30 +274,24 @@ namespace ReplayKitHelper
             catch (Exception ex) { Log.Write("ResumeTranscodePollsAtStartup: read db: " + ex.Message, "upload"); return; }
             if (db == null) return;
 
-            long nowSec = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
             int armed = 0;
             foreach (var prop in db.Properties())
-            {
-                if (!(prop.Value is JObject e)) continue;
-                // clips_db stores the raw "shortcode" + "url"; the /clips response renames url -> streamable_url, so read the db field names here.
-                string shortcode = e["shortcode"]?.Value<string>();
-                if (string.IsNullOrEmpty(shortcode))
-                {
-                    var m = Regex.Match(e["url"]?.Value<string>() ?? "", @"^https://streamable\.com/([A-Za-z0-9_-]+)$");
-                    if (m.Success) shortcode = m.Groups[1].Value;
-                }
-                if (string.IsNullOrEmpty(shortcode)) continue;
-                bool ready = e["ready"]?.Value<bool>() ?? false;
-                int? ts = e["transcode_status"]?.Value<int?>();
-                // 2 = ready, 3 = failed, 4 = timed out -- only null/0/1 are still worth polling.
-                if (ready || ts == 2 || ts == 3 || ts == 4) continue;
-                long uploadedAt = e["uploaded_at"]?.Value<long>() ?? 0;
-                if (uploadedAt <= 0 || nowSec - uploadedAt > 90 * 60) continue;
-                // resumed after a restart -- the user has moved on, so no toast / clipboard-hijack when it finishes; the dock card still flips to "Copy Link".
-                StartTranscodePoll(shortcode, prop.Name, quiet: true);
-                armed++;
-            }
+                if (prop.Value is JObject entry && ResumeTranscodePoll(prop.Name, entry, recentOnly: true)) armed++;
             if (armed > 0) Log.Write("ResumeTranscodePollsAtStartup: re-armed " + armed + " transcode poll(s)", "upload");
+        }
+
+        internal static bool ResumeTranscodePoll(string name, JObject entry, bool recentOnly = false)
+        {
+            bool? ready = entry["ready"]?.Value<bool?>();
+            int? status = entry["transcode_status"]?.Value<int?>();
+            if (ready == true || status >= 2 || (ready == null && status == null)) return false;
+            long uploadedAt = entry["uploaded_at"]?.Value<long>() ?? 0;
+            long age = DateTimeOffset.UtcNow.ToUnixTimeSeconds() - uploadedAt;
+            if (uploadedAt <= 0 || age >= Constants.GetEntryRetentionSec(entry) || (recentOnly && age > 90 * 60)) return false;
+            var link = Regex.Match(entry["url"]?.Value<string>() ?? "", @"\Ahttps://streamable\.com/([A-Za-z0-9_-]+)\z");
+            if (!link.Success) return false;
+            StartTranscodePoll(link.Groups[1].Value, name, quiet: true);
+            return true;
         }
     }
 }

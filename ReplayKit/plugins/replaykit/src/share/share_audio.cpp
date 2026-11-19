@@ -55,7 +55,8 @@ void OnAudio(void *param, obs_source_t *source, const struct audio_data *data, b
 
 bool Monitored(obs_source_t *source)
 {
-	return source && !obs_source_removed(source) && (obs_source_get_output_flags(source) & OBS_SOURCE_AUDIO) && obs_source_get_monitoring_enabled(source);
+	return source && !obs_source_removed(source) && (obs_source_get_output_flags(source) & OBS_SOURCE_AUDIO) &&
+	       obs_source_get_monitoring_enabled(source) && obs_source_active(source);
 }
 
 std::vector<obs_source_t *> MonitoredSources()

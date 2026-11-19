@@ -4,6 +4,7 @@
 
 #include "app/ipc_commands.hpp"
 #include "app/capture_context.hpp"
+#include "shell/shell_done_popup.hpp"
 
 namespace rk {
 
@@ -13,6 +14,8 @@ namespace {
 constexpr const wchar_t *kIpcPipeName = L"\\\\.\\pipe\\OBSReplayKitIpc";
 std::thread g_pipeThread;
 std::atomic<bool> g_pipeStop{false};
+std::mutex configRepliesLock;
+std::vector<std::string> configReplies;
 
 // writes one newline-terminated line to the connected helper. false on any write failure so the caller drops the connection and waits for a reconnect.
 bool PipeWriteLine(HANDLE pipe, const std::string &line)
@@ -44,6 +47,9 @@ void PipeServeClient(HANDLE pipe)
 		for (const std::string &message : CaptureContextMessages())
 			if (!PipeWriteLine(pipe, message))
 				return;
+		for (const std::string &message : TakeDonePopupAcks())
+			if (!PipeWriteLine(pipe, message))
+				return;
 		quintptr mw = g_mainWinValue.load();
 		if (!mainWinSent && mw != 0) {
 			if (!PipeWriteLine(pipe, "MAINWIN " + std::to_string((unsigned long long)mw)))
@@ -58,8 +64,13 @@ void PipeServeClient(HANDLE pipe)
 			if (!PipeWriteLine(pipe, "RELEASEOUTPUTS_ACK"))
 				return;
 		}
-		if (g_pipeSendLanguageAck.exchange(false)) {
-			if (!PipeWriteLine(pipe, "LANGUAGE_ACK"))
+		std::vector<std::string> replies;
+		{
+			std::lock_guard<std::mutex> lock(configRepliesLock);
+			replies.swap(configReplies);
+		}
+		for (const auto &reply : replies) {
+			if (!PipeWriteLine(pipe, reply))
 				return;
 		}
 		const int shareCard = g_pipeShareCardAck.exchange(-1);
@@ -135,8 +146,14 @@ std::atomic<quintptr> g_mainWinValue{0};
 std::atomic<unsigned long long> g_allowCloseUntilMs{0};
 std::atomic<bool> g_pipeSendAllowCloseAck{false};
 std::atomic<bool> g_pipeSendOutputsReleasedAck{false};
-std::atomic<bool> g_pipeSendLanguageAck{false};
 std::atomic<int> g_pipeShareCardAck{-1};
+
+void QueueConfigReply(const std::string &id, bool ok)
+{
+	std::lock_guard<std::mutex> lock(configRepliesLock);
+	if (configReplies.size() < 64)
+		configReplies.push_back("CONFIG_ACK " + id + (ok ? " 1" : " 0"));
+}
 
 // starts the thread that serves the helper; the stop flag is cleared first so a reload does not begin stopped
 void StartPipeServer()

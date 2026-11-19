@@ -57,7 +57,7 @@ namespace ReplayKitHelper
                 if (!int.TryParse(Q("gate"), out int gate)) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("helper.inputSensitivityMustBeANumber") }); return false; }
                 string noiseFlag = Q("ns");
                 if (noiseFlag != "0" && noiseFlag != "1") { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("helper.noiseSuppressionMustBe0Or") }); return false; }
-                var changed = MicTest.SetParams(volume, noiseFlag == "1", gate);
+                var changed = MicTest.SetParams(Q("session"), volume, noiseFlag == "1", gate);
                 HttpResponse.SendJson(stream, changed["ok"]?.Value<bool>() == true ? 200 : 400, changed);
                 return false;
             }
@@ -65,14 +65,14 @@ namespace ReplayKitHelper
             if (path == "/mic/test/level")
             {
                 if (req.Method != "GET") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "GET required"); return false; }
-                HttpResponse.SendJson(stream, 200, MicTest.ReadLevel());
+                HttpResponse.SendJson(stream, 200, MicTest.ReadLevel(Q("session")));
                 return false;
             }
 
             if (path == "/mic/test/stop")
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
-                HttpResponse.SendJson(stream, 200, MicTest.Stop());
+                HttpResponse.SendJson(stream, 200, MicTest.Stop(Q("session")));
                 return false;
             }
 

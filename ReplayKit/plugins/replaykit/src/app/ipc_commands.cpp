@@ -14,6 +14,7 @@
 #include "core/app_icon.hpp"
 #include "core/ipc_pipe.hpp"
 #include "core/main_window.hpp"
+#include "core/open_clips_hotkey.hpp"
 #include "core/shared_values.hpp"
 #include "core/state.hpp"
 #include "core/window_state.hpp"
@@ -37,6 +38,80 @@
 #include "share/share_card.hpp"
 
 namespace rk {
+
+namespace {
+
+bool SaveLanguage(const std::string &code)
+{
+	auto *config = obs_frontend_get_user_config();
+	if (!config)
+		return false;
+	const char *previous = config_get_string(config, "General", "Language");
+	const std::string old = previous ? previous : "";
+	const bool hadValue = config_has_user_value(config, "General", "Language");
+	if (code == "-")
+		config_remove_value(config, "General", "Language");
+	else
+		config_set_string(config, "General", "Language", code.c_str());
+	if (config_save_safe(config, "tmp", nullptr) == CONFIG_SUCCESS)
+		return true;
+	if (hadValue)
+		config_set_string(config, "General", "Language", old.c_str());
+	else
+		config_remove_value(config, "General", "Language");
+	return false;
+}
+
+bool SaveMonitoringDevice(const std::string &payload)
+{
+	const auto request = QJsonDocument::fromJson(QByteArray::fromStdString(payload)).object();
+	const auto id = request.value("id").toString();
+	const auto name = request.value("name").toString();
+	if (id.isEmpty() || id.size() > 512 || name.isEmpty() || name.size() > 256 ||
+	    id.contains(QChar('\0')) || name.contains(QChar('\0')))
+		return false;
+	auto *config = obs_frontend_get_profile_config();
+	if (!config)
+		return false;
+	const char *liveId = nullptr, *liveName = nullptr;
+	obs_get_audio_monitoring_device(&liveName, &liveId);
+	const std::string oldId = liveId ? liveId : "", oldName = liveName ? liveName : "";
+	const bool changed = id.compare(QString::fromStdString(oldId), Qt::CaseInsensitive) != 0;
+	const auto idUtf8 = id.toUtf8();
+	const auto nameUtf8 = name.toUtf8();
+	if (changed && !obs_set_audio_monitoring_device(nameUtf8.constData(), idUtf8.constData()))
+		return false;
+	obs_get_audio_monitoring_device(&liveName, &liveId);
+	if (!liveId || id.compare(QString::fromUtf8(liveId), Qt::CaseInsensitive) != 0) {
+		if (changed && !oldId.empty())
+			obs_set_audio_monitoring_device(oldName.c_str(), oldId.c_str());
+		return false;
+	}
+	const auto read = [config](const char *key) {
+		const char *value = config_get_string(config, "Audio", key);
+		return std::string(value ? value : "");
+	};
+	const auto oldProfileId = read("MonitoringDeviceId"), oldProfileName = read("MonitoringDeviceName");
+	if (oldProfileId == idUtf8.constData() && oldProfileName == nameUtf8.constData())
+		return true;
+	const bool hadId = config_has_user_value(config, "Audio", "MonitoringDeviceId");
+	const bool hadName = config_has_user_value(config, "Audio", "MonitoringDeviceName");
+	config_set_string(config, "Audio", "MonitoringDeviceId", idUtf8.constData());
+	config_set_string(config, "Audio", "MonitoringDeviceName", nameUtf8.constData());
+	if (config_save_safe(config, "tmp", nullptr) == CONFIG_SUCCESS)
+		return true;
+	const auto restore = [config](const char *key, const std::string &value, bool existed) {
+		if (existed) config_set_string(config, "Audio", key, value.c_str());
+		else config_remove_value(config, "Audio", key);
+	};
+	restore("MonitoringDeviceId", oldProfileId, hadId);
+	restore("MonitoringDeviceName", oldProfileName, hadName);
+	if (changed && !oldId.empty())
+		obs_set_audio_monitoring_device(oldName.c_str(), oldId.c_str());
+	return false;
+}
+
+} // namespace
 
 void PipeDispatchLine(const std::string &line)
 {
@@ -212,24 +287,35 @@ void PipeDispatchLine(const std::string &line)
 		// drawn on the ui thread, where qt draws text and svg
 		const std::string request = line.substr(10);
 		QMetaObject::invokeMethod(g_callbacks, [request]() { g_pipeShareCardAck.store(RenderShareCard(request) ? 1 : 0); }, Qt::QueuedConnection);
-	} else if (line.rfind("LANGUAGE ", 0) == 0) {
-		// the language obs starts in next, set in the user config obs holds and saved the way its own language picker does, so no later save of obs writes the old one back; - clears it to follow windows
-		const std::string code = line.substr(9);
-		const bool follow = code == "-";
-		if (!follow && std::none_of(std::begin(kSupportedLocales), std::end(kSupportedLocales), [&code](const char *supported) { return code == supported; }))
+	} else if (line.rfind("LANGUAGE ", 0) == 0 || line.rfind("MONITORDEVICE ", 0) == 0) {
+		const auto start = line.find(' ') + 1;
+		const auto end = line.find(' ', start);
+		if (end != start + 32)
 			return;
-		QMetaObject::invokeMethod(g_callbacks, [code, follow]() {
-			config_t *config = obs_frontend_get_user_config();
-			if (!config)
-				return;
-			if (follow)
-				config_remove_value(config, "General", "Language");
-			else
-				config_set_string(config, "General", "Language", code.c_str());
-			if (config_save_safe(config, "tmp", nullptr) == CONFIG_SUCCESS)
-				g_pipeSendLanguageAck.store(true);
-			else
-				blog(LOG_WARNING, "[replaykit] the picked language could not be saved to the obs user config");
+		const auto id = line.substr(start, 32);
+		if (id.find_first_not_of("0123456789abcdef") != std::string::npos)
+			return;
+		const auto value = line.substr(end + 1);
+		const bool language = line[0] == 'L';
+		if (language && value != "-" && std::none_of(std::begin(kSupportedLocales), std::end(kSupportedLocales), [&value](const char *supported) { return value == supported; }))
+			return;
+		QMetaObject::invokeMethod(g_callbacks, [id, value, language]() {
+			QueueConfigReply(id, language ? SaveLanguage(value) : SaveMonitoringDevice(value));
+		}, Qt::QueuedConnection);
+	} else if (line.rfind("HOTKEYCAPTURE ", 0) == 0 || line.rfind("OPENCLIPSKEYS ", 0) == 0) {
+		const auto start = line.find(' ') + 1;
+		const auto end = line.find(' ', start);
+		if (end != start + 32)
+			return;
+		const auto id = line.substr(start, 32);
+		if (id.find_first_not_of("0123456789abcdef") != std::string::npos)
+			return;
+		const auto value = line.substr(end + 1);
+		const bool capture = line[0] == 'H';
+		if (capture && value != "0" && value != "1")
+			return;
+		QMetaObject::invokeMethod(g_callbacks, [id, value, capture]() {
+			QueueConfigReply(id, capture ? SetHotkeyCapture(value == "1") : RegisterOpenClipsHotkey(value));
 		}, Qt::QueuedConnection);
 	} else if (line == "SETTINGSAPPLIED") {
 		QMetaObject::invokeMethod(g_callbacks, []() {

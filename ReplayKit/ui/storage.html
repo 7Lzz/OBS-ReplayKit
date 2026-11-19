@@ -495,7 +495,8 @@
     try {
       const done = await helperJson("/storage/trim-apply?token=" + encodeURIComponent(plan.token), { method:"POST" });
       plan = null;
-      setStatus(els.limitStatus, done.failed ? RK_M("storage.deletedClipsFreedSizeFailedCould", { clips: clipsText(done.deleted), size: done.freedText, failed: done.failed }) : RK_M("storage.deletedClipsFreedSize", { clips: clipsText(done.deleted), size: done.freedText }), !!done.failed);
+      const summary = done.failed ? RK_M("storage.deletedClipsFreedSizeFailedCould", { clips: clipsText(done.deleted), size: done.freedText, failed: done.failed }) : RK_M("storage.deletedClipsFreedSize", { clips: clipsText(done.deleted), size: done.freedText });
+      setStatus(els.limitStatus, summary + (done.warning ? " " + done.warning : ""), !!done.failed);
     } catch (err) {
       plan = null;
       setStatus(els.limitStatus, err.message || RK_M("storage.couldNotDeleteTheClips"), true);
@@ -615,14 +616,14 @@
       const data = await helperJson("/storage/compress-candidates?favorites=" + (els.skipFav.checked ? "0" : "1") + "&limit=" + cmp.limit + "&t=" + Date.now());
       if (generation !== cmp.loadGeneration) return;
       showCompressionType(data.mode);
-      const previous = new Set(cmp.clips.map((c) => c.name));
+      const previous = new Map(cmp.clips.map(c => [c.name, c.version]));
       const firstPage = !cmp.loadedOnce;
       cmp.loadedOnce = true;
       cmp.clips = Array.isArray(data.clips) ? data.clips : [];
       cmp.hasMore = !!data.hasMore;
       // New verified clips start selected; clips already shown keep the user's choice.
       const kept = new Set();
-      cmp.clips.forEach((c) => { if (firstPage || !previous.has(c.name) || cmp.picked.has(c.name)) kept.add(c.name); });
+      cmp.clips.forEach(c => { if (firstPage || !previous.has(c.name) || (previous.get(c.name) === c.version && cmp.picked.has(c.name))) kept.add(c.name); });
       cmp.picked = kept;
       setStatus(els.cmpStatus, data.unchecked ? RK_M("storage.countClipsCouldNotBeChecked", { count: data.unchecked }) : "");
       renderPick();
@@ -664,10 +665,11 @@
     els.start.disabled = true;
     setStatus(els.cmpStatus, "");
     try {
-      const started = await helperJson("/storage/compress-start", { method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify({ names:Array.from(cmp.picked), mode:cmp.mode }) });
+      const clips = cmp.clips.filter(clip => cmp.picked.has(clip.name)).map(({name, version}) => ({name, version}));
+      const started = await helperJson("/storage/compress-start", { method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify({ clips, mode:cmp.mode }) });
       showPhase("run");
       paintRun({ running:true, percent:0, done:0, failed:0, total:started.count, mode:started.mode, current:"", savedText:"0 B" });
-      pollCompress(true);
+      pollCompress();
     } catch (err) {
       showPhase("pick");
       setStatus(els.cmpStatus, err.message || RK_M("storage.couldNotStartCompressing"), true);
@@ -716,21 +718,29 @@
     let text = st.cancelled ? RK_M("storage.stoppedAfterClipsFreedSize", { clips: clips, size: st.savedText }) : RK_M("storage.compressedClipsAndFreedSize", { clips: clips, size: st.savedText });
     if (st.failed) text += " " + (st.error ? RK_M("storage.countCouldNotBeCompressedError", { count: st.failed, error: st.error }) : RK_M("storage.countCouldNotBeCompressed", { count: st.failed }));
     if (!st.done && !st.cancelled && st.failed && st.error) text = RK_M("storage.nothingWasCompressedError", { error: st.error });
+    if (st.warning) text += " " + st.warning;
     els.doneText.textContent = text;
   }
 
   // one read of the run: the ring follows it while it goes, and the result shows once when it ends
-  async function pollCompress(keepGoing) {
-    let st;
-    try { st = await helperJson("/storage/compress-status?t=" + Date.now()); } catch (_) { st = null; }
+  let pollingCompress = false;
+  async function pollCompress() {
+    if (pollingCompress) return;
+    pollingCompress = true;
     clearTimeout(cmp.timer);
     cmp.timer = 0;
-    if (!st || !st.started) { if (cmp.phase === "run") showPhase("pick"); return; }
+    let st;
+    try { st = await helperJson("/storage/compress-status?t=" + Date.now()); }
+    catch (_) {
+      if (shown) cmp.timer = setTimeout(pollCompress, cmp.phase === "run" ? 1000 : 5000);
+      return;
+    } finally { pollingCompress = false; }
+    if (!st.started) { if (cmp.phase === "run") showPhase("pick"); return; }
     cmp.lastId = st.id;
     if (st.running) {
       if (cmp.phase !== "run") showPhase("run");
       paintRun(st);
-      if (shown) cmp.timer = setTimeout(() => pollCompress(true), 1000);
+      if (shown) cmp.timer = setTimeout(pollCompress, 1000);
       return;
     }
     // it ended: what this page watched run, or a result that is minutes old, is shown until it is acknowledged
@@ -773,7 +783,7 @@
     cmp.picked = new Set();
     if (cmp.phase === "confirm") showPhase("pick");
     // favorites start out of the list the way the storage settings say, and the switch only changes it for this visit
-    refresh(true).then(() => { els.skipFav.checked = !summary || summary.skipFavorites !== false; pollCompress(true); loadCandidates(); });
+    refresh(true).then(() => { els.skipFav.checked = !summary || summary.skipFavorites !== false; pollCompress(); loadCandidates(); });
     clearInterval(pollTimer);
     pollTimer = setInterval(() => { if (shown && !busy) refresh(false); }, 5000);
   };
@@ -790,7 +800,7 @@
     shown = true;
     if (!pollTimer) pollTimer = setInterval(() => { if (shown && !busy) refresh(false); }, 5000);
     refresh(false);
-    if (!cmp.timer) pollCompress(true);
+    if (!cmp.timer) pollCompress();
   });
 
   if (window.RKHover) RKHover.apply(document, { control:".btn" });

@@ -282,7 +282,7 @@ window.RKClipGames = (function () {
       busy(true);
       status.textContent = RK_M("clips.saving");
       try {
-        const response = await fetch(helper + (restore ? "/games/reset" : "/games/set") + "?file=" + encodeURIComponent(item.name) + "&id=" + encodeURIComponent(id || "") + (name ? "&name=" + encodeURIComponent(name) : "") + (universe ? "&universe=" + encodeURIComponent(universe) : "") + (screenshot ? "&screenshot=1" : ""), {method:"POST",cache:"no-store"});
+        const response = await fetch(helper + (restore ? "/games/reset" : "/games/set") + "?file=" + encodeURIComponent(item.name) + "&id=" + encodeURIComponent(id || "") + (name ? "&name=" + encodeURIComponent(name) : "") + (universe ? "&universe=" + encodeURIComponent(universe) : "") + (screenshot ? "&screenshot=1&v=" + encodeURIComponent(item.version) : ""), {method:"POST",cache:"no-store"});
         const data = await response.json();
         if (!response.ok || !data.ok) throw Error(data.message || RK_M("clips.gameCouldNotBeChanged"));
         window.dispatchEvent(new CustomEvent("replaykit:game-tags-changed")); dialog.close();

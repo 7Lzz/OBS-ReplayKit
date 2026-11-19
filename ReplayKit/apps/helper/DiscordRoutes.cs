@@ -68,7 +68,7 @@ namespace ReplayKitHelper
             if (path == "/projector-repark")
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
-                try { HttpResponse.SendJson(stream, 200, DiscordProjector.Repark(force: true)); }
+                try { HttpResponse.SendJson(stream, 200, DiscordProjector.Repark()); }
                 catch (Exception ex) { HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = ex.Message }); }
                 return false;
             }
@@ -109,7 +109,7 @@ namespace ReplayKitHelper
                 HttpResponse.SendFile(stream, 200, "OK", new Dictionary<string, string> { ["Content-Type"] = "image/png", ["Cache-Control"] = "no-store" }, ShareCover.ImagePath, FileShare.ReadWrite | FileShare.Delete);
                 return false;
             }
-            if (path == "/share/cover/video.mp4" && req.Method == "GET") return HttpResponse.ServeRangedFile(stream, req, File.Exists(ShareCover.VideoPath) ? ShareCover.VideoPath : null, "video/mp4");
+            if (path == "/share/cover/video.mp4" && req.Method == "GET") return HttpResponse.ServeRangedFile(stream, req, ShareCover.CurrentVideoPath(), "video/mp4");
             if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
             try
             {
@@ -137,8 +137,7 @@ namespace ReplayKitHelper
                         break;
                     }
                     case "/share/cover/video/remove":
-                        ShareCover.Remove(ShareCover.VideoPath);
-                        ShareCover.Remove(ShareCover.VideoSoundPath);
+                        ShareCover.RemoveVideo();
                         result = new JObject { ["ok"] = true, ["settings"] = SetCoverSetting("share_cover_background", "theme", onlyFrom: "video") };
                         break;
                     case "/share/cover/sound":

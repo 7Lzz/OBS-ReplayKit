@@ -35,7 +35,7 @@ namespace ReplayKitSetup
         private static string LogFile() => Path.Combine(Path.GetTempPath(), "OBSReplayKitUpdate.log");
 
         // the helper serves this back over /update/install-result so the update popup can say what actually happened. it lives beside the helper logs, not in the update temp dir, which ScheduleCleanup wipes right after this process exits.
-        private static string ResultFile() => Path.Combine(TempLayout.Logs, TempLayout.UpdateResultFile);
+        private static string ResultFile(string attemptId) => Path.Combine(TempLayout.Logs, TempLayout.UpdateFile(TempLayout.UpdateResultFile, attemptId));
 
         private static string PendingFile() => Path.Combine(Config.REPLAYKIT_CONFIG, StateLayout.UpdatePendingFile);
 
@@ -65,11 +65,11 @@ namespace ReplayKitSetup
             finally { if (File.Exists(temporary)) File.Delete(temporary); }
         }
 
-        private static void WriteResult(bool ok, string stage, string message, string releaseUrl = ReleasePage)
+        private static void WriteResult(bool ok, string stage, string message, string releaseUrl = ReleasePage, string attemptId = null)
         {
             try
             {
-                string path = ResultFile();
+                string path = ResultFile(attemptId);
                 Directory.CreateDirectory(Path.GetDirectoryName(path));
                 var payload = new JObject
                 {
@@ -80,7 +80,13 @@ namespace ReplayKitSetup
                     ["releaseUrl"] = string.IsNullOrWhiteSpace(releaseUrl) ? ReleasePage : releaseUrl,
                     ["finishedAt"] = DateTime.UtcNow.ToString("o"),
                 };
-                File.WriteAllText(path, payload.ToString(Formatting.Indented) + "\n", new UTF8Encoding(false));
+                string temporary = path + "." + Guid.NewGuid().ToString("N");
+                try
+                {
+                    File.WriteAllText(temporary, payload.ToString(Formatting.Indented) + "\n", new UTF8Encoding(false));
+                    File.Move(temporary, path, true);
+                }
+                finally { File.Delete(temporary); }
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
             {
@@ -131,19 +137,21 @@ namespace ReplayKitSetup
         }
 
         // run a non-interactive repair/update install from a downloaded release exe.
-        public static int RunUpdateMode(string relaunchObs = null, int waitPid = 0, int startDelayMs = 0, bool relaunch = true, string releaseUrl = ReleasePage)
+        public static int RunUpdateMode(string relaunchObs = null, int waitPid = 0, int startDelayMs = 0, bool relaunch = true, string releaseUrl = ReleasePage, string attemptId = null)
         {
             void LogBoth(string message)
             {
                 Log(message);
                 try { Console.WriteLine(message); } catch (IOException) { }
             }
+            void Report(bool ok, string stage, string message) => WriteResult(ok, stage, message, releaseUrl, attemptId);
 
             bool obsClosed = false;
             bool relaunchAttempted = false;
             bool relaunched = false;
             Mutex updateGate = null;
             bool updateGateHeld = false;
+            RuntimeTransaction transaction = null;
             try
             {
                 updateGate = new Mutex(false, @"Local\OBSReplayKit-runtime-update");
@@ -153,20 +161,20 @@ namespace ReplayKitSetup
                 {
                     const string busy = "Another ReplayKit update is already running.";
                     LogBoth(busy);
-                    WriteResult(false, "busy", busy, releaseUrl);
+                    if (attemptId != null) Report(false, "busy", busy);
                     return 1;
                 }
+                DetachedSpawn.WritePid(Environment.ProcessId, attemptId);
                 Log("update starting version=" + VersionInfo.Version);
                 if (startDelayMs > 0) Thread.Sleep(Math.Min(startDelayMs, 5000));
 
                 // the payload is checked before obs is touched. a release exe built without its embedded assets used to get past here, kill obs, then discover it had nothing to install -- leaving no obs, no helper, and an update popup waiting on a restart that never came.
-                string runtimeSrc = Installer.GetRuntimeAssetsDir();
-                if (!Directory.Exists(runtimeSrc))
+                try { Installer.ValidateRuntimeAssets(); }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is InvalidDataException)
                 {
-                    string reason = AssetBundle.LastError ?? "This OBSReplayKit.exe was built without its bundled ReplayKit files.";
-                    string message = "ReplayKit runtime assets not found: " + runtimeSrc + ". " + reason;
+                    string message = ex.Message;
                     LogBoth("preflight failed, OBS was left running: " + message);
-                    WriteResult(false, "preflight", message, releaseUrl);
+                    Report(false, "preflight", message);
                     return 1;
                 }
 
@@ -175,10 +183,11 @@ namespace ReplayKitSetup
                 if (unreachable != null)
                 {
                     LogBoth("preflight failed, OBS was left running: " + unreachable);
-                    WriteResult(false, "preflight", unreachable, releaseUrl);
+                    Report(false, "preflight", unreachable);
                     return 1;
                 }
 
+                transaction = RuntimeTransaction.Open();
                 Obs.CloseObs(LogBoth);
                 obsClosed = true;
                 MarkUpdatePending();
@@ -186,11 +195,12 @@ namespace ReplayKitSetup
                 Log("stage: obs closed, waiting for helper pid " + waitPid);
                 if (!WaitForPid(waitPid > 0 ? waitPid : 0, 60, LogBoth))
                     throw new IOException(SetupLocale.Message("setup.theOldReplaykitHelperCouldNot"));
+                transaction.Recover(LogBoth);
                 Log("stage: helper gone, clearing crash flags");
                 Obs.CleanupCrashFlags(LogBoth);
                 Log("stage: copying runtime files");
                 var problems = new List<string>();
-                int count = Installer.InstallReplaykitRuntimeUpdate(LogBoth, problems);
+                int count = Installer.InstallReplaykitRuntimeUpdate(transaction, LogBoth, problems);
                 LogBoth($"runtime update copied {count} file(s)");
                 if (problems.Count == 0) File.Delete(PendingFile());
                 Startup.RefreshObsStartup(LogBoth);
@@ -202,32 +212,33 @@ namespace ReplayKitSetup
                     relaunched = LaunchObsPath(relaunchObs, LogBoth);
                     if (!relaunched)
                     {
-                        WriteResult(false, "relaunch", $"ReplayKit {VersionInfo.Version} was installed but OBS could not be restarted. Start OBS manually.", releaseUrl);
+                        Report(false, "relaunch", $"ReplayKit {VersionInfo.Version} was installed but OBS could not be restarted. Start OBS manually.");
                         return 1;
                     }
                 }
                 if (problems.Count > 0)
                 {
-                    WriteResult(false, "incomplete", $"ReplayKit {VersionInfo.Version} files were installed, but the update is incomplete. Not repaired: " + string.Join(", ", problems) + ". Run the installer again to finish the repair.", releaseUrl);
+                    Report(false, "incomplete", $"ReplayKit {VersionInfo.Version} files were installed, but the update is incomplete. Not repaired: " + string.Join(", ", problems) + ". Run the installer again to finish the repair.");
                     return 1;
                 }
-                WriteResult(true, "done", $"ReplayKit {VersionInfo.Version} installed ({count} file(s)).", releaseUrl);
+                Report(true, "done", $"ReplayKit {VersionInfo.Version} installed ({count} file(s)).");
                 return 0;
             }
             catch (Exception exc)
             {
                 Log("update failed: " + exc.Message);
-                WriteResult(false, obsClosed ? "install" : "startup", exc.Message, releaseUrl);
+                Report(false, obsClosed ? "install" : "startup", exc.Message);
                 return 1;
             }
             finally
             {
-                // obs has to come back even when the install died partway thru the copy, otherwise a failed update costs the user their whole obs session. skipped once the install got far enough to report its own relaunch outcome.
+                // bring obs back once the runtime is consistent, including after a successful rollback.
                 if (obsClosed && relaunch && !relaunchAttempted)
                 {
-                    try { LaunchObsPath(relaunchObs, LogBoth); }
+                    try { if (!transaction.Pending) LaunchObsPath(relaunchObs, LogBoth); }
                     catch (Exception ex) { Log("OBS recovery launch failed: " + ex.Message); }
                 }
+                transaction?.Dispose();
                 if (updateGateHeld) updateGate.ReleaseMutex();
                 updateGate?.Dispose();
             }
@@ -375,6 +386,8 @@ namespace ReplayKitSetup
                 return RunUninstallDiscordScreenshareMode(startDelay);
             }
             if (!argv.Contains("--update")) return null;
+            string attemptId = StringArg(argv, "--attempt-id", null);
+            if (attemptId != null && !TempLayout.ValidAttempt(attemptId)) return 1;
 
             // hand the whole job to a copy of ourselves that owns no console and belongs to no job object, then get out of the way. everything this process inherited from the helper dies with OBS moments from now; the detached copy inherits none of it, so killing OBS cannot reach it. see DetachedSpawn.
             if (!argv.Contains(DetachedSpawn.DetachedFlag))
@@ -388,10 +401,6 @@ namespace ReplayKitSetup
                 // could not detach -- carry on inline rather than skipping the update, and say so, so a failure right after OBS closes is recognisable instead of looking like a silent death.
                 Log("warn: could not relaunch detached, running inline (an OBS teardown may kill this process)");
             }
-            else
-            {
-                DetachedSpawn.WriteOwnPid();
-            }
 
             // the download folder this exe runs from is left to the helper that made it (Update.ClearStaleUpdateFolders); an older helper still passes --cleanup-dir, which is not read
             string relaunchObs = StringArg(argv, "--relaunch-obs", "");
@@ -401,7 +410,7 @@ namespace ReplayKitSetup
             string releaseUrl = StringArg(argv, "--release-url", ReleasePage);
             if (!Uri.TryCreate(releaseUrl, UriKind.Absolute, out Uri releaseUri) || releaseUri.Scheme != Uri.UriSchemeHttps)
                 releaseUrl = ReleasePage;
-            return RunUpdateMode(relaunchObs, waitPid, startDelayMs, !noRelaunch, releaseUrl);
+            return RunUpdateMode(relaunchObs, waitPid, startDelayMs, !noRelaunch, releaseUrl, attemptId);
         }
 
         private static string StringArg(string[] argv, string name, string @default)

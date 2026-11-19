@@ -8,7 +8,8 @@
 namespace rk {
 
 extern QPointer<QTimer> g_openClipsHotkeyTimer;
-void RegisterOpenClipsHotkey(const std::string &settingsBody);
+bool RegisterOpenClipsHotkey(const std::string &settingsBody);
+bool SetHotkeyCapture(bool active);
 void InstallOpenClipsHotkeyFilter();
 void RemoveOpenClipsHotkey();
 

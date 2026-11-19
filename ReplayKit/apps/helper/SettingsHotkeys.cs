@@ -30,30 +30,37 @@ namespace ReplayKitHelper
     {
         // -- hotkey capture + sync-from-obs: lets the docks "press a key to bind" ui temporarily blank obss native hotkeys while listening, and detects when the user rebinds a hotkey through obss own Settings dialog instead of the dock, so the dock does not silently fight/revert that edit.
 
+        private static string captureOwner;
+        private static DateTime captureExpires;
+        private const int CaptureLeaseSeconds = 15;
+
         internal static JObject SyncRecordingKeybindFromObs(JObject settings)
         {
             var start = GetObsProfileParameterSafe("Hotkeys", "OBSBasic.StartRecording");
             var stop = GetObsProfileParameterSafe("Hotkeys", "OBSBasic.StopRecording");
-            if (!start.Ok && !stop.Ok) return settings;
+            if (!start.Ok || !stop.Ok) return settings;
 
-            string json = start.Ok ? start.Data?["parameterValue"]?.Value<string>() ?? "" : "";
-            JObject combo = ConvertRecordingBasicIniToKeybind(json);
-            if (combo["key"] == null && stop.Ok)
-            {
-                json = stop.Data?["parameterValue"]?.Value<string>() ?? "";
-                combo = ConvertRecordingBasicIniToKeybind(json);
-            }
-            JObject extra = ConvertRecordingBasicIniToKeybind(json, 1);
-
-            string current = (settings["recordingKeybind"] as JObject ?? new JObject()).ToString(Formatting.None);
-            string next = combo.ToString(Formatting.None);
-            if (current != next) settings["recordingKeybind"] = combo;
-            if ((settings["recordingKeybindExtra"] as JObject ?? new JObject()).ToString(Formatting.None) != extra.ToString(Formatting.None)) settings["recordingKeybindExtra"] = extra;
+            string startJson = start.Data?["parameterValue"]?.Value<string>() ?? "";
+            string stopJson = stop.Data?["parameterValue"]?.Value<string>() ?? "";
+            var startBinding = ConvertRecordingBasicIniToKeybind(startJson);
+            var startExtra = ConvertRecordingBasicIniToKeybind(startJson, 1);
+            var stopBinding = ConvertRecordingBasicIniToKeybind(stopJson);
+            var stopExtra = ConvertRecordingBasicIniToKeybind(stopJson, 1);
+            bool shared = JToken.DeepEquals(startBinding, stopBinding) && JToken.DeepEquals(startExtra, stopExtra);
+            settings["recordingKeybind"] = startBinding;
+            settings["recordingKeybindExtra"] = startExtra;
+            settings["recordingStopKeybind"] = shared ? (JToken)JValue.CreateNull() : stopBinding;
+            settings["recordingStopKeybindExtra"] = shared ? (JToken)JValue.CreateNull() : stopExtra;
             return settings;
         }
 
+        internal static string RecordingStopHotkey(JObject settings) =>
+            settings["recordingStopKeybind"] is JObject stop
+                ? ConvertRecordingKeybindToBasicIni(stop, settings["recordingStopKeybindExtra"] as JObject)
+                : ConvertRecordingKeybindToBasicIni(settings["recordingKeybind"] as JObject, settings["recordingKeybindExtra"] as JObject);
+
         internal static string HotkeySignature(JObject settings) =>
-            new JObject { ["clip"] = settings["clipKeybind"], ["clipExtra"] = settings["clipKeybindExtra"], ["recording"] = settings["recordingKeybind"], ["recordingExtra"] = settings["recordingKeybindExtra"], ["screenshot"] = settings["screenshotKeybind"], ["screenshotExtra"] = settings["screenshotKeybindExtra"] }.ToString(Formatting.None);
+            new JObject { ["clip"] = settings["clipKeybind"], ["clipExtra"] = settings["clipKeybindExtra"], ["recording"] = settings["recordingKeybind"], ["recordingExtra"] = settings["recordingKeybindExtra"], ["recordingStop"] = settings["recordingStopKeybind"], ["recordingStopExtra"] = settings["recordingStopKeybindExtra"], ["screenshot"] = settings["screenshotKeybind"], ["screenshotExtra"] = settings["screenshotKeybindExtra"] }.ToString(Formatting.None);
 
         // the screenshot hotkey is obss own Screenshot Output, which can be set in the hotkeys of obs as well, so a key picked there shows here too
         internal static JObject SyncScreenshotKeybindFromObs(JObject settings)
@@ -106,70 +113,58 @@ namespace ReplayKitHelper
             return settings;
         }
 
-        // recording_hotkey.lua fast-polls this file (~50ms, separate from its normal 1s saved-settings sync) and applies it via obs_hotkey_load, which rewrites the live in-memory hotkey binding immediately. this is not cosmetic like SetProfileParameter below -- SetProfileParameter only ever reaches the on-disk profile ini, and obs only rereads that ini into its live hotkey registry on a full profile switch, so it could never actually stop the native hotkey from firing while capture was "active". obs_hotkey_load is the same api the lua script already relies on to make a saved keybind change take effect without restarting obs.
-        internal static string GetHotkeyCaptureSignalPath() => StateLayout.PathFor(AppConfig.GetReplayKitRoot(), StateLayout.HotkeySignalFile);
-
-        internal static void WriteHotkeyCaptureSignal(JObject signal) => AppConfig.WriteUtf8(GetHotkeyCaptureSignalPath(), signal.ToString(Formatting.None));
-
-        // called once at helper startup so a signal file left at active:true by a crashed prior helper process (obs itself keeps running independently of the helper, so its lua side has no equivalent restart to reset on) does not leave the native hotkeys blanked forever.
-        public static void ResetHotkeyCaptureSignalAtStartup() => WriteHotkeyCaptureSignal(new JObject { ["active"] = false });
-
-        public static JObject SetHotkeyCapture(bool active)
+        public static JObject SetHotkeyCapture(bool active, string owner)
         {
-            if (active)
-            {
-                lock (Server.State.HotkeyCaptureLock)
-                {
-                    Server.State.ReplaykitHotkeyCaptureActive = true;
-                }
-                WriteHotkeyCaptureSignal(new JObject { ["active"] = true });
-                return new JObject { ["ok"] = true, ["active"] = true };
-            }
-
-            if (!Server.State.ReplaykitHotkeyCaptureActive) return new JObject { ["ok"] = true, ["active"] = false };
-
-            var currentSettings = ReadSettings();
-            return RestoreHotkeysFromSettings(currentSettings);
-        }
-
-        internal static JObject RestoreHotkeysFromSettings(JObject settings)
-        {
-            string recordingJson = ConvertRecordingKeybindToBasicIni(settings["recordingKeybind"] as JObject, settings["recordingKeybindExtra"] as JObject);
-            var r1 = SetReplayBufferHotkeyJson(settings["clipKeybind"] as JObject, settings["clipKeybindExtra"] as JObject);
-            var r2 = SetRecordingHotkeyPairJson(recordingJson, recordingJson);
-            var r3 = SetObsProfileParameterSafe("Hotkeys", "OBSBasic.Screenshot", ConvertRecordingKeybindToBasicIni(settings["screenshotKeybind"] as JObject, settings["screenshotKeybindExtra"] as JObject));
-            var errors = new List<string>();
-            if (!r1.Ok) errors.Add(r1.Message);
-            if (r2["ok"]?.Value<bool>() != true) errors.Add(r2["message"]?.Value<string>());
-            if (!r3.Ok) errors.Add("OBSBasic.Screenshot: " + r3.Message);
-
-            // unconditional even if the ini writes above failed -- those are best-effort disk consistency, not what actually restores the live binding, so a websocket hiccup should not leave the native hotkey blanked.
-            WriteHotkeyCaptureSignal(new JObject
-            {
-                ["active"] = false,
-                ["clipKeybind"] = settings["clipKeybind"] as JObject ?? new JObject(),
-                ["recordingKeybind"] = settings["recordingKeybind"] as JObject ?? new JObject(),
-                ["clipKeybindExtra"] = settings["clipKeybindExtra"] as JObject ?? new JObject(),
-                ["recordingKeybindExtra"] = settings["recordingKeybindExtra"] as JObject ?? new JObject(),
-                ["screenshotKeybind"] = settings["screenshotKeybind"] as JObject ?? new JObject(),
-                ["screenshotKeybindExtra"] = settings["screenshotKeybindExtra"] as JObject ?? new JObject(),
-            });
+            if (!Guid.TryParseExact(owner, "N", out _)) return CaptureFailure();
             lock (Server.State.HotkeyCaptureLock)
             {
-                Server.State.ReplaykitHotkeyCaptureActive = false;
+                if (captureOwner != null && DateTime.UtcNow >= captureExpires) captureOwner = null;
+                if (!active)
+                {
+                    if (captureOwner != owner) return new JObject { ["ok"] = true, ["active"] = false };
+                    return EndCapture() ? new JObject { ["ok"] = true, ["active"] = false } : CaptureFailure();
+                }
+                if (captureOwner != null && captureOwner != owner) return CaptureFailure();
+                if (!PipeClient.ApplyObsConfig("HOTKEYCAPTURE", "1", 1500))
+                {
+                    EndCapture();
+                    return CaptureFailure();
+                }
+                captureOwner = owner;
+                captureExpires = DateTime.UtcNow.AddSeconds(CaptureLeaseSeconds);
+                return new JObject { ["ok"] = true, ["active"] = true };
             }
-
-            if (errors.Count > 0) return new JObject { ["ok"] = false, ["message"] = string.Join("; ", errors) };
-            return new JObject { ["ok"] = true, ["active"] = false };
         }
 
-        internal static JObject EnsureHotkeyCaptureReleased(JObject settings)
+        private static bool EndCapture()
         {
-            if (!Server.State.ReplaykitHotkeyCaptureActive) return new JObject { ["ok"] = true, ["warnings"] = new JArray(), ["applied"] = new JArray() };
-            var restore = RestoreHotkeysFromSettings(settings);
-            if (restore["ok"]?.Value<bool>() == true) return new JObject { ["ok"] = true, ["warnings"] = new JArray(), ["applied"] = new JArray("OBS hotkeys restored") };
-            return new JObject { ["ok"] = false, ["warnings"] = new JArray(Locales.Message("settings.hotkeysNotRestoredError", "error", restore["message"]?.ToString())), ["applied"] = new JArray() };
+            captureOwner = null;
+            return PipeClient.ApplyObsConfig("HOTKEYCAPTURE", "0", 1500);
         }
 
+        private static JObject CaptureFailure() => new JObject
+        {
+            ["ok"] = false, ["message"] = Locales.Message("common.hotkeyCaptureFailed"),
+        };
+
+        internal static JObject EnsureHotkeyCaptureReleased(bool hotkeysChanged)
+        {
+            lock (Server.State.HotkeyCaptureLock)
+            {
+                if (!hotkeysChanged || captureOwner == null || DateTime.UtcNow >= captureExpires || EndCapture())
+                    return new JObject { ["ok"] = true, ["warnings"] = new JArray(), ["applied"] = new JArray() };
+            }
+            return new JObject { ["ok"] = false, ["warnings"] = new JArray(Locales.Message("settings.hotkeysNotRestoredError", "error", Locales.Message("common.hotkeyCaptureFailed"))), ["applied"] = new JArray() };
+        }
+
+        internal static bool ApplyOpenClipsHotkeys(JObject settings)
+        {
+            var bindings = new JObject
+            {
+                ["openClipsKeybind"] = settings["openClipsKeybind"],
+                ["openClipsKeybindExtra"] = settings["openClipsKeybindExtra"],
+            };
+            return PipeClient.ApplyObsConfig("OPENCLIPSKEYS", bindings.ToString(Formatting.None), 1500);
+        }
     }
 }

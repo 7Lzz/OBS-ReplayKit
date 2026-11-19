@@ -36,6 +36,7 @@
         Comma:"OBS_KEY_COMMA", Period:"OBS_KEY_PERIOD", Backquote:"OBS_KEY_QUOTELEFT",
       };
       if (byCode[e.code]) return byCode[e.code];
+      if (/^Digit[0-9]$/.test(e.code)) return "OBS_KEY_" + e.code.slice(-1);
       if (/^F([1-9]|1[0-9]|2[0-4])$/.test(k)) return "OBS_KEY_" + k.toUpperCase();
       if (/^[a-z]$/i.test(k)) return "OBS_KEY_" + k.toUpperCase();
       if (/^[0-9]$/.test(k)) return "OBS_KEY_" + k;
@@ -64,6 +65,26 @@
       return combo;
     }
 
-    return { comboToLabel:comboToLabel, keyLabel:keyLabel, obsKeyFromEvent:obsKeyFromEvent, comboFromEvent:comboFromEvent };
+    function captureClient(helper) {
+      const owner = Array.from(crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2, "0")).join("");
+      let wanted = false;
+      let transition = Promise.resolve(true);
+      return function setCapture(active, keepalive) {
+        if (wanted === active) return transition;
+        wanted = active;
+        transition = transition.then(async () => {
+          try {
+            const response = await fetch(helper + "/settings/hotkey-capture?active=" + (active ? "1" : "0") + "&owner=" + owner, {
+              method:"POST", cache:"no-store", keepalive:!!keepalive,
+            });
+            const body = await response.json();
+            return response.ok && body.ok === true && body.active === active;
+          } catch (_) { return false; }
+        });
+        return transition;
+      };
+    }
+
+    return { comboToLabel:comboToLabel, keyLabel:keyLabel, obsKeyFromEvent:obsKeyFromEvent, comboFromEvent:comboFromEvent, captureClient:captureClient };
   })();
 </script>

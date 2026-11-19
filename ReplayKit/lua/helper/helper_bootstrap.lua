@@ -15,6 +15,7 @@ ffi.cdef[[
     DWORD GetModuleFileNameA(HANDLE hModule, LPSTR lpFilename, DWORD nSize);
     void Sleep(DWORD dwMilliseconds);
     unsigned long long GetTickCount64(void);
+    DWORD WaitForSingleObject(HANDLE hHandle, DWORD dwMilliseconds);
 
     typedef unsigned long long SOCKET;
     typedef struct WSAData {
@@ -63,6 +64,7 @@ ffi.cdef[[
 ]]
 -- a module of its own may declare it as well
 pcall(ffi.cdef, [[ void *ShellExecuteW(void *hwnd, const wchar_t *lpOperation, const wchar_t *lpFile, const wchar_t *lpParameters, const wchar_t *lpDirectory, int nShowCmd); ]])
+pcall(ffi.cdef, [[ int TerminateProcess(void *process, unsigned int exitCode); ]])
 
 local kernel32 = ffi.load("kernel32")
 local ws2_32 = ffi.load("ws2_32")
@@ -81,6 +83,7 @@ local WSAEWOULDBLOCK       = 10035
 local HELPER_START_WAIT_MS = 3000
 local HELPER_WATCHDOG_MS = 10000
 local HELPER_RESTART_COOLDOWN_MS = 15000
+local HELPER_SHUTDOWN_GRACE_MS = 150000
 local HELPER_PROBE_POLL_MS = 100
 local HELPER_PROBE_TIMEOUT_MS = 2000
 -- developer override for lua and helper logging, off in releases; the debug logging setting turns it on per user
@@ -88,6 +91,9 @@ local REPLAYKIT_LOGGING_ENABLED = false
 local hotkey_id = obs.OBS_INVALID_HOTKEY_ID
 local helper_watchdog_started = false
 local helper_last_restart_ms = 0
+local helper_process
+local helper_shutdown_since
+local post_helper
 local winsock_started = false
 
 local cfg = {
@@ -255,18 +261,18 @@ local function win_quote(arg)
 end
 
 -- the launch of replaykit.lua hides the window from the first tick and takes a command line outside ascii (the helper path is in the folder of the user); do not add detached_process to a powershell launch, that means no console at all and breaks its startup
-local function spawn_hidden(cmdline, stay_in_job)
+local function spawn_hidden(cmdline, stay_in_job, keep_handle)
     local flags = CREATE_NO_WINDOW + CREATE_BREAKAWAY_FROM_JOB + DETACHED_PROCESS
     if stay_in_job then flags = CREATE_NO_WINDOW end
-    local ok, err = replaykit_create_process(cmdline, flags)
+    local ok, err, process = replaykit_create_process(cmdline, flags, keep_handle)
     -- some restrictive job policies deny breakaway. The compiled helper still works in that case, so retry with the ordinary launch flags.
     if not ok and not stay_in_job then
-        ok, err = replaykit_create_process(cmdline, CREATE_NO_WINDOW)
+        ok, err, process = replaykit_create_process(cmdline, CREATE_NO_WINDOW, keep_handle)
     end
     if not ok then
         return false, err
     end
-    return true
+    return true, nil, process
 end
 
 local function json_escape(s)
@@ -376,8 +382,17 @@ local function start_update_bootstrap()
     return true
 end
 
+local function release_exited_helper()
+    if not helper_process or kernel32.WaitForSingleObject(helper_process, 0) ~= 0 then return end
+    kernel32.CloseHandle(helper_process)
+    helper_process = nil
+    helper_shutdown_since = nil
+end
+
 -- writes the config and starts the helper exe; true once the process was created. a missing exe is a broken install, re-running the ReplayKit setup restores it
 local function spawn_helper()
+    release_exited_helper()
+    if helper_process then return true end
     local helper = helper_path()
     if not file_exists(helper) then
         log(obs.LOG_ERROR, "Missing helper: " .. helper)
@@ -388,11 +403,12 @@ local function spawn_helper()
     local command, hosted = helper_command()
     if not command then return false end
     local cmd = command .. ' -ConfigPath ' .. win_quote(helper_config_path())
-    local ok, err = spawn_hidden(cmd, hosted)
+    local ok, err, process = spawn_hidden(cmd, hosted, true)
     if not ok then
         log(obs.LOG_ERROR, "Could not start ReplayKit helper. Win32 error: " .. tostring(err))
         return false
     end
+    helper_process = process
     return true
 end
 
@@ -413,14 +429,16 @@ local function start_helper()
     return true
 end
 
--- a helper under real load can take a couple of seconds to answer, so only a run of failed probes counts as down. a new helper only takes over once the old process is gone: while it still runs, the singleton mutex makes the new one quit at once
+-- a healthy helper can take a couple of seconds to answer. give an unresponsive child time for a graceful shutdown and for a disk clip save to finish
 local helper_consecutive_fails = 0
 local HELPER_UNHEALTHY_THRESHOLD = 3
 
 local function on_helper_health(ok)
+    release_exited_helper()
     if ok then
         helper_started = true
         helper_consecutive_fails = 0
+        helper_shutdown_since = nil
         start_update_bootstrap()
         return
     end
@@ -429,6 +447,17 @@ local function on_helper_health(ok)
         return
     end
     local now = now_ms()
+    if helper_process then
+        if not helper_shutdown_since then
+            helper_shutdown_since = now
+            post_helper("/shutdown")
+        elseif now - helper_shutdown_since >= HELPER_SHUTDOWN_GRACE_MS and kernel32.WaitForSingleObject(helper_process, 0) == 258 then
+            if kernel32.TerminateProcess(helper_process, 1) ~= 0 then
+                log(obs.LOG_WARNING, "Stopped the unresponsive ReplayKit helper this OBS session started.")
+            end
+        end
+        return
+    end
     if helper_started or (now - helper_last_restart_ms) >= HELPER_RESTART_COOLDOWN_MS then
         helper_started = false
         helper_last_restart_ms = now
@@ -519,7 +548,7 @@ local function drain_posts()
     if #pending_posts == 0 then obs.remove_current_callback() end
 end
 
-local function post_helper(path)
+post_helper = function(path)
     if not HELPER or not ensure_winsock() then return false end
     local s = ws2_32.socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)
     if s == INVALID_SOCKET then return false end
@@ -572,9 +601,12 @@ local function open_url(path)
 end
 
 local function save_replay()
-    if obs.obs_frontend_replay_buffer_save then
+    local cd = obs.calldata_create()
+    local called = obs.proc_handler_call(obs.obs_get_proc_handler(), "replaykit_clip_save", cd)
+    local handled = called and obs.calldata_bool(cd, "handled")
+    obs.calldata_destroy(cd)
+    if not handled and obs.obs_frontend_replay_buffer_active() then
         obs.obs_frontend_replay_buffer_save()
-        log(obs.LOG_INFO, "Saved clip from ReplayKit menu.")
     end
 end
 
@@ -693,6 +725,10 @@ function script_unload()
         finish_probe()
     end
     if HELPER then post_helper("/shutdown") end
+    if helper_process then
+        kernel32.CloseHandle(helper_process)
+        helper_process = nil
+    end
     -- nothing may run after the unload, so the answers still on their way are not waited for
     if #pending_posts > 0 then
         obs.timer_remove(drain_posts)

@@ -287,7 +287,15 @@ namespace ReplayKitHelper
             return closed;
         }
 
-        // the native plugin (core/main_window.cpp, out of scope here) hands obss real main-window hwnd over the OBSReplayKitIpc pipe; PipeClient caches it in Server.State. window-title matching alone cant tell obss own main window from a projector, so the plugin -- which has the authoritative Qt-side isOBSProjectorWindow check -- sends it directly. returns false (caller force-kills) if the pipe never delivered one.
+        internal static int ObsMainWindowPid()
+        {
+            long hwndVal;
+            lock (Server.State.IpcLock) hwndVal = Server.State.ObsMainWindowHwnd;
+            var hwnd = new IntPtr(hwndVal);
+            return IsWindow(hwnd) && GetWindowThreadProcessId(hwnd, out uint pid) != 0 ? (int)pid : 0;
+        }
+
+        // the native plugin supplies the real obs main window over the pipe.
         public static bool CloseObsMainWindow(uint requireOwnerPid)
         {
             long hwndVal;

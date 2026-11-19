@@ -192,29 +192,12 @@ namespace ReplayKitHelper
             {
                 found.AddRange(SafeEnumerateFiles(Constants.SCRATCH_DIR, "*.tmp"));
                 // A detached status poll lasts at most thirty minutes; older private cookie copies are abandoned.
-                foreach (string file in SafeEnumerateFiles(Constants.SCRATCH_DIR, "streamable_poll_*.cookies.txt"))
+                foreach (string file in SafeEnumerateFiles(Constants.SCRATCH_DIR, "streamable_*.cookies.txt"))
                 {
                     try { if (File.GetLastWriteTimeUtc(file) < DateTime.UtcNow.AddHours(-1)) found.Add(file); }
                     catch (IOException) { } catch (UnauthorizedAccessException) { }
                 }
             }
-            // sweep the clip folder for crashed-worker leftovers (sidecars from cross-volume finalize + older naming patterns).
-            try
-            {
-                string clipDir = AppConfig.GetClipDir();
-                if (!string.IsNullOrEmpty(clipDir) && Directory.Exists(clipDir))
-                {
-                    foreach (var file in new[] { clipDir }.Concat(Clips.GameFolders(clipDir)).SelectMany(dir => SafeEnumerateFiles(dir)))
-                    {
-                        string name = Path.GetFileName(file);
-                        if (name.StartsWith("_replaykit_", StringComparison.OrdinalIgnoreCase) ||
-                            name.StartsWith("_compress_tmp_", StringComparison.OrdinalIgnoreCase) ||
-                            name.StartsWith("_trim_tmp_", StringComparison.OrdinalIgnoreCase))
-                            found.Add(file);
-                    }
-                }
-            }
-            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
             return found.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         }
 

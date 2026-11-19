@@ -166,7 +166,7 @@ namespace ReplayKitHelper
                     }
                     bool left;
                     // a file something still holds open, such as a recording in progress, is not copied for nothing
-                    try { left = HevcTag.NeedsFix(file.FullName) && !(WaitUntilUnlocked(file.FullName, 0) && HevcTag.Fix(file.FullName)); }
+                    try { left = HevcTag.NeedsFix(file.FullName, reportReadFailure: true) && !(WaitUntilUnlocked(file.FullName, 0) && HevcTag.Fix(file.FullName)); }
                     catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { Log.Write("HEVC sweep: " + file.Name + ": " + ex.Message); left = true; }
                     if (left) earliestLeft = Math.Min(earliestLeft, file.LastWriteTimeUtc.Ticks);
                 }

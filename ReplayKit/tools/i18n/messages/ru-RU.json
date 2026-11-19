@@ -2196,6 +2196,10 @@
     "source": "643687bc3adaac76",
     "text": "Длительность"
   },
+  "common.libraryMetadataNotSaved": {
+    "source": "eacdd6020bcafe24",
+    "text": "Операция с файлом выполнена, но ReplayKit не удалось сохранить метаданные библиотеки."
+  },
   "common.microphone": {
     "source": "a0b39d22329a3057",
     "text": "Микрофон"
@@ -4932,6 +4936,10 @@
     "source": "154539677af96fde",
     "text": "Остановить генерацию"
   },
+  "editor.stopWaitingForSpeech": {
+    "source": "755a025356331703",
+    "text": "Перестать ждать"
+  },
   "editor.stopping": {
     "source": "24a54b7783c68b9d",
     "text": "Остановка"
@@ -6913,10 +6921,6 @@
     "source": "1ef347e11e320e77",
     "text": "Не удалось задать непрозрачность {name}: {error}"
   },
-  "settings.couldNotSetObsMonitoringDevice": {
-    "source": "7a59e2250afe7e65",
-    "text": "Не удалось установить устройство мониторинга OBS {device} после {attempts} попыток. {error}"
-  },
   "settings.couldNotSetTheInputSensitivity": {
     "source": "14a78e615b5856e2",
     "text": "Не удалось задать чувствительность входа: {error}"
@@ -7073,10 +7077,6 @@
     "source": "dc224b7bdacd7452",
     "text": "Звук рабочего стола не является источником захвата звука ReplayKit."
   },
-  "settings.desktopAudioMixerStateCouldNot": {
-    "source": "a6cb6a37c3f32ec3",
-    "text": "Не удалось изменить состояние микшера звука рабочего стола: {error}"
-  },
   "settings.desktopAudioMonitoringStateCouldNot": {
     "source": "8b4f905e314f933e",
     "text": "Не удалось проверить состояние мониторинга звука рабочего стола: {error}"
@@ -7140,18 +7140,6 @@
   "settings.discordOutputModeWasSavedBut": {
     "source": "cf54892ef94981cc",
     "text": "Режим вывода Discord сохранён, но {message}"
-  },
-  "settings.discordOutputModeWasSavedBut2": {
-    "source": "b2e1e3c1f61824da",
-    "text": "Режим вывода Discord сохранён, но не удалось прочитать состояние виртуальной камеры: {error}"
-  },
-  "settings.discordOutputModeWasSavedBut3": {
-    "source": "d4b6c910b24f583c",
-    "text": "Режим вывода Discord сохранён, но не удалось запустить старую виртуальную камеру: {error}"
-  },
-  "settings.discordOutputModeWasSavedBut4": {
-    "source": "a8734d0c4437f133",
-    "text": "Режим вывода Discord сохранён, но не удалось остановить виртуальную камеру: {error}"
   },
   "settings.discordRichPresence": {
     "source": "6257e038f7a60bdc",
@@ -7236,6 +7224,18 @@
   "settings.dragToPosition": {
     "source": "43ddd66cdc6eb3f4",
     "text": "Перетащите, чтобы расположить"
+  },
+  "settings.followWindowsLanguage": {
+    "source": "4611df7bceeadea6",
+    "text": "Использовать язык Windows"
+  },
+  "settings.micSettingsReverted": {
+    "source": "8090a6cb1a20a12d",
+    "text": "Изменения микрофона, которые OBS не удалось применить, отменены."
+  },
+  "settings.monitoringDeviceNotConfirmed": {
+    "source": "3ebdf5a7cab0f4b6",
+    "text": "OBS не подтвердила, что {device} используется для мониторинга звука."
   },
   "settings.resetOverlaySizeAndRotation": {
     "source": "910d03d1f3f121c3",
@@ -7817,10 +7817,6 @@
     "source": "fba79278f18f924b",
     "text": "Уровень микрофона"
   },
-  "settings.microphoneSettingsWereSavedButObs": {
-    "source": "6f14c78637164845",
-    "text": "Настройки микрофона сохранены, но OBS недоступен или в нём нет входа «{MicInputName}». Перезапустите OBS и попробуйте снова."
-  },
   "settings.microphoneTestFailedError": {
     "source": "50c8f789e3a910a5",
     "text": "Тест микрофона не удался: {error}"
@@ -8200,10 +8196,6 @@
   "settings.obsStartsInTheSystemTray": {
     "source": "f20d594c5c35b559",
     "text": "OBS запускается в системном трее, а не открывает своё окно."
-  },
-  "settings.obsStillReportsMonitoringDevice": {
-    "source": "fbf08ec8489ae7d3",
-    "text": "OBS всё ещё сообщает об устройстве мониторинга '{name}' ({id})."
   },
   "settings.obsStudioItselfWillAlsoBe": {
     "source": "bb2ea21750848284",
@@ -9538,10 +9530,6 @@
     "source": "a5a22c78e84a093d",
     "text": "Вид (V)"
   },
-  "settings.virtualCameraIsLegacyDeprecatedFor": {
-    "source": "b1ce52f88717759e",
-    "text": "Виртуальная камера устарела для вывода в Discord."
-  },
   "settings.volumeMustBeBetween0And": {
     "source": "815edf45de52ca90",
     "text": "Громкость должна быть от 0 до {VolumeMax}."
@@ -9681,10 +9669,6 @@
   "setup.cleanupComplete": {
     "source": "aca630d212306171",
     "text": "Очистка завершена"
-  },
-  "setup.clearOldObsFiles": {
-    "source": "bcb2b555e88da7f9",
-    "text": "Удалить старые файлы OBS"
   },
   "setup.clearTheSetupCache": {
     "source": "9e44cd91060a45b7",
@@ -10065,10 +10049,6 @@
   "setup.removeWindowsStartup": {
     "source": "e5147babfcd16e35",
     "text": "Удалить автозапуск Windows"
-  },
-  "setup.removesFilesAnObsUpdateLeft": {
-    "source": "b82245e09590bef7",
-    "text": "Удаляет файлы, оставшиеся после обновления OBS."
   },
   "setup.removesStreamableLoginDataAndSchedules": {
     "source": "7c1b2590789a2f8f",
@@ -11326,10 +11306,6 @@
   "update.startupUpdateCheckAlreadyRan": {
     "source": "b521777f902946bb",
     "text": "Проверка обновлений при запуске уже выполнена."
-  },
-  "update.theInstallerDidNotFinishWithin": {
-    "source": "e8064abfffb78ac5",
-    "text": "Установщик не завершился за 3 минуты."
   },
   "update.theInstallerDidNotStart": {
     "source": "351d29af6f6c787b",

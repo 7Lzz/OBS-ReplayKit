@@ -32,12 +32,11 @@ namespace ReplayKitHelper
 
         private static JObject Load(string path, int maxBytes)
         {
-            if (maxBytes == 0) return File.Exists(path) ? JObject.Parse(File.ReadAllText(path)) : new JObject();
             try
             {
                 using (var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
                 {
-                    if (file.Length > maxBytes) throw new InvalidDataException(Locales.Message("clips.theSavedStateFileIsToo"));
+                    if (maxBytes > 0 && file.Length > maxBytes) throw new InvalidDataException(Locales.Message("clips.theSavedStateFileIsToo"));
                     using (var reader = new StreamReader(file, Encoding.UTF8, true)) return JObject.Parse(reader.ReadToEnd());
                 }
             }
@@ -115,7 +114,7 @@ namespace ReplayKitHelper
         {
             return WithLock(path, full =>
             {
-                var db = File.Exists(full) ? JObject.Parse(File.ReadAllText(full)) : new JObject();
+                var db = Load(full, 0);
                 var scoped = Folder(db, folder, out bool created);
                 if (created) Write(full, db);
                 return read(scoped);
@@ -137,7 +136,8 @@ namespace ReplayKitHelper
                 var folders = (db["_folders"] as JObject)?.Properties().Select(p => p.Value).OfType<JObject>() ?? Enumerable.Empty<JObject>();
                 foreach (var entry in folders.Concat(new[] { db }).SelectMany(owner => owner.Properties().Select(p => p.Value)).OfType<JObject>())
                 {
-                    if (entry["shortcode"]?.Type != JTokenType.String || entry["shortcode"].Value<string>() != shortcode) continue;
+                    if (entry["shortcode"]?.Type == JTokenType.String ? entry.Value<string>("shortcode") != shortcode :
+                        entry["url"]?.Type != JTokenType.String || entry.Value<string>("url") != "https://streamable.com/" + shortcode) continue;
                     found = true;
                     int currentStatus = entry["transcode_status"]?.Value<int>() ?? 0;
                     if (currentStatus >= 2 && (status < 2 || status == 4)) continue;

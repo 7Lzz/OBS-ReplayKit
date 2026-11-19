@@ -134,23 +134,21 @@ namespace ReplayKitHelper
                             if (cookies == null || cookies.Count == 0) return;
                             string jar = ToCookieJar(cookies);
                             if (string.IsNullOrEmpty(jar) || jar == lastCheckedJar) return;
-                            lastCheckedJar = jar;
                             // the /me call shells out to curl and blocks until it answers, so it runs off the ui thread -- a blocked ui thread cannot pump window messages, and a drag is one of them
-                            bool signedIn = await System.Threading.Tasks.Task.Run(() =>
+                            var check = await System.Threading.Tasks.Task.Run(() => AuthCore.InvokeStreamableMe(jar));
+                            if (form.IsDisposed || form.Disposing) return;
+                            if (!IsAuthenticatedUser(check.User))
                             {
-                                JObject user = AuthCore.InvokeStreamableMe(jar);
-                                if (!IsAuthenticatedUser(user)) return false;
-                                AuthCore.SaveAuthBlob(jar, user);
-                                AuthCore.ApplyAuth(user, jar);
-                                return true;
-                            });
-                            if (!signedIn)
-                            {
-                                Log.Write("Streamable sign-in: cookie jar changed but /me is still not authenticated (" + cookies.Count + " streamable cookie(s)).");
+                                if (check.Rejected || check.User != null) lastCheckedJar = jar;
                                 return;
                             }
+                            lock (Server.State.AuthLock)
+                            {
+                                AuthCore.SaveAuthBlob(jar, check.User);
+                                AuthCore.ApplyAuth(check.User, jar);
+                            }
                             Log.Write("Saved Streamable session from ReplayKit's owned WebView2 profile.");
-                            if (!form.IsDisposed) form.BeginInvoke((Action)(() => form.Close()));
+                            form.Close();
                         }
                         catch (Exception ex)
                         {

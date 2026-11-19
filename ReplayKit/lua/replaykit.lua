@@ -148,7 +148,7 @@ local function utf8_remove(path)
 end
 
 -- starts a process from a utf-8 command line with its window hidden from the first tick (STARTF_USESHOWWINDOW and SW_HIDE, which keeps powershell from flashing a console); false and the windows error when it cannot
-local function create_process(cmdline, flags)
+local function create_process(cmdline, flags, keep_handle)
     local command = wide(cmdline)
     if not command then return false, 0 end
     local si = ffi.new("rk_startupinfo_w")
@@ -159,8 +159,9 @@ local function create_process(cmdline, flags)
     if ffi.C.CreateProcessW(nil, command, nil, nil, 0, flags, nil, nil, si, pi) == 0 then
         return false, tonumber(ffi.C.GetLastError())
     end
-    ffi.C.CloseHandle(pi.hProcess)
     ffi.C.CloseHandle(pi.hThread)
+    if keep_handle then return true, nil, pi.hProcess end
+    ffi.C.CloseHandle(pi.hProcess)
     return true
 end
 

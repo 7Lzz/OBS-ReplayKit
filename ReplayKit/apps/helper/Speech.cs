@@ -59,6 +59,8 @@ namespace ReplayKitHelper
             SslProtocols = System.Security.Authentication.SslProtocols.Tls12,
         }) { Timeout = System.Threading.Timeout.InfiniteTimeSpan };
         private static readonly object Gate = new object();
+        private static readonly object EngineHashGate = new object();
+        private static Dictionary<string, string> engineHashes;
         private static readonly SemaphoreSlim TranscribeSlot = new SemaphoreSlim(1, 1);
 
         // installs run one after another, so asking for the other model while one downloads queues it behind
@@ -87,30 +89,82 @@ namespace ReplayKitHelper
 
         private static string Root => Path.Combine(AppConfig.GetReplayKitUserStateDir(), "speech");
         private static string EngineDir => Path.Combine(Root, "whisper-" + EngineTag);
+        private static string EngineArchive => EngineDir + ".zip";
         private static string ModelPath(Model model) => Path.Combine(Root, model.Name);
         private static string VadPath => Path.Combine(Root, VadName);
         private static string EngineExe => Path.Combine(EngineDir, "whisper-cli.exe");
         private static string DetectorExe => Path.Combine(EngineDir, "whisper-vad-speech-segments.exe");
 
-        private static bool VadInstalled()
+        private static string Digest(Stream file)
         {
-            if (!File.Exists(VadPath) || new FileInfo(VadPath).Length != VadBytes) return false;
-            using (var file = File.OpenRead(VadPath))
             using (var sha = SHA256.Create())
-                return string.Equals(BitConverter.ToString(sha.ComputeHash(file)).Replace("-", ""), VadSha256, StringComparison.OrdinalIgnoreCase);
+                return BitConverter.ToString(sha.ComputeHash(file)).Replace("-", "");
+        }
+
+        private static bool Matches(string path, string hash, long? length = null, long maxBytes = long.MaxValue)
+        {
+            try
+            {
+                var info = new FileInfo(path);
+                if (!info.Exists || (info.Attributes & FileAttributes.ReparsePoint) != 0) return false;
+                using (var file = File.OpenRead(path))
+                    return file.Length <= maxBytes && (!length.HasValue || file.Length == length.Value) &&
+                        string.Equals(Digest(file), hash, StringComparison.OrdinalIgnoreCase);
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { return false; }
         }
 
         private static Model FindModel(string id) => Models.FirstOrDefault(m => m.Id == id);
 
-        private static bool ModelInstalled(Model model) => File.Exists(ModelPath(model)) && new FileInfo(ModelPath(model)).Length == model.Bytes;
+        private static bool ModelInstalled(Model model) => Matches(ModelPath(model), model.Sha256, model.Bytes);
+        private static bool VadInstalled() => Matches(VadPath, VadSha256, VadBytes);
 
-        // an engine folder from before the speech detector was used lacks it, and is fetched again
-        private static bool EngineInstalled() => EngineFiles.All(f => File.Exists(Path.Combine(EngineDir, f)));
+        private static bool IsEngineEntry(ZipArchiveEntry entry) => !entry.FullName.Contains("..") &&
+            (EngineFiles.Contains(entry.Name, StringComparer.OrdinalIgnoreCase) ||
+             (entry.Name.StartsWith(EngineCpuPrefix, StringComparison.OrdinalIgnoreCase) && entry.Name.EndsWith(".dll", StringComparison.OrdinalIgnoreCase)));
 
-        private static bool Installed(Model model) => EngineInstalled() && ModelInstalled(model) && VadInstalled();
+        private static Dictionary<string, string> EngineHashes()
+        {
+            lock (EngineHashGate)
+            {
+                if (engineHashes != null) return engineHashes;
+                try
+                {
+                    using (var package = File.OpenRead(EngineArchive))
+                    {
+                        if (package.Length > EngineMaxBytes || !string.Equals(Digest(package), EngineSha256, StringComparison.OrdinalIgnoreCase)) return null;
+                        package.Position = 0;
+                        using (var zip = new ZipArchive(package, ZipArchiveMode.Read))
+                        {
+                            var trusted = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                            foreach (var entry in zip.Entries.Where(IsEngineEntry))
+                                using (var contents = entry.Open()) trusted.Add(entry.Name, Digest(contents));
+                            if (!EngineFiles.All(trusted.ContainsKey)) return null;
+                            return engineHashes = trusted;
+                        }
+                    }
+                }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is InvalidDataException || ex is ArgumentException) { return null; }
+            }
+        }
+
+        private static bool EngineInstalled()
+        {
+            var expected = EngineHashes();
+            if (expected == null) return false;
+            try
+            {
+                var dir = new DirectoryInfo(EngineDir);
+                return dir.Exists && (dir.Attributes & FileAttributes.ReparsePoint) == 0 &&
+                    dir.EnumerateFiles().Count() == expected.Count &&
+                    expected.All(file => Matches(Path.Combine(EngineDir, file.Key), file.Value, maxBytes: EngineMaxBytes));
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { return false; }
+        }
 
         // what is still missing for this model, so the download size shown is the one about to happen
         private static long MissingBytes(Model model) => (EngineInstalled() ? 0 : EngineBytes) + (ModelInstalled(model) ? 0 : model.Bytes) + (VadInstalled() ? 0 : VadBytes);
+        private static bool Installed(Model model) => EngineInstalled() && ModelInstalled(model) && VadInstalled();
 
         private static JObject UnknownModel() => new JObject { ["ok"] = false, ["message"] = Locales.Message("editor.unknownSpeechModel") };
 
@@ -121,9 +175,10 @@ namespace ReplayKitHelper
             lock (Gate)
             {
                 bool queued = Queued.Contains(model.Id);
-                bool installed = Installed(model);
                 long total = Interlocked.Read(ref _installTotal);
                 bool active = _installing == model.Id && total > 0;
+                long missing = queued ? (active ? total : EngineBytes + model.Bytes + VadBytes) : MissingBytes(model);
+                bool installed = missing == 0;
                 InstallErrors.TryGetValue(model.Id, out string error);
                 return new JObject
                 {
@@ -132,7 +187,7 @@ namespace ReplayKitHelper
                     ["installing"] = queued,
                     ["percent"] = active ? (int)Math.Min(99, Interlocked.Read(ref _installDone) * 100 / total) : 0,
                     ["error"] = queued || installed ? null : error,
-                    ["downloadMb"] = (int)Math.Round(MissingBytes(model) / 1048576.0),
+                    ["downloadMb"] = (int)Math.Round(missing / 1048576.0),
                 };
             }
         }
@@ -144,9 +199,9 @@ namespace ReplayKitHelper
             if (model == null) return UnknownModel();
             lock (Gate)
             {
-                if (Installed(model)) return Status(modelId);
-                if (Queued.Add(model.Id))
+                if (!Queued.Contains(model.Id) && !Installed(model))
                 {
+                    Queued.Add(model.Id);
                     InstallErrors.Remove(model.Id);
                     _install = _install.ContinueWith(_ => Install(model), CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default);
                 }
@@ -169,24 +224,32 @@ namespace ReplayKitHelper
                 Directory.CreateDirectory(staging);
                 if (!EngineInstalled())
                 {
-                    string zip = Path.Combine(staging, "engine.zip");
-                    Download(EngineUrl, zip, EngineMaxBytes, EngineSha256);
+                    string zip = EngineArchive;
+                    if (!Matches(zip, EngineSha256, maxBytes: EngineMaxBytes))
+                    {
+                        zip = Path.Combine(staging, "engine.zip");
+                        Download(EngineUrl, zip, EngineMaxBytes, EngineSha256);
+                    }
                     string unpacked = Path.Combine(staging, "engine");
                     Directory.CreateDirectory(unpacked);
-                    using (var archive = ZipFile.OpenRead(zip))
+                    using (var package = File.OpenRead(zip))
                     {
-                        foreach (var entry in archive.Entries)
-                        {
-                            string name = Path.GetFileName(entry.FullName);
-                            bool wanted = EngineFiles.Contains(name, StringComparer.OrdinalIgnoreCase) ||
-                                (name.StartsWith(EngineCpuPrefix, StringComparison.OrdinalIgnoreCase) && name.EndsWith(".dll", StringComparison.OrdinalIgnoreCase));
-                            if (!wanted || entry.FullName.Contains("..")) continue;
-                            entry.ExtractToFile(Path.Combine(unpacked, name), true);
-                        }
+                        if (package.Length > EngineMaxBytes || !string.Equals(Digest(package), EngineSha256, StringComparison.OrdinalIgnoreCase))
+                            throw new InvalidDataException(Locales.Message("editor.theDownloadedFileDidNotMatch"));
+                        package.Position = 0;
+                        using (var archive = new ZipArchive(package, ZipArchiveMode.Read))
+                            foreach (var entry in archive.Entries.Where(IsEngineEntry))
+                                entry.ExtractToFile(Path.Combine(unpacked, entry.Name), false);
                     }
                     if (EngineFiles.Any(f => !File.Exists(Path.Combine(unpacked, f)))) throw new InvalidDataException(Locales.Message("editor.theSpeechEngineDownloadIsMissing"));
-                    if (Directory.Exists(EngineDir)) Directory.Delete(EngineDir, true);
-                    Directory.Move(unpacked, EngineDir);
+                    TranscribeSlot.Wait();
+                    try
+                    {
+                        if (Directory.Exists(EngineDir)) Directory.Delete(EngineDir, true);
+                        Directory.Move(unpacked, EngineDir);
+                        if (zip != EngineArchive) Native.MoveFileReplace(zip, EngineArchive);
+                    }
+                    finally { TranscribeSlot.Release(); }
                 }
                 if (!ModelInstalled(model))
                 {
@@ -279,6 +342,8 @@ namespace ReplayKitHelper
             if (!Languages.Contains(language ?? "")) return new JObject { ["ok"] = false, ["message"] = Locales.Message("common.unknownLanguage") };
             var selected = Clips.GetSafeClipPath(clipName);
             if (selected == null || !File.Exists(selected.Full)) return new JObject { ["ok"] = false, ["message"] = Locales.Message("editor.theClipWasNotFound") };
+            string sourceVersion = ClipRenames.Version(new FileInfo(selected.Full));
+            if (sourceVersion == null) return new JObject { ["ok"] = false, ["message"] = Locales.Message("storage.theSelectedClipChangedSelectIt") };
             if (!(end > start) || start < 0 || end - start > 3 * 60 * 60) return new JObject { ["ok"] = false, ["message"] = Locales.Message("editor.nothingToListenToInThat") };
             // the first stream is the mix of all the others, so it is only ever listened to alone
             if (tracks == null || tracks.Count == 0 || tracks.Count > 8 || tracks.Any(t => t < 0 || t > 31) || tracks.Distinct().Count() != tracks.Count || (tracks.Contains(0) && tracks.Count > 1))
@@ -295,7 +360,7 @@ namespace ReplayKitHelper
                 Jobs[job.Id] = job;
             }
             var picked = tracks.ToArray();
-            Task.Run(() => Run(job, selected.Full, start, end, picked, language, model));
+            Task.Run(() => Run(job, selected.Full, sourceVersion, start, end, picked, language, model));
             return new JObject { ["ok"] = true, ["id"] = job.Id };
         }
 
@@ -330,7 +395,7 @@ namespace ReplayKitHelper
             }
         }
 
-        private static void Run(Job job, string clipPath, double start, double end, int[] tracks, string language, Model model)
+        private static void Run(Job job, string clipPath, string sourceVersion, double start, double end, int[] tracks, string language, Model model)
         {
             string work = Path.Combine(Constants.SCRATCH_DIR, "speech-" + job.Id);
             bool slot = false;
@@ -339,6 +404,7 @@ namespace ReplayKitHelper
                 // one at a time: two at once would only share the processor and both take twice as long
                 TranscribeSlot.Wait(job.Cancel.Token);
                 slot = true;
+                if (!Installed(model)) throw new InvalidOperationException(Locales.Message("editor.autoSubtitlesAreNotSetUp"));
                 Directory.CreateDirectory(work);
                 lock (Gate) job.State = "preparing";
                 string wav = Path.Combine(work, "audio.wav");
@@ -355,7 +421,12 @@ namespace ReplayKitHelper
                 extract.AddRange(new[] { "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le", "-y", wav });
                 Compression.NativeCaptureResult extracted;
                 using (JobCoordinator.ReadSource(clipPath))
+                using (var source = new FileStream(clipPath, FileMode.Open, FileAccess.Read, FileShare.Read))
+                {
+                    if (ClipRenames.Version(new FileInfo(clipPath)) != sourceVersion)
+                        throw new IOException(Locales.Message("storage.theSelectedClipChangedSelectIt"));
                     extracted = Compression.InvokeNativeCapture(ffmpeg, extract, job.Cancel.Token, 10 * 60 * 1000, true);
+                }
                 if (extracted.ExitCode != 0 || !File.Exists(wav)) throw new InvalidOperationException(Locales.Message("editor.theAudioOfTheClipCould"));
 
                 lock (Gate) job.State = "listening";

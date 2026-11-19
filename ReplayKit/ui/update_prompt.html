@@ -253,16 +253,17 @@
   function stopProgressPolling() { clearInterval(progressTimer); progressTimer = 0; }
 
   // the installer runs detached and takes obs (and this helper) down with it, so "helper stopped answering" is an expected stage here, not a failure. done when the new helper is back up and reports a verdict.
-  function watchInstall(onComplete, onFail) {
+  function watchInstall(attemptId, onComplete, onFail) {
     const started = Date.now();
     let percent = 82;
     let seenHelperDown = false;
     const timer = setInterval(async () => {
       try {
-        const r = await fetch(HELPER + "/update/install-result?t=" + Date.now(), { cache:"no-store" });
+        const r = await fetch(HELPER + "/update/install-result?attempt=" + encodeURIComponent(attemptId || "") + "&t=" + Date.now(), { cache:"no-store" });
         const body = await r.json().catch(() => ({}));
         if (body && body.present) {
           clearInterval(timer);
+          helperJson("update/install-result/ack?attempt=" + encodeURIComponent(attemptId || ""), { method:"POST" }).catch(() => {});
           if (body.installOk) onComplete();
           else onFail(body.message || RK_M("update.theInstallerReportedAFailure"));
           return;
@@ -274,10 +275,7 @@
         percent = Math.min(percent + 0.7, 97);
         setStatus(RK_M("update.closingObsToApplyFiles"), "", percent);
       }
-      if (Date.now() - started > 180000) {
-        clearInterval(timer);
-        onFail(RK_M("update.theInstallerDidNotFinishWithin"));
-      }
+      if (Date.now() - started > 180000) els.closeBtn.hidden = false;
     }, 1500);
   }
 
@@ -305,7 +303,7 @@
         return;
       }
       setStatus(RK_M("update.installingUpdate"), "", 82);
-      watchInstall(() => {
+      watchInstall(data.attemptId, () => {
         setHero(latest && latest.repairRequired ? RK_M("update.repairComplete") : RK_M("update.updateComplete"), RK_M("update.replaykitVersionIsInstalled", { version: latest && latest.latestVersion ? latest.latestVersion : "" }), RK_M("update.obsIsBackUp"));
         setStatus(RK_M("common.done"), "", 100, "done");
         setTimeout(closeWindow, 1500);

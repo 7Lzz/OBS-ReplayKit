@@ -341,6 +341,8 @@ void ShellCreateHost(QMainWindow *mw)
 			ShellSetEditor(ShellView::Home, title.endsWith(QLatin1String(":editor")));
 		else if (title == QLatin1String("rk-status:clips:editor") || title == QLatin1String("rk-status:clips:page"))
 			ShellSetEditor(ShellView::Clips, title.endsWith(QLatin1String(":editor")));
+		else if (title.startsWith(QLatin1String("rk-shell-pong:")))
+			ShellHostPong(title.section(':', 1, 1).toInt());
 	});
 	g_shellHost = page;
 	g_hostRequested = ShellBootView();
@@ -494,7 +496,7 @@ void ShellWakeHost()
 void ShellReloadHost()
 {
 	// a sleeping page answers nothing by design and is loaded again when the window shows
-	if (!CefOpen() || !g_shellOn || !g_shellHost || !g_shellHost->browser || ShellAsleep())
+	if (!CefOpen() || !g_shellOn || !g_shellHost || !g_shellHost->browser || ShellAsleep() || g_settingsDirty || g_homeEditor || g_clipsEditor)
 		return;
 	// a reload that did not bring the page back is not repeated every few seconds
 	if (g_hostReloadTimer.isValid() && g_hostReloadTimer.elapsed() < 30000)

@@ -252,17 +252,18 @@ namespace ReplayKitHelper
         }
 
         // picks a non-colliding "<base> (<suffix>).<ext>" or "<base> (<suffix> n).<ext>" filename inside the clip folder. returns null if 99 candidates are taken.
-        public static string GetSuffixedOutputName(string sourceName, string suffix, string folder = null)
+        public static string GetSuffixedOutputName(string sourceName, string suffix, string folder, int maxNameLength = int.MaxValue)
         {
             string baseName = Path.GetFileNameWithoutExtension(sourceName);
             string ext = Path.GetExtension(sourceName);
-            string clipDir = folder ?? AppConfig.GetClipDir();
-            string candidate = baseName + " (" + suffix + ")" + ext;
-            if (!File.Exists(Path.Combine(clipDir, candidate)) && !Clips.NameTaken(candidate)) return candidate;
-            for (int i = 2; i <= 99; i++)
+            for (int i = 1; i <= 99; i++)
             {
-                candidate = baseName + " (" + suffix + " " + i + ")" + ext;
-                if (!File.Exists(Path.Combine(clipDir, candidate)) && !Clips.NameTaken(candidate)) return candidate;
+                string ending = " (" + suffix + (i == 1 ? "" : " " + i) + ")" + ext;
+                int stemLength = Math.Min(baseName.Length, maxNameLength - ending.Length);
+                if (stemLength <= 0) return null;
+                if (char.IsHighSurrogate(baseName[stemLength - 1])) stemLength--;
+                string candidate = baseName.Substring(0, stemLength) + ending;
+                if (!File.Exists(Path.Combine(folder, candidate)) && !Clips.NameTaken(candidate)) return candidate;
             }
             return null;
         }
@@ -368,7 +369,8 @@ namespace ReplayKitHelper
         internal const string SingleTrackLabel = "Audio";
         private const string NumberedTrackLabel = "Track ";
 
-        internal static string AudioTrackLabel(int index) => index >= 0 && index < AudioTrackLabels.Length ? AudioTrackLabels[index] : NumberedTrackLabel + (index + 1);
+        internal static string NumberedAudioTrackLabel(int index) => NumberedTrackLabel + (index + 1);
+        internal static string AudioTrackLabel(int index) => index >= 0 && index < AudioTrackLabels.Length ? AudioTrackLabels[index] : NumberedAudioTrackLabel(index);
 
         // the name a page shows for a track label, in the current language; the label itself stays the english data the clip files carry, and a name of its own (Discord, or one a file came with) is shown as it is
         internal static string AudioTrackName(string label)
@@ -406,7 +408,7 @@ namespace ReplayKitHelper
                 using var reader = JobCoordinator.ReadSource(path);
                 var r = Compression.InvokeNativeCapture(ffprobe, new[]
                 {
-                    "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height,avg_frame_rate,r_frame_rate,pix_fmt,sample_aspect_ratio,bit_rate:format=duration",
+                    "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height,avg_frame_rate,r_frame_rate,pix_fmt,sample_aspect_ratio,bit_rate:stream_side_data=rotation:format=duration",
                     "-of", "json", path,
                 });
                 if (r.ExitCode != 0) return null;
@@ -415,6 +417,14 @@ namespace ReplayKitHelper
                 if (stream == null) return null;
                 int width = stream.Value<int?>("width") ?? 0;
                 int height = stream.Value<int?>("height") ?? 0;
+                string aspect = stream.Value<string>("sample_aspect_ratio");
+                double rotation = (stream["side_data_list"] as JArray)?.FirstOrDefault(item => item["rotation"] != null)?.Value<double>("rotation") ?? 0;
+                if (Math.Abs(rotation % 180) == 90)
+                {
+                    (width, height) = (height, width);
+                    string[] ratio = aspect?.Split(':');
+                    if (ratio?.Length == 2) aspect = ratio[1] + ":" + ratio[0];
+                }
                 string fps = ValidFrameRate(stream.Value<string>("avg_frame_rate")) ?? ValidFrameRate(stream.Value<string>("r_frame_rate"));
                 double.TryParse(json["format"]?.Value<string>("duration"), NumberStyles.Float, CultureInfo.InvariantCulture, out double duration);
                 if (width < 16 || height < 16 || fps == null || !(duration > 0)) return null;
@@ -422,7 +432,7 @@ namespace ReplayKitHelper
                 return new VideoPlan.SourceInfo
                 {
                     Width = width, Height = height, Fps = fps, Duration = duration,
-                    PixelFormat = stream.Value<string>("pix_fmt"), SampleAspect = stream.Value<string>("sample_aspect_ratio"),
+                    PixelFormat = stream.Value<string>("pix_fmt"), SampleAspect = aspect,
                     ConstantFrameRate = ValidFrameRate(stream.Value<string>("avg_frame_rate")) == ValidFrameRate(stream.Value<string>("r_frame_rate")),
                     Bitrate = bitrate,
                 };
@@ -651,21 +661,28 @@ namespace ReplayKitHelper
             {
                 string outputFolder = screenshot ? Screenshots.Folder(Clips.LibraryRoot(Path.GetDirectoryName(source.Full)), create: true) : Path.GetDirectoryName(source.Full);
                 string suffix = screenshot ? "screenshot" : precise ? "trimmed" : "trimmed (fast)";
-                outName = GetSuffixedOutputName(screenshot ? Path.ChangeExtension(source.Name, ".png") : source.Name, suffix, outputFolder);
+                outName = screenshot
+                    ? GetSuffixedOutputName(Path.ChangeExtension(source.Name, ".png"), suffix, outputFolder, Screenshots.MaxNameLength)
+                    : GetSuffixedOutputName(source.Name, suffix, outputFolder);
                 if (outName == null) return new TrimResult { Ok = false, Message = Locales.Message("editor.tooManyExistingTrimOutputs") };
                 finalPath = Path.Combine(outputFolder, outName);
                 tempPath = Path.Combine(outputFolder, "_replaykit_trim_copy_" + Guid.NewGuid().ToString("N") + ext);
                 outPath = tempPath;
             }
 
-            // a screenshot has no audio, so the audio of the clip is never read for one
-            int audioCount = screenshot ? 0 : Mp4Tracks.CountAudio(source.Full);
+            bool bringsIn = (((audioEdit as JObject)?["imports"] as JArray)?.Count ?? 0) > 0;
+            int audioCount = 0;
+            if (!screenshot && !removeAudio)
+            {
+                var audio = ClipAudioTracks.ReadAudioLabels(source.Full);
+                if (audio == null)
+                    return new TrimResult { Ok = false, Message = bringsIn
+                        ? Locales.Message("editor.audioCannotBeAddedToThis3")
+                        : Locales.Message("editor.theAudioOfThisClipWas") };
+                audioCount = audio.Length;
+            }
             // the audio edits of the editor: a plan that leaves nothing audible writes no audio at all, and a plan that is out of range stops the trim before anything is made
             AudioPlan.Rendering planned = null;
-            // a plan can also bring in audio files from outside the clip, which a clip without audio takes as well
-            bool bringsIn = (((audioEdit as JObject)?["imports"] as JArray)?.Count ?? 0) > 0;
-            // a clip whose boxes cannot be read may hold audio that is not seen, which a plan would leave out without a word
-            if (bringsIn && !removeAudio && audioCount == 0 && !Mp4Tracks.IsReadable(source.Full)) return new TrimResult { Ok = false, Message = Locales.Message("editor.audioCannotBeAddedToThis3") };
             bool hasPlan = audioEdit != null && !removeAudio && (audioCount > 0 || bringsIn);
             var importArgs = new List<string>();
             // the saved clip is the part of the timeline between these two times; with video pieces the editor says which part, and it may reach past the video on either side
@@ -998,9 +1015,10 @@ namespace ReplayKitHelper
             else
             {
                 // same-volume move is an atomic rename; across volumes its copy-then-delete, which can corrupt the destination on crash. detect and route thru a sidecar on the sources volume when needed, so the final replace is always atomic.
+                string previousIdentity;
                 try
                 {
-                    ClipFiles.Replace(requestId, tempPath, source.Full, originalSize, origLastWriteUtc.GetValueOrDefault());
+                    previousIdentity = ClipFiles.Replace(requestId, tempPath, source.Full, originalSize, origLastWriteUtc.GetValueOrDefault());
                     try { if (File.Exists(tempPath)) File.Delete(tempPath); } catch (IOException) { } catch (UnauthorizedAccessException) { }
                 }
                 catch (OperationCanceledException) when (token.IsCancellationRequested)
@@ -1027,6 +1045,7 @@ namespace ReplayKitHelper
                         Log.Write("Trim overwrite: timestamp restore failed: " + ex.Message);
                     }
                 }
+                if (source.Root != null) ClipRenames.FollowLink(source.Root, source.Full, previousIdentity);
             }
 
             // the clip under this name is another file now, so an edit that was kept for the old one fits nothing any more

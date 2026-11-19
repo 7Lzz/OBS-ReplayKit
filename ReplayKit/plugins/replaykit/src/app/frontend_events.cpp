@@ -69,22 +69,32 @@ void CloseCefWidgetsBeforeShutdown()
 		delete g_prewarmWindow.data();
 }
 
-// obs saves a screenshot where it saves recordings, which is the clip folder; it is moved into the Screenshots folder there, the one the clips page lists, keeping the name obs gave it. a file obs still holds is tried again a few times, and a Screenshots folder that is a link is left alone the way the helper leaves it alone
-void FileScreenshot(const QString &path, int tries, qint64 captureAt)
+// file the screenshot where the helper's gallery looks, even if obs saved it in a subfolder
+void FileScreenshot(const QString &path, const QString &folderPath, int tries, qint64 captureAt)
 {
 	const QFileInfo shot(path);
-	if (!shot.isFile() || shot.suffix().compare(QStringLiteral("png"), Qt::CaseInsensitive) != 0)
+	if (!shot.isFile() || shot.isSymLink() || shot.isJunction() || shot.suffix().compare(QStringLiteral("png"), Qt::CaseInsensitive) != 0)
 		return;
-	const QString folderPath = shot.dir().filePath(QStringLiteral("Screenshots"));
-	const QFileInfo folder(folderPath);
+	if (!QDir::isAbsolutePath(folderPath)) {
+		blog(LOG_WARNING, "[replaykit] screenshot left where obs saved it: the clip library is unavailable");
+		return;
+	}
+	if (QDir::cleanPath(shot.absolutePath()).compare(QDir::cleanPath(folderPath), Qt::CaseInsensitive) == 0) {
+		CaptureContextFile(shot.absoluteFilePath().toStdString(), captureAt);
+		return;
+	}
+	QFileInfo folder(folderPath);
 	if (folder.isSymLink() || folder.isJunction() || (folder.exists() && !folder.isDir())) {
 		blog(LOG_WARNING, "[replaykit] screenshot left where obs saved it: the Screenshots folder is not a plain folder");
 		return;
 	}
-	if (!folder.exists() && !shot.dir().mkdir(QStringLiteral("Screenshots"))) {
+	if (!folder.exists() && !folder.absoluteDir().mkdir(folder.fileName()) && !QFileInfo(folderPath).isDir()) {
 		blog(LOG_WARNING, "[replaykit] screenshot left where obs saved it: the Screenshots folder could not be made");
 		return;
 	}
+	folder.refresh();
+	if (!folder.isDir() || folder.isSymLink() || folder.isJunction())
+		return;
 	QString target = QDir(folderPath).filePath(shot.fileName());
 	for (int n = 2; QFileInfo::exists(target) && n < 1000; ++n)
 		target = QDir(folderPath).filePath(QStringLiteral("%1 (%2).png").arg(shot.completeBaseName()).arg(n));
@@ -94,7 +104,7 @@ void FileScreenshot(const QString &path, int tries, qint64 captureAt)
 		return;
 	}
 	if (tries > 0)
-		QTimer::singleShot(250, g_callbacks, [path, tries, captureAt]() { FileScreenshot(path, tries - 1, captureAt); });
+		QTimer::singleShot(250, g_callbacks, [path, folderPath, tries, captureAt]() { FileScreenshot(path, folderPath, tries - 1, captureAt); });
 	else
 		blog(LOG_WARNING, "[replaykit] screenshot left where obs saved it: it could not be moved");
 }
@@ -175,7 +185,10 @@ void OnFrontendEvent(enum obs_frontend_event event, void *)
 		const QString path = QString::fromUtf8(last ? last : "");
 		bfree(last);
 		if (!path.isEmpty())
-			FileScreenshot(path, 8, captureAt);
+			RunAsync([path, captureAt]() {
+				const QString folder = QString::fromStdString(ExtractJsonStringField(HttpRequest("GET", "/screenshots/folder", nullptr, 3500), "folder"));
+				QMetaObject::invokeMethod(g_callbacks, [path, folder, captureAt]() { FileScreenshot(path, folder, 8, captureAt); }, Qt::QueuedConnection);
+			});
 		return;
 	}
 	// recording / replay-buffer state drives the red dot on the tray icon, the only surface that wears it

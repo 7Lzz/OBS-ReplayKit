@@ -291,13 +291,17 @@ void AudioOut::FeedCard()
 	}
 	if (!showing || !sound || sound->samples.empty() || !deviceReady || volume <= 0.0f) {
 		card.reset();
-		cardWasShowing = false;
+		playingSound.reset();
 		return;
 	}
-	// every time the card comes up its sound starts from the beginning
-	if (!cardWasShowing)
+	const size_t total = sound->samples.size();
+	if (playingSound != sound) {
+		card.reset();
+		playingSound = sound;
 		cardPosition = 0;
-	cardWasShowing = true;
+	}
+	if (cardPosition >= total)
+		cardPosition = 0;
 	if (!card || card->sampleRate != sound->sampleRate || card->channels != sound->channels) {
 		card = std::make_unique<Stream>();
 		if (!card->Open(device.Get(), sound->sampleRate, sound->channels)) {
@@ -320,7 +324,6 @@ void AudioOut::FeedCard()
 	if (FAILED(card->render->GetBuffer(room, &data)))
 		return;
 	float *out = reinterpret_cast<float *>(data);
-	const size_t total = sound->samples.size();
 	const size_t needed = size_t(room) * sound->channels;
 	for (size_t i = 0; i < needed; ++i) {
 		out[i] = sound->samples[cardPosition] * volume;

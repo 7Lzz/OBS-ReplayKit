@@ -23,8 +23,9 @@ function Get-ZipVersion([string]$path) {
 }
 
 function Compare-Version([string]$a, [string]$b) {
-    $va = $null; $vb = $null
-    if ([version]::TryParse(($a + '.0').Split('.')[0..2] -join '.', [ref]$va) -and [version]::TryParse(($b + '.0').Split('.')[0..2] -join '.', [ref]$vb)) { return $va.CompareTo($vb) }
+    $va = $null
+    $vb = $null
+    if ([version]::TryParse(($a + '.0.0.0').Split('.')[0..3] -join '.', [ref]$va) -and [version]::TryParse(($b + '.0.0.0').Split('.')[0..3] -join '.', [ref]$vb)) { return $va.CompareTo($vb) }
     return [string]::CompareOrdinal($a, $b)
 }
 
@@ -44,8 +45,8 @@ try {
     if (-not $latest) {
         Write-UpdateWarning "Could not reach $latestUrl to check for a newer ffmpeg (repo has $current)."
     } elseif ((Compare-Version $latest $current) -gt 0) {
-        Write-UpdateWarning "A new release of ffmpeg is available: $current > $latest"
-        Write-UpdateWarning "To update, replace ReplayKit\downloads\ffmpeg-tools.zip with the gyan.dev ffmpeg-$latest-essentials_build zip and update FfmpegSha256 and FfprobeSha256 in shared\VideoTools.cs."
+        Write-UpdateWarning "A new release of ffmpeg is available: $current -> $latest"
+        Write-UpdateWarning "To update, replace ReplayKit\downloads\ffmpeg-tools.zip with the gyan.dev ffmpeg-$latest-essentials_build zip. Commit the archive, then update ArchiveUrl to pin that commit and update FfmpegSha256 and FfprobeSha256 in shared\VideoTools.cs."
     } else {
         Write-Host "ffmpeg $current is the latest release." -ForegroundColor Green
     }

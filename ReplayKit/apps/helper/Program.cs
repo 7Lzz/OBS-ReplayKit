@@ -30,6 +30,7 @@ namespace ReplayKitHelper
             if (args.Length == 1 && args[0] == "--host-info")
             {
                 Console.WriteLine(new JObject { ["hosted"] = ProcessHost.Hosted, ["helperRoot"] = Constants.HelperRoot,
+                    ["grouped"] = ProcessHost.Grouped(),
                     ["assembly"] = ProcessHost.HelperExecutable, ["command"] = ProcessHost.CommandLine(new[] { "--host-info" }) }.ToString(Newtonsoft.Json.Formatting.None));
                 return 0;
             }
@@ -149,6 +150,7 @@ namespace ReplayKitHelper
             catch (Exception ex) { Log.Write("StateLayout.Run: " + ex.Message); }
 
             try { UploadState.ClearStaleCompressedTempFiles(); } catch (Exception ex) { Log.Write("ClearStaleCompressedTempFiles: " + ex.Message); }
+            try { Voiceover.RemoveAbandonedTakes(); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { Log.Write("Voiceover startup cleanup: " + ex.GetType().Name); }
             try { Update.ClearStaleUpdateFolders(); } catch (Exception ex) { Log.Write("ClearStaleUpdateFolders: " + ex.Message); }
 
             // the port helper_config.json of an older release still carries is not read, see --update-window above
@@ -194,7 +196,6 @@ namespace ReplayKitHelper
 
             try { DiscordProjector.StartAtStartup(); } catch (Exception ex) { Log.Write("warn: Discord projector startup threw: " + ex.Message); }
             try { AuthCore.RestoreAuthAtStartup(); } catch (Exception ex) { Log.Write("RestoreAuthAtStartup: " + ex.Message); }
-            try { SettingsHotkeys.ResetHotkeyCaptureSignalAtStartup(); } catch (Exception ex) { Log.Write("ResetHotkeyCaptureSignalAtStartup: " + ex.Message); }
             try { SettingsOverlayLive.RevertAbandonedOverlayPreviewAtStartup(); } catch (Exception ex) { Log.Write("RevertAbandonedOverlayPreviewAtStartup: " + ex.Message); }
             try { SettingsHttp.ApplyAppIconAtStartup(); } catch (Exception ex) { Log.Write("ApplyAppIconAtStartup: " + ex.Message); }
             try { SettingsHttp.EnsureObsRecordingFolderAtStartup(); } catch (Exception ex) { Log.Write("EnsureObsRecordingFolderAtStartup: " + ex.Message); }

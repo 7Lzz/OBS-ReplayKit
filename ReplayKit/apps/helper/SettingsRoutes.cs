@@ -80,7 +80,7 @@ namespace ReplayKitHelper
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
                 bool active = QFlag("active");
-                try { HttpResponse.SendJson(stream, 200, SettingsHotkeys.SetHotkeyCapture(active)); }
+                try { HttpResponse.SendJson(stream, 200, SettingsHotkeys.SetHotkeyCapture(active, Q("owner"))); }
                 catch (Exception ex) { HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = ex.Message }); }
                 return false;
             }

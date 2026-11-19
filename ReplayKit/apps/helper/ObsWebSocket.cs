@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Net.Sockets;
 using System.Net.WebSockets;
@@ -133,7 +134,13 @@ namespace ReplayKitHelper
             {
                 var ar = probe.BeginConnect("127.0.0.1", settings.Port, null, null);
                 using (var wait = ar.AsyncWaitHandle)
-                    if (!wait.WaitOne(500)) throw new InvalidOperationException(Locales.Message("helper.obsWebsocketIsNotReachable"));
+                {
+                    if (WaitHandle.WaitAny(new[] { wait, token.WaitHandle }, 500) != 0)
+                    {
+                        token.ThrowIfCancellationRequested();
+                        throw new InvalidOperationException(Locales.Message("helper.obsWebsocketIsNotReachable"));
+                    }
+                }
                 probe.EndConnect(ar);
             }
 
@@ -166,13 +173,19 @@ namespace ReplayKitHelper
 
         public static ObsWebSocketResult InvokeRequest(string requestType, JToken requestData = null, int timeoutMs = 3000)
         {
+            var clock = Stopwatch.StartNew();
+            int budget = Math.Max(1000, timeoutMs);
             // with the clip buffer on disk the replay buffer requests are answered by the plugin, which owns that buffer, and obs never starts its own
             var routed = ClipBuffer.TryInvoke(requestType);
             if (routed != null) return routed;
             var settings = GetObsWebSocketSettings();
 
             // the whole connect-reuse-or-fresh + send + receive cycle runs under one lock -- the request/response matching below has no way to tell two concurrent callers requests apart on a shared socket, so at most one request can be in flight on it at a time regardless of how many callers fire one.
-            lock (Server.State.ObsWebSocketLock)
+            var gate = Server.State.ObsWebSocketLock;
+            int remaining = (int)Math.Max(0, budget - clock.ElapsedMilliseconds);
+            if (remaining == 0 || !Monitor.TryEnter(gate, remaining))
+                return new ObsWebSocketResult { Ok = false, Unavailable = true, RequestType = requestType, Message = Locales.Message("helper.obsWebsocketIsNotReachable") };
+            try
             {
                 if (obsClosing) return new ObsWebSocketResult { Ok = false, Unavailable = true, Message = Locales.Message("helper.obsIsClosing") };
                 if (!settings.Ok)
@@ -183,7 +196,10 @@ namespace ReplayKitHelper
 
                 using (var cts = new CancellationTokenSource())
                 {
-                    cts.CancelAfter(Math.Max(1000, timeoutMs));
+                    remaining = (int)Math.Max(0, budget - clock.ElapsedMilliseconds);
+                    if (remaining == 0)
+                        return new ObsWebSocketResult { Ok = false, Unavailable = true, RequestType = requestType, Message = Locales.Message("helper.obsWebsocketIsNotReachable") };
+                    cts.CancelAfter(remaining);
                     try
                     {
                         var socket = GetConnected(settings, cts.Token);
@@ -214,6 +230,7 @@ namespace ReplayKitHelper
                     }
                 }
             }
+            finally { Monitor.Exit(gate); }
         }
 
         public static ObsWebSocketResult SaveReplayBuffer() => InvokeRequest("SaveReplayBuffer", null, 3000);

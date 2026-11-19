@@ -17,7 +17,7 @@ namespace ReplayKitSetup
     public static class Cleanup
     {
         // the clip state that is kept across an uninstall; it is looked up with StateLayout.Resolve, so an install that has not been moved to the new layout yet is kept too
-        private static readonly string[] ReplaykitRuntimeStateFiles = { StateLayout.ClipsDbFile, StateLayout.ClipsIndexFile };
+        internal static readonly string[] ReplaykitRuntimeStateFiles = { StateLayout.ClipsDbFile, StateLayout.ClipsIndexFile, StateLayout.CompressionHistoryFile };
 
         [StructLayout(LayoutKind.Sequential)]
         private struct PROCESS_BASIC_INFORMATION
@@ -177,19 +177,30 @@ namespace ReplayKitSetup
             var folders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var prop in db.Properties())
             {
-                string stored = (prop.Value as JObject)?["stored"]?.Value<string>();
-                if (string.IsNullOrEmpty(stored) || !Path.IsPathRooted(stored)) continue;
-                string folder = Path.GetDirectoryName(Path.GetFullPath(stored));
-                if (!string.Equals(Path.GetFileName(folder), ".replaykit-deleted", StringComparison.OrdinalIgnoreCase)) continue;
-                folders.Add(folder);
                 try
                 {
-                    if (File.Exists(stored) && (File.GetAttributes(stored) & FileAttributes.ReparsePoint) == 0) { File.Delete(stored); removed++; }
+                    var value = (prop.Value as JObject)?["stored"];
+                    if (value?.Type != JTokenType.String || !Path.IsPathFullyQualified((string)value))
+                        throw new InvalidDataException("invalid deleted history path");
+                    string stored = Path.GetFullPath((string)value);
+                    string folder = Path.GetDirectoryName(stored);
+                    if (!string.Equals(Path.GetFileName(folder), ".replaykit-deleted", StringComparison.OrdinalIgnoreCase))
+                        throw new InvalidDataException("invalid deleted history folder");
+                    for (string parent = stored; parent != null; parent = Path.GetDirectoryName(parent))
+                    {
+                        if ((File.GetAttributes(parent) & FileAttributes.ReparsePoint) != 0)
+                            throw new IOException("deleted history uses a reparse point: " + parent);
+                    }
+                    File.Delete(stored);
+                    folders.Add(folder);
+                    removed++;
                 }
-                catch (Exception exc) when (exc is IOException || exc is UnauthorizedAccessException)
+                catch (FileNotFoundException) { }
+                catch (DirectoryNotFoundException) { }
+                catch (Exception exc) when (exc is IOException || exc is UnauthorizedAccessException || exc is InvalidDataException || exc is ArgumentException || exc is NotSupportedException)
                 {
                     ok = false;
-                    log?.Invoke("warn: could not delete " + stored + ": " + exc.Message);
+                    log?.Invoke("warn: could not remove a deleted history item: " + exc.Message);
                 }
             }
             foreach (string folder in folders)
@@ -299,9 +310,27 @@ namespace ReplayKitSetup
         // clears %localappdata%\OBS ReplayKit after an uninstall -- deletes what is unlocked, and hands the still-running exe (and the folder itself on a full uninstall) to the session manager for delete-on-reboot rather than a self-deleting cmd stub that av would flag.
         public static bool ClearSetupCache(bool keepUserSettings, Action<string> log = null)
         {
-            string cacheDir = Config.REPLAYKIT_SETUP_CACHE;
-            if (!Directory.Exists(cacheDir)) return true;
             bool ok = true;
+            if (!keepUserSettings)
+            {
+                string credentials = Path.Combine(Config.LOCALAPPDATA, StateLayout.StreamableCredentialsFolder);
+                try
+                {
+                    if ((File.GetAttributes(credentials) & FileAttributes.ReparsePoint) != 0)
+                        throw new IOException("the Streamable credential folder is a reparse point");
+                    File.Delete(Path.Combine(credentials, StateLayout.StreamableCredentialsFile));
+                    File.Delete(Path.Combine(credentials, StateLayout.StreamableLegacyCookieFile));
+                }
+                catch (FileNotFoundException) { }
+                catch (DirectoryNotFoundException) { }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+                {
+                    ok = false;
+                    log?.Invoke("warn: could not remove Streamable credentials: " + ex.Message);
+                }
+            }
+            string cacheDir = Config.REPLAYKIT_SETUP_CACHE;
+            if (!Directory.Exists(cacheDir)) return ok;
 
             // the streamable sign-in webview2 profile -- nothing reads it after an uninstall and no other step touches it
             string streamable = Path.Combine(cacheDir, "StreamableProfile");
@@ -791,9 +820,15 @@ namespace ReplayKitSetup
 
         public static List<string> RunCleanup(IInstallProgress progress, bool keepUserSettings = true, bool removeObs = false)
         {
+            using var transaction = RuntimeTransaction.Open();
             var steps = new List<(SetupLocale.Text Title, SetupLocale.Text Detail, Func<object> Action)>
             {
-                (SetupLocale.Pair("setup.closeObs"), SetupLocale.Pair("setup.stopsObsAndReplaykitHelpersBut"), () => StopObsAndHelpers(progress.LogLine)),
+                (SetupLocale.Pair("setup.closeObs"), SetupLocale.Pair("setup.stopsObsAndReplaykitHelpersBut"), () =>
+                {
+                    bool stopped = StopObsAndHelpers(progress.LogLine);
+                    transaction.Recover(progress.LogLine);
+                    return stopped;
+                }),
                 (SetupLocale.Pair("setup.restoreObsBrowser"), SetupLocale.Pair("setup.restoresTheOriginalObsBrowserProcess"), () => ProcessHost.Restore(progress.LogLine)),
                 (SetupLocale.Pair("setup.removeLaunchPermission"), SetupLocale.Pair("setup.deletesTheReplaykitScheduledTask"), () => ScheduledTask.DeleteElevationTask(progress.LogLine)),
                 (SetupLocale.Pair("setup.removeWindowsStartup"), SetupLocale.Pair("setup.stopsReplaykitFromLaunchingObsWhen"), () => Startup.ConfigureObsStartup(false, progress.LogLine)),
@@ -804,12 +839,14 @@ namespace ReplayKitSetup
                 (SetupLocale.Pair("setup.removeObsStreamAudio"), SetupLocale.Pair("setup.uninstallsTheReplaykitVirtualAudioDevice"), () => VbCable.UninstallVbcable(progress.LogLine)),
                 (SetupLocale.Pair("setup.removeVirtualDisplayDriver"), SetupLocale.Pair("setup.deletesTheOptionalVirtualDisplayDriver"), () => VirtualDisplayDriver.Remove(progress.LogLine)),
             };
+            bool stateSaved = true;
+            bool historyEmptied = false;
             if (keepUserSettings)
-                steps.Add((SetupLocale.Pair("setup.keepReplaykitSettings"), SetupLocale.Pair("setup.savesCurrentReplaykitSettingsForThe"), () => SaveUserSettings(progress.LogLine)));
+                steps.Add((SetupLocale.Pair("setup.keepReplaykitSettings"), SetupLocale.Pair("setup.savesCurrentReplaykitSettingsForThe"), () => stateSaved = SaveUserSettings(progress.LogLine)));
             else
                 steps.Add((SetupLocale.Pair("setup.removeReplaykitSettings"), SetupLocale.Pair("setup.deletesSavedReplaykitPreferences"), () => RemoveUserSettings(progress.LogLine)));
-            steps.Add((SetupLocale.Pair("setup.emptyDeletedHistory"), SetupLocale.Pair("setup.deletesTheClipsAndScreenshotsThat"), () => EmptyDeletedHistory(progress.LogLine)));
-            steps.Add((SetupLocale.Pair("setup.wipeObsReplaykitConfig"), SetupLocale.Pair("setup.deletesReplaykitSObsConfigFolder"), () => WipeObsConfig(progress.LogLine)));
+            steps.Add((SetupLocale.Pair("setup.emptyDeletedHistory"), SetupLocale.Pair("setup.deletesTheClipsAndScreenshotsThat"), () => historyEmptied = EmptyDeletedHistory(progress.LogLine)));
+            steps.Add((SetupLocale.Pair("setup.wipeObsReplaykitConfig"), SetupLocale.Pair("setup.deletesReplaykitSObsConfigFolder"), () => stateSaved && historyEmptied && WipeObsConfig(progress.LogLine)));
             steps.Add((SetupLocale.Pair("setup.clearTheSetupCache"), SetupLocale.Pair("setup.removesStreamableLoginDataAndSchedules"), () => ClearSetupCache(keepUserSettings, progress.LogLine)));
             if (removeObs)
                 steps.Add((SetupLocale.Pair("setup.uninstallObsStudio"), SetupLocale.Pair("setup.runsObsStudioSOwnUninstaller"), () => UninstallObsStudio(progress.LogLine)));

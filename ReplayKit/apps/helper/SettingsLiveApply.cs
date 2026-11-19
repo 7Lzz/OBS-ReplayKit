@@ -54,30 +54,35 @@ namespace ReplayKitHelper
         {
             var warnings = new List<string>();
             var applied = new List<string>();
-            bool legacyVcam = settings["discord_output_mode"]?.Value<string>() == "virtual_camera_legacy";
             bool stopAllOutputs = restartObs || applyVideoSettings;
             var record = NewInactiveOutputState();
             var replay = NewInactiveOutputState();
-            var vcam = NewInactiveOutputState();
+
+            if (applyVideoSettings && !restartObs)
+            {
+                var camera = ObsWebSocket.InvokeRequest("GetVirtualCamStatus", null, 3000);
+                var active = camera.Data?["outputActive"];
+                if (!camera.Ok || active?.Type != JTokenType.Boolean || active.Value<bool>())
+                    return new JObject { ["applied"] = new JArray(), ["warnings"] = new JArray(Locales.Message("settings.obsOutputsWereNotStoppedSafely")) };
+            }
 
             if (stopAllOutputs)
             {
                 record = StopObsOutputIfActive("GetRecordStatus", "StopRecord");
                 replay = StopObsOutputIfActive("GetReplayBufferStatus", "StopReplayBuffer");
-                vcam = StopObsOutputIfActive("GetVirtualCamStatus", "StopVirtualCam");
             }
             else if (applyReplayBufferOutput)
             {
                 replay = StopObsOutputIfActive("GetReplayBufferStatus", "StopReplayBuffer");
             }
 
-            foreach (var state in new[] { record, replay, vcam })
+            foreach (var state in new[] { record, replay })
             {
                 string warning = state["warning"]?.Value<string>();
                 if (!string.IsNullOrEmpty(warning)) warnings.Add(warning);
             }
 
-            if (record["ok"]?.Value<bool>() == true && replay["ok"]?.Value<bool>() == true && vcam["ok"]?.Value<bool>() == true)
+            if (record["ok"]?.Value<bool>() == true && replay["ok"]?.Value<bool>() == true)
             {
                 if (applyVideoSettings)
                 {
@@ -107,15 +112,6 @@ namespace ReplayKitHelper
                 new JObject { ["state"] = replay, ["request"] = "StartReplayBuffer", ["label"] = "replay buffer" },
                 new JObject { ["state"] = record, ["request"] = "StartRecord", ["label"] = "recording" },
             };
-            if (legacyVcam)
-            {
-                outputs.Insert(0, new JObject { ["state"] = vcam, ["request"] = "StartVirtualCam", ["label"] = "virtual camera (legacy)" });
-            }
-            else if (vcam["ok"]?.Value<bool>() == true && vcam["wasActive"]?.Value<bool>() == true)
-            {
-                applied.Add("virtual camera stopped for projector Discord output");
-            }
-
             if (restartObs)
             {
                 foreach (var output in outputs)
@@ -160,7 +156,7 @@ namespace ReplayKitHelper
             var renderDevice = DiscordProjector.GetObsStreamAudioRenderDevice();
             if (!renderDevice.Ok) return new JObject { ["ok"] = false, ["applied"] = new JArray(), ["message"] = renderDevice.Message };
 
-            var monitorDevice = SetObsMonitoringDevice(renderDevice.Id, renderDevice.Name, 6);
+            var monitorDevice = SetObsMonitoringDevice(renderDevice.Id, renderDevice.Name);
             if (monitorDevice["ok"]?.Value<bool>() != true) return new JObject { ["ok"] = false, ["applied"] = new JArray(), ["message"] = monitorDevice["message"] };
 
             var applied = new List<string>((monitorDevice["applied"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
@@ -209,7 +205,7 @@ namespace ReplayKitHelper
             }
             if (!monitorReady) return new JObject { ["ok"] = false, ["applied"] = new JArray(applied), ["message"] = Locales.Message("settings.obsDidNotReportTheRequested", "error", lastMonitorMessage) };
 
-            if (!ensureUnmuted)
+            if (!ensureUnmuted || targetIsOff)
                 return new JObject { ["ok"] = true, ["applied"] = new JArray("desktop audio monitor off"), ["message"] = "" };
 
             var unmute = SetInputMuteState(inputName, false, 6);
@@ -401,135 +397,51 @@ namespace ReplayKitHelper
             }
         }
 
-        // -- discord output live-apply + share preview: updates desktop-audio exclusion/monitoring settings, starts/stops the legacy virtual camera, and parks/unparks the obs windowed projector via DiscordProjector.
-
         internal static JObject ApplyDiscordOutputLive(JObject settings)
         {
             var warnings = new List<string>();
             var applied = new List<string>();
-            bool ok = true;
             string message = "";
-            string inputName = DesktopAudioInputName;
-            string mode = settings["discord_output_mode"]?.Value<string>() ?? "";
-            if (mode != "projector") mode = "projector";
-            bool isLegacyVcam = false;
             bool screenshareEnabled = TestDiscordScreenshareEnabled(settings);
             bool shareEnabled = screenshareEnabled && (settings["discord_projector_enabled"]?.Value<bool>() ?? false);
             if (!screenshareEnabled) applied.Add("Discord screenshare support disabled");
-            string monitorType = shareEnabled ? "OBS_MONITORING_TYPE_MONITOR_AND_OUTPUT" : "OBS_MONITORING_TYPE_NONE";
 
             var capture = ApplyRecordingAudioLive(settings);
             applied.AddRange(capture["applied"].Values<string>());
             warnings.AddRange(capture["warnings"].Values<string>());
 
-            if (mode == "projector")
+            var mixer = SetProjectorMonitoringState(settings, shareEnabled);
+            if (mixer["ok"]?.Value<bool>() == true)
             {
-                var mixer = SetProjectorMonitoringState(settings, shareEnabled);
-                if (mixer["ok"]?.Value<bool>() == true)
+                applied.AddRange((mixer["applied"] as JArray)?.Values<string>() ?? Enumerable.Empty<string>());
+                if (!UsesOutputDeviceRecording(settings) && capture["liveApplied"]?.Value<bool>() == true)
                 {
-                    applied.AddRange((mixer["applied"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
-                    if (!UsesOutputDeviceRecording(settings) && capture["liveApplied"]?.Value<bool>() == true)
-                    {
-                        int sceneMonitoringType = shareEnabled ? 2 : 0;
-                        var sceneFile = SetShareModeSceneFile(sceneMonitoringType, false);
-                        if (sceneFile["ok"]?.Value<bool>() != true)
-                            warnings.Add(Locales.Message("settings.desktopAudioMonitoringWasAppliedLive", "error", sceneFile["message"]));
-                        else if (sceneFile["changed"]?.Value<bool>() == true)
-                            applied.Add("desktop audio monitor state saved");
-                    }
-                }
-                else
-                {
-                    ok = false;
-                    message = Locales.Message("settings.desktopAudioMonitoringStateCouldNot", "error", mixer["message"]);
-                    warnings.Add(Locales.Message("settings.discordOutputModeWasSavedBut", "message", message));
+                    var sceneFile = SetShareModeSceneFile(shareEnabled ? 2 : 0, false);
+                    if (sceneFile["ok"]?.Value<bool>() != true)
+                        warnings.Add(Locales.Message("settings.desktopAudioMonitoringWasAppliedLive", "error", sceneFile["message"]));
+                    else if (sceneFile["changed"]?.Value<bool>() == true) applied.Add("desktop audio monitor state saved");
                 }
             }
             else
             {
-                var mixer = SetDesktopAudioMixerState(inputName, monitorType);
-                if (mixer["ok"]?.Value<bool>() == true)
-                {
-                    applied.AddRange((mixer["applied"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
-                }
-                else
-                {
-                    ok = false;
-                    message = Locales.Message("settings.desktopAudioMixerStateCouldNot", "error", mixer["message"]);
-                    warnings.Add(Locales.Message("settings.discordOutputModeWasSavedBut", "message", message));
-                }
+                message = Locales.Message("settings.desktopAudioMonitoringStateCouldNot", "error", mixer["message"]);
+                warnings.Add(Locales.Message("settings.discordOutputModeWasSavedBut", "message", message));
             }
 
-            if (!ok && mode != "projector")
-                return new JObject { ["ok"] = false, ["message"] = message, ["applied"] = new JArray(applied), ["warnings"] = new JArray(warnings), ["restartRequired"] = false, ["restartReason"] = "" };
-
-            var status = ObsWebSocket.InvokeRequest("GetVirtualCamStatus", null, 3000);
-            if (!status.Ok)
-            {
-                warnings.Add(Locales.Message("settings.discordOutputModeWasSavedBut2", "error", status.Message));
-            }
+            DiscordProjector.StopShareBridge();
+            var projector = shareEnabled ? DiscordProjector.Repark(settings) : DiscordProjector.Disable(settings);
+            if (projector["ok"]?.Value<bool>() == true)
+                applied.AddRange((projector["applied"] as JArray)?.Values<string>() ?? Enumerable.Empty<string>());
             else
             {
-                bool running = status.Data?["outputActive"]?.Value<bool>() ?? false;
-                if (isLegacyVcam && !running)
-                {
-                    Log.Write("Virtual Camera legacy mode enabled for Discord output.");
-                    var start = ObsWebSocket.InvokeRequest("StartVirtualCam", null, 8000);
-                    if (start.Ok) applied.Add("virtual camera started (legacy)");
-                    else warnings.Add(Locales.Message("settings.discordOutputModeWasSavedBut3", "error", start.Message));
-                }
-                else if (!isLegacyVcam && running)
-                {
-                    var stop = ObsWebSocket.InvokeRequest("StopVirtualCam", null, 8000);
-                    if (stop.Ok) applied.Add("virtual camera stopped");
-                    else warnings.Add(Locales.Message("settings.discordOutputModeWasSavedBut4", "error", stop.Message));
-                }
-                else
-                {
-                    applied.Add(isLegacyVcam ? "virtual camera already on (legacy)" : "virtual camera already off");
-                }
+                string warning = shareEnabled
+                    ? Locales.Message("settings.obsProjectorWasNotReadyError", "error", projector["message"])
+                    : Locales.Message("settings.sharePreviewCouldNotBeDisabled", "error", projector["message"]);
+                if (message.Length == 0) message = warning;
+                warnings.Add(warning);
             }
-
-            if (shareEnabled)
-            {
-                DiscordProjector.StopShareBridge();
-                Log.Write("Discord projector mode enabled");
-                Log.Write("Skipping OBS Virtual Camera for Discord output");
-                var projector = DiscordProjector.Repark(settings);
-                if (projector["ok"]?.Value<bool>() == true)
-                {
-                    applied.AddRange((projector["applied"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
-                }
-                else
-                {
-                    ok = false;
-                    if (string.IsNullOrWhiteSpace(message)) message = Locales.Message("settings.obsProjectorWasNotReadyError", "error", projector["message"]);
-                    warnings.Add(Locales.Message("settings.obsProjectorWasNotReadyError", "error", projector["message"]));
-                }
-                if (projector["warnings"] is JArray pw) warnings.AddRange(pw.Select(t => t.Value<string>()));
-            }
-            else if (mode == "projector")
-            {
-                DiscordProjector.StopShareBridge();
-                var projector = DiscordProjector.Disable(settings);
-                if (projector["ok"]?.Value<bool>() == true)
-                {
-                    applied.AddRange((projector["applied"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
-                }
-                else
-                {
-                    ok = false;
-                    if (string.IsNullOrWhiteSpace(message)) message = Locales.Message("settings.sharePreviewCouldNotBeDisabled", "error", projector["message"]);
-                    warnings.Add(Locales.Message("settings.sharePreviewCouldNotBeDisabled", "error", projector["message"]));
-                }
-                if (projector["warnings"] is JArray pw2) warnings.AddRange(pw2.Select(t => t.Value<string>()));
-            }
-            else
-            {
-                warnings.Add(Locales.Message("settings.virtualCameraIsLegacyDeprecatedFor"));
-            }
-
-            return new JObject { ["ok"] = ok, ["message"] = message, ["applied"] = new JArray(applied), ["warnings"] = new JArray(warnings), ["restartRequired"] = false, ["restartReason"] = "" };
+            warnings.AddRange((projector["warnings"] as JArray)?.Values<string>() ?? Enumerable.Empty<string>());
+            return new JObject { ["ok"] = message.Length == 0, ["message"] = message, ["applied"] = new JArray(applied), ["warnings"] = new JArray(warnings), ["restartRequired"] = false, ["restartReason"] = "" };
         }
 
         public static JObject SetSharePreviewEnabled(bool enabled)
@@ -1106,7 +1018,7 @@ namespace ReplayKitHelper
         }
 
         // brings the mic input in line with the saved settings, touching only what differs from obs right now.
-        internal static JObject ApplyMicLive(JObject settings)
+        internal static JObject ApplyMicLive(JObject settings, JObject previous)
         {
             var applied = new List<string>();
             var warnings = new List<string>();
@@ -1118,7 +1030,7 @@ namespace ReplayKitHelper
             var live = ReadMicLive();
             if (live == null)
             {
-                warnings.Add(Locales.Message("settings.microphoneSettingsWereSavedButObs", "MicInputName", MicInputName));
+                ReconcileMicSave(settings, previous, null, warnings);
                 return new JObject { ["applied"] = new JArray(applied), ["warnings"] = new JArray(warnings) };
             }
 
@@ -1132,7 +1044,17 @@ namespace ReplayKitHelper
             if (live["micNoiseSuppression"].Value<bool>() != noise) ApplyMicNoiseSuppressionLive(noise, applied, warnings);
             if (live["micInputSensitivity"].Value<int>() != sensitivity) ApplyMicGateLive(sensitivity, applied, warnings);
 
+            if (warnings.Count > 0) ReconcileMicSave(settings, previous, ReadMicLive(), warnings);
             return new JObject { ["applied"] = new JArray(applied), ["warnings"] = new JArray(warnings) };
+        }
+
+        private static void ReconcileMicSave(JObject settings, JObject previous, JObject live, List<string> warnings)
+        {
+            var confirmed = live ?? previous;
+            if (!MicKeysChanged(confirmed, settings)) return;
+            foreach (var key in MicSettingKeys) settings[key] = confirmed[key]?.DeepClone();
+            WriteSettings(settings);
+            warnings.Add(Locales.Message("settings.micSettingsReverted"));
         }
 
         // an existing noise suppression filter is only ever toggled, never replaced or moved, so a filter built in obs keeps its own settings and position.
@@ -1265,7 +1187,7 @@ namespace ReplayKitHelper
         // run unconditionally on every call, not gated behind applyOverlay/restartObs the way overlay and motion
         // blur are -- there is deliberately no "prepare for restart via file edit instead" branch for those two;
         // preserve that asymmetry, it is not an oversight to fix.
-        internal static JObject ApplyLiveSettings(JObject settings, bool restartObs = false, bool applyOverlay = true, bool recreateBongo = true, bool applyMotionBlur = true, bool applyRuntimeOutputs = true, bool applyVideoSettings = true, bool applyReplayBufferOutput = true, bool applyMic = false, bool applyAudioVolumes = false, bool rebuildInputOverlay = false, bool applySleep = false)
+        internal static JObject ApplyLiveSettings(JObject settings, bool restartObs = false, bool applyOverlay = true, bool recreateBongo = true, bool applyMotionBlur = true, bool applyRuntimeOutputs = true, bool applyVideoSettings = true, bool applyReplayBufferOutput = true, JObject previousMic = null, bool applyAudioVolumes = false, bool rebuildInputOverlay = false, bool applySleep = false)
         {
             var warnings = new List<string>();
             var applied = new List<string>();
@@ -1320,7 +1242,7 @@ namespace ReplayKitHelper
             profileUpdates.Add(new[] { "Hotkeys", "OBSBasic.SaveReplayBuffer", ConvertRecordingKeybindToBasicIni(settings["clipKeybind"] as JObject, settings["clipKeybindExtra"] as JObject) });
             string recordingHotkey = ConvertRecordingKeybindToBasicIni(settings["recordingKeybind"] as JObject, settings["recordingKeybindExtra"] as JObject);
             profileUpdates.Add(new[] { "Hotkeys", "OBSBasic.StartRecording", recordingHotkey });
-            profileUpdates.Add(new[] { "Hotkeys", "OBSBasic.StopRecording", recordingHotkey });
+            profileUpdates.Add(new[] { "Hotkeys", "OBSBasic.StopRecording", SettingsHotkeys.RecordingStopHotkey(settings) });
             profileUpdates.Add(new[] { "Hotkeys", "OBSBasic.Screenshot", ConvertRecordingKeybindToBasicIni(settings["screenshotKeybind"] as JObject, settings["screenshotKeybindExtra"] as JObject) });
             // always pin obss recording folder to the RESOLVED clip dir (custom or the ~/Videos default) -- the helpers clip watcher/scanner uses that same resolved dir, so if obss own RecFilePath ever drifts (a reset profile, an obs update) clips land where nothing is looking for them.
             string clipDirValue = settings["clipDir"]?.Value<string>();
@@ -1387,9 +1309,9 @@ namespace ReplayKitHelper
                 }
             }
 
-            if (applyMic)
+            if (previousMic != null)
             {
-                var mic = ApplyMicLive(settings);
+                var mic = ApplyMicLive(settings, previousMic);
                 applied.AddRange((mic["applied"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
                 warnings.AddRange((mic["warnings"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
             }

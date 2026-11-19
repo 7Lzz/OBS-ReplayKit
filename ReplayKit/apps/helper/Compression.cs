@@ -542,6 +542,8 @@ namespace ReplayKitHelper
             using (var reservation = JobCoordinator.TryReserve(requestId, selected.Name, selected.Full, "compress-upload", out string busy))
             {
                 if (reservation == null) return new JObject { ["ok"] = false, ["busy"] = true, ["message"] = busy };
+                string fileIdentity = ClipRenames.Identity(new FileInfo(selected.Full));
+                if (fileIdentity == null) return new JObject { ["ok"] = false, ["message"] = Locales.Message("storage.theSelectedClipChangedSelectIt") };
 
                 var caps = GetToolPaths();
                 string ffmpeg = caps["ffmpeg"]?.Value<string>();
@@ -611,7 +613,7 @@ namespace ReplayKitHelper
                 reservation.Start(() => CompressedUploadWorker.Run(requestId, ffmpeg, selectedFull, tempOut, passLog, effCap, videoKbps, audioKbps, duration, auth.Cookies, auth.Required), t =>
                 {
                     try { if (File.Exists(tempOut)) File.Delete(tempOut); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
-                    Upload.HandleUploadCompletion(t, requestId, selectedName, sourcePath: selectedFull, auth: auth);
+                    Upload.HandleUploadCompletion(t, requestId, selectedName, selected.Root, fileIdentity, auth: auth);
                 });
 
                 return new JObject { ["ok"] = true, ["state"] = "compressing", ["clip"] = selectedName, ["requestId"] = requestId, ["message"] = Locales.Message("storage.compressingTempCopyAndUploading") };

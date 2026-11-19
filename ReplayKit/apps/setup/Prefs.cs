@@ -393,8 +393,9 @@ namespace ReplayKitSetup
         }
 
         // return saved preferences, or defaults if the file is missing/corrupt.
-        public static Preferences LoadPrefs()
+        public static Preferences LoadPrefs(bool cleanInstall = false)
         {
+            if (cleanInstall) return new Preferences();
             Dictionary<string, object> data = new Dictionary<string, object>();
             string prefsFile = PREFS_FILE;
             if (!File.Exists(prefsFile) && File.Exists(SETUP_CACHE_PREFS_FILE)) prefsFile = SETUP_CACHE_PREFS_FILE;

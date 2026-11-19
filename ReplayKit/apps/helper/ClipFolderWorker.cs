@@ -79,6 +79,7 @@ namespace ReplayKitHelper
         private static void Adopt(string root, JObject entries)
         {
             var known = new HashSet<string>(Clips.GameFolders(root), StringComparer.OrdinalIgnoreCase);
+            var missingIds = ClipRenames.MissingIdentities(root, entries);
             // the library is only listed once a folder holds a clip the db knows, which is rare
             HashSet<string> inLibrary = null;
             List<DirectoryInfo> dirs;
@@ -89,8 +90,13 @@ namespace ReplayKitHelper
                 if (known.Contains(dir.FullName) || (dir.Attributes & FileAttributes.ReparsePoint) != 0 || !Clips.IsGameFolderName(dir.Name)) continue;
                 try
                 {
-                    var knownHere = dir.EnumerateFiles().Take(500).Where(f => Constants.ALLOWED_EXTS.Contains(f.Extension.ToLowerInvariant()) &&
-                        entries[f.Name] is JObject entry && (entry["filed"] != null || entry["capture"] != null)).Select(f => f.Name).ToList();
+                    var candidates = dir.EnumerateFiles().Take(500).Where(Clips.IsLibraryClip).ToList();
+                    if (missingIds.Count > 0 && candidates.Any(file => missingIds.Contains(ClipRenames.Identity(file))))
+                    {
+                        Clips.RegisterFolder(root, dir.Name);
+                        continue;
+                    }
+                    var knownHere = candidates.Where(f => entries[f.Name] is JObject entry && (entry["filed"] != null || entry["capture"] != null)).Select(f => f.Name).ToList();
                     if (knownHere.Count == 0) continue;
                     inLibrary = inLibrary ?? new HashSet<string>(Clips.LibraryFiles(root).Select(f => f.Name), StringComparer.OrdinalIgnoreCase);
                     bool holdsClips = knownHere.Any(name => !inLibrary.Contains(name));

@@ -186,7 +186,7 @@ namespace ReplayKitHelper
         public static string GetClipDir()
         {
             string fromSettings = ClipDirFromSettings();
-            if (!string.IsNullOrWhiteSpace(fromSettings)) return ResolveDir(fromSettings, GetDefaultClipDir());
+            if (fromSettings != null) return ResolveDir(fromSettings, GetDefaultClipDir());
             return ResolveDir(Server.State.Config?["clipDir"]?.Value<string>(), GetDefaultClipDir());
         }
         public static string GetDockDir() => GetDefaultDockDir();

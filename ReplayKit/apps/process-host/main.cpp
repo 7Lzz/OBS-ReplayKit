@@ -22,6 +22,10 @@ class ProcessGroup {
 public:
     ProcessGroup()
     {
+        BOOL grouped = FALSE;
+        if (!IsProcessInJob(GetCurrentProcess(), nullptr, &grouped))
+            throw std::runtime_error("Cannot query the OBS process group.");
+        if (grouped) return;
         handle = CreateJobObjectW(nullptr, nullptr);
         JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits{};
         limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_BREAKAWAY_OK;
@@ -31,7 +35,7 @@ public:
             throw std::runtime_error("Cannot establish the OBS process group.");
         }
     }
-    ~ProcessGroup() { CloseHandle(handle); }
+    ~ProcessGroup() { if (handle) CloseHandle(handle); }
     ProcessGroup(const ProcessGroup &) = delete;
     ProcessGroup &operator=(const ProcessGroup &) = delete;
 private:
@@ -104,27 +108,6 @@ int Run(const fs::path &directory, const std::vector<std::wstring> &arguments)
         std::puts("OBS Studio role host - " OBS_HOST_VERSION);
         return 0;
     }
-    if (arguments.size() == 2 && arguments[1] == L"--host-child-check") {
-        BOOL grouped = FALSE;
-        return IsProcessInJob(GetCurrentProcess(), nullptr, &grouped) && grouped ? 0 : 2;
-    }
-    if (arguments.size() == 2 && arguments[1] == L"--host-group-check") {
-        ProcessGroup group;
-        std::wstring executable = Executable();
-        std::wstring command = L"\"" + executable + L"\" --host-child-check";
-        STARTUPINFOW startup{};
-        startup.cb = sizeof(startup);
-        PROCESS_INFORMATION child{};
-        if (!CreateProcessW(executable.c_str(), command.data(), nullptr, nullptr, FALSE, CREATE_NO_WINDOW,
-                            nullptr, directory.c_str(), &startup, &child))
-            throw std::runtime_error("Cannot verify the OBS process group.");
-        CloseHandle(child.hThread);
-        DWORD result = 1;
-        if (WaitForSingleObject(child.hProcess, 10000) == WAIT_OBJECT_0) GetExitCodeProcess(child.hProcess, &result);
-        else TerminateProcess(child.hProcess, 1);
-        CloseHandle(child.hProcess);
-        return int(result);
-    }
     bool helper = false;
     bool browser = false;
     bool check = false;
@@ -148,8 +131,12 @@ int Run(const fs::path &directory, const std::vector<std::wstring> &arguments)
             throw std::runtime_error("The OBS host components are incompatible.");
         return 0;
     }
-    if (helper) return Helper();
+    if (helper) {
+        ProcessGroup group;
+        return Helper();
+    }
     if (browser) {
+        ProcessGroup group;
         HMODULE module = Load(directory / OBS_BROWSER_ROLE_PATH);
         auto run = reinterpret_cast<int (*)(HINSTANCE)>(GetProcAddress(module, "RunBrowser"));
         if (!run) throw std::runtime_error("The browser host component is incompatible.");

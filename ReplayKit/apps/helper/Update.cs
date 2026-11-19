@@ -442,7 +442,7 @@ namespace ReplayKitHelper
 
             try
             {
-                string path = InstallResultPath();
+                string path = LatestResultPath();
                 if (!File.Exists(path)) return null;
                 var data = JObject.Parse(File.ReadAllText(path));
                 if (data["ok"]?.Type != JTokenType.Boolean || data.Value<bool>("ok")) return null;
@@ -467,19 +467,57 @@ namespace ReplayKitHelper
         }
 
         // written by the detached installer on its way out (apps/setup/Update.cs WriteResult). the popup polls this so a failed install shows its real reason instead of sitting on its last progress stage until the watchdog gives up.
-        private static string InstallResultPath() => Path.Combine(Constants.LOG_DIR, ReplayKitShared.TempLayout.UpdateResultFile);
+        private static string InstallResultPath(string attemptId = null) => Path.Combine(Constants.LOG_DIR, TempLayout.UpdateFile(TempLayout.UpdateResultFile, attemptId));
 
-        // the detached installer records its own pid here (ReplayKitSetup DetachedSpawn.WriteOwnPid) -- the process the helper starts is only a launcher and exits immediately, so watching that pid would read as "died".
-        private static string InstallPidPath() => Path.Combine(Constants.LOG_DIR, ReplayKitShared.TempLayout.UpdatePidFile);
+        // the installer holding the update mutex records the worker pid here.
+        private static string InstallPidPath(string attemptId = null) => Path.Combine(Constants.LOG_DIR, TempLayout.UpdateFile(TempLayout.UpdatePidFile, attemptId));
 
-        public static JObject GetInstallResult()
+        private static string AttemptPath() => Path.Combine(Constants.LOG_DIR, TempLayout.UpdateAttemptFile);
+
+        private static string ReadInstallAttempt()
+        {
+            try
+            {
+                string id = File.ReadAllText(AttemptPath()).Trim();
+                return TempLayout.ValidAttempt(id) ? id : null;
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { return null; }
+        }
+
+        private static void WriteInstallAttempt(string id)
+        {
+            string path = AttemptPath();
+            if (id == null) { File.Delete(path); return; }
+            Directory.CreateDirectory(Path.GetDirectoryName(path));
+            string temporary = path + "." + Guid.NewGuid().ToString("N");
+            try
+            {
+                File.WriteAllText(temporary, id);
+                if (File.Exists(path)) File.Replace(temporary, path, null);
+                else File.Move(temporary, path);
+            }
+            finally { File.Delete(temporary); }
+        }
+
+        private static string LatestResultPath()
+        {
+            string attemptId = ReadInstallAttempt();
+            string legacy = InstallResultPath();
+            if (attemptId == null) return legacy;
+            string scoped = InstallResultPath(attemptId);
+            if (File.Exists(legacy) && (!File.Exists(scoped) || File.GetLastWriteTimeUtc(legacy) > File.GetLastWriteTimeUtc(scoped))) return legacy;
+            return scoped;
+        }
+
+        public static JObject GetInstallResult(string attemptId = null)
         {
             var result = new JObject { ["ok"] = true, ["present"] = false, ["installedVersion"] = "", ["releaseUrl"] = ReleasePage };
             try { result["installedVersion"] = NormalizeVersion(GetInstalledVersion()); }
             catch (Exception) { }
             try
             {
-                string path = InstallResultPath();
+                if (!string.IsNullOrEmpty(attemptId) && !TempLayout.ValidAttempt(attemptId)) return result;
+                string path = string.IsNullOrEmpty(attemptId) ? LatestResultPath() : InstallResultPath(attemptId);
                 if (!File.Exists(path)) return result;
                 var data = JObject.Parse(File.ReadAllText(path));
                 result["present"] = true;
@@ -500,11 +538,12 @@ namespace ReplayKitHelper
         }
 
         // stamped by the update window once it has displayed the verdict
-        public static JObject MarkInstallResultSeen()
+        public static JObject MarkInstallResultSeen(string attemptId = null)
         {
             try
             {
-                string path = InstallResultPath();
+                if (!string.IsNullOrEmpty(attemptId) && !TempLayout.ValidAttempt(attemptId)) return new JObject { ["ok"] = false };
+                string path = string.IsNullOrEmpty(attemptId) ? LatestResultPath() : InstallResultPath(attemptId);
                 if (!File.Exists(path)) return new JObject { ["ok"] = true, ["present"] = false };
                 var data = JObject.Parse(File.ReadAllText(path));
                 data["seen"] = true;
@@ -780,7 +819,7 @@ namespace ReplayKitHelper
         }
 
         // the watchdog is a detached copy of this helper exe, since the installer replaces the one in scripts\helper while it runs
-        private static void StartUpdateWatchdog(int installerPid, string obsPath, string targetVersion, string releaseUrl)
+        private static int StartUpdateWatchdog(int installerPid, string obsPath, string targetVersion, string releaseUrl, string attemptId)
         {
             string source = ProcessHost.HelperExecutable;
             string watchdogDir = Path.Combine(Constants.REPLAYKIT_TEMP_ROOT, "watchdog-" + Guid.NewGuid().ToString("N"));
@@ -793,26 +832,28 @@ namespace ReplayKitHelper
             catch (Exception ex)
             {
                 WriteUpdateDebug("update watchdog copy failed: " + ex.Message);
-                return;
+                return 0;
             }
             var args = new[]
             {
                 "--update-watchdog", "-LauncherPid", installerPid.ToString(),
-                "-PidFile", InstallPidPath(), "-Result", InstallResultPath(),
+                "-PidFile", InstallPidPath(attemptId), "-Result", InstallResultPath(attemptId),
+                "-LegacyPidFile", InstallPidPath(), "-LegacyResult", InstallResultPath(),
                 "-ObsPath", obsPath ?? "", "-TargetVersion", targetVersion ?? "",
                 "-ReleaseUrl", releaseUrl ?? ReleasePage,
             };
             string cmdLine = ProcessArgs.Quote(watchdogExe) + " " + ProcessArgs.Join(args);
             int pid = Native.SpawnDetached(cmdLine, Constants.LOG_DIR);
             WriteUpdateDebug(pid > 0 ? "update watchdog started (pid=" + pid + ", watching installer " + installerPid + ")" : "update watchdog failed to start; a mid-install abort will not self-recover");
+            return pid;
         }
 
-        private static JObject StartUpdater(string installerPath, string tempDir, string targetVersion, string releaseUrl)
+        private static JObject StartUpdater(string installerPath, string tempDir, string targetVersion, string releaseUrl, string attemptId)
         {
             string obsPath = GetUpdateObsPath();
             // wait on this helpers own pid, not obs -- obs is already confirmed dead synchronously before the installer even reaches this wait, but this helper process (which holds the lock on its own exe under scripts/helper/) only exits afterward, asynchronously, once its parent-watchdog notices obs is gone. waiting on obs pid here races the copy step against that and loses.
             int waitPid = Process.GetCurrentProcess().Id;
-            var argList = new List<string> { "--update", "--start-delay-ms", "1200" };
+            var argList = new List<string> { "--update", "--start-delay-ms", "1200", "--attempt-id", attemptId };
             argList.Add("--release-url");
             argList.Add(releaseUrl ?? ReleasePage);
             if (!string.IsNullOrWhiteSpace(obsPath)) { argList.Add("--relaunch-obs"); argList.Add(obsPath); }
@@ -825,7 +866,7 @@ namespace ReplayKitHelper
                 WriteUpdateDebug("StartUpdater (admin, detached): " + cmdLine);
                 int installerPid = Native.SpawnDetached(cmdLine, tempDir);
                 if (installerPid <= 0) throw new InvalidOperationException(Locales.Message("update.spawndetachedReturned0ForInstaller"));
-                StartUpdateWatchdog(installerPid, obsPath, targetVersion, releaseUrl);
+                watchdogPid = StartUpdateWatchdog(installerPid, obsPath, targetVersion, releaseUrl, attemptId);
                 return new JObject { ["ok"] = true, ["processId"] = installerPid };
             }
 
@@ -847,7 +888,7 @@ namespace ReplayKitHelper
                 if (proc == null) throw new InvalidOperationException(Locales.Message("update.theInstallerDidNotStart"));
                 pid = proc.Id;
             }
-            StartUpdateWatchdog(pid, obsPath, targetVersion, releaseUrl);
+            watchdogPid = StartUpdateWatchdog(pid, obsPath, targetVersion, releaseUrl, attemptId);
             return new JObject { ["ok"] = true, ["processId"] = pid };
         }
 
@@ -882,9 +923,24 @@ namespace ReplayKitHelper
             }
         }
 
-        // set once this helper started an installer; it is never cleared, since obs and this helper are on their way out from then on
-        private static volatile bool installerStarted;
-        public static bool InstallerRunning() => installerStarted;
+        private static int launcherPid;
+        private static int watchdogPid;
+        private static DateTime handoffDeadline;
+
+        private static bool InstallerRunning()
+        {
+            string attemptId = ReadInstallAttempt();
+            int workerPid = UpdateWatchdog.ReadPid(InstallPidPath(attemptId));
+            if (workerPid <= 0 && (attemptId == null || !File.Exists(InstallResultPath(attemptId))))
+                workerPid = UpdateWatchdog.ReadPid(InstallPidPath());
+            bool handingOff = attemptId != null && workerPid <= 0 && !File.Exists(InstallResultPath(attemptId)) &&
+                DateTime.UtcNow - File.GetLastWriteTimeUtc(AttemptPath()) < TimeSpan.FromSeconds(45);
+            return (workerPid > 0 && UpdateWatchdog.IsRunning(workerPid)) ||
+                (watchdogPid > 0 && UpdateWatchdog.IsRunning(watchdogPid)) ||
+                handingOff ||
+                (launcherPid > 0 && (UpdateWatchdog.IsRunning(launcherPid) ||
+                    !File.Exists(InstallResultPath(attemptId)) && DateTime.UtcNow < handoffDeadline));
+        }
 
         public static JObject ApplyUpdate(bool automatic = false)
         {
@@ -892,7 +948,7 @@ namespace ReplayKitHelper
             bool claimed;
             lock (Server.State.UpdateCheckLock)
             {
-                if (Server.State.UpdateApplyInProgress) return new JObject { ["ok"] = false, ["message"] = Locales.Message("update.anUpdateIsAlreadyBeingApplied") };
+                if (Server.State.UpdateApplyInProgress || InstallerRunning()) return new JObject { ["ok"] = false, ["message"] = Locales.Message("update.anUpdateIsAlreadyBeingApplied") };
                 Server.State.UpdateApplyInProgress = true;
                 claimed = true;
             }
@@ -922,19 +978,24 @@ namespace ReplayKitHelper
                 if (string.IsNullOrWhiteSpace(latest.ChecksumsUrl)) throw new InvalidOperationException(Locales.Message("update.latestReleaseIsMissingFile", "file", ChecksumsAsset));
 
                 string tempDir = CreateUpdateTemp();
+                string attemptId = Guid.NewGuid().ToString("N");
+                string previousAttempt = ReadInstallAttempt();
                 JObject started;
                 string previousResult = null;
                 try
                 {
                     string installerPath = DownloadVerifiedInstaller(latest, tempDir, " " + Locales.Message("update.obsWasLeftRunningTryAgain"));
                     previousResult = ClearInstallResult();
+                    WriteInstallAttempt(attemptId);
                     SetProgressStage("install");
-                    started = StartUpdater(installerPath, tempDir, latest.LatestVersion, releaseUrl);
-                    installerStarted = true;
+                    started = StartUpdater(installerPath, tempDir, latest.LatestVersion, releaseUrl, attemptId);
+                    launcherPid = started.Value<int>("processId");
+                    handoffDeadline = DateTime.UtcNow.AddSeconds(45);
                 }
                 catch
                 {
                     RestoreInstallResult(previousResult);
+                    if (ReadInstallAttempt() == attemptId) WriteInstallAttempt(previousAttempt);
                     // the installer never started (a declined uac prompt, a failed spawn), so its download goes
                     try { Directory.Delete(tempDir, true); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
                     throw;
@@ -945,6 +1006,7 @@ namespace ReplayKitHelper
                     ["installedVersion"] = installed, ["latestVersion"] = latest.LatestVersion,
                     ["releaseUrl"] = releaseUrl,
                     ["processId"] = started["processId"],
+                    ["attemptId"] = attemptId,
                     ["message"] = Locales.Message("update.replaykitVersionIsInstallingObsWill", "version", latest.LatestVersion),
                 };
             }

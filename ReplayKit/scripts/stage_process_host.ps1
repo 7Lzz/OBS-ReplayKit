@@ -12,19 +12,24 @@ foreach ($folder in $versions) {
     if (-not (Test-Path -LiteralPath $manifestPath)) { throw "Missing process host manifest: $manifestPath" }
     $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
     if ($manifest.ObsVersion -ne $folder.Name) { throw "The process host manifest in $($folder.Name) is for OBS $($manifest.ObsVersion)." }
-    $target = Join-Path $Stage $folder.Name
+    $target = [IO.Path]::GetFullPath((Join-Path $Stage $folder.Name)).TrimEnd('\') + '\'
     $leaves = @{}
     foreach ($file in @($manifest.Files)) {
         $relative = [string]$file.Path
         # the manifest path is pasted under the bundle folder, so it must stay inside it
-        if ($relative -notmatch '^[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*$') { throw "Unsafe process host path: $relative" }
+        if ($relative -notmatch '^[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*$' -or $relative -match '\.(?:/|$)') { throw "Unsafe process host path: $relative" }
+        $to = [IO.Path]::GetFullPath((Join-Path $target $relative.Replace('/', '\')))
+        if (-not $to.StartsWith($target, [StringComparison]::OrdinalIgnoreCase)) { throw "Unsafe process host path: $relative" }
         $leaf = Split-Path -Leaf $relative
         if ($leaves.ContainsKey($leaf)) { throw "Two process host files share the name $leaf" }
         $leaves[$leaf] = $true
         $from = Join-Path $folder.FullName $leaf
         if (-not (Test-Path -LiteralPath $from -PathType Leaf)) { throw "Missing process host file: $from" }
-        if ((Get-FileHash -LiteralPath $from -Algorithm SHA256).Hash -ne $file.Sha256) { throw "The process host file $leaf does not match its manifest." }
-        $to = Join-Path $target $relative.Replace('/', '\')
+        $stream = [IO.File]::OpenRead($from)
+        $sha = [Security.Cryptography.SHA256]::Create()
+        try { $digest = [BitConverter]::ToString($sha.ComputeHash($stream)).Replace('-', '') }
+        finally { $sha.Dispose(); $stream.Dispose() }
+        if ($digest -ne $file.Sha256) { throw "The process host file $leaf does not match its manifest." }
         New-Item -ItemType Directory -Force -Path (Split-Path -Parent $to) | Out-Null
         Copy-Item -LiteralPath $from -Destination $to -Force
     }

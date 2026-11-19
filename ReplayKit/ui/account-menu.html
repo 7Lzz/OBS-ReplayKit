@@ -152,6 +152,7 @@
   const picture = { version:"", picking:false, error:"" };
   // a sign out the helper could not finish leaves the old sign-in on disk, so it says so instead of looking done
   let signOutError = "";
+  let signInError = "";
   const flow = { active:false, poll:0, timeout:0 };
 
   async function helperJson(path, options) {
@@ -208,7 +209,7 @@
     els.busy.hidden = !working;
     if (working) els.busyText.textContent = busyText;
     els.note.hidden = working;
-    const error = picture.error || signOutError;
+    const error = picture.error || signInError || signOutError;
     els.note.classList.toggle("is-error", !!error);
     if (error) els.note.textContent = error;
     els.signIn.hidden = on || working;
@@ -262,6 +263,7 @@
   // one poller drives the whole flow: the first call opens the window and every later one only reads its state, so a status read can never race ahead of the open and be mistaken for a window closed without signing in
   function startSignIn() {
     if (flow.active) return;
+    signInError = "";
     flow.active = true;
     let sawWindow = false;
     render(RK_M("common.openingStreamable"));
@@ -272,7 +274,11 @@
         res = await fetch(HELPER + "/import-session?source=owned" + (first ? "&start=1" : ""), { method:"POST", cache:"no-store" });
         data = await res.json().catch(() => ({}));
       } catch (_) { return; }
-      if (!flow.active || !res.ok) return;
+      if (!flow.active) return;
+      if (!res.ok) {
+        if (data.message) { signInError = data.message; stopFlow(); }
+        return;
+      }
       if (data.signedIn) { apply(data); stopFlow(); render(); return; }
       if (data.pending === true) { sawWindow = true; render(RK_M("common.signInInTheStreamableWindow")); return; }
       if (sawWindow) { stopFlow(); return; }

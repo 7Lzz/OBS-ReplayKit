@@ -169,6 +169,9 @@ namespace ReplayKitHelper
             AppConfig.WriteUtf8(path, payload.ToString(Formatting.Indented));
         }
 
+        internal static IEnumerable<FileInfo> Candidates(IEnumerable<FileInfo> files, int maxFiles) =>
+            files.OrderByDescending(file => file.LastWriteTimeUtc).Take(maxFiles);
+
         // returns the names actually (re)probed this pass (not reused from the existing index) -- newest-first, same order as the enumeration below -- so a caller can proactively warm up just-created clips without also rescanning every clip already sitting in the folder.
         public static List<string> Run(string clipDir, string indexPath, string ffprobe, IEnumerable<string> allowedExts, int maxFiles)
         {
@@ -183,16 +186,11 @@ namespace ReplayKitHelper
 
                 var existing = ReadExistingIndex(indexFull);
                 var entries = new JObject();
-                int count = 0;
-
                 var files = Clips.LibraryFiles(root)
-                    .Where(f => allowed.Contains(f.Extension) && Clips.IsLibraryClip(f))
-                    .OrderByDescending(f => f.LastWriteTimeUtc);
+                    .Where(f => allowed.Contains(f.Extension) && Clips.IsLibraryClip(f));
 
-                foreach (var file in files)
+                foreach (var file in Candidates(files, maxFiles > 0 ? maxFiles : int.MaxValue))
                 {
-                    if (maxFiles > 0 && count >= maxFiles) break;
-                    count++;
                     var old = existing[file.Name];
                     if (TestEntryReusable(old, file))
                     {

@@ -8,7 +8,7 @@ namespace ReplayKitHelper
     // starts a local compress-overwrite job (CompressOverwriteWorker) and resolves the job state once it finishes
     internal static class CompressOverwrite
     {
-        public static JObject StartCompressOverwriteFile(Clips.SafeClipPath selected, string mode = "smaller", int scaleHeight = 0, long? expectedSize = null, DateTime? expectedWriteTime = null)
+        public static JObject StartCompressOverwriteFile(Clips.SafeClipPath selected, string mode = "smaller", int scaleHeight = 0, long? expectedSize = null, DateTime? expectedWriteTime = null, string expectedVersion = null)
         {
             AppConfig.LoadConfig();
             string requestId = UploadState.NewRequestId();
@@ -27,7 +27,8 @@ namespace ReplayKitHelper
                 long sourceSize = current.Length;
                 DateTime sourceWriteTime = current.LastWriteTimeUtc;
                 if ((expectedSize.HasValue && sourceSize != expectedSize.Value) ||
-                    (expectedWriteTime.HasValue && sourceWriteTime != expectedWriteTime.Value))
+                    (expectedWriteTime.HasValue && sourceWriteTime != expectedWriteTime.Value) ||
+                    (expectedVersion != null && ClipRenames.Version(current) != expectedVersion))
                     return new JObject { ["ok"] = false, ["message"] = Locales.Message("storage.theSelectedClipChangedSelectIt") };
 
                 try { CompressionHistory.Prepare(); }
@@ -68,7 +69,7 @@ namespace ReplayKitHelper
                 string selectedName = selected.Name;
                 int scale = scaleHeight;
 
-                reservation.Start(() => CompressOverwriteWorker.Run(requestId, ffmpeg, sourceFull, tempPath, duration, mode, preBytes, caps, fastEncoder, smallerEncoder, scale, sourceWriteTime),
+                reservation.Start(() => CompressOverwriteWorker.Run(requestId, ffmpeg, sourceFull, selected.Root, tempPath, duration, mode, preBytes, caps, fastEncoder, smallerEncoder, scale, sourceWriteTime, expectedVersion),
                     t => OnCompressOverwriteComplete(t, requestId, tempPath));
 
                 return new JObject { ["ok"] = true, ["state"] = "compressing", ["clip"] = selectedName, ["requestId"] = requestId };

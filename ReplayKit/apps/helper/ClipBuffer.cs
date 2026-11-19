@@ -153,7 +153,7 @@ namespace ReplayKitHelper
             // the save sound already went out on the press, so a clip that did not make it says so where it stays seen
             if (result["ok"]?.Value<bool>() != true && result["message"]?.Value<string>() != BusyMessage)
             {
-                try { Notifications.Add("warning", "clip-save-failed", Locales.Message("clips.aClipWasNotSaved"), result["message"]?.Value<string>() ?? Locales.Message("clips.theClipCouldNotBeSaved")); }
+                try { Notifications.Add("warning", "", Locales.Message("clips.aClipWasNotSaved"), result["message"]?.Value<string>() ?? Locales.Message("clips.theClipCouldNotBeSaved")); }
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is InvalidOperationException || ex is Newtonsoft.Json.JsonException) { Log.Write("clip save notice: " + ex.Message); }
             }
             return result;

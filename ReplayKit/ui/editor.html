@@ -568,6 +568,8 @@ window.__rkEditorApi = (function () {
   let trimDraftArmed = false;
   let trimDraftTimer = 0;
   let trimDraftSent = "";
+  let trimDraftPending = null;
+  let trimDraftLeaving = false;
   let trimDraftNoteTimer = 0;
   const TRIM_DRAFT_DELAY_MS = 900;
   let trimSnapPoints = [];
@@ -1237,7 +1239,7 @@ window.__rkEditorApi = (function () {
 
 
   function openTrimModal(clip) {
-    if (!clip || !clip.name || trimSaving) return;
+    if (!clip || !clip.name || trimSaving || trimDraftLeaving) return;
     // the real editor stays closed and this stands in for it until onMeta below fires -- popping the actual trim-veil open early would show stale slider positions and an unloaded video (left over from whatever clip was edited last) for a beat before they snap to the right values.
     trimProcessingVeil.classList.add("is-open");
     trimVeil.classList.add("is-measuring");
@@ -1253,6 +1255,7 @@ window.__rkEditorApi = (function () {
     const draftPromise = hasDraft(clip.name) ? fetchDraft(clip.name) : Promise.resolve(null);
     trimDraftArmed = false;
     trimDraftSent = "";
+    trimDraftPending = null;
     trimLanes.resetZoom();
     trimProcessingStage.textContent = RK_M("editor.readingTheClip");
     resetVideoZoom(trimVideo);
@@ -1351,7 +1354,7 @@ window.__rkEditorApi = (function () {
 
   function closeTrimModal() {
     // a save in progress keeps the editor up, and the save closes it when the file is written
-    if (trimSaving || trimRenaming) return false;
+    if (trimSaving || trimRenaming || trimDraftLeaving) return false;
     // the edit stays behind as a draft wherever the editor is left from: the cancel button, escape, another view, a closed obs
     const kept = keepTrimDraft();
     editorTools.closed();
@@ -1604,18 +1607,38 @@ window.__rkEditorApi = (function () {
     editorExit.classList.remove("is-open");
     editorExitBtn.setAttribute("aria-expanded", "false");
   }
-  function exitEditor(keep) {
+  async function exitEditor(keep) {
+    if (trimSaving || trimRenaming || trimDraftLeaving) return;
     closeExitMenu();
     if (!keep && trimSourceClip) {
       const name = trimSourceClip.name;
       trimDraftArmed = false;
-      if (hasDraft(name)) forgetDraft(name);
+      if (hasDraft(name) || trimDraftPending) forgetDraft(name);
     }
-    if (closeTrimModal() && keep) tellTrimDraftKept();
+    if (keep && trimDraftArmed && trimEdited()) {
+      trimDraftLeaving = true;
+      trimVeil.inert = true;
+      let kept;
+      try { kept = await sendTrimDraft(true); }
+      finally {
+        trimVeil.inert = false;
+        trimDraftLeaving = false;
+      }
+      if (!kept) {
+        showToast(RK_M("editor.theDraftCouldNotBeKept"), "bad", RK_M("common.editor"));
+        scheduleToastHide(TOAST_ERROR_MS);
+        return;
+      }
+      trimDraftArmed = false;
+      closeTrimModal();
+      tellTrimDraftKept();
+      return;
+    }
+    closeTrimModal();
   }
   editorExitBtn.addEventListener("click", (e) => {
     e.stopPropagation();
-    if (trimSaving) return;
+    if (trimSaving || trimDraftLeaving) return;
     if (editorExit.classList.contains("is-open")) { closeExitMenu(); return; }
     // with nothing edited there is no draft to keep, so that row is greyed out and leaving is the other one
     document.getElementById("editor-exit-keep").disabled = !trimEdited();
@@ -1713,7 +1736,7 @@ window.__rkEditorApi = (function () {
     // the render settings and the exit menu close first, then the editor
     if (renderVeil.classList.contains("is-open")) { closeRenderSettings(); return; }
     if (editorExit.classList.contains("is-open")) { closeExitMenu(); return; }
-    if (closeTrimModal()) tellTrimDraftKept();
+    exitEditor(true);
   }, { capture: true, signal: EDITOR_SIGNAL });
 
   // the draft of the open editor. nothing is kept or dropped until the editor is up and the edit that was kept earlier is back, so a half built editor can never take a draft away
@@ -1758,31 +1781,37 @@ window.__rkEditorApi = (function () {
       trimDraftTimer = 0;
     }
     if (!trimDraftArmed || !trimSourceClip) return false;
-    const name = trimSourceClip.name;
+    const clip = trimSourceClip;
+    const name = clip.name;
     if (!trimEdited()) {
       trimDraftSent = "";
-      if (hasDraft(name)) forgetDraft(name);
+      if (hasDraft(name) || trimDraftPending) forgetDraft(name);
+      trimDraftPending = null;
       return false;
     }
     const edit = buildTrimDraft();
     const body = JSON.stringify(edit);
-    if (body === trimDraftSent) return true;
+    if (body === trimDraftSent) return trimDraftPending || true;
     trimDraftSent = body;
-    const isNew = !hasDraft(name);
-    draftsByName.set(name, { savedAt: Math.floor(Date.now() / 1000), duration: edit.duration });
-    if (isNew) draftsChanged();
-    queueDraftWrite(() => fetch(HELPER + "/drafts/save?file=" + encodeURIComponent(name) + "&t=" + Date.now(), {
+    const pending = queueDraftWrite(() => fetch(HELPER + "/drafts/save?file=" + encodeURIComponent(name) + "&t=" + Date.now(), {
       method: "POST",
       cache: "no-store",
       // a request that must outlive the page may not carry much, and a draft that is bigger just goes the plain way
       keepalive: !!final && body.length < 60000,
+      signal: AbortSignal.timeout(10000),
       headers: { "Content-Type": "application/json" },
       body,
-    })).then((res) => {
-      if (!res.ok) trimDraftSent = "";
-      else if (!final) showTrimDraftNote();
-    }).catch(() => { trimDraftSent = ""; });
-    return true;
+    })).then(async (res) => res.ok && (await res.json()).ok === true).catch(() => false).then((saved) => {
+      if (trimDraftPending === pending) {
+        trimDraftPending = null;
+        if (!saved) trimDraftSent = "";
+        else if (!final && !trimDraftLeaving && trimSourceClip === clip) showTrimDraftNote();
+      }
+      if (saved) refreshDrafts();
+      return saved;
+    });
+    trimDraftPending = pending;
+    return pending;
   }
 
   // the editor is being left, whichever way: what was changed goes to the helper now. true when something was kept
@@ -1790,7 +1819,7 @@ window.__rkEditorApi = (function () {
     const wasArmed = trimDraftArmed;
     const kept = sendTrimDraft(true);
     trimDraftArmed = false;
-    return wasArmed && kept;
+    return wasArmed && !!kept;
   }
 
   function tellTrimDraftKept() {
@@ -2194,6 +2223,7 @@ window.__rkEditorApi = (function () {
       ];
     },
     quickAction(id) {
+      if (trimDraftLeaving) return;
       if (id === "exit") editorExitBtn.click();
       else if (id === "screenshot") screenshotBtn.click();
       else if (id === "render") trimRender.click();

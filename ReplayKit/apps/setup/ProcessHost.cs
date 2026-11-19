@@ -12,6 +12,8 @@ namespace ReplayKitSetup
 {
     public static class ProcessHost
     {
+        private const string ManifestName = "manifest.json";
+        private const string PendingManifestName = "manifest.pending.json";
         private static string Root => Config.PROGRAMFILES_OBS_DIR;
         private static string Backup => PathAt(Root, "bin/64bit/replaykit-host-backup");
 
@@ -42,9 +44,9 @@ namespace ReplayKitSetup
         private static string CurrentVersion() =>
             ObsVersions.InstalledVersion()?.ToString(3) ?? throw new IOException(SetupLocale.Message("setup.obsStudioIsMissing"));
 
-        private static JObject Read(string folder, string version)
+        private static JObject Read(string folder, string version, string name = ManifestName)
         {
-            var manifest = JObject.Parse(File.ReadAllText(PathAt(folder, "manifest.json")));
+            var manifest = JObject.Parse(File.ReadAllText(PathAt(folder, name)));
             var line = ObsVersions.Lines.SingleOrDefault(item => item.Tested.ToString(3) == version)
                 ?? throw new IOException(SetupLocale.Message("setup.noProcessHostForObs", "version", version)).WithEnglish(SetupLocale.Pair("setup.noProcessHostForObs", "version", version));
             string browser = line.ModernPlugins ? "core/obs-browser/" : "obs-plugins/64bit/";
@@ -64,6 +66,9 @@ namespace ReplayKitSetup
         }
 
         private static bool ValidHash(string hash) => Regex.IsMatch(hash ?? "", "^[0-9A-F]{64}$");
+
+        private static JObject Entry(JObject manifest, string path) =>
+            (manifest?["Files"] as JArray)?.OfType<JObject>().Single(file => (string)file["Path"] == path);
 
         private static (string Folder, JObject Manifest) Bundle()
         {
@@ -114,7 +119,12 @@ namespace ReplayKitSetup
             string temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
             try
             {
-                File.WriteAllText(temporary, manifest.ToString(Formatting.Indented));
+                using (var stream = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None, 4096, FileOptions.WriteThrough))
+                {
+                    byte[] bytes = System.Text.Encoding.UTF8.GetBytes(manifest.ToString(Formatting.Indented));
+                    stream.Write(bytes, 0, bytes.Length);
+                    stream.Flush(true);
+                }
                 if (File.Exists(path)) File.Replace(temporary, path, null);
                 else File.Move(temporary, path);
             }
@@ -126,8 +136,10 @@ namespace ReplayKitSetup
             var bundle = Bundle();
             string version = (string)bundle.Manifest["ObsVersion"];
             string backup = PathAt(Backup, version);
-            string record = PathAt(backup, "manifest.json");
+            string record = PathAt(backup, ManifestName);
+            string pending = PathAt(backup, PendingManifestName);
             JObject previous = File.Exists(record) ? Read(backup, version) : null;
+            JObject interrupted = File.Exists(pending) ? Read(backup, version, PendingManifestName) : null;
             RequireClosed();
             var files = ((JArray)bundle.Manifest["Files"]).OfType<JObject>().ToArray();
             foreach (var file in files)
@@ -140,17 +152,19 @@ namespace ReplayKitSetup
                 string saved = PathAt(backup, relative);
                 if (previous != null)
                 {
-                    var old = ((JArray)previous["Files"]).OfType<JObject>().Single(item => (string)item["Path"] == relative);
+                    var old = Entry(previous, relative);
                     if ((string)old["OriginalSha256"] != original || Hash(saved) != original)
                         throw new InvalidDataException(SetupLocale.Message("setup.theOriginalObsBackupFailedVerification"));
-                    if (current != original && current != (string)old["Sha256"])
+                    if (current != original && current != (string)old["Sha256"] &&
+                        current != (string)Entry(interrupted, relative)?["Sha256"] && current != (string)file["Sha256"])
                         throw new IOException("An OBS host file changed outside ReplayKit: " + target);
                 }
                 else
                 {
-                    if (current != original)
+                    if (current == original) Copy(target, saved, original);
+                    else if ((current != (string)file["Sha256"] && current != (string)Entry(interrupted, relative)?["Sha256"]) ||
+                        !File.Exists(saved) || Hash(saved) != original)
                         throw new IOException(SetupLocale.Message("setup.originalObsFilesRequired", "version", version)).WithEnglish(SetupLocale.Pair("setup.originalObsFilesRequired", "version", version));
-                    Copy(target, saved, original);
                 }
             }
             var needed = files.Where(file =>
@@ -161,11 +175,16 @@ namespace ReplayKitSetup
             if (needed.Length == 0)
             {
                 if (!JToken.DeepEquals(previous, bundle.Manifest)) Save(record, bundle.Manifest);
+                File.Delete(pending);
                 log?.Invoke("shared OBS " + version + " process host already current");
                 return;
             }
+            if (interrupted == null) Save(pending, bundle.Manifest);
+            else if (!JToken.DeepEquals(interrupted, bundle.Manifest))
+                throw new IOException("Finish the interrupted OBS process host update with its original ReplayKit installer first.");
             Change(needed, file => Copy(PathAt(bundle.Folder, (string)file["Path"]), PathAt(Root, (string)file["Path"]), (string)file["Sha256"]),
                 () => Save(record, bundle.Manifest));
+            File.Delete(pending);
             log?.Invoke("installed the shared OBS " + version + " process host");
         }
 
@@ -222,15 +241,23 @@ namespace ReplayKitSetup
             if (!File.Exists(PathAt(Root, "bin/64bit/obs64.exe"))) return true;
             string version = CurrentVersion();
             string backup = PathAt(Backup, version);
-            string record = PathAt(backup, "manifest.json");
-            if (!File.Exists(record))
+            string record = PathAt(backup, ManifestName);
+            string pending = PathAt(backup, PendingManifestName);
+            JObject interrupted = File.Exists(pending) ? Read(backup, version, PendingManifestName) : null;
+            JObject manifest;
+            if (File.Exists(record)) manifest = Read(backup, version);
+            else if (interrupted != null) manifest = interrupted;
+            else
             {
-                if (File.Exists(PathAt(Root, "bin/64bit/replaykit-host/obs64.exe")))
-                    return RemoveStale(version, log);
-                return true;
+                string launcher = PathAt(Root, "bin/64bit/replaykit-host/obs64.exe");
+                if (!File.Exists(launcher)) return true;
+                if (!ObsVersions.Lines.Any(line => line.Tested.ToString(3) == version)) return RemoveStale(version, log);
+                manifest = Bundle().Manifest;
+                var browser = ((JArray)manifest["Files"]).OfType<JObject>().Single(file => file["OriginalSha256"]?.Type == JTokenType.String);
+                string savedBrowser = PathAt(backup, (string)browser["Path"]);
+                if (!File.Exists(savedBrowser)) return RemoveStale(version, log);
             }
             RequireClosed();
-            var manifest = Read(backup, version);
             var files = ((JArray)manifest["Files"]).OfType<JObject>().ToArray();
             foreach (var file in files)
             {
@@ -238,7 +265,7 @@ namespace ReplayKitSetup
                 string original = (string)file["OriginalSha256"];
                 string target = PathAt(Root, relative);
                 string current = File.Exists(target) ? Hash(target) : null;
-                if (current != (string)file["Sha256"] && current != original)
+                if (current != (string)file["Sha256"] && current != original && current != (string)Entry(interrupted, relative)?["Sha256"])
                     throw new IOException("An OBS host file changed outside ReplayKit: " + target);
                 if (original != null && Hash(PathAt(backup, relative)) != original)
                     throw new InvalidDataException(SetupLocale.Message("setup.theOriginalObsBackupFailedVerification"));
@@ -250,6 +277,7 @@ namespace ReplayKitSetup
                 if (original != null) Copy(PathAt(backup, (string)file["Path"]), target, original);
                 else if (File.Exists(target)) File.Delete(target);
             }, () => File.Delete(record));
+            File.Delete(pending);
             foreach (var file in files.Where(item => item["OriginalSha256"]?.Type == JTokenType.String))
                 File.Delete(PathAt(backup, (string)file["Path"]));
             log?.Invoke("restored the original OBS " + version + " browser");
@@ -259,17 +287,13 @@ namespace ReplayKitSetup
         private static bool RemoveStale(string version, Action<string> log)
         {
             RequireClosed();
-            var current = Bundle().Manifest;
-            var browser = ((JArray)current["Files"]).OfType<JObject>().Single(file => file["OriginalSha256"]?.Type == JTokenType.String);
-            if (Hash(PathAt(Root, (string)browser["Path"])) != (string)browser["OriginalSha256"])
-                throw new IOException(SetupLocale.Message("setup.theCurrentObsBrowserIsNot"));
             string launcher = PathAt(Root, "bin/64bit/replaykit-host/obs64.exe");
             string launcherHash = Hash(launcher);
             foreach (var line in ObsVersions.Lines.Where(item => item.Tested.ToString(3) != version))
             {
                 string older = line.Tested.ToString(3);
                 string folder = PathAt(Backup, older);
-                string record = PathAt(folder, "manifest.json");
+                string record = PathAt(folder, ManifestName);
                 if (!File.Exists(record)) continue;
                 var manifest = Read(folder, older);
                 var files = ((JArray)manifest["Files"]).OfType<JObject>().ToArray();
@@ -279,13 +303,14 @@ namespace ReplayKitSetup
                 {
                     string target = PathAt(Root, (string)file["Path"]);
                     string hash = File.Exists(target) ? Hash(target) : null;
-                    if (hash != null && hash != (string)file["Sha256"] && hash != (string)file["OriginalSha256"])
-                        throw new IOException("A stale process role file changed outside ReplayKit: " + target);
+                    if (file["OriginalSha256"]?.Type == JTokenType.String && hash == (string)file["Sha256"])
+                        throw new IOException(SetupLocale.Message("setup.theCurrentObsBrowserIsNot"));
                 }
                 Change(files, file =>
                 {
                     string target = PathAt(Root, (string)file["Path"]);
-                    if (File.Exists(target) && Hash(target) == (string)file["Sha256"]) File.Delete(target);
+                    if (file["OriginalSha256"]?.Type != JTokenType.String &&
+                        File.Exists(target) && Hash(target) == (string)file["Sha256"]) File.Delete(target);
                 }, () => File.Delete(record));
                 log?.Invoke("removed verified OBS " + older + " process roles; the current OBS " + version + " browser was preserved");
                 return true;

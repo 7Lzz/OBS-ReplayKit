@@ -189,6 +189,15 @@ namespace ReplayKitHelper
 
             if (path.StartsWith("/thumb/")) { HttpResponse.ServeThumbnail(stream, Uri.UnescapeDataString(path.Substring(7))); return false; }
 
+            if (path == "/screenshots/folder")
+            {
+                if (req.Method != "GET") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "GET required"); return false; }
+                try { HttpResponse.SendJson(stream, 200, new JObject { ["folder"] = Screenshots.Folder() }); }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException)
+                { HttpResponse.SendJson(stream, 404, new JObject { ["ok"] = false }); }
+                return false;
+            }
+
             if (path == "/screenshots" || path == "/screenshots/file" || path == "/screenshots/thumb")
             {
                 if (req.Method != "GET") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "GET required"); return false; }
@@ -197,16 +206,17 @@ namespace ReplayKitHelper
                     if (path == "/screenshots") HttpResponse.SendJson(stream, 200, new JObject { ["screenshots"] = Screenshots.List() });
                     else
                     {
-                        string file = Screenshots.Resolve(query.ContainsKey("file") ? query["file"] : null);
+                        string version = Q("v");
+                        string file = Screenshots.Resolve(Q("file"), version);
                         if (file == null) { HttpResponse.SendText(stream, 404, "Not Found", "Screenshot not found"); return false; }
                         bool thumb = path == "/screenshots/thumb";
-                        // the page asks with the size and time of the file in the address, so a picture under one address never changes and the browser keeps it instead of reading it again on every paint of the grid
+                        // the address includes the file version, so each picture can be cached across grid updates
                         HttpResponse.SendFile(stream, 200, "OK", new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
                         {
                             ["Content-Type"] = thumb ? "image/jpeg" : "image/png",
                             ["Cache-Control"] = "private, max-age=31536000, immutable",
                             ["X-Content-Type-Options"] = "nosniff",
-                        }, thumb ? Screenshots.Thumb(file) : file);
+                        }, thumb ? Screenshots.Thumb(file, version: version) : file);
                     }
                 }
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException || ex is System.Runtime.InteropServices.ExternalException)
@@ -254,7 +264,7 @@ namespace ReplayKitHelper
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
                 try
                 {
-                    string shot = Screenshots.Resolve(query.ContainsKey("file") ? query["file"] : null);
+                    string shot = Screenshots.Resolve(Q("file"), Q("v"));
                     if (shot == null) { HttpResponse.SendJson(stream, 404, new JObject { ["ok"] = false, ["message"] = Locales.Message("clips.screenshotNotFound") }); return false; }
                     var answer = new JObject { ["ok"] = true };
                     if (path == "/screenshots/delete") answer["kept"] = Screenshots.Delete(shot);
@@ -317,7 +327,7 @@ namespace ReplayKitHelper
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
                 var deleted = Clips.DeleteClip(query.ContainsKey("file") ? query["file"] : null);
-                if (deleted.Status == 200) HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["name"] = deleted.Name, ["kept"] = deleted.Kept });
+                if (deleted.Status == 200) HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["name"] = deleted.Name, ["kept"] = deleted.Kept, ["warning"] = deleted.Warning });
                 else HttpResponse.SendJson(stream, deleted.Status, new JObject { ["ok"] = false, ["message"] = deleted.Message });
                 return false;
             }
@@ -366,15 +376,24 @@ namespace ReplayKitHelper
                         answer["file"] = made;
                         answer["size"] = size;
                         // the popup over the obs window, so it is seen from any view; the clips page shows its own toast only when that popup could not be shown
-                        answer["popup"] = DonePopups.Show("done", Locales.Message("clips.gifExported"),
+                        string title = Locales.Message("clips.gifExported");
+                        string detail = Locales.Message("clips.sizeSavedToTheGifsSection", "size", Storage.FormatBytes(size));
+                        bool shown = DonePopups.Show("done", title,
                             new JObject
                             {
                                 ["icon"] = "gif",
                                 ["media"] = "/gifs/file?file=" + Uri.EscapeDataString(made) + "&v=" + size,
                                 ["text"] = Path.GetFileNameWithoutExtension(made),
-                                ["detail"] = Locales.Message("clips.sizeSavedToTheGifsSection", "size", Storage.FormatBytes(size)),
+                                ["detail"] = detail,
                                 ["action"] = new JObject { ["label"] = Locales.Message("clips.goToGif"), ["kind"] = "reveal-gif", ["file"] = made },
                             });
+                        answer["popup"] = shown;
+                        if (!shown)
+                        {
+                            try { Notifications.Add("info", "", title, made + "\n" + detail); }
+                            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is Newtonsoft.Json.JsonException)
+                            { Log.Write("GIF completion notice: " + ex.Message); }
+                        }
                     }
                     else
                     {

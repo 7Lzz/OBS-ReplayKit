@@ -23,8 +23,12 @@ namespace ReplayKitHelper
                 string path = StorePath();
                 if (!File.Exists(path)) return new JArray();
                 var parsed = JToken.Parse(File.ReadAllText(path));
-                if (parsed is JArray direct) return direct;
-                return (parsed as JObject)?["items"] as JArray ?? new JArray();
+                var items = parsed as JArray ?? (parsed as JObject)?["items"] as JArray;
+                if (items == null) return new JArray();
+                return new JArray(items.OfType<JObject>().Where(item =>
+                    item["id"]?.Type == JTokenType.String &&
+                    (item["read"] == null || item["read"].Type == JTokenType.Boolean) &&
+                    (item["key"] == null || item["key"].Type == JTokenType.String)));
             }
             catch (Exception ex) when (ex is IOException || ex is JsonException || ex is UnauthorizedAccessException)
             {

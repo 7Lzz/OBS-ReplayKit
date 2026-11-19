@@ -11,8 +11,25 @@ namespace ReplayKitHelper
     // auth storage (dpapi). saves the streamable session cookie + the user info json, encrypted with the current windows users dpapi master key -- so its tied to this account, never leaves disk readable, and survives reboots without us needing to store a password.
     internal static class AuthCore
     {
-        // path to the curl cookie jar handed to the in-process upload orchestration (Upload.cs) whenever the user is signed in. ApplyAuth rewrites it from the decrypted blob, so the cookies live on disk in plaintext only while a session is active.
-        public static string GetAuthCookieJarPath() => Path.Combine(Constants.AUTH_DIR, "auth_cookies.txt");
+        private static string _cookies = "";
+        private static int _sessionVersion;
+        private static string LegacyCookieJar => Path.Combine(Constants.AUTH_DIR, ReplayKitShared.StateLayout.StreamableLegacyCookieFile);
+
+        public static string CaptureCookies()
+        {
+            lock (Server.State.AuthLock) return _cookies;
+        }
+
+        private static bool DeleteAuthFile(string file)
+        {
+            try { File.Delete(file); return true; }
+            catch (DirectoryNotFoundException) { return true; }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+            {
+                Log.Write("Could not remove sign-in file " + Path.GetFileName(file) + ": " + ex.GetType().Name);
+                return false;
+            }
+        }
 
         // persists a curl cookie jar (the session of the streamable sign-in window) encrypted with the current users dpapi key, so the session never lives on disk in plain text.
         public static void SaveAuthBlob(string cookieFileContent, JObject user)
@@ -49,33 +66,27 @@ namespace ReplayKitHelper
         // false when a saved sign-in file is still there, so a sign out can say it did not finish instead of signing back in on the next start
         public static bool ClearAuthBlob()
         {
-            bool cleared = true;
-            foreach (string file in new[] { Constants.AUTH_FILE, GetAuthCookieJarPath() })
-            {
-                try { if (File.Exists(file)) File.Delete(file); }
-                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
-                {
-                    Log.Write("Clear sign-in file " + Path.GetFileName(file) + ": " + ex.Message);
-                    cleared = false;
-                }
-            }
-            return cleared;
+            bool encryptedCleared = DeleteAuthFile(Constants.AUTH_FILE);
+            return DeleteAuthFile(LegacyCookieJar) && encryptedCleared;
         }
 
         public static void StreamableBackgroundLogout()
         {
-            string jar = GetAuthCookieJarPath();
-            if (!File.Exists(jar)) return;
+            string cookies = CaptureCookies();
+            if (string.IsNullOrEmpty(cookies)) return;
+            string jar = Path.Combine(Constants.SCRATCH_DIR, "streamable_logout_" + Guid.NewGuid().ToString("N") + ".cookies.txt");
             string respPath = Path.Combine(Constants.SCRATCH_DIR, "streamable_logout_" + Guid.NewGuid().ToString("N") + ".txt");
             try
             {
                 string url = "https://streamable.com/logout?_cb=" + DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-                var r = Curl.Run("-s", "-S", "--max-time", "10", "-L", "-b", jar, "-c", jar, "-o", respPath, "-w", "%{http_code}", url);
-                string codeText = (r.Stdout + r.Stderr).Trim();
+                File.WriteAllText(jar, cookies, Encoding.ASCII);
+                var r = Curl.Run("-s", "-S", "--max-time", "10", "-L", "-b", jar, "-o", respPath, "-w", "%{http_code}", url);
+                string codeText = r.Stdout.Trim();
                 Log.Write("Background Streamable logout http=" + codeText + " curlExit=" + r.ExitCode);
             }
             finally
             {
+                DeleteAuthFile(jar);
                 try { if (File.Exists(respPath)) File.Delete(respPath); }
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
             }
@@ -118,12 +129,8 @@ namespace ReplayKitHelper
             }
             lock (Server.State.AuthLock)
             {
-                // publish the session only after its cookie jar is ready for readers of the same lock.
-                if (!string.IsNullOrEmpty(cookieFile))
-                {
-                    Directory.CreateDirectory(Constants.AUTH_DIR);
-                    File.WriteAllText(GetAuthCookieJarPath(), cookieFile, Encoding.ASCII);
-                }
+                _cookies = cookieFile ?? "";
+                _sessionVersion++;
                 Server.State.Auth = new AuthState
                 {
                     SignedIn = user != null,
@@ -139,6 +146,8 @@ namespace ReplayKitHelper
         {
             lock (Server.State.AuthLock)
             {
+                _cookies = "";
+                _sessionVersion++;
                 Server.State.Auth = new AuthState
                 {
                     SignedIn = false,
@@ -151,10 +160,9 @@ namespace ReplayKitHelper
             }
         }
 
-        // validate an existing session by hitting /api/v1/me. returns the user object on success, null otherwise. called at startup from the dpapi-stored blob; if streamables session has expired the stored auth gets dropped.
-        public static JObject InvokeStreamableMe(string cookieFileContent)
+        public static (JObject User, bool Rejected) InvokeStreamableMe(string cookieFileContent)
         {
-            string jar = Path.Combine(Constants.SCRATCH_DIR, "streamable_me_" + Guid.NewGuid().ToString("N") + ".txt");
+            string jar = Path.Combine(Constants.SCRATCH_DIR, "streamable_me_" + Guid.NewGuid().ToString("N") + ".cookies.txt");
             string respPath = Path.Combine(Constants.SCRATCH_DIR, "streamable_me_resp_" + Guid.NewGuid().ToString("N") + ".txt");
             try
             {
@@ -170,24 +178,25 @@ namespace ReplayKitHelper
                     "-o", respPath,
                     "-w", "%{http_code}",
                     url);
-                if (!int.TryParse(r.Stdout.Trim(), out int code) || code < 200 || code >= 300) return null;
-                if (!File.Exists(respPath)) return null;
+                if (r.ExitCode != 0 || !int.TryParse(r.Stdout.Trim(), out int code)) return (null, false);
+                if (code == 401 || code == 403) return (null, true);
+                if (code < 200 || code >= 300 || !File.Exists(respPath)) return (null, false);
                 string body = File.ReadAllText(respPath);
                 try
                 {
                     var u = JObject.Parse(body);
                     Log.Write("Streamable session validated.");
-                    return u;
+                    return (u, false);
                 }
                 catch (JsonException)
                 {
                     Log.Write("Streamable /me: invalid JSON response.");
-                    return null;
+                    return (null, false);
                 }
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is System.ComponentModel.Win32Exception)
             {
-                return null;
+                return (null, false);
             }
             finally
             {
@@ -201,18 +210,32 @@ namespace ReplayKitHelper
         // restore the signed-in session from the dpapi cookie blob. called once at startup. if streamable rejects the cookies (session expired, signed out elsewhere), drop the stored auth quietly.
         public static void RestoreAuthAtStartup()
         {
-            var blob = LoadAuthBlob();
-            string cookies = blob?["cookies"]?.Value<string>();
-            if (blob == null || string.IsNullOrEmpty(cookies)) return;
-            var live = InvokeStreamableMe(cookies);
-            if (live != null)
+            string cookies;
+            int version;
+            lock (Server.State.AuthLock)
             {
-                ApplyAuth(live, cookies);
-                Log.Write("Restored signed-in session.");
-                return;
+                DeleteAuthFile(LegacyCookieJar);
+                if (_sessionVersion != 0) return;
+                cookies = LoadAuthBlob()?["cookies"]?.Value<string>();
+                version = _sessionVersion;
             }
-            Log.Write("Stored auth blob exists but Streamable rejected the session -- clearing.");
-            ClearAuthBlob();
+            if (string.IsNullOrEmpty(cookies)) return;
+            var live = InvokeStreamableMe(cookies);
+            lock (Server.State.AuthLock)
+            {
+                if (version != _sessionVersion) return;
+                if (live.User != null)
+                {
+                    ApplyAuth(live.User, cookies);
+                    Log.Write("Restored signed-in session.");
+                }
+                else if (live.Rejected)
+                {
+                    Log.Write("Streamable rejected the saved session; clearing it.");
+                    ClearAuthBlob();
+                }
+                else Log.Write("Streamable session could not be verified; keeping the encrypted sign-in.");
+            }
         }
     }
 }

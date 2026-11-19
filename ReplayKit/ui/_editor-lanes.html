@@ -1700,12 +1700,15 @@
       showMenu(e.clientX, e.clientY, items);
     }
 
-    // a time of the source video as it lands on the timeline: through the piece of the video it is in when the video was cut up, else stretched by the speed; null when that moment was cut out
-    function sourceToTimeline(srcT) {
-      if (!videoEdited()) return srcT / st.vspeed;
+    // a word maps through one retained piece, including its end boundary
+    function sourceToTimeline(start, end) {
+      if (!videoEdited()) return [start / st.vspeed, end / st.vspeed];
       for (var i = 0; i < st.vsegs.length; i++) {
         var v = st.vsegs[i];
-        if (!v.ref && srcT >= v.srcStart && srcT < v.srcEnd) return v.at + (srcT - v.srcStart) / vSpeed(v);
+        if (!v.ref && start >= v.srcStart && start < v.srcEnd && end <= v.srcEnd + 1e-6) {
+          var speed = vSpeed(v);
+          return [v.at + (start - v.srcStart) / speed, v.at + (Math.min(end, v.srcEnd) - v.srcStart) / speed];
+        }
       }
       return null;
     }
@@ -2510,7 +2513,11 @@
       var len = vLen(piece);
       t = r3(t);
       var under = vAt(t);
-      if (under && t > under.at + MIN_LEN && t < vEnd(under) - MIN_LEN) splitV(under, t);
+      if (under) {
+        var before = t - under.at, after = vEnd(under) - t;
+        if (Math.min(before, after) <= MIN_LEN) t = before <= after ? under.at : r3(vEnd(under));
+        else t = splitV(under, t).at;
+      }
       st.vsegs.forEach(function (v) { if (v.at >= t - 1e-6) v.at = r3(v.at + len); });
       if (st.ready) {
         allSegs().forEach(function (h) { if (!h.seg.link && t > h.seg.at + MIN_LEN && t < segEnd(h.seg) - MIN_LEN) splitPiece(h, t); });
@@ -5410,12 +5417,14 @@
     }
 
     // the audio of a file that is ready becomes a piece in a row of its own. its waveform is drawn and the element that plays it is loaded before the row is made, so audio that cannot be played never gets one
-    function placeImport(info, at, mine, link) {
+    function placeImport(info, at, mine, link, sourceStart) {
       var known = trackOfImport(info.id);
       var src = known ? known.index : IMPORT_BASE + st.nextImport;
       var peaked = known ? Promise.resolve(st.peaks[src]) : fetchPeaksFrom(opts.helper + "/import-audio/peaks?id=" + encodeURIComponent(info.id));
       return peaked.then(function (peaks) {
         if (mine !== seq) return false;
+        var from = r3(sourceStart || 0);
+        if (from >= peaks.duration) return false;
         if (!known) {
           st.nextImport += 1;
           st.tracks.push({ index: src, label: info.name || RK_M("common.audio"), importId: info.id });
@@ -5425,7 +5434,7 @@
           // a piece that went while its sound was being made takes no sound
           if (mine !== seq || (link && linkAt(link) == null) || !roomForRow()) return false;
           var start = importStart(at);
-          var seg = newSeg(src, 0, r3(Math.min(peaks.duration, boundsT().end - start)), start);
+          var seg = newSeg(src, from, r3(Math.min(peaks.duration, from + boundsT().end - start)), start);
           // the sound of a piece from another clip lies on that piece, which syncLinked works out
           if (link) { seg = newSeg(src, 0, r3(peaks.duration), linkAt(link)); seg.link = link; }
           var lane = { id: newId("L"), label: pieceLabel(seg), segments: [seg] };
@@ -6154,7 +6163,7 @@
         return track && !track.importId ? track.index : null;
       },
       checkpoint: function () { commit(); },
-      sourceToTimeline: function (srcT) { return sourceToTimeline(srcT); },
+      sourceToTimeline: sourceToTimeline,
       // the audio tracks of the clip itself (not the files brought in), which the speech engine can listen to
       sourceTracks: function () { return st.tracks.filter(function (t) { return !t.importId; }).map(function (t) { return { index: t.index, label: t.label, name: t.name }; }); },
       // the part of the source video the saved copy shows, in seconds of the video, which is what the speech engine listens to
@@ -6214,13 +6223,13 @@
       // whether audio can be added right now, and what the audio tab says when it cannot
       importState: function () { return { ready: st.ready, picking: st.picking, importing: st.importing, tip: IMPORT_TIP }; },
       // an import the helper already made (a voiceover), placed as a row of its own starting at the time of the timeline given
-      placeImportAt: function (id, at, link) {
+      placeImportAt: function (id, at, link, sourceStart) {
         if (!st.ready) return Promise.resolve(false);
         var mine = seq;
         st.importing += 1;
         setBusy();
         return waitImport(id, mine)
-          .then(function (info) { return info ? placeImport(info, at, mine, link) : false; })
+          .then(function (info) { return info ? placeImport(info, at, mine, link, sourceStart) : false; })
           .catch(function (err) { importNote((err && err.message) || RK_M("editor.theRecordingCouldNotBeAdded")); return false; })
           .then(function (placed) {
             if (mine === seq) { st.importing = Math.max(0, st.importing - 1); setBusy(); }

@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using Newtonsoft.Json.Linq;
 
 namespace ReplayKitHelper
@@ -12,6 +13,8 @@ namespace ReplayKitHelper
         private static string _staging;
         private static string _wav;
         private static int _takes;
+        private const string StagingPrefix = "voice-";
+        private const string WavName = "voiceover.wav";
 
         private static JObject Fail(string message) => new JObject { ["ok"] = false, ["message"] = message };
 
@@ -44,9 +47,9 @@ namespace ReplayKitHelper
                 DiscardLocked();
                 // a mic test running at the same time would only meter the same microphone twice
                 MicTest.Stop();
-                _staging = Path.Combine(Constants.SCRATCH_DIR, "voice-" + Guid.NewGuid().ToString("N"));
+                _staging = Path.Combine(Constants.SCRATCH_DIR, StagingPrefix + Guid.NewGuid().ToString("N"));
                 Directory.CreateDirectory(_staging);
-                _wav = Path.Combine(_staging, "voiceover.wav");
+                _wav = Path.Combine(_staging, WavName);
                 var session = MicLoopback.Start(deviceId, gain, noise, sensitivity, false, out string error, _wav);
                 if (session == null)
                 {
@@ -108,6 +111,28 @@ namespace ReplayKitHelper
             }
             _staging = null;
             _wav = null;
+        }
+
+        internal static void RemoveAbandonedTakes()
+        {
+            var scratch = new DirectoryInfo(Constants.SCRATCH_DIR);
+            if (!scratch.Exists || (scratch.Attributes & FileAttributes.ReparsePoint) != 0 ||
+                (scratch.Parent.Attributes & FileAttributes.ReparsePoint) != 0) return;
+            foreach (var folder in scratch.EnumerateDirectories(StagingPrefix + "*"))
+            {
+                if (!folder.Name.StartsWith(StagingPrefix, StringComparison.Ordinal) ||
+                    !Guid.TryParseExact(folder.Name.Substring(StagingPrefix.Length), "N", out _) ||
+                    (folder.Attributes & FileAttributes.ReparsePoint) != 0) continue;
+                try
+                {
+                    var wav = new FileInfo(Path.Combine(folder.FullName, WavName));
+                    if (wav.Exists && (wav.Attributes & FileAttributes.ReparsePoint) == 0)
+                        wav.Delete();
+                    if (!folder.EnumerateFileSystemInfos().Any()) folder.Delete();
+                }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+                { Log.Write("Voiceover startup cleanup: " + ex.GetType().Name); }
+            }
         }
     }
 }

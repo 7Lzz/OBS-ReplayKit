@@ -17,6 +17,8 @@ namespace {
 
 // how long a live obs may send no frame before the card shows; obs keeps rendering while it runs, so this only covers a stall
 constexpr ULONGLONG kFrameStaleMs = 1000;
+// the obs plugin checks for new share windows once a second
+constexpr ULONGLONG kFirstProducerWaitMs = 6000;
 // the card and a frozen frame are presented again this often, since discord gives up on a window that stops presenting
 constexpr ULONGLONG kRepresentMs = 33;
 // the card fades in over the frame it replaces while its picture rises into place, and fades out over the frame that comes back
@@ -199,6 +201,7 @@ int ShareApp::Run(const Options &options)
 	Log("share window ready: hwnd %p, keep %lld s", static_cast<void *>(window.Handle()), keepSeconds);
 
 	awaySince = NowMs();
+	firstProducerDeadline = awaySince + kFirstProducerWaitMs;
 	cardShownAt = awaySince;
 	HANDLE waits[] = {shared.FrameEvent(), pipe.Ready(), timer};
 	while (!quit) {
@@ -254,19 +257,20 @@ bool ShareApp::RebuildRenderer(uint64_t luid)
 	return true;
 }
 
-bool ShareApp::EnsureSharedTexture()
+bool ShareApp::EnsureSharedTexture(bool replace)
 {
 	SharedState *state = shared.State();
 	uint32_t width = state->wantWidth.load();
 	uint32_t height = state->wantHeight.load();
 	if (!width || !height)
 		return false;
-	if (renderer.SharedHandle() && renderer.SharedWidth() == width && renderer.SharedHeight() == height)
+	if (!replace && renderer.SharedHandle() && renderer.SharedWidth() == width && renderer.SharedHeight() == height)
 		return true;
 	if (!renderer.CreateSharedTexture(width, height)) {
 		shared.PublishTexture(0, 0, 0, 0, renderer.AdapterLuid());
 		return false;
 	}
+	lastFramesWritten = state->framesWritten.load(std::memory_order_acquire);
 	shared.PublishTexture(renderer.SharedHandle(), width, height, renderer.SharedFormat(), renderer.AdapterLuid());
 	return true;
 }
@@ -285,12 +289,14 @@ void ShareApp::Tick(bool frameSignal)
 	uint32_t producerState = state->producerState.load();
 	bool present = producer && producerState == ProducerLive;
 	if (present) {
+		firstProducerDeadline = 0;
 		uint64_t luid = state->producerAdapterLuid.load();
 		if (luid && luid != renderer.AdapterLuid() && !RebuildRenderer(luid)) {
 			rebuildAt = now + 2000;
 			return;
 		}
-		EnsureSharedTexture();
+		if (EnsureSharedTexture(previousProducer != 0 && previousProducer != producer))
+			previousProducer = producer;
 		if (awaySince) {
 			Log("obs (pid %lu) is sending frames", producer);
 			awaySince = 0;
@@ -325,7 +331,7 @@ void ShareApp::Tick(bool frameSignal)
 	}
 	audio.SetCardShowing(!live);
 
-	if (!present && awaySince && holdUntil <= now && keepSeconds >= 0 && now - awaySince >= ULONGLONG(keepSeconds) * 1000) {
+	if (!present && awaySince && firstProducerDeadline <= now && holdUntil <= now && keepSeconds >= 0 && now - awaySince >= ULONGLONG(keepSeconds) * 1000) {
 		Log("obs stayed away for %lld s, the keep time", keepSeconds);
 		quit = true;
 		return;

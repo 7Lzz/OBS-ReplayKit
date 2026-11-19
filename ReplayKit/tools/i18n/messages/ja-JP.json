@@ -2193,6 +2193,10 @@
     "source": "643687bc3adaac76",
     "text": "長さ"
   },
+  "common.libraryMetadataNotSaved": {
+    "source": "eacdd6020bcafe24",
+    "text": "ファイル操作は成功しましたが、ReplayKit はライブラリのメタデータを保存できませんでした。"
+  },
   "common.microphone": {
     "source": "a0b39d22329a3057",
     "text": "マイク"
@@ -4929,6 +4933,10 @@
     "source": "154539677af96fde",
     "text": "生成を停止"
   },
+  "editor.stopWaitingForSpeech": {
+    "source": "755a025356331703",
+    "text": "待機をやめる"
+  },
   "editor.stopping": {
     "source": "24a54b7783c68b9d",
     "text": "停止しています"
@@ -6907,10 +6915,6 @@
     "source": "1ef347e11e320e77",
     "text": "{name} の不透明度を設定できませんでした: {error}"
   },
-  "settings.couldNotSetObsMonitoringDevice": {
-    "source": "7a59e2250afe7e65",
-    "text": "{attempts} 回試しても OBS のモニター出力デバイスを {device} に設定できませんでした。{error}"
-  },
   "settings.couldNotSetTheInputSensitivity": {
     "source": "14a78e615b5856e2",
     "text": "入力感度を設定できませんでした: {error}"
@@ -7067,10 +7071,6 @@
     "source": "dc224b7bdacd7452",
     "text": "デスクトップ音声は ReplayKit の音声キャプチャのソースではありません。"
   },
-  "settings.desktopAudioMixerStateCouldNot": {
-    "source": "a6cb6a37c3f32ec3",
-    "text": "デスクトップ音声のミキサーの状態を変更できませんでした: {error}"
-  },
   "settings.desktopAudioMonitoringStateCouldNot": {
     "source": "8b4f905e314f933e",
     "text": "デスクトップ音声のモニター状態を確認できませんでした: {error}"
@@ -7134,18 +7134,6 @@
   "settings.discordOutputModeWasSavedBut": {
     "source": "cf54892ef94981cc",
     "text": "Discord の出力モードは保存されましたが、{message}"
-  },
-  "settings.discordOutputModeWasSavedBut2": {
-    "source": "b2e1e3c1f61824da",
-    "text": "Discord の出力モードは保存されましたが、仮想カメラの状態を読み取れませんでした: {error}"
-  },
-  "settings.discordOutputModeWasSavedBut3": {
-    "source": "d4b6c910b24f583c",
-    "text": "Discord の出力モードは保存されましたが、従来の仮想カメラを開始できませんでした: {error}"
-  },
-  "settings.discordOutputModeWasSavedBut4": {
-    "source": "a8734d0c4437f133",
-    "text": "Discord の出力モードは保存されましたが、仮想カメラを停止できませんでした: {error}"
   },
   "settings.discordRichPresence": {
     "source": "6257e038f7a60bdc",
@@ -7230,6 +7218,18 @@
   "settings.dragToPosition": {
     "source": "43ddd66cdc6eb3f4",
     "text": "ドラッグして位置を設定"
+  },
+  "settings.followWindowsLanguage": {
+    "source": "4611df7bceeadea6",
+    "text": "Windows の言語に従う"
+  },
+  "settings.micSettingsReverted": {
+    "source": "8090a6cb1a20a12d",
+    "text": "OBS で適用できなかったマイクの変更を元に戻しました。"
+  },
+  "settings.monitoringDeviceNotConfirmed": {
+    "source": "3ebdf5a7cab0f4b6",
+    "text": "OBS が {device} を現在のモニタリングデバイスとして確認できませんでした。"
   },
   "settings.resetOverlaySizeAndRotation": {
     "source": "910d03d1f3f121c3",
@@ -7811,10 +7811,6 @@
     "source": "fba79278f18f924b",
     "text": "マイクのレベル"
   },
-  "settings.microphoneSettingsWereSavedButObs": {
-    "source": "6f14c78637164845",
-    "text": "マイクの設定は保存されましたが、OBS に接続できないか、「{MicInputName}」の入力がありません。OBS を再起動してもう一度お試しください。"
-  },
   "settings.microphoneTestFailedError": {
     "source": "50c8f789e3a910a5",
     "text": "マイクのテストに失敗しました: {error}"
@@ -8194,10 +8190,6 @@
   "settings.obsStartsInTheSystemTray": {
     "source": "f20d594c5c35b559",
     "text": "OBS はウィンドウを開かず、システムトレイで起動します。"
-  },
-  "settings.obsStillReportsMonitoringDevice": {
-    "source": "fbf08ec8489ae7d3",
-    "text": "OBS はまだモニタリングデバイス '{name}' ({id}) を報告しています。"
   },
   "settings.obsStudioItselfWillAlsoBe": {
     "source": "bb2ea21750848284",
@@ -9529,10 +9521,6 @@
     "source": "a5a22c78e84a093d",
     "text": "表示(V)"
   },
-  "settings.virtualCameraIsLegacyDeprecatedFor": {
-    "source": "b1ce52f88717759e",
-    "text": "仮想カメラは Discord 出力では旧式で、非推奨です。"
-  },
   "settings.volumeMustBeBetween0And": {
     "source": "815edf45de52ca90",
     "text": "音量は 0 から {VolumeMax} の間で指定してください。"
@@ -9672,10 +9660,6 @@
   "setup.cleanupComplete": {
     "source": "aca630d212306171",
     "text": "クリーンアップが完了しました"
-  },
-  "setup.clearOldObsFiles": {
-    "source": "bcb2b555e88da7f9",
-    "text": "古い OBS ファイルを削除"
   },
   "setup.clearTheSetupCache": {
     "source": "9e44cd91060a45b7",
@@ -10056,10 +10040,6 @@
   "setup.removeWindowsStartup": {
     "source": "e5147babfcd16e35",
     "text": "Windows のスタートアップから削除"
-  },
-  "setup.removesFilesAnObsUpdateLeft": {
-    "source": "b82245e09590bef7",
-    "text": "OBS の更新で残されたファイルを削除します。"
   },
   "setup.removesStreamableLoginDataAndSchedules": {
     "source": "7c1b2590789a2f8f",
@@ -11302,10 +11282,6 @@
   "update.startupUpdateCheckAlreadyRan": {
     "source": "b521777f902946bb",
     "text": "起動時の更新確認は既に実行されています。"
-  },
-  "update.theInstallerDidNotFinishWithin": {
-    "source": "e8064abfffb78ac5",
-    "text": "インストーラーは 3 分以内に完了しませんでした。"
   },
   "update.theInstallerDidNotStart": {
     "source": "351d29af6f6c787b",

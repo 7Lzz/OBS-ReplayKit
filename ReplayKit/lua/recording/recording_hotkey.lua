@@ -4,24 +4,16 @@ local obs = obslua
 local ffi_ok, ffi = pcall(require, "ffi")
 
 local REFRESH_SECONDS = 1.0
-local CAPTURE_POLL_SECONDS = 0.05
 local MAX_SETTINGS_BYTES = 65536
 -- obs 33 moved replay saving from the output to a frontend hotkey
 local CLIP_HOTKEY_NAMES = { "ReplayBuffer.Save", "OBSBasic.SaveReplayBuffer" }
-local RECORDING_HOTKEY_NAMES = {
-    "OBSBasic.StartRecording",
-    "OBSBasic.StopRecording",
-}
+local START_RECORDING_HOTKEY = { "OBSBasic.StartRecording" }
+local STOP_RECORDING_HOTKEY = { "OBSBasic.StopRecording" }
 -- obss own Screenshot Output; the plugin moves the picture it saves into the Screenshots folder
 local SCREENSHOT_HOTKEY_NAMES = { "OBSBasic.Screenshot" }
 
 local last_signature = nil
 local refresh_elapsed = 0
-local capture_elapsed = 0
-local capture_active = false
--- write time and size of the capture signal when it was last read; the 50ms poll runs on the obs graphics thread, and checking these costs about a third of reading the file
-local last_signal_stamp = nil
-local file_attr = nil
 local native_warned = false
 local missing_warned = {}
 local obsffi = nil
@@ -87,10 +79,6 @@ local function runtime_settings_path()
     return replaykit_state_file("replaykit_settings.json")
 end
 
-local function capture_signal_path()
-    return replaykit_state_file("hotkey_capture_signal.json")
-end
-
 local function valid_obs_key(key)
     return type(key) == "string"
         and #key >= 9
@@ -136,8 +124,15 @@ local function load_runtime_settings()
     local settings = {
         clip = read_combos(data, "clipKeybind"),
         recording = read_combos(data, "recordingKeybind"),
+        recordingStop = read_combos(data, "recordingStopKeybind"),
         screenshot = read_combos(data, "screenshotKeybind"),
     }
+    local stop = obs.obs_data_get_obj(data, "recordingStopKeybind")
+    if stop == nil then
+        settings.recordingStop = settings.recording
+    else
+        obs.obs_data_release(stop)
+    end
     obs.obs_data_release(data)
     return settings
 end
@@ -161,6 +156,7 @@ end
 local function settings_signature(settings)
     return "clip=" .. combos_signature(settings.clip) ..
         "|recording=" .. combos_signature(settings.recording) ..
+        "|recordingStop=" .. combos_signature(settings.recordingStop) ..
         "|screenshot=" .. combos_signature(settings.screenshot)
 end
 
@@ -245,90 +241,24 @@ local function load_native_hotkeys(target_names, combos, warn_key, missing_messa
 end
 
 local function refresh_hotkeys(force)
+    local cd = obs.calldata_create()
+    local called = obs.proc_handler_call(obs.obs_get_proc_handler(), "replaykit_hotkey_capture_active", cd)
+    local capturing = called and obs.calldata_bool(cd, "active")
+    obs.calldata_destroy(cd)
+    if capturing then return end
     local settings = load_runtime_settings()
     local signature = settings_signature(settings)
     if not force and signature == last_signature then return end
     last_signature = signature
 
     load_native_hotkeys(CLIP_HOTKEY_NAMES, settings.clip, "clip", "Could not find OBS native clip hotkey to update.")
-    load_native_hotkeys(RECORDING_HOTKEY_NAMES, settings.recording, "recording", "Could not find OBS native recording hotkeys to update.")
+    load_native_hotkeys(START_RECORDING_HOTKEY, settings.recording, "recordingStart", "Could not find OBS start recording hotkey to update.")
+    load_native_hotkeys(STOP_RECORDING_HOTKEY, settings.recordingStop, "recordingStop", "Could not find OBS stop recording hotkey to update.")
     load_native_hotkeys(SCREENSHOT_HOTKEY_NAMES, settings.screenshot, "screenshot", "Could not find OBS native screenshot hotkey to update.")
     log(obs.LOG_INFO, "Loaded OBS native hotkeys: " .. signature)
 end
 
--- nil when the stamp cannot be taken, and the file is then read every time like before
-local function file_stamp(path)
-    if not ffi_ok then return nil end
-    if file_attr == nil then
-        if not _G.__replaykit_file_stamp_defined then
-            pcall(ffi.cdef, [[
-                typedef struct { uint32_t attrs, c1, c2, a1, a2, w1, w2, sizeHigh, sizeLow; } rk_file_attr_t;
-                int GetFileAttributesExA(const char *name, int level, rk_file_attr_t *out);
-            ]])
-            _G.__replaykit_file_stamp_defined = true
-        end
-        local ok, attr = pcall(ffi.new, "rk_file_attr_t")
-        if not ok then return nil end
-        file_attr = attr
-    end
-    local ok, found = pcall(ffi.C.GetFileAttributesExA, path, 0, file_attr)
-    if not ok or found == 0 then return nil end
-    return tostring(file_attr.w1) .. ":" .. tostring(file_attr.w2) .. ":" .. tostring(file_attr.sizeLow)
-end
-
--- written by the c# helper when the settings dock starts/stops capturing a new hotkey combo. fast-polled (CAPTURE_POLL_SECONDS) separately from the REFRESH_SECONDS saved-settings sync above, since this is the signal that actually has to beat a users reaction time.
-local function read_capture_signal()
-    local text = read_text(capture_signal_path())
-    if not text or text == "" then return nil end
-    local data = obs.obs_data_create_from_json(text)
-    if data == nil then return nil end
-    local signal = { active = obs.obs_data_get_bool(data, "active") }
-    if not signal.active then
-        signal.clip = read_combos(data, "clipKeybind")
-        signal.recording = read_combos(data, "recordingKeybind")
-        signal.screenshot = read_combos(data, "screenshotKeybind")
-    end
-    obs.obs_data_release(data)
-    return signal
-end
-
-local function apply_capture_signal()
-    -- an unchanged file holds the signal that was already applied
-    local stamp = file_stamp(capture_signal_path())
-    if stamp ~= nil and stamp == last_signal_stamp then return end
-    last_signal_stamp = stamp
-    local signal = read_capture_signal()
-    if not signal then return end
-
-    if signal.active and not capture_active then
-        capture_active = true
-        load_native_hotkeys(CLIP_HOTKEY_NAMES, {}, "clip", "Could not find OBS native clip hotkey to blank for capture.")
-        load_native_hotkeys(RECORDING_HOTKEY_NAMES, {}, "recording", "Could not find OBS native recording hotkeys to blank for capture.")
-        load_native_hotkeys(SCREENSHOT_HOTKEY_NAMES, {}, "screenshot", "Could not find OBS native screenshot hotkey to blank for capture.")
-        log(obs.LOG_INFO, "Hotkey capture started -- blanked native clip/recording/screenshot hotkeys live")
-    elseif not signal.active and capture_active then
-        capture_active = false
-        load_native_hotkeys(CLIP_HOTKEY_NAMES, signal.clip, "clip", "Could not find OBS native clip hotkey to restore.")
-        load_native_hotkeys(RECORDING_HOTKEY_NAMES, signal.recording, "recording", "Could not find OBS native recording hotkeys to restore.")
-        load_native_hotkeys(SCREENSHOT_HOTKEY_NAMES, signal.screenshot, "screenshot", "Could not find OBS native screenshot hotkey to restore.")
-        log(obs.LOG_INFO, "Hotkey capture ended -- restored native clip/recording/screenshot hotkeys live")
-        -- matches what the saved-settings poll above would already converge on, so it does not immediately redo the same obs_hotkey_load call a moment later.
-        last_signature = settings_signature(signal)
-    end
-end
-
--- a signal left at active:true by a crashed prior obs session would otherwise blank the native hotkeys forever -- obs has no equivalent restart hook to clear this on the way the c# helper does for its own copy, so a fresh script load always resets it on disk before the fast poll starts trusting it.
-local function write_capture_signal_inactive()
-    local f = io.open(capture_signal_path(), "wb")
-    if not f then return end
-    f:write('{"active":false}')
-    f:close()
-end
-
 function script_load(settings)
-    write_capture_signal_inactive()
-    capture_active = false
-    last_signal_stamp = nil
     refresh_hotkeys(true)
 end
 
@@ -337,12 +267,6 @@ function script_update(settings)
 end
 
 function script_tick(seconds)
-    capture_elapsed = capture_elapsed + (seconds or 0)
-    if capture_elapsed >= CAPTURE_POLL_SECONDS then
-        capture_elapsed = 0
-        apply_capture_signal()
-    end
-
     refresh_elapsed = refresh_elapsed + (seconds or 0)
     if refresh_elapsed < REFRESH_SECONDS then return end
     refresh_elapsed = 0

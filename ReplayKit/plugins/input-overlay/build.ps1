@@ -20,7 +20,7 @@ $OutDir = [IO.Path]::GetFullPath($OutDir)
 $outDll = Join-Path $OutDir 'input-overlay.dll'
 
 $buildInputs = @($PSCommandPath, (Join-Path $PSScriptRoot 'CMakeLists.txt'), $ObsVersionsManifest, (Join-Path $PSScriptRoot '..\..\scripts\obs_versions.ps1'))
-if (Test-Path -LiteralPath $outDll -PathType Leaf) {
+if (-not ('input-overlay.dll', 'SDL3.dll', 'uiohook.dll' | Where-Object { -not (Test-Path -LiteralPath (Join-Path $OutDir $_) -PathType Leaf) })) {
     $built = (Get-Item -LiteralPath $outDll).LastWriteTimeUtc
     if (-not ($buildInputs | Where-Object { (Get-Item -LiteralPath $_).LastWriteTimeUtc -gt $built })) {
         Write-Output "Current: $OutDir"

@@ -65,6 +65,21 @@ namespace ReplayKitHelper
         // a plain exit leaves obs and the helper running when a normal close cannot finish; a restart someone pressed and an update have to happen (the installer cannot replace the files of a running obs either), so for those obs is made to stop once the normal close has had its time, and the armed relauncher brings it back
         internal static void StopObsForRestart(string reason, bool mustStop)
         {
+            int pid = Native.ObsMainWindowPid();
+            if (pid <= 0)
+            {
+                ReportCloseFailure(reason);
+                return;
+            }
+            Process target;
+            try { target = Process.GetProcessById(pid); }
+            catch (ArgumentException) { return; }
+            using var process = target;
+            if (Constants.IsRoleHost(process))
+            {
+                ReportCloseFailure(reason);
+                return;
+            }
             // every close thru here is a restart, an update or a setup run that starts obs again, so the share window keeps its card until obs is back, whatever its keep time
             ShareWindow.HoldForObsReturn(600, reason);
             Thread.Sleep(300);
@@ -75,49 +90,39 @@ namespace ReplayKitHelper
             }
             catch (Exception ex) { Log.Write(reason + ": close acknowledgement failed: " + ex.Message); }
             ObsWebSocket.DisconnectForObsClose();
-            var procs = GetProcessesByNames("obs64", "obs32", "obs");
-            bool stopped = true;
-            DateTime deadline = DateTime.UtcNow.AddSeconds(15);
-            foreach (var p in procs)
+            try
             {
-                try
+                if (process.HasExited ||
+                    (Native.CloseObsMainWindow((uint)pid) && process.WaitForExit(15000)))
                 {
-                    if (Constants.IsRoleHost(p)) continue;
-                    Native.CloseObsMainWindow((uint)p.Id);
-                    int remaining = (int)Math.Max(0, (deadline - DateTime.UtcNow).TotalMilliseconds);
-                    if (!p.HasExited && !p.WaitForExit(remaining)) stopped = false;
+                    Server.State.Shutdown = true;
+                    return;
                 }
-                catch (InvalidOperationException) { }
-                catch (Win32Exception ex)
+                if (mustStop && Native.ObsMainWindowPid() == pid)
                 {
-                    stopped = false;
-                    Log.Write(reason + ": could not confirm OBS exit: " + ex.Message);
+                    Log.Write(reason + ": OBS did not close within 15 s, stopping it");
+                    process.Kill();
+                    if (process.WaitForExit(5000))
+                    {
+                        Server.State.Shutdown = true;
+                        return;
+                    }
                 }
-                finally { p.Dispose(); }
             }
-            if (!stopped && mustStop)
+            catch (Exception ex) when (ex is InvalidOperationException || ex is Win32Exception)
             {
-                Log.Write(reason + ": OBS did not close within 15 s, stopping it");
-                foreach (var p in GetProcessesByNames("obs64", "obs32", "obs"))
-                {
-                    try { if (!Constants.IsRoleHost(p) && !p.HasExited) { p.Kill(); p.WaitForExit(5000); } }
-                    catch (InvalidOperationException) { }
-                    catch (Win32Exception ex) { Log.Write(reason + ": could not stop OBS: " + ex.Message); }
-                    finally { p.Dispose(); }
-                }
-                Server.State.Shutdown = true;
-                return;
+                Log.Write(reason + ": could not confirm OBS exit: " + ex.Message);
             }
-            if (!stopped)
-            {
-                ObsWebSocket.AllowConnect();
-                Server.State.RestartAfterCleanObsPath = null;
-                string message = Locales.Message("helper.obsDidNotCloseSafelyReplaykit");
-                Log.Write(reason + ": " + message);
-                Notifications.Add("warning", "obs-close-timeout", Locales.Message("helper.obsCouldNotCloseSafely"), message);
-                return;
-            }
-            Server.State.Shutdown = true;
+            ReportCloseFailure(reason);
+        }
+
+        private static void ReportCloseFailure(string reason)
+        {
+            ObsWebSocket.AllowConnect();
+            Server.State.RestartAfterCleanObsPath = null;
+            string message = Locales.Message("helper.obsDidNotCloseSafelyReplaykit");
+            Log.Write(reason + ": " + message);
+            Notifications.Add("warning", "obs-close-timeout", Locales.Message("helper.obsCouldNotCloseSafely"), message);
         }
 
         // starts this program again in its --relaunch-obs mode, outside our kill-on-close job so it lives past helper exit. an in-process relaunch is unreliable -- by the time obs is dead and any cleanup completes, this process has often already been torn down (parent-process watchdog exit, abandoned-mutex on takeover, etc.) and never reaches the launch line. doing the relaunch from a sibling process owned by the os instead of by us is the only way to make it survive every shutdown path.
@@ -145,18 +150,8 @@ namespace ReplayKitHelper
         // arms the detached relauncher (or the in-process path) before requesting a normal obs close. shared by /settings' restart-required branch, /restart-obs, and /restart-obs-clean.
         internal static void ArmRelaunchAndCloseObs(string obsPath, string routeName)
         {
-            int obsTargetPid = 0;
-            if (ParentWatchdog.ParentPid > 0)
-            {
-                obsTargetPid = ParentWatchdog.ParentPid;
-            }
-            else
-            {
-                var running = GetProcessesByNames("obs64", "obs32", "obs");
-                var found = running.Where(p => !Constants.IsRoleHost(p)).ToArray();
-                if (found.Length > 0) obsTargetPid = found[0].Id;
-                foreach (var p in running) p.Dispose();
-            }
+            int obsTargetPid = Native.ObsMainWindowPid();
+            if (obsTargetPid <= 0) return;
             bool detached = StartDetachedObsRelauncher(obsPath, obsTargetPid);
             if (!detached)
             {
@@ -264,8 +259,8 @@ namespace ReplayKitHelper
                 string target = staged.Substring(0, staged.Length - ".replaykit-pending".Length);
                 try
                 {
-                    if (File.Exists(target)) File.Delete(target);
-                    File.Move(staged, target);
+                    if (File.Exists(target)) File.Replace(staged, target, null);
+                    else File.Move(staged, target);
                     Log.Write("ApplyPendingOverlayScene: applied " + Path.GetFileName(target));
                 }
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)

@@ -147,7 +147,7 @@
   // idle, arming (obs hotkeys being paused), listening, saving
   let phase = "idle";
   let flashText = "";
-  let captureActive = false;
+  const setCapture = RKHotkeys.captureClient(HELPER);
   let captureTimer = 0;
   // bumped by every cancel, so a request that comes back after the capture ended knows it is stale
   let generation = 0;
@@ -201,16 +201,6 @@
     return body;
   }
 
-  // pauses obs own bindings while a key is being picked, otherwise pressing the current hotkey would save a clip or start a recording
-  async function setCapture(active) {
-    try {
-      await helperJson("/settings/hotkey-capture?active=" + (active ? "1" : "0") + "&t=" + Date.now(), { method:"POST" });
-      return true;
-    } catch (_) {
-      return false;
-    }
-  }
-
   async function beginCapture() {
     if (phase !== "idle") return;
     flashText = "";
@@ -218,17 +208,12 @@
     render();
     const mine = ++generation;
     const ok = await setCapture(true);
-    if (mine !== generation) {
-      // cancelled while the request was out: give the bindings back
-      if (ok) setCapture(false);
-      return;
-    }
+    if (mine !== generation) return;
     if (!ok) {
       phase = "idle";
       flash(RK_M("controls.couldNotPauseTheObsHotkeys"));
       return;
     }
-    captureActive = true;
     phase = "listening";
     render();
     els.key.focus();
@@ -240,10 +225,7 @@
     ++generation;
     phase = "idle";
     render();
-    if (captureActive) {
-      captureActive = false;
-      setCapture(false);
-    }
+    setCapture(false, true);
   }
 
   async function saveCombo(combo) {
@@ -253,16 +235,15 @@
     const mine = ++generation;
     const field = KINDS[kind].field;
     try {
+      if (!await setCapture(false)) throw new Error(RK_M("common.hotkeyCaptureFailed"));
+      if (mine !== generation) return;
       const body = await helperJson("/settings", { method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify({ [field]: combo }) });
       if (mine !== generation) return;
-      // the save gives the obs bindings back itself, from the new settings
-      captureActive = false;
       settings = body.settings || settings;
       phase = "idle";
       render();
     } catch (err) {
       if (mine !== generation) return;
-      if (captureActive) { captureActive = false; setCapture(false); }
       phase = "idle";
       flash(RK_M("controls.couldNotSaveTheHotkey"));
     }

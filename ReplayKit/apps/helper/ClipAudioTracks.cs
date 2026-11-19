@@ -24,33 +24,58 @@ namespace ReplayKitHelper
         private static JObject Fail(string message) => new JObject { ["ok"] = false, ["message"] = message };
 
         // one folder per state of a clip, so an edited or replaced clip never plays the audio of its old self
-        private static string KeyFor(string name, FileInfo info) => ClipCache.KeyFor(name, info, "peaks");
+        private static string KeyFor(string name, FileInfo info, int first) => ClipCache.KeyFor(name, info, first == 0 ? "peaks-all" : "peaks");
+
+        internal static string[] ReadAudioLabels(string path)
+        {
+            var mp4 = Mp4Tracks.ReadFile(path);
+            if (mp4 != null) return mp4.Where(track => track.Audio).Select(track => track.HandlerName).ToArray();
+
+            string ffprobe = Compression.FindCompressionFfprobe();
+            if (string.IsNullOrWhiteSpace(ffprobe) || !File.Exists(ffprobe)) return null;
+            try
+            {
+                var probe = Compression.InvokeNativeCapture(ffprobe, new[]
+                {
+                    "-v", "error", "-select_streams", "a", "-show_entries", "stream=index:stream_tags=title",
+                    "-of", "json", path,
+                });
+                if (probe.ExitCode != 0) return null;
+                var json = JObject.Parse(string.Join("\n", probe.Output));
+                return (json["streams"] as JArray)?.Select(track => track["tags"]?.Value<string>("title")).ToArray();
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is System.ComponentModel.Win32Exception || ex is TimeoutException || ex is Newtonsoft.Json.JsonException)
+            {
+                Log.Write("Could not probe clip audio: " + ex.GetType().Name);
+                return null;
+            }
+        }
 
         // what the editor asks for: the tracks it lays out and whether their audio files and waveforms are ready; asking also starts cutting them out when that has not been done. a clip with separate tracks lists the ones after the mix, since the mix is what they add up to, and a clip with one audio stream lists that stream. the warm up after a recording asks the same way at a lower priority, so a game running meanwhile does not notice
         public static JObject Describe(string clipName, bool lowPriority = false)
         {
             var clip = Clips.GetSafeClipPath(clipName);
             if (clip == null || !File.Exists(clip.Full)) return Fail(Locales.Message("common.clipNotFound"));
-            var entries = Mp4Tracks.ReadFile(clip.Full);
-            var audio = entries?.Where(t => t.Audio).ToArray();
+            var audio = ReadAudioLabels(clip.Full);
             int count = audio?.Length ?? 0;
-            int first = count >= 2 ? 1 : 0;
+            bool obsMix = count == Trim.AudioTrackLabels.Length && audio.All(label => label == SavedClipAudio.ObsAudioHandler);
+            int first = count >= 2 && (obsMix || audio[0] == Trim.AudioTrackLabels[0]) ? 1 : 0;
             var tracks = new JArray();
             for (int i = first; i < count; i++)
             {
-                string label = audio[i].HandlerName;
-                if (!Trim.AudioTrackLabels.Contains(label, StringComparer.Ordinal)) label = count >= 2 ? Trim.AudioTrackLabel(i) : Trim.SingleTrackLabel;
+                string label = obsMix ? Trim.AudioTrackLabel(i) : audio[i];
+                if (string.IsNullOrWhiteSpace(label)) label = count >= 2 ? Trim.NumberedAudioTrackLabel(i) : Trim.SingleTrackLabel;
                 tracks.Add(new JObject { ["index"] = i, ["label"] = label, ["name"] = Trim.AudioTrackName(label) });
             }
             var result = new JObject { ["ok"] = true, ["audioTracks"] = count, ["tracks"] = tracks };
             if (count < 1)
             {
                 // a clip with no audio at all takes audio from outside, but only when its boxes could be read; one that could not may hold audio that is not seen
-                result["readable"] = entries != null;
+                result["readable"] = audio != null;
                 return result;
             }
 
-            string key = KeyFor(clip.Name, new FileInfo(clip.Full));
+            string key = KeyFor(clip.Name, new FileInfo(clip.Full), first);
             string dir = Path.Combine(Root, key);
             bool ready = File.Exists(Path.Combine(dir, DoneMarker));
             result["key"] = key;

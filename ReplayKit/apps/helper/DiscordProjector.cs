@@ -320,29 +320,21 @@ namespace ReplayKitHelper
         }
 
         // starts the share window when none runs and parks it beside its monitor with nonzero alpha so discord can capture it during fullscreen gameplay, all under ProjectorLock so a helper restart and the keep-alive tick can never start or move it at the same time; Inspect and Disable take the same lock
-        public static JObject Repark(JObject settings = null, string titleOverride = "", bool force = false)
+        public static JObject Repark(JObject settings = null, string titleOverride = "")
         {
-            parkedWindow = null;
-            if (settings == null) settings = ReplaykitSettings.ReadSettings();
-            string mode = settings["discord_output_mode"]?.Value<string>() ?? "";
-            if (mode != "projector")
-            {
-                Log.Write("Discord projector repark skipped: output mode is '" + mode + "'");
-                return new JObject { ["ok"] = true, ["applied"] = new JArray("Discord projector skipped: legacy output mode selected."), ["warnings"] = new JArray() };
-            }
-            if (!(settings["discord_screenshare_enabled"]?.Value<bool>() ?? true))
-            {
-                Log.Write("Discord projector repark skipped: screenshare disabled in settings");
-                return new JObject { ["ok"] = true, ["applied"] = new JArray("Discord screenshare support disabled."), ["warnings"] = new JArray() };
-            }
-            if (!(settings["discord_projector_enabled"]?.Value<bool>() ?? true) && !force)
-            {
-                Log.Write("Discord projector repark skipped: projector disabled in settings");
-                return new JObject { ["ok"] = true, ["applied"] = new JArray("Discord projector disabled."), ["warnings"] = new JArray() };
-            }
-
+            lock (SettingsStore.Gate)
             lock (Server.State.ProjectorLock)
             {
+                if (settings == null) settings = ReplaykitSettings.ReadSettings();
+                string mode = settings["discord_output_mode"]?.Value<string>() ?? "";
+                if (mode != "projector")
+                    return new JObject { ["ok"] = false, ["message"] = Locales.Message("screenshare.discordProjectorIsNotTheActive"), ["warnings"] = new JArray() };
+                if (!ReplaykitSettings.TestDiscordScreenshareEnabled(settings))
+                    return new JObject { ["ok"] = false, ["message"] = Locales.Message("screenshare.discordScreenshareSupportIsDisabled"), ["warnings"] = new JArray() };
+                if (settings["discord_projector_enabled"]?.Value<bool>() != true)
+                    return new JObject { ["ok"] = false, ["message"] = Locales.Message("shell.sharePreviewOff"), ["warnings"] = new JArray() };
+
+                parkedWindow = null;
                 disablePending = false;
                 if (ProjectorNative.OperationPending())
                     return new JObject { ["ok"] = false, ["message"] = Locales.Message("screenshare.thePreviousProjectorWindowChangeIs") };
@@ -423,15 +415,19 @@ namespace ReplayKitHelper
         // shows the projector centered and windowed, for a user-triggered visual check -- not hidden, not topmost.
         public static JObject Inspect(JObject settings = null, string titleOverride = "")
         {
-            parkedWindow = null;
-            if (settings == null) settings = ReplaykitSettings.ReadSettings();
-            string mode = settings["discord_output_mode"]?.Value<string>() ?? "";
-            if (mode != "projector") return new JObject { ["ok"] = false, ["message"] = Locales.Message("screenshare.discordProjectorIsNotTheActive"), ["warnings"] = new JArray() };
-            if (!(settings["discord_screenshare_enabled"]?.Value<bool>() ?? true))
-                return new JObject { ["ok"] = false, ["message"] = Locales.Message("screenshare.discordScreenshareSupportIsDisabled"), ["warnings"] = new JArray() };
-
+            lock (SettingsStore.Gate)
             lock (Server.State.ProjectorLock)
             {
+                if (settings == null) settings = ReplaykitSettings.ReadSettings();
+                string mode = settings["discord_output_mode"]?.Value<string>() ?? "";
+                if (mode != "projector")
+                    return new JObject { ["ok"] = false, ["message"] = Locales.Message("screenshare.discordProjectorIsNotTheActive"), ["warnings"] = new JArray() };
+                if (!ReplaykitSettings.TestDiscordScreenshareEnabled(settings))
+                    return new JObject { ["ok"] = false, ["message"] = Locales.Message("screenshare.discordScreenshareSupportIsDisabled"), ["warnings"] = new JArray() };
+                if (settings["discord_projector_enabled"]?.Value<bool>() != true)
+                    return new JObject { ["ok"] = false, ["message"] = Locales.Message("shell.sharePreviewOff"), ["warnings"] = new JArray() };
+
+                parkedWindow = null;
                 disablePending = false;
                 if (ProjectorNative.OperationPending())
                     return new JObject { ["ok"] = false, ["message"] = Locales.Message("screenshare.thePreviousProjectorWindowChangeIs") };
@@ -617,6 +613,13 @@ namespace ReplayKitHelper
                 StartAtStartup();
                 return;
             }
+            if (!Monitor.TryEnter(SettingsStore.Gate)) return;
+            try { KeepProjectorAlive(); }
+            finally { Monitor.Exit(SettingsStore.Gate); }
+        }
+
+        private static void KeepProjectorAlive()
+        {
             // Complete an explicit off request once the timed-out operation and fresh window information are available.
             if (disablePending)
             {
@@ -716,6 +719,7 @@ namespace ReplayKitHelper
 
         private static bool ApplyStartup()
         {
+            lock (SettingsStore.Gate)
             lock (Server.State.ProjectorLock)
             {
                 if (!WindowInfoReady() || ProjectorNative.OperationPending()) return false;

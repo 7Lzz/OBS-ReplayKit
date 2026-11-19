@@ -58,8 +58,8 @@ namespace ReplayKitHelper
         // what makes a clip quick to open in the editor again, see ClipCache
         public static readonly string CACHE_DIR = Path.Combine(REPLAYKIT_TEMP_ROOT, "cache");
 
-        public static readonly string AUTH_DIR = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "OBS Streamable Helper");
-        public static readonly string AUTH_FILE = Path.Combine(AUTH_DIR, "auth.dat");
+        public static readonly string AUTH_DIR = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), ReplayKitShared.StateLayout.StreamableCredentialsFolder);
+        public static readonly string AUTH_FILE = Path.Combine(AUTH_DIR, ReplayKitShared.StateLayout.StreamableCredentialsFile);
 
         public static readonly HashSet<string> ALLOWED_EXTS = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".mp4", ".mkv", ".mov" };
         public static readonly Dictionary<string, string> CONTENT_TYPES = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -258,7 +258,6 @@ namespace ReplayKitHelper
 
         // -- HotkeyCaptureLock --
         public readonly object HotkeyCaptureLock = new object();
-        public bool ReplaykitHotkeyCaptureActive;
 
         // -- ProjectorLock --
         public readonly object ProjectorLock = new object();

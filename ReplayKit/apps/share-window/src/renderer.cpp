@@ -340,16 +340,22 @@ uint32_t Renderer::SharedFormat() const
 
 bool Renderer::TakeFrame()
 {
-	if (!sharedMutex)
+	if (!sharedHandle)
 		return false;
 	HRESULT hr = sharedMutex->AcquireSync(0, 4);
 	if (hr == static_cast<HRESULT>(WAIT_TIMEOUT))
 		return false;
-	if (FAILED(hr)) {
+	if (hr == static_cast<HRESULT>(WAIT_ABANDONED)) {
+		Log("obs abandoned the shared texture; replacing it");
+		sharedMutex.Reset();
+		shared.Reset();
+		sharedHandle = 0;
+		return false;
+	}
+	if (hr != S_OK) {
 		Log("could not take the shared texture: 0x%08lx", hr);
 		return false;
 	}
-	// an obs that died while drawing leaves the texture abandoned, which still hands it over
 	context->CopyResource(frame.Get(), shared.Get());
 	sharedMutex->ReleaseSync(0);
 	hasFrame = true;

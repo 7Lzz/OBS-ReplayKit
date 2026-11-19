@@ -26,6 +26,7 @@ namespace ReplayKitHelper
         private const int ReplyMs = 3000;
         private const int MaxFrameBytes = 64 * 1024;
         private const int RobloxCheckSeconds = 15;
+        private const int CaptureExpirySeconds = 10;
 
         private sealed class Sighting
         {
@@ -40,6 +41,7 @@ namespace ReplayKitHelper
         private static readonly AutoResetEvent Wake = new AutoResetEvent(false);
         // the recognised game seen last, with the program it runs as and when it was first seen
         private static volatile Sighting seen;
+        private static long lastCaptureTicks;
         // the setting, read once and then kept in step by every settings write; -1 until it is known
         private static int enabled = -1;
         private static volatile NamedPipeClientStream pipe;
@@ -47,6 +49,7 @@ namespace ReplayKitHelper
         private static volatile string lastError = "";
         private static DateTime sentAt = DateTime.MinValue, retryAt = DateTime.MinValue, robloxCheckedAt = DateTime.MinValue;
         private static RobloxExperiences.Experience roblox;
+        private static Sighting robloxSighting;
         // discord ties the activity to this process and takes it away when it ends
         private static readonly int OwnPid = Process.GetCurrentProcess().Id;
 
@@ -59,8 +62,14 @@ namespace ReplayKitHelper
         }
 
         // every capture sample that recognised a game, with the path of the program it captured
-        internal static void Seen(GameCatalog.Game game, string path)
+        internal static void Seen(GameCatalog.Game game, string path, bool capturing)
         {
+            if (!capturing)
+            {
+                if (seen != null) { seen = null; Wake.Set(); }
+                return;
+            }
+            Interlocked.Exchange(ref lastCaptureTicks, DateTime.UtcNow.Ticks);
             if (game == null || seen?.Game.Id == game.Id) return;
             string process;
             try { process = Path.GetFileNameWithoutExtension(path); }
@@ -161,7 +170,8 @@ namespace ReplayKitHelper
             if (ClientId.Length == 0 || !Enabled() || !ClipGames.RecognitionOn()) return null;
             var sighting = seen;
             if (sighting == null) return null;
-            if (!Running(sighting.Process))
+            if (DateTime.UtcNow.Ticks - Interlocked.Read(ref lastCaptureTicks) > TimeSpan.FromSeconds(CaptureExpirySeconds).Ticks ||
+                !Running(sighting.Process))
             {
                 if (seen == sighting) seen = null;
                 return null;
@@ -171,10 +181,12 @@ namespace ReplayKitHelper
             if (sighting.Game.Id == RobloxExperiences.RobloxId)
             {
                 var now = DateTime.UtcNow;
-                if ((now - robloxCheckedAt).TotalSeconds >= RobloxCheckSeconds)
+                if (robloxSighting != sighting || (now - robloxCheckedAt).TotalSeconds >= RobloxCheckSeconds)
                 {
+                    robloxSighting = sighting;
                     robloxCheckedAt = now;
-                    try { roblox = RobloxExperiences.Playing(); }
+                    roblox = null;
+                    try { roblox = RobloxExperiences.Playing(sighting.Process); }
                     catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { Log.Write("Discord presence: roblox logs unreadable: " + ex.GetType().Name); }
                 }
                 if (!string.IsNullOrWhiteSpace(roblox?.Name))

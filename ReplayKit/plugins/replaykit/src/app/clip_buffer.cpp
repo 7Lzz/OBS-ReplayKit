@@ -8,6 +8,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QStringList>
 #include <deque>
 #include <functional>
 #include <memory>
@@ -75,6 +76,7 @@ QPointer<QTimer> g_splitTimer;
 bool g_splitAsked = false;
 int g_clipSeconds = 20;
 bool g_saving = false;
+QStringList g_savePieceNames;
 bool g_awaitingSplit = false;
 int g_saveGen = 0;
 // when the running save was pressed, the number the helper knows it by; a time and not the count above, which starts over with obs while the helper may not
@@ -84,6 +86,7 @@ bool g_sharedEncoders = false;
 // a stop that is only the first half of moving onto those encoders, which keeps the pieces already recorded
 bool g_restartShared = false;
 bool g_closing = false;
+bool g_resumeAfterClose = false;
 bool g_shuttingDown = false;
 obs_hotkey_id g_saveHotkey = OBS_INVALID_HOTKEY_ID;
 std::vector<obs_key_combination_t> g_mirrored;
@@ -128,7 +131,8 @@ void ReportState()
 
 void ForgetPiece(const std::string &path)
 {
-	if (!os_unlink(path.c_str()) || !os_file_exists(path.c_str()))
+	const QString name = QFileInfo(QString::fromStdString(path)).fileName();
+	if (!g_savePieceNames.contains(name, Qt::CaseInsensitive) && (!os_unlink(path.c_str()) || !os_file_exists(path.c_str())))
 		return;
 	// still held by the muxer or a reader; tried again on the next sweep
 	g_doomed.push_back(path);
@@ -140,18 +144,18 @@ void ClearPieceDir()
 	if (!dir.exists())
 		return;
 	for (const QFileInfo &info : dir.entryInfoList({QStringLiteral("*.mp4"), QStringLiteral("*.mkv")}, QDir::Files))
-		QFile::remove(info.absoluteFilePath());
+		ForgetPiece(QDir::toNativeSeparators(info.absoluteFilePath()).toStdString());
 }
 
 // pieces older than the clip length plus a spare piece are no use to any clip and go; never while a save is reading them
 void Purge()
 {
+	if (g_saving)
+		return;
 	std::vector<std::string> doomed;
 	doomed.swap(g_doomed);
 	for (const std::string &path : doomed)
 		ForgetPiece(path);
-	if (g_saving)
-		return;
 	const qint64 keepFrom = NowMs() - qint64(g_clipSeconds + 2 * kPieceSeconds) * 1000;
 	while (!g_pieces.empty() && g_pieces.front().endMs < keepFrom) {
 		ForgetPiece(g_pieces.front().path);
@@ -184,6 +188,7 @@ void ReleaseEncoders()
 void OnFileChanged(void *, calldata_t *cd);
 void OnOutputStop(void *, calldata_t *cd);
 void StartDisk(bool keepPieces);
+void SendSave();
 
 void DiskStopped()
 {
@@ -215,22 +220,24 @@ void DiskStopped()
 		g_purgeTimer->stop();
 	if (g_splitTimer)
 		g_splitTimer->stop();
+	if (g_awaitingSplit) {
+		g_awaitingSplit = false;
+		SendSave();
+	}
 	g_pieces.clear();
 	g_current = Piece();
-	g_saving = false;
-	g_awaitingSplit = false;
 	g_splitAsked = false;
 	// the muxer lets go of its last file a moment after it reports the stop
 	QTimer::singleShot(1500, g_callbacks, []() {
-		if (!DiskActive())
+		if (!g_out)
 			ClearPieceDir();
 	});
 	ReportState();
 	RefreshTrayIcon();
 	blog(LOG_INFO, "[replaykit] disk clip buffer stopped");
+	if (g_resumeAfterClose && !g_closing)
+		ClipBufferCancelClose();
 }
-
-void SendSave();
 
 // a piece is finished when the muxer moves on to the next file; a save waiting on that split goes ahead from here
 void PieceChanged(const std::string &next, qint64 captureAt)
@@ -452,8 +459,11 @@ void StartDisk(bool keepPieces)
 	const std::string dir = QDir::toNativeSeparators(dirPath).toStdString();
 	const char *format = "rkbuffer %CCYY-%MM-%DD %hh-%mm-%ss";
 	char *first = os_generate_formatted_filename("mp4", true, format);
-	const std::string path = dir + "\\" + (first ? first : "rkbuffer.mp4");
+	const std::string base = dir + "\\" + (first ? first : "rkbuffer.mp4");
 	bfree(first);
+	std::string path = base;
+	for (int suffix = 1; os_file_exists(path.c_str()); ++suffix)
+		path = base.substr(0, base.size() - 4) + "-" + std::to_string(suffix) + ".mp4";
 
 	obs_data_t *settings = obs_data_create();
 	obs_data_set_string(settings, "path", path.c_str());
@@ -565,8 +575,10 @@ void SendSave()
 	char *name = os_generate_formatted_filename(ext, true, format.c_str());
 	QJsonArray segments;
 	QJsonArray capturePieces;
-	for (const std::string &path : paths)
+	for (const std::string &path : paths) {
 		segments.append(QString::fromStdString(path));
+		g_savePieceNames.append(QFileInfo(QString::fromStdString(path)).fileName());
+	}
 	for (const std::string &path : paths)
 		for (const auto &piece : g_pieces)
 			if (piece.path == path)
@@ -583,6 +595,8 @@ void SendSave()
 			g_callbacks,
 			[answer]() {
 				g_saving = false;
+				g_savePieceNames.clear();
+				Purge();
 				if (!JsonBoolField(answer, "ok", false)) {
 					const std::string message = ExtractJsonStringField(answer, "message");
 					blog(LOG_WARNING, "[replaykit] disk clip buffer save failed: %s", message.empty() ? "no answer from the helper" : message.c_str());
@@ -721,6 +735,13 @@ void ClipStartProc(void *, calldata_t *cd)
 		QMetaObject::invokeMethod(g_callbacks, []() { ClipBufferStart(); }, Qt::QueuedConnection);
 }
 
+void ClipSaveProc(void *, calldata_t *cd)
+{
+	calldata_set_bool(cd, "handled", true);
+	if (g_callbacks)
+		QMetaObject::invokeMethod(g_callbacks, []() { ClipBufferSave(); }, Qt::QueuedConnection);
+}
+
 void SwitchMode(Mode next)
 {
 	const bool wasActive = ClipBufferActive();
@@ -761,6 +782,7 @@ void ClipBufferInit()
 	signal_handler_add(obs_get_signal_handler(), "void replaykit_clip_saving()");
 	signal_handler_add(obs_get_signal_handler(), "void replaykit_clip_saved(string path)");
 	proc_handler_add(obs_get_proc_handler(), "void replaykit_clip_start(out bool handled)", ClipStartProc, nullptr);
+	proc_handler_add(obs_get_proc_handler(), "void replaykit_clip_save(out bool handled)", ClipSaveProc, nullptr);
 	signal_handler_connect(obs_get_signal_handler(), "hotkey_bindings_changed", OnHotkeyBindingsChanged, nullptr);
 	g_saveHotkey = obs_hotkey_register_frontend("ReplayKit.SaveClip", TrMessage("shell.hotkeySaveClipDiskBuffer").toUtf8().constData(), OnSaveHotkey, nullptr);
 	blog(LOG_INFO, "[replaykit] clip buffer mode at startup: %s", ModeName(g_mode));
@@ -800,6 +822,7 @@ bool ClipBufferPrepareClose()
 		return true;
 	if (!g_closing) {
 		g_closing = true;
+		g_resumeAfterClose = DiskActive();
 		g_restartShared = false;
 		blog(LOG_INFO, "[replaykit] draining disk clip buffer before closing");
 		StopDisk();
@@ -810,6 +833,10 @@ bool ClipBufferPrepareClose()
 void ClipBufferCancelClose()
 {
 	g_closing = false;
+	if (g_resumeAfterClose && !g_out) {
+		g_resumeAfterClose = false;
+		ClipBufferStart();
+	}
 }
 
 bool ClipBufferActive()

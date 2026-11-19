@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.Globalization;
@@ -45,7 +46,7 @@ namespace ReplayKitHelper
         internal static bool ValidUniverse(string id) => id != null && UniverseId.IsMatch(id);
 
         // the joins and leaves of the newest player logs, oldest first; roblox keeps its log open, so the times in the file names are read instead of the write times the files show
-        private static List<Visit> Visits(DateTime until)
+        private static List<Visit> Visits(DateTime until, DateTime? launch)
         {
             var visits = new List<Visit>();
             string local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
@@ -60,7 +61,8 @@ namespace ReplayKitHelper
                 foreach (string file in Directory.EnumerateFiles(dir, "*_Player_*.log").Take(2000))
                 {
                     var match = LogName.Match(Path.GetFileName(file));
-                    if (match.Success && DateTime.TryParseExact(match.Groups[1].Value, "yyyyMMdd'T'HHmmss'Z'", CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out DateTime started) && started <= until)
+                    if (match.Success && DateTime.TryParseExact(match.Groups[1].Value, "yyyyMMdd'T'HHmmss'Z'", CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out DateTime started) &&
+                        started <= until && (!launch.HasValue || started >= launch.Value))
                         logs.Add(Tuple.Create(started, file));
                 }
             }
@@ -68,6 +70,7 @@ namespace ReplayKitHelper
             {
                 using (var stream = new FileStream(log.Item2, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
                 {
+                    visits.Add(new Visit { At = log.Item1 });
                     if (stream.Length > MaxLogBytes) continue;
                     using (var reader = new StreamReader(stream))
                     {
@@ -88,11 +91,11 @@ namespace ReplayKitHelper
         }
 
         // the experience joined last before the clip ended that the clip still overlaps; null when the player was in the app menu or roblox was closed the whole time
-        private static Visit During(DateTime start, DateTime end)
+        private static Visit During(DateTime start, DateTime end, DateTime? launch = null)
         {
             Visit current = null;
             DateTime? left = null;
-            foreach (var visit in Visits(end))
+            foreach (var visit in Visits(end, launch))
             {
                 if (visit.At > end) break;
                 if (visit.Universe != null) { current = visit; left = null; }
@@ -246,6 +249,7 @@ namespace ReplayKitHelper
                 List<string> pins;
                 lock (Gate) { pins = Unpinned.ToList(); Unpinned.Clear(); }
                 if (pins.Count > 0) Pin(pins);
+                if (!ClipGames.RecognitionOn()) continue;
                 List<string> batch;
                 lock (Gate)
                 {
@@ -313,12 +317,15 @@ namespace ReplayKitHelper
         // asks roblox about a batch of experiences: one request for the names, one for the icon addresses, and an image only for an icon whose address changed, which is how roblox shows a new icon; an old icon stays on disk for the clips made with it
         private static void Fetch(List<string> batch)
         {
+            if (!ClipGames.RecognitionOn()) return;
             string ids = string.Join(",", batch);
             var games = (GetJson("https://games.roblox.com/v1/games?universeIds=" + ids)["data"] as JArray)?.OfType<JObject>().ToList() ?? new List<JObject>();
+            if (!ClipGames.RecognitionOn()) return;
             var thumbs = (GetJson("https://thumbnails.roblox.com/v1/games/icons?universeIds=" + ids + "&returnPolicy=PlaceHolder&size=150x150&format=Png&isCircular=false")["data"] as JArray)?.OfType<JObject>().ToList() ?? new List<JObject>();
             DateTime now = DateTime.UtcNow;
             foreach (string universe in batch)
             {
+                if (!ClipGames.RecognitionOn()) return;
                 var game = games.FirstOrDefault(g => g["id"]?.ToString() == universe);
                 var thumb = thumbs.FirstOrDefault(t => t["targetId"]?.ToString() == universe);
                 string name = (game?["name"]?.Type == JTokenType.String ? game["name"].Value<string>() : "").Trim();
@@ -429,10 +436,10 @@ namespace ReplayKitHelper
         }
 
         // the experience the logs say is open now with what is known of it, for the discord presence; null when roblox shows its menu or is closed, and one not known yet is looked up
-        internal static Experience Playing()
+        internal static Experience Playing(string process)
         {
             var now = DateTime.UtcNow;
-            var visit = During(now, now);
+            var visit = CurrentVisit(now, process);
             if (visit == null) return null;
             Load();
             lock (Gate)
@@ -443,11 +450,31 @@ namespace ReplayKitHelper
             }
         }
 
+        private static Visit CurrentVisit(DateTime now, params string[] names)
+        {
+            DateTime? latest = null;
+            foreach (string name in names)
+                foreach (var process in Process.GetProcessesByName(name))
+                    using (process)
+                    {
+                        try
+                        {
+                            var started = process.StartTime.ToUniversalTime();
+                            if (!latest.HasValue || started > latest.Value) latest = started;
+                        }
+                        catch (Exception ex) when (ex is InvalidOperationException || ex is System.ComponentModel.Win32Exception) { }
+                    }
+            if (!latest.HasValue) return null;
+            // the file name records the start rounded down to seconds.
+            var launch = latest.Value.AddTicks(-(latest.Value.Ticks % TimeSpan.TicksPerSecond));
+            return During(now, now, launch);
+        }
+
         // what the sdk shows: the experience the logs say is open now, what is known, and whether lookups are waiting on roblox
         internal static JObject State()
         {
             var now = DateTime.UtcNow;
-            var visit = During(now, now);
+            var visit = CurrentVisit(now, "RobloxPlayerBeta", "Windows10Universal");
             Load();
             lock (Gate)
             {

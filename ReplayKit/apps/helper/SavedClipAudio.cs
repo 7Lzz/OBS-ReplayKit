@@ -12,7 +12,7 @@ namespace ReplayKitHelper
     internal static class SavedClipAudio
     {
         private const int DiscordTrack = 2;
-        private const string ObsAudioHandler = "OBS Audio Handler";
+        internal const string ObsAudioHandler = "OBS Audio Handler";
 
         internal static bool DiscordClosed()
         {

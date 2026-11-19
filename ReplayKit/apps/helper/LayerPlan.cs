@@ -124,7 +124,7 @@ namespace ReplayKitHelper
             {
                 string dur = N(l.End - l.At);
                 if (l.Clip) argv.AddRange(new[] { "-ss", N(l.Src), "-t", dur, "-i", l.Path });
-                else if (l.Gif) argv.AddRange(new[] { "-ignore_loop", "0", "-t", N(l.End - l.At + l.Src), "-i", l.Path });
+                else if (l.Gif) argv.AddRange(new[] { "-stream_loop", "-1", "-ignore_loop", "1", "-t", N(l.End - l.At + l.Src), "-i", l.Path });
                 else argv.AddRange(new[] { "-loop", "1", "-framerate", "30", "-t", dur, "-i", l.Path });
             }
             return argv;

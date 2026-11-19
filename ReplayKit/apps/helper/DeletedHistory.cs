@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using ReplayKitShared;
 
 namespace ReplayKitHelper
 {
@@ -15,9 +16,10 @@ namespace ReplayKitHelper
         private const string FolderName = ".replaykit-deleted";
         private const int PurgeMs = 60 * 60 * 1000;
         private static readonly object Gate = new object();
+        private static readonly HashSet<string> RecoveredRoots = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private static bool started;
 
-        private static string StorePath() => ReplayKitShared.StateLayout.Resolve(AppConfig.GetReplayKitRoot(), ReplayKitShared.StateLayout.DeletedHistoryFile);
+        private static string StorePath() => StateLayout.Resolve(AppConfig.GetReplayKitRoot(), StateLayout.DeletedHistoryFile);
         private static long Now() => DateTimeOffset.UtcNow.ToUnixTimeSeconds();
 
         private static JObject Fail(string message) => new JObject { ["ok"] = false, ["message"] = message };
@@ -29,15 +31,27 @@ namespace ReplayKitHelper
             return kind == "screenshot" || kind == "gif" ? kind : "clip";
         }
 
-        // a record that cannot be read turned every delete away; it is kept aside, and the files of the hidden folder come back as recovered items, so they can still be restored and still expire. runs under Gate
+        // keep a damaged record aside and recover each library's unindexed files when that library is selected
         private static void Heal()
         {
-            try { ClipStore.Read(StorePath(), db => true); return; }
-            catch (JsonException) { }
             string store = StorePath();
-            string aside = store + ".broken-" + DateTime.UtcNow.ToString("yyyyMMddHHmmss");
-            File.Move(store, aside);
+            try { ClipStore.Read(store, db => true); }
+            catch (JsonException)
+            {
+                string aside = store + ".broken-" + Guid.NewGuid().ToString("N");
+                File.Move(store, aside);
+                store = StorePath();
+                RecoveredRoots.Clear();
+                Log.Write("Deleted history: kept the unreadable record as " + Path.GetFileName(aside));
+            }
             string root = Path.GetFullPath(AppConfig.GetClipDir());
+            string key = store + "\n" + root.TrimEnd('\\', '/');
+            if (RecoveredRoots.Contains(key)) return;
+            if (!StateLayout.Paths(AppConfig.GetReplayKitRoot(), StateLayout.DeletedHistoryFile).Any(HasBackup))
+            {
+                RecoveredRoots.Add(key);
+                return;
+            }
             string dir = Path.Combine(root, FolderName);
             var recovered = new JObject();
             if (Directory.Exists(dir) && (File.GetAttributes(dir) & FileAttributes.ReparsePoint) == 0)
@@ -49,6 +63,7 @@ namespace ReplayKitHelper
                     if (!ValidId(id) || (file.Attributes & FileAttributes.ReparsePoint) != 0) continue;
                     bool shot = file.Extension.Equals(".png", StringComparison.OrdinalIgnoreCase);
                     bool gif = file.Extension.Equals(".gif", StringComparison.OrdinalIgnoreCase);
+                    if (!shot && !gif && Clips.GetSafeFilename(file.Name) == null) continue;
                     recovered[id] = new JObject
                     {
                         ["kind"] = shot ? "screenshot" : gif ? "gif" : "clip",
@@ -61,8 +76,25 @@ namespace ReplayKitHelper
                     };
                 }
             }
-            ClipStore.Update(store, db => { foreach (var prop in recovered.Properties()) db[prop.Name] = prop.Value; return true; });
-            Log.Write("Deleted history: the record could not be read, kept it as " + Path.GetFileName(aside) + " and recovered " + recovered.Count + " item(s) from the hidden folder");
+            int added = 0;
+            if (recovered.HasValues) ClipStore.Update(store, db =>
+            {
+                foreach (var prop in recovered.Properties())
+                {
+                    if (db[prop.Name] != null) continue;
+                    db[prop.Name] = prop.Value;
+                    added++;
+                }
+                return added > 0;
+            });
+            RecoveredRoots.Add(key);
+            if (added > 0) Log.Write("Deleted history: recovered " + added + " item(s) from the hidden folder");
+        }
+
+        private static bool HasBackup(string path)
+        {
+            string parent = Path.GetDirectoryName(path);
+            return Directory.Exists(parent) && Directory.EnumerateFiles(parent, Path.GetFileName(path) + ".broken-*").Any();
         }
 
         // moves the file into the history and says so; false when deleted history is off, and the caller then deletes it for good
@@ -196,7 +228,7 @@ namespace ReplayKitHelper
                 if (!Path.IsPathRooted(folder) || !validName) return Fail(Locales.Message("storage.whereThatItemCameFromIs"));
                 Directory.CreateDirectory(folder);
                 if ((File.GetAttributes(folder) & FileAttributes.ReparsePoint) != 0) return Fail(Locales.Message("storage.theFolderItCameFromIs"));
-                string root = screenshot ? Path.GetDirectoryName(folder) : Clips.LibraryRoot(folder);
+                string root = Path.GetDirectoryName(Path.GetDirectoryName(stored));
                 // a game folder that was removed once it was empty joins the library again
                 if (!screenshot && !string.Equals(Path.GetFullPath(folder).TrimEnd('\\'), Path.GetFullPath(root).TrimEnd('\\'), StringComparison.OrdinalIgnoreCase))
                     Clips.RegisterFolder(root, Path.GetFileName(folder.TrimEnd('\\')));
@@ -213,7 +245,11 @@ namespace ReplayKitHelper
                 {
                     if (record != null) ClipGames.Write(target, record);
                 }
-                else if (record != null) Clips.UpdateDb(db => { db[restored] = record; return true; }, folder);
+                else if (record != null)
+                {
+                    Clips.UpdateLibraryDb(db => { db[restored] = record; return true; }, root);
+                    Upload.ResumeTranscodePoll(restored, record);
+                }
                 else AppConfig.ClearClipsCache();
                 return new JObject { ["ok"] = true, ["name"] = restored, ["kind"] = kind };
             }

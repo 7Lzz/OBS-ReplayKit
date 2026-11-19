@@ -41,7 +41,7 @@ namespace ReplayKitHelper
                     else if (path == "/games/set" || path == "/games/reset")
                     {
                         if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
-                        string file = QFlag("screenshot") ? Screenshots.Resolve(Q("file")) : Clips.GetSafeClipPath(Q("file"))?.Full;
+                        string file = QFlag("screenshot") ? Screenshots.Resolve(Q("file"), Q("v")) : Clips.GetSafeClipPath(Q("file"))?.Full;
                         if (file == null || !File.Exists(file)) throw new ArgumentException(Locales.Message("common.clipNotFound2"));
                         if (path == "/games/reset") ClipGames.Reset(file);
                         else ClipGames.Correct(file, Q("id"), Q("name"), 0, Q("universe"));

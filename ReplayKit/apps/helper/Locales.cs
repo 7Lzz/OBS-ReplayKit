@@ -15,6 +15,7 @@ namespace ReplayKitHelper
     internal static class Locales
     {
         public const string English = ReplayKitShared.LanguageMatch.English;
+        internal const string FollowWindows = "-";
         private const string Section = "General";
         private const string Key = "Language";
 
@@ -32,6 +33,8 @@ namespace ReplayKitHelper
         // locale selection applies on restart, so the message assets can be cached for this helper session
         private static readonly Dictionary<string, JObject> MessagesByCode = new Dictionary<string, JObject>(StringComparer.Ordinal);
         private static readonly Dictionary<string, string> MessageVersions = new Dictionary<string, string>(StringComparer.Ordinal);
+        private static readonly Dictionary<string, string> InlineMessages = new Dictionary<string, string>(StringComparer.Ordinal);
+        private static bool languageUnconfirmed;
 
         internal static JObject Messages(string code)
         {
@@ -65,6 +68,20 @@ namespace ReplayKitHelper
             lock (Gate) return MessageVersions[code];
         }
 
+        internal static string InlineCatalog(string code)
+        {
+            lock (Gate)
+            {
+                if (!InlineMessages.TryGetValue(code, out string script))
+                {
+                    var escape = new JsonSerializerSettings { StringEscapeHandling = StringEscapeHandling.EscapeHtml };
+                    script = JsonConvert.SerializeObject(Messages(code), escape);
+                    InlineMessages[code] = script;
+                }
+                return script;
+            }
+        }
+
         internal static string Message(string id, params object[] pairs)
         {
             string code = Current();
@@ -77,7 +94,7 @@ namespace ReplayKitHelper
             string ini = Path.Combine(SettingsSceneJson.GetObsInstallRoot(), "data", "obs-studio", "locale.ini");
             string stamp;
             try { stamp = File.Exists(ini) ? File.GetLastWriteTimeUtc(ini).Ticks.ToString() : "none"; }
-            catch (IOException) { stamp = "none"; }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { stamp = "none"; }
             lock (Gate)
             {
                 if (_list != null && _listStamp == stamp) return _list;
@@ -94,7 +111,7 @@ namespace ReplayKitHelper
                                 list.Add(new Language { Code = item.Key, Name = item.Value, EnglishName = EnglishNameOf(item.Key) });
                         }
                     }
-                    catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { Log.Write("Locales.Available: " + ex.Message); list.Clear(); obsCodes.Clear(); }
+                    catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { Log.Write("Locales.Available: " + ex.Message); list.Clear(); obsCodes.Clear(); stamp = null; }
                 }
                 if (!list.Any(l => l.Code == English)) list.Insert(0, new Language { Code = English, Name = "English", EnglishName = "English" });
                 if (!obsCodes.Contains(English)) obsCodes.Insert(0, English);
@@ -111,7 +128,7 @@ namespace ReplayKitHelper
         public static string Current()
         {
             string running = PipeClient.ObsLocale;
-            if (running == null) return Picked();
+            if (running == null) running = Effective(Picked());
             return IsAvailable(running) ? running : English;
         }
 
@@ -128,8 +145,7 @@ namespace ReplayKitHelper
             string saved = null;
             try { saved = ObsUserIni.Read(Section, Key); }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { Log.Write("Locales.Picked: " + ex.Message); }
-            if (string.IsNullOrEmpty(saved)) saved = WindowsDefault();
-            return IsAvailable(saved) ? saved : English;
+            return LanguageMatch.IsCode(saved) ? saved : FollowWindows;
         }
 
         // the windows default, matched against the languages obs ships by the same rule obs uses (shared/LanguageMatch.cs)
@@ -139,16 +155,35 @@ namespace ReplayKitHelper
             return ReplayKitShared.LanguageMatch.WindowsDefault(_obsCodes);
         }
 
-        public static JArray ToJson() => new JArray(Available().Select(l => new JObject { ["code"] = l.Code, ["name"] = l.Name, ["englishName"] = l.EnglishName }));
+        private static string Effective(string choice) => choice == FollowWindows ? WindowsDefault() : choice;
 
-        // the plugin puts the pick into the user config obs holds and saves it, the way the language picker of obs does, so every later save and exit of obs keeps it; obs reads it only as it starts, so a change needs a restart. picking the windows language clears the key instead, so obs and replaykit keep following windows the way a fresh obs does. false when the plugin did not confirm
-        public static bool ApplyToObs(string code)
+        internal static bool CanSelect(string choice) => choice == FollowWindows || IsAvailable(choice) || (LanguageMatch.IsCode(choice) && choice == Picked());
+
+        public static JArray ToJson()
         {
-            if (!IsAvailable(code)) throw new InvalidOperationException("Unknown language: " + code);
-            string value = code == WindowsDefault() ? "-" : code;
-            bool applied = PipeClient.SetObsLanguageAndWait(value, 3000);
-            Log.Write("Locales.ApplyToObs: " + (value == "-" ? "follow windows" : value) + (applied ? "" : ", not confirmed by the plugin"));
-            return applied;
+            var options = new JArray(Available().Select(l => new JObject { ["code"] = l.Code, ["name"] = l.Name, ["englishName"] = l.EnglishName, ["preview"] = l.Code }));
+            string windows = WindowsDefault();
+            options.Insert(0, new JObject { ["code"] = FollowWindows, ["name"] = Locales.Message("settings.followWindowsLanguage"), ["preview"] = IsAvailable(windows) ? windows : English });
+            string saved = Picked();
+            if (saved != FollowWindows && !IsAvailable(saved))
+                options.Add(new JObject { ["code"] = saved, ["name"] = EnglishNameOf(saved) is string name && name.Length > 0 ? name : saved, ["preview"] = English });
+            return options;
+        }
+
+        internal static bool ApplyToObs(string choice, out bool restart)
+        {
+            restart = false;
+            if (!CanSelect(choice)) return false;
+            string saved = ObsUserIni.Read(Section, Key);
+            string desired = choice == FollowWindows ? null : choice;
+            if (languageUnconfirmed || !string.Equals(saved ?? "", desired ?? "", StringComparison.Ordinal))
+            {
+                languageUnconfirmed = !PipeClient.ApplyObsConfig("LANGUAGE", choice, 3000);
+                if (languageUnconfirmed) return false;
+            }
+            string running = PipeClient.ObsLocale;
+            restart = running != null && !string.Equals(Effective(choice), running, StringComparison.OrdinalIgnoreCase);
+            return true;
         }
 
         private static string EnglishNameOf(string code)

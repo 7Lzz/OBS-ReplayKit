@@ -327,62 +327,20 @@ namespace ReplayKitHelper
             return new JObject { ["ok"] = true, ["value"] = value.Value<string>(), ["message"] = "" };
         }
 
-        internal static bool TestStringEqual(string actual, string expected) => string.Equals(actual, expected, StringComparison.OrdinalIgnoreCase);
-
-        // obs does not always apply a profile-parameter write instantly -- read-current, write, verify, retry with backoff up to maxAttempts before giving up.
-        internal static JObject SetObsMonitoringDevice(string deviceId, string deviceName, int maxAttempts = 6)
+        internal static JObject SetObsMonitoringDevice(string deviceId, string deviceName)
         {
             deviceId = (deviceId ?? "").Trim();
             deviceName = (deviceName ?? "").Trim();
-            if (string.IsNullOrWhiteSpace(deviceId) || string.IsNullOrWhiteSpace(deviceName))
+            if (deviceId.Length == 0 || deviceName.Length == 0)
                 return new JObject { ["ok"] = false, ["applied"] = new JArray(), ["message"] = Locales.Message("settings.obsMonitoringDeviceIdNameIs") };
             if (deviceId.Length > 512 || deviceName.Length > 256 || Regex.IsMatch(deviceId, @"[\x00-\x1F]") || Regex.IsMatch(deviceName, @"[\x00-\x1F]"))
                 return new JObject { ["ok"] = false, ["applied"] = new JArray(), ["message"] = Locales.Message("settings.obsMonitoringDeviceIdNameIs2") };
 
-            int attempts = Math.Max(1, Math.Min(10, maxAttempts));
-            string lastMessage = "";
-            for (int attempt = 1; attempt <= attempts; attempt++)
-            {
-                var currentId = GetObsProfileParameterValue("Audio", "MonitoringDeviceId");
-                var currentName = GetObsProfileParameterValue("Audio", "MonitoringDeviceName");
-                if (currentId["ok"]?.Value<bool>() == true && currentName["ok"]?.Value<bool>() == true &&
-                    TestStringEqual(currentId["value"]?.Value<string>(), deviceId) && TestStringEqual(currentName["value"]?.Value<string>(), deviceName))
-                {
-                    return new JObject { ["ok"] = true, ["applied"] = new JArray("OBS monitoring device already set"), ["message"] = "" };
-                }
-
-                var setId = SetObsProfileParameterSafe("Audio", "MonitoringDeviceId", deviceId);
-                if (!setId.Ok)
-                {
-                    lastMessage = "MonitoringDeviceId rejected: " + setId.Message;
-                    Thread.Sleep(Math.Min(1000, 150 * attempt));
-                    continue;
-                }
-                var setName = SetObsProfileParameterSafe("Audio", "MonitoringDeviceName", deviceName);
-                if (!setName.Ok)
-                {
-                    lastMessage = "MonitoringDeviceName rejected: " + setName.Message;
-                    Thread.Sleep(Math.Min(1000, 150 * attempt));
-                    continue;
-                }
-
-                Thread.Sleep(Math.Min(1000, 150 * attempt));
-                var verifyId = GetObsProfileParameterValue("Audio", "MonitoringDeviceId");
-                var verifyName = GetObsProfileParameterValue("Audio", "MonitoringDeviceName");
-                if (verifyId["ok"]?.Value<bool>() == true && verifyName["ok"]?.Value<bool>() == true &&
-                    TestStringEqual(verifyId["value"]?.Value<string>(), deviceId) && TestStringEqual(verifyName["value"]?.Value<string>(), deviceName))
-                {
-                    return new JObject { ["ok"] = true, ["applied"] = new JArray("OBS monitoring device set to " + deviceName), ["message"] = "" };
-                }
-
-                string actualId = verifyId["ok"]?.Value<bool>() == true ? verifyId["value"]?.Value<string>() : verifyId["message"]?.Value<string>();
-                string actualName = verifyName["ok"]?.Value<bool>() == true ? verifyName["value"]?.Value<string>() : verifyName["message"]?.Value<string>();
-                lastMessage = Locales.Message("settings.obsStillReportsMonitoringDevice", "name", actualName, "id", actualId);
-            }
-
-            return new JObject { ["ok"] = false, ["applied"] = new JArray(), ["message"] = Locales.Message("settings.couldNotSetObsMonitoringDevice", "device", deviceName, "attempts", attempts, "error", lastMessage) };
+            var request = new JObject { ["id"] = deviceId, ["name"] = deviceName };
+            if (!PipeClient.ApplyObsConfig("MONITORDEVICE", request.ToString(Newtonsoft.Json.Formatting.None), 3000))
+                return new JObject { ["ok"] = false, ["applied"] = new JArray(), ["message"] = Locales.Message("settings.monitoringDeviceNotConfirmed", "device", deviceName) };
+            return new JObject { ["ok"] = true, ["applied"] = new JArray("OBS monitoring device verified"), ["message"] = "" };
         }
-
         // -- keybind <-> basic.ini hotkey json --
 
         internal static JObject ConvertKeybindToObsBinding(JObject combo)

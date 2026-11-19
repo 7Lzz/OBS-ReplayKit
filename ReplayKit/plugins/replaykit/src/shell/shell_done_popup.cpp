@@ -2,12 +2,14 @@
 #include "prelude.hpp"
 #include "shell/shell_done_popup.hpp"
 
+#include "core/cef_host.hpp"
 #include "core/helper_client.hpp"
 #include "core/main_window.hpp"
 #include "core/state.hpp"
 #include "shell/shell_modal_card.hpp"
 #include "shell/shell_notify_reader.hpp"
 #include "shell/shell_storage_modal.hpp"
+#include "shell/shell_views.hpp"
 
 namespace rk {
 
@@ -28,9 +30,8 @@ ModalCard &Card()
 	return card;
 }
 
-// a popup that came while the window was minimized or hidden (a game in front, obs in the tray), waiting for the window to be back
-std::string g_waiting;
-QPointer<QTimer> g_waitTimer;
+std::mutex g_doneAckLock;
+std::vector<std::string> g_doneAcks;
 
 bool WindowOnScreen()
 {
@@ -42,33 +43,20 @@ bool WindowOnScreen()
 
 void DonePopupRequest(const std::string &id)
 {
-	// the card sits over the obs window of the clean layout; the classic layout has no place for it
-	if (!g_shellOn)
-		return;
-	if (WindowOnScreen()) {
-		g_waiting.clear();
+	const bool accepted = g_shellOn && CefOpen() && WindowOnScreen() && !ShellSetupLocked() && !Card().IsOpen();
+	if (accepted)
 		DonePopupOpen(id);
-		return;
-	}
-	g_waiting = id;
-	if (!g_waitTimer) {
-		g_waitTimer = new QTimer(g_callbacks);
-		g_waitTimer->setInterval(1000);
-		QObject::connect(g_waitTimer, &QTimer::timeout, g_callbacks, []() {
-			if (g_waiting.empty()) {
-				g_waitTimer->stop();
-				return;
-			}
-			if (!WindowOnScreen())
-				return;
-			const std::string shown = g_waiting;
-			g_waiting.clear();
-			g_waitTimer->stop();
-			// a moment for the window to finish coming back before the card is laid over it
-			QTimer::singleShot(400, g_callbacks, [shown]() { DonePopupOpen(shown); });
-		});
-	}
-	g_waitTimer->start();
+	std::lock_guard<std::mutex> guard(g_doneAckLock);
+	if (g_doneAcks.size() < 64)
+		g_doneAcks.push_back("DONEPOPUP_ACK " + id + (accepted ? " 1" : " 0"));
+}
+
+std::vector<std::string> TakeDonePopupAcks()
+{
+	std::lock_guard<std::mutex> guard(g_doneAckLock);
+	std::vector<std::string> messages;
+	messages.swap(g_doneAcks);
+	return messages;
 }
 
 void DonePopupOpen(const std::string &id)

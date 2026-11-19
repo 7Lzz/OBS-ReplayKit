@@ -20,12 +20,15 @@ namespace ReplayKitHelper
         internal static bool ReplaceKeepingDates(string path, string replacement, FileInfo original, Func<bool> stillWanted = null)
         {
             bool replaced = false;
+            string previousIdentity = null;
+            string root = Clips.LibraryRoot(Path.GetDirectoryName(path));
             JobCoordinator.ChangeSource(path, () =>
             {
                 var current = new FileInfo(path);
                 if (!current.Exists || (current.Attributes & FileAttributes.ReparsePoint) != 0 ||
                     current.Length != original.Length || current.LastWriteTimeUtc != original.LastWriteTimeUtc ||
                     current.CreationTimeUtc != original.CreationTimeUtc || (stillWanted != null && !stillWanted())) return;
+                previousIdentity = ClipRenames.Identity(current);
                 File.Replace(replacement, path, null);
                 replaced = true;
             });
@@ -39,6 +42,7 @@ namespace ReplayKitHelper
             {
                 Log.Write("Clip replace could not restore the file dates: " + ex.GetType().Name);
             }
+            ClipRenames.FollowLink(root, path, previousIdentity);
             return true;
         }
 
@@ -81,9 +85,10 @@ namespace ReplayKitHelper
             throw new ArgumentException(Locales.Message("clips.noAvailableNumberedNameWasFound"));
         }
 
-        public static void Replace(string requestId, string temporary, string source, long expectedSize, DateTime expectedWriteTime)
+        public static string Replace(string requestId, string temporary, string source, long expectedSize, DateTime expectedWriteTime, string expectedVersion = null)
         {
             string staged = temporary;
+            string previousIdentity = null;
             try
             {
                 var token = JobCoordinator.Token(requestId);
@@ -108,10 +113,13 @@ namespace ReplayKitHelper
                 JobCoordinator.Commit(requestId, () =>
                 {
                     var current = new FileInfo(source);
-                    if (!current.Exists || current.Length != expectedSize || current.LastWriteTimeUtc != expectedWriteTime)
+                    if (!current.Exists || current.Length != expectedSize || current.LastWriteTimeUtc != expectedWriteTime ||
+                        (expectedVersion != null && ClipRenames.Version(current) != expectedVersion))
                         throw new IOException(Locales.Message("clips.theSourceClipChangedDuringProcessing"));
+                    previousIdentity = ClipRenames.Identity(current);
                     Native.MoveFileReplace(staged, source);
                 });
+                return previousIdentity;
             }
             finally
             {

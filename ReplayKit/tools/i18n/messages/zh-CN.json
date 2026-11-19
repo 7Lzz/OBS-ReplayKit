@@ -2193,6 +2193,10 @@
     "source": "643687bc3adaac76",
     "text": "时长"
   },
+  "common.libraryMetadataNotSaved": {
+    "source": "eacdd6020bcafe24",
+    "text": "文件操作已成功，但 ReplayKit 无法保存媒体库元数据。"
+  },
   "common.microphone": {
     "source": "a0b39d22329a3057",
     "text": "麦克风"
@@ -4929,6 +4933,10 @@
     "source": "154539677af96fde",
     "text": "停止生成"
   },
+  "editor.stopWaitingForSpeech": {
+    "source": "755a025356331703",
+    "text": "停止等待"
+  },
   "editor.stopping": {
     "source": "24a54b7783c68b9d",
     "text": "正在停止"
@@ -6907,10 +6915,6 @@
     "source": "1ef347e11e320e77",
     "text": "无法设置 {name} 的透明度：{error}"
   },
-  "settings.couldNotSetObsMonitoringDevice": {
-    "source": "7a59e2250afe7e65",
-    "text": "经 {attempts} 次尝试后仍无法将 OBS 监听设备设置为 {device}。{error}"
-  },
   "settings.couldNotSetTheInputSensitivity": {
     "source": "14a78e615b5856e2",
     "text": "无法设置输入灵敏度：{error}"
@@ -7067,10 +7071,6 @@
     "source": "dc224b7bdacd7452",
     "text": "桌面音频不是 ReplayKit 的音频采集源。"
   },
-  "settings.desktopAudioMixerStateCouldNot": {
-    "source": "a6cb6a37c3f32ec3",
-    "text": "无法更改桌面音频混音器状态：{error}"
-  },
   "settings.desktopAudioMonitoringStateCouldNot": {
     "source": "8b4f905e314f933e",
     "text": "无法验证桌面音频监听状态：{error}"
@@ -7134,18 +7134,6 @@
   "settings.discordOutputModeWasSavedBut": {
     "source": "cf54892ef94981cc",
     "text": "Discord 输出模式已保存，但{message}"
-  },
-  "settings.discordOutputModeWasSavedBut2": {
-    "source": "b2e1e3c1f61824da",
-    "text": "Discord 输出模式已保存，但无法读取虚拟摄像机状态：{error}"
-  },
-  "settings.discordOutputModeWasSavedBut3": {
-    "source": "d4b6c910b24f583c",
-    "text": "Discord 输出模式已保存，但无法启动旧版虚拟摄像机：{error}"
-  },
-  "settings.discordOutputModeWasSavedBut4": {
-    "source": "a8734d0c4437f133",
-    "text": "Discord 输出模式已保存，但无法停止虚拟摄像机：{error}"
   },
   "settings.discordRichPresence": {
     "source": "6257e038f7a60bdc",
@@ -7230,6 +7218,18 @@
   "settings.dragToPosition": {
     "source": "43ddd66cdc6eb3f4",
     "text": "拖动以定位"
+  },
+  "settings.followWindowsLanguage": {
+    "source": "4611df7bceeadea6",
+    "text": "跟随 Windows 语言"
+  },
+  "settings.micSettingsReverted": {
+    "source": "8090a6cb1a20a12d",
+    "text": "已撤销 OBS 未能应用的麦克风更改。"
+  },
+  "settings.monitoringDeviceNotConfirmed": {
+    "source": "3ebdf5a7cab0f4b6",
+    "text": "OBS 未确认 {device} 为当前音频监听设备。"
   },
   "settings.resetOverlaySizeAndRotation": {
     "source": "910d03d1f3f121c3",
@@ -7811,10 +7811,6 @@
     "source": "fba79278f18f924b",
     "text": "麦克风电平"
   },
-  "settings.microphoneSettingsWereSavedButObs": {
-    "source": "6f14c78637164845",
-    "text": "麦克风设置已保存，但无法连接 OBS，或 OBS 中没有 \"{MicInputName}\" 输入。请重启 OBS 后重试。"
-  },
   "settings.microphoneTestFailedError": {
     "source": "50c8f789e3a910a5",
     "text": "麦克风测试失败：{error}"
@@ -8194,10 +8190,6 @@
   "settings.obsStartsInTheSystemTray": {
     "source": "f20d594c5c35b559",
     "text": "OBS 将在系统托盘中启动，而不是打开其窗口。"
-  },
-  "settings.obsStillReportsMonitoringDevice": {
-    "source": "fbf08ec8489ae7d3",
-    "text": "OBS 仍报告监听设备“{name}”（{id}）。"
   },
   "settings.obsStudioItselfWillAlsoBe": {
     "source": "bb2ea21750848284",
@@ -9529,10 +9521,6 @@
     "source": "a5a22c78e84a093d",
     "text": "视图(V)"
   },
-  "settings.virtualCameraIsLegacyDeprecatedFor": {
-    "source": "b1ce52f88717759e",
-    "text": "虚拟摄像机已不再用于 Discord 输出（旧版/已弃用）。"
-  },
   "settings.volumeMustBeBetween0And": {
     "source": "815edf45de52ca90",
     "text": "音量必须在 0 到 {VolumeMax} 之间。"
@@ -9672,10 +9660,6 @@
   "setup.cleanupComplete": {
     "source": "aca630d212306171",
     "text": "清理完成"
-  },
-  "setup.clearOldObsFiles": {
-    "source": "bcb2b555e88da7f9",
-    "text": "清除旧的 OBS 文件"
   },
   "setup.clearTheSetupCache": {
     "source": "9e44cd91060a45b7",
@@ -10056,10 +10040,6 @@
   "setup.removeWindowsStartup": {
     "source": "e5147babfcd16e35",
     "text": "移除 Windows 启动项"
-  },
-  "setup.removesFilesAnObsUpdateLeft": {
-    "source": "b82245e09590bef7",
-    "text": "移除 OBS 更新遗留的文件。"
   },
   "setup.removesStreamableLoginDataAndSchedules": {
     "source": "7c1b2590789a2f8f",
@@ -11302,10 +11282,6 @@
   "update.startupUpdateCheckAlreadyRan": {
     "source": "b521777f902946bb",
     "text": "启动时的更新检查已运行。"
-  },
-  "update.theInstallerDidNotFinishWithin": {
-    "source": "e8064abfffb78ac5",
-    "text": "安装程序未在 3 分钟内完成。"
   },
   "update.theInstallerDidNotStart": {
     "source": "351d29af6f6c787b",

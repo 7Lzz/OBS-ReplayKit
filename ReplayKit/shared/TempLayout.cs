@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 
 namespace ReplayKitShared
@@ -15,6 +16,16 @@ namespace ReplayKitShared
         // inside the logs folder: the installer writes how an update ended and its own pid, and the helper reads both
         public const string UpdateResultFile = "update_result.json";
         public const string UpdatePidFile = "update_pid";
+        public const string UpdateAttemptFile = "update_attempt";
+
+        public static bool ValidAttempt(string id) => Guid.TryParseExact(id, "N", out _);
+
+        public static string UpdateFile(string filename, string attemptId)
+        {
+            if (string.IsNullOrEmpty(attemptId)) return filename;
+            if (!ValidAttempt(attemptId)) throw new ArgumentException("Invalid update attempt ID.", nameof(attemptId));
+            return attemptId + "-" + filename;
+        }
         // inside the logs folder: the share window writes its log there and the helper reads it for the sdk
         public const string ShareWindowLogFile = "share-window.log";
 

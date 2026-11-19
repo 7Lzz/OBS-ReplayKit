@@ -4,6 +4,11 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'obs_versions.ps1')
 $dist = Join-Path $PSScriptRoot '..\dist'
 
+foreach ($name in 'SDL3.dll', 'uiohook.dll') {
+    $dependency = Join-Path $dist "input-overlay\$name"
+    if (-not (Test-Path -LiteralPath $dependency -PathType Leaf)) { throw "input-overlay is missing $dependency" }
+}
+
 # each bundled plugin dll, by the archive it ships in, or loose when it ships as itself
 $plugins = @(
     @{ Name = 'replaykit.dll'; Path = Join-Path $dist 'replaykit.dll' },

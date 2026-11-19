@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 
@@ -8,6 +9,9 @@ namespace ReplayKitShared
     public static class StateLayout
     {
         public const string Folder = "user-data";
+        public const string StreamableCredentialsFolder = "OBS Streamable Helper";
+        public const string StreamableCredentialsFile = "auth.dat";
+        public const string StreamableLegacyCookieFile = "auth_cookies.txt";
 
         public const string SettingsFile = "replaykit_settings.json";
         public const string HotkeySignalFile = "hotkey_capture_signal.json";
@@ -28,6 +32,7 @@ namespace ReplayKitShared
         public const string ShareCoverImageFile = "share_cover_image.png";
         public const string ShareCoverVideoFile = "share_cover_video.mp4";
         public const string ShareCoverVideoSoundFile = "share_cover_video_sound.wav";
+        public const string ShareCoverVideoSelectionFile = "share_cover_video_selection.txt";
         public const string ShareCoverSoundFile = "share_cover_sound.wav";
         public const string ShareCoverCardFile = "share_cover_card.png";
         // the hand-off between the installer and a helper that can still be the one of the release before, so it keeps its place in the folder root
@@ -68,6 +73,7 @@ namespace ReplayKitShared
             new Entry { File = ShareCoverImageFile, OldFolders = new[] { Root } },
             new Entry { File = ShareCoverVideoFile, OldFolders = new[] { Root } },
             new Entry { File = ShareCoverVideoSoundFile, OldFolders = new[] { Root } },
+            new Entry { File = ShareCoverVideoSelectionFile, OldFolders = new[] { Root } },
             new Entry { File = ShareCoverSoundFile, OldFolders = new[] { Root } },
             new Entry { File = ShareCoverCardFile, OldFolders = new[] { Root }, Regenerated = true },
         };
@@ -98,14 +104,23 @@ namespace ReplayKitShared
         {
             string current = PathFor(root, file);
             if (File.Exists(current)) return current;
-            var entry = Find(file);
-            if (entry == null) return current;
-            foreach (var old in entry.OldFolders)
-            {
-                string legacy = Path.Combine(root, old, file);
-                if (File.Exists(legacy)) return legacy;
-            }
+            foreach (string path in LegacyPaths(root, file))
+                if (File.Exists(path)) return path;
             return current;
+        }
+
+        public static IEnumerable<string> Paths(string root, string file)
+        {
+            yield return PathFor(root, file);
+            foreach (string path in LegacyPaths(root, file)) yield return path;
+        }
+
+        private static IEnumerable<string> LegacyPaths(string root, string file)
+        {
+            var entry = Find(file);
+            if (entry == null) yield break;
+            foreach (var old in entry.OldFolders)
+                yield return Path.Combine(root, old, file);
         }
 
         // moves what is still in the old places into the user-data folder; safe to run any number of times and never overwrites a file that is already in the new place
