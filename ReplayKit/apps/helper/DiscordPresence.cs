@@ -211,7 +211,7 @@ namespace ReplayKitHelper
                 ["state"] = Fit(Locales.Message("presence.clipping"), 128),
                 ["timestamps"] = new JObject { ["start"] = sighting.StartUnix },
                 ["assets"] = assets,
-                ["buttons"] = new JArray(new JObject { ["label"] = Fit(Locales.Message("presence.getReplayKit"), 32), ["url"] = Update.RepoPage }),
+                ["buttons"] = new JArray(new JObject { ["label"] = Fit(Locales.Message("presence.getReplayKit"), 32), ["url"] = Update.ReleasePage }),
                 ["instance"] = false,
             };
         }
