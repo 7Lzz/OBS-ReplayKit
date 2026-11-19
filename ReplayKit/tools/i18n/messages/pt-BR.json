@@ -2384,8 +2384,8 @@
     "text": "Ver todos"
   },
   "common.sharePreview": {
-    "source": "1faa5322e045dd37",
-    "text": "Pré-visualização de compartilhamento"
+    "source": "97a1c94589647387",
+    "text": "Transmissão de tela"
   },
   "common.signInInTheStreamableWindow": {
     "source": "e764eeafd8f574a7",
@@ -2596,16 +2596,16 @@
     "text": "retenção de {days}d"
   },
   "controls.disableSharePreview": {
-    "source": "834d472cbc7f25ba",
-    "text": "Desativar pré-visualização de compartilhamento"
+    "source": "3137cab16c8d5e0a",
+    "text": "Desativar Transmissão de tela"
   },
   "controls.disabling": {
     "source": "2fd59055f990ecfe",
     "text": "Desativando..."
   },
   "controls.enableSharePreview": {
-    "source": "e62362122b49632e",
-    "text": "Ativar Pré-visualização de compartilhamento"
+    "source": "56c765cced08dc4d",
+    "text": "Ativar Transmissão de tela"
   },
   "controls.enabling": {
     "source": "83f57eed999ef9ad",
@@ -6136,16 +6136,16 @@
     "text": "Não foi possível definir um tamanho válido para a janela da projeção."
   },
   "screenshare.discordProjectorIsNotTheActive": {
-    "source": "bea3a5075aee0b82",
-    "text": "A projeção do Discord não é o modo ativo de pré-visualização de compartilhamento."
+    "source": "4d1e936bb23ae0c4",
+    "text": "A projeção do Discord não é o modo ativo da Transmissão de tela."
   },
   "screenshare.discordScreenshareSupportIsDisabled": {
     "source": "fb0de0d5feb53f24",
     "text": "O suporte à transmissão de tela do Discord está desativado."
   },
   "screenshare.missingSharePreviewBody": {
-    "source": "32888b97345fca89",
-    "text": "Corpo da pré-visualização de compartilhamento ausente."
+    "source": "1455b12e2a205e26",
+    "text": "Corpo da Transmissão de tela ausente."
   },
   "screenshare.monitorWorkAreaIsInvalid": {
     "source": "efbae713290b7567",
@@ -6164,16 +6164,16 @@
     "text": "A janela do projetor do OBS foi movida, mas o Windows recusou o pedido de ocultar a barra de tarefas."
   },
   "screenshare.theShareWindowIsMissing": {
-    "source": "b5f7a930d8477eb4",
-    "text": "O programa da janela do Share Preview está faltando ({path}). Execute o instalador do ReplayKit novamente."
+    "source": "614721c15e3ab526",
+    "text": "O programa da janela da Transmissão de tela está faltando ({path}). Execute o instalador do ReplayKit novamente."
   },
   "screenshare.theShareWindowCouldNotStart": {
-    "source": "964d6e4a8ff066b8",
-    "text": "Não foi possível iniciar a janela do Share Preview. Desative e ative o Share Preview de novo e verifique os registros do ReplayKit se continuar falhando."
+    "source": "c6fdf63ee4646d3f",
+    "text": "Não foi possível iniciar a janela da Transmissão de tela. Desative e ative a Transmissão de tela de novo e verifique os registros do ReplayKit se continuar falhando."
   },
   "screenshare.theShareWindowDidNotClose": {
-    "source": "df55f2f86a7f167f",
-    "text": "A janela do Share Preview não fechou, mesmo depois de receber a ordem para encerrar."
+    "source": "6753d9127bc1caff",
+    "text": "A janela da Transmissão de tela não fechou, mesmo depois de receber a ordem para encerrar."
   },
   "screenshare.coverDefaultText": {
     "source": "a99e83da4583ab31",
@@ -6208,12 +6208,12 @@
     "text": "Não foi possível usar esse som. Escolha outro arquivo de áudio."
   },
   "screenshare.turnOnSharePreviewFirst": {
-    "source": "bd28264ea2b20433",
-    "text": "Ative o Share Preview primeiro."
+    "source": "a110f4ef767f5aea",
+    "text": "Ative a Transmissão de tela primeiro."
   },
   "screenshare.obsStreamAudioPlaybackEndpointIs": {
-    "source": "67f2ce393de09ce9",
-    "text": "O ponto de reprodução do OBS Stream Audio não está ativo. Instale ou ative o VB-Audio Cable e execute a Pré-visualização de compartilhamento novamente."
+    "source": "a945afc4f6856138",
+    "text": "O ponto de reprodução do OBS Stream Audio não está ativo. Instale ou ative o VB-Audio Cable e execute a Transmissão de tela novamente."
   },
   "screenshare.obsVideoSettingsDidNotInclude": {
     "source": "da283b2911048744",
@@ -6228,8 +6228,8 @@
     "text": "Os limites do monitor da fonte do projetor são inválidos."
   },
   "screenshare.sharePreviewEnabledMustBeA": {
-    "source": "46cebaccaa5c1840",
-    "text": "O valor de pré-visualização de compartilhamento ativada precisa ser um booleano JSON."
+    "source": "cb28470ed021d2d5",
+    "text": "O valor de Transmissão de tela ativada precisa ser um booleano JSON."
   },
   "screenshare.theObsProjectorWindowChangeDid": {
     "source": "243400152e4ba38f",
@@ -6544,8 +6544,8 @@
     "text": "Escolha o que remover e se deseja manter suas configurações."
   },
   "settings.chooseWhatYouShareOnDiscord": {
-    "source": "e7204bc67854d42c",
-    "text": "Escolha o que você compartilha no Discord e gerencie a janela de pré-visualização de compartilhamento."
+    "source": "5fabcc3c7473a023",
+    "text": "Escolha o que você compartilha no Discord e gerencie a janela da Transmissão de tela."
   },
   "settings.chooseWhenYourMouseCursorShows": {
     "source": "8820c52f85fc3389",
@@ -7256,12 +7256,12 @@
     "text": "Ativar desfoque de movimento nas fontes de captura"
   },
   "settings.enableSharePreviewBeforeReparkingThe": {
-    "source": "269179265c7003ff",
-    "text": "Ative a Pré-visualização de compartilhamento antes de reposicionar a projeção."
+    "source": "30b603f2bbfebd12",
+    "text": "Ative a Transmissão de tela antes de reposicionar a projeção."
   },
   "settings.enableSharePreviewBeforeShowingThe": {
-    "source": "a19ddb144187a6f5",
-    "text": "Ative a Pré-visualização de compartilhamento antes de mostrar a projeção."
+    "source": "049dd712c96f09fc",
+    "text": "Ative a Transmissão de tela antes de mostrar a projeção."
   },
   "settings.encoderDidNotLoad": {
     "source": "4700fc8a8876b5ed",
@@ -7532,8 +7532,8 @@
     "text": "Controle deslizante da sensibilidade de entrada"
   },
   "settings.installDiscordScreenshareSharePreviewAudio": {
-    "source": "db1b17fd5779cddb",
-    "text": "Instalar o áudio de transmissão de tela do Discord / Pré-visualização de compartilhamento?"
+    "source": "157785fd77200cb8",
+    "text": "Instalar o áudio da Transmissão de tela para o Discord?"
   },
   "settings.installFailedError": {
     "source": "2d83457fb92b3586",
@@ -7544,8 +7544,8 @@
     "text": "Instale ou abra **{app}**, atualize o driver de gráficos da {maker} e reinicie o PC. O ReplayKit volta para o codificador da {maker} sozinho assim que ele carregar."
   },
   "settings.installTheAudioDriverNeededFor": {
-    "source": "6ceaff2c5df645e8",
-    "text": "Instale o driver de áudio necessário para a Pré-visualização de compartilhamento."
+    "source": "63a0ebeeea7e2bf1",
+    "text": "Instale o driver de áudio necessário para a Transmissão de tela."
   },
   "settings.installingDiscordScreenshareSupport": {
     "source": "72706add6b819838",
@@ -8224,8 +8224,8 @@
     "text": "O OBS será fechado enquanto os componentes selecionados são removidos."
   },
   "settings.obsWillCloseWhileTheShare": {
-    "source": "3df8d17868294e12",
-    "text": "O OBS será fechado enquanto o driver de áudio da Pré-visualização de compartilhamento é removido. O ReplayKit continua instalado."
+    "source": "0e2f8a2e2eedf641",
+    "text": "O OBS será fechado enquanto o driver de áudio da Transmissão de tela é removido. O ReplayKit continua instalado."
   },
   "settings.off": {
     "source": "50accd740fa2e736",
@@ -8600,8 +8600,8 @@
     "text": "Controle deslizante do volume do som de gravação"
   },
   "settings.recordsEverythingPlayedThroughTheWindows": {
-    "source": "06ba5ceb58c8001d",
-    "text": "Grava tudo o que é reproduzido pelo dispositivo de saída padrão do Windows. O Discord está incluído no Áudio do PC e o áudio da Pré-visualização de compartilhamento fica desativado."
+    "source": "d3016a183883b880",
+    "text": "Grava tudo o que é reproduzido pelo dispositivo de saída padrão do Windows. O Discord está incluído no Áudio do PC e o áudio da Transmissão de tela fica desativado."
   },
   "settings.recordsPcAudioAndDiscordDiscord": {
     "source": "3975047a1c3ebe6b",
@@ -8620,8 +8620,8 @@
     "text": "Falha na remoção: {error}"
   },
   "settings.removeDiscordScreenshareSharePreviewAudio": {
-    "source": "70f09f2cf9321f37",
-    "text": "Remover transmissão de tela do Discord / áudio da Pré-visualização de compartilhamento?"
+    "source": "4598e306433b82e1",
+    "text": "Remover o áudio da Transmissão de tela para o Discord?"
   },
   "settings.removeGame": {
     "source": "840db8a5ced88aba",
@@ -8636,8 +8636,8 @@
     "text": "Remover o ReplayKit e os componentes instalados do OBS."
   },
   "settings.removeReplaykitOrSharePreviewAudio": {
-    "source": "597f6776c456009d",
-    "text": "Remover o ReplayKit ou o áudio da Pré-visualização de compartilhamento"
+    "source": "849368f43d08ec36",
+    "text": "Remover o ReplayKit ou o áudio da Transmissão de tela"
   },
   "settings.removeStop": {
     "source": "3f6e25cbc71bf302",
@@ -8656,8 +8656,8 @@
     "text": "Removendo o suporte à transmissão de tela do Discord..."
   },
   "settings.removingSharePreviewAudio": {
-    "source": "ef481f457377346e",
-    "text": "Removendo o áudio da Pré-visualização de compartilhamento..."
+    "source": "fcdc7e854d03cefd",
+    "text": "Removendo o áudio da Transmissão de tela..."
   },
   "settings.rendering": {
     "source": "bbf763522a41c231",
@@ -8787,13 +8787,17 @@
     "source": "a0ff61dc6aea6e4e",
     "text": "Escolher som"
   },
-  "settings.shareCardSoundVolume": {
-    "source": "25c4333eb6d1d390",
-    "text": "Volume do som"
+  "settings.beRightBackSound": {
+    "source": "8fae6c071ccdf2dc",
+    "text": "Som do \"Já volto\""
   },
-  "settings.shareCardSoundVolumeSlider": {
-    "source": "ff512b3729993d4c",
-    "text": "Controle deslizante do volume do som"
+  "settings.beRightBackSoundVolume": {
+    "source": "ccb51d3a82f0ebc7",
+    "text": "Volume do som do \"Já volto\""
+  },
+  "settings.beRightBackSoundVolumeSlider": {
+    "source": "af47f39f31935609",
+    "text": "Controle deslizante do volume do som do \"Já volto\""
   },
   "settings.keepTheCardAfterObsCloses": {
     "source": "60dabedaae281b48",
@@ -9028,16 +9032,16 @@
     "text": "O arquivo de instalação ainda não pode ser usado depois de baixá-lo de novo."
   },
   "settings.sharePreviewAudio": {
-    "source": "1b679b4a88a2c529",
-    "text": "Áudio da Pré-visualização de compartilhamento"
+    "source": "e6c6493cb22443f6",
+    "text": "Áudio da Transmissão de tela"
   },
   "settings.sharePreviewAudioOnly": {
-    "source": "0b8768e8f7b8feb1",
-    "text": "Somente áudio da Pré-visualização de compartilhamento"
+    "source": "99fcc7463219ae14",
+    "text": "Somente áudio da Transmissão de tela"
   },
   "settings.sharePreviewCouldNotBeDisabled": {
-    "source": "14aa57c2a55f570c",
-    "text": "Não foi possível desativar a pré-visualização de compartilhamento: {error}"
+    "source": "0ca616c63c9dc438",
+    "text": "Não foi possível desativar a Transmissão de tela: {error}"
   },
   "settings.sharpPixels": {
     "source": "8a84830d749dc42b",
@@ -9360,8 +9364,8 @@
     "text": "Claro"
   },
   "settings.thisClosesObsAndInstallsThe": {
-    "source": "1c2632254e87b8a9",
-    "text": "Isto fecha o OBS e instala o driver de áudio virtual OBS Stream Audio, depois ativa a Pré-visualização de compartilhamento. O restante do ReplayKit continua como está."
+    "source": "6e106b63e011af80",
+    "text": "Isto fecha o OBS e instala o driver de áudio virtual OBS Stream Audio, depois ativa a Transmissão de tela. O restante do ReplayKit continua como está."
   },
   "settings.thisClosesObsAndUninstallsThe": {
     "source": "bc915d988e5e46da",
@@ -9768,8 +9772,8 @@
     "text": "Ativar transmissão de tela do Discord"
   },
   "setup.enableDiscordScreenshareSharePreview": {
-    "source": "0fac908a70f760c0",
-    "text": "Ativar transmissão de tela do Discord (Pré-visualização de compartilhamento)"
+    "source": "2c3f50eac8b41589",
+    "text": "Ativar Transmissão de tela para o Discord"
   },
   "setup.enableObsWebsocket": {
     "source": "850789894cbc103d",
@@ -10132,8 +10136,8 @@
     "text": "A configuração está incompleta: {count} etapa(s) precisam de atenção. Execute o instalador novamente depois de resolver os avisos no log."
   },
   "setup.sharePreviewStaysOff": {
-    "source": "8cb35a1a0d1fd7a9",
-    "text": "A Pré-visualização de compartilhamento permanece desativada."
+    "source": "b68f2c4f486badb6",
+    "text": "A Transmissão de tela permanece desativada."
   },
   "setup.skipDiscordScreenshare": {
     "source": "439e6659a820e632",
@@ -10516,8 +10520,8 @@
     "text": "Salvar clipe"
   },
   "shell.setUpSharePreview": {
-    "source": "b090d523c8b2fd23",
-    "text": "Configurar a Pré-visualização de compartilhamento"
+    "source": "b65db834459e9c17",
+    "text": "Configurar a Transmissão de tela"
   },
   "shell.settings": {
     "source": "83909f82446ee9c3",
@@ -10528,12 +10532,12 @@
     "text": "Configuração"
   },
   "shell.sharePreviewOff": {
-    "source": "33cd8963a8c41919",
-    "text": "Pré-visualização de compartilhamento: desativada"
+    "source": "937e0280c625e28f",
+    "text": "Transmissão de tela: desativada"
   },
   "shell.sharePreviewOn": {
-    "source": "3977d69891657d63",
-    "text": "Pré-visualização de compartilhamento: ativada"
+    "source": "d5dc050fb4fb330b",
+    "text": "Transmissão de tela: ativada"
   },
   "shell.streamableAnonymous": {
     "source": "a788f94e631febb7",

@@ -2382,8 +2382,8 @@
     "text": "查看全部"
   },
   "common.sharePreview": {
-    "source": "1faa5322e045dd37",
-    "text": "共享预览"
+    "source": "97a1c94589647387",
+    "text": "屏幕共享"
   },
   "common.signInInTheStreamableWindow": {
     "source": "e764eeafd8f574a7",
@@ -2594,16 +2594,16 @@
     "text": "保留 {days} 天"
   },
   "controls.disableSharePreview": {
-    "source": "834d472cbc7f25ba",
-    "text": "禁用分享预览"
+    "source": "3137cab16c8d5e0a",
+    "text": "禁用屏幕共享"
   },
   "controls.disabling": {
     "source": "2fd59055f990ecfe",
     "text": "正在停用..."
   },
   "controls.enableSharePreview": {
-    "source": "e62362122b49632e",
-    "text": "启用分享预览"
+    "source": "56c765cced08dc4d",
+    "text": "启用屏幕共享"
   },
   "controls.enabling": {
     "source": "83f57eed999ef9ad",
@@ -6134,16 +6134,16 @@
     "text": "无法确定有效的投影窗口大小。"
   },
   "screenshare.discordProjectorIsNotTheActive": {
-    "source": "bea3a5075aee0b82",
-    "text": "Discord 投影窗口不是当前的分享预览模式。"
+    "source": "4d1e936bb23ae0c4",
+    "text": "Discord 投影窗口不是当前的屏幕共享模式。"
   },
   "screenshare.discordScreenshareSupportIsDisabled": {
     "source": "fb0de0d5feb53f24",
     "text": "Discord 屏幕共享支持已禁用。"
   },
   "screenshare.missingSharePreviewBody": {
-    "source": "32888b97345fca89",
-    "text": "缺少分享预览内容。"
+    "source": "1455b12e2a205e26",
+    "text": "缺少屏幕共享内容。"
   },
   "screenshare.monitorWorkAreaIsInvalid": {
     "source": "efbae713290b7567",
@@ -6162,16 +6162,16 @@
     "text": "OBS 投影窗口已移动，但 Windows 拒绝了隐藏任务栏的请求。"
   },
   "screenshare.theShareWindowIsMissing": {
-    "source": "b5f7a930d8477eb4",
-    "text": "缺少 Share Preview 窗口程序（{path}）。请重新运行 ReplayKit 安装程序。"
+    "source": "614721c15e3ab526",
+    "text": "缺少屏幕共享窗口程序（{path}）。请重新运行 ReplayKit 安装程序。"
   },
   "screenshare.theShareWindowCouldNotStart": {
-    "source": "964d6e4a8ff066b8",
-    "text": "无法启动 Share Preview 窗口。请关闭再打开 Share Preview，如果仍然失败，请查看 ReplayKit 日志。"
+    "source": "c6fdf63ee4646d3f",
+    "text": "无法启动屏幕共享窗口。请关闭再打开屏幕共享，如果仍然失败，请查看 ReplayKit 日志。"
   },
   "screenshare.theShareWindowDidNotClose": {
-    "source": "df55f2f86a7f167f",
-    "text": "即使已要求结束，Share Preview 窗口仍未关闭。"
+    "source": "6753d9127bc1caff",
+    "text": "即使已要求结束，屏幕共享窗口仍未关闭。"
   },
   "screenshare.coverDefaultText": {
     "source": "a99e83da4583ab31",
@@ -6204,12 +6204,12 @@
     "text": "无法使用该声音。请选择其他音频文件。"
   },
   "screenshare.turnOnSharePreviewFirst": {
-    "source": "bd28264ea2b20433",
-    "text": "请先打开 Share Preview。"
+    "source": "a110f4ef767f5aea",
+    "text": "请先打开屏幕共享。"
   },
   "screenshare.obsStreamAudioPlaybackEndpointIs": {
-    "source": "67f2ce393de09ce9",
-    "text": "OBS Stream Audio 播放端点未启用。请安装或启用 VB-Audio Cable，然后重新运行分享预览。"
+    "source": "a945afc4f6856138",
+    "text": "OBS Stream Audio 播放端点未启用。请安装或启用 VB-Audio Cable，然后重新运行屏幕共享。"
   },
   "screenshare.obsVideoSettingsDidNotInclude": {
     "source": "da283b2911048744",
@@ -6224,8 +6224,8 @@
     "text": "投影源显示器范围无效。"
   },
   "screenshare.sharePreviewEnabledMustBeA": {
-    "source": "46cebaccaa5c1840",
-    "text": "共享预览是否启用必须是 JSON 布尔值。"
+    "source": "cb28470ed021d2d5",
+    "text": "屏幕共享是否启用必须是 JSON 布尔值。"
   },
   "screenshare.theObsProjectorWindowChangeDid": {
     "source": "243400152e4ba38f",
@@ -6540,8 +6540,8 @@
     "text": "选择要删除的内容，以及是否保留你的设置。"
   },
   "settings.chooseWhatYouShareOnDiscord": {
-    "source": "e7204bc67854d42c",
-    "text": "选择在 Discord 上分享的内容，并管理分享预览窗口。"
+    "source": "5fabcc3c7473a023",
+    "text": "选择在 Discord 上分享的内容，并管理屏幕共享窗口。"
   },
   "settings.chooseWhenYourMouseCursorShows": {
     "source": "8820c52f85fc3389",
@@ -7252,12 +7252,12 @@
     "text": "为采集源启用动态模糊"
   },
   "settings.enableSharePreviewBeforeReparkingThe": {
-    "source": "269179265c7003ff",
-    "text": "在重新停放投影窗口前请先启用分享预览。"
+    "source": "30b603f2bbfebd12",
+    "text": "在重新停放投影窗口前请先启用屏幕共享。"
   },
   "settings.enableSharePreviewBeforeShowingThe": {
-    "source": "a19ddb144187a6f5",
-    "text": "在显示投影窗口前请先启用分享预览。"
+    "source": "049dd712c96f09fc",
+    "text": "在显示投影窗口前请先启用屏幕共享。"
   },
   "settings.encoderDidNotLoad": {
     "source": "4700fc8a8876b5ed",
@@ -7528,8 +7528,8 @@
     "text": "输入灵敏度滑块"
   },
   "settings.installDiscordScreenshareSharePreviewAudio": {
-    "source": "db1b17fd5779cddb",
-    "text": "安装 Discord 屏幕共享 / 分享预览音频？"
+    "source": "157785fd77200cb8",
+    "text": "安装 Discord 屏幕共享音频？"
   },
   "settings.installFailedError": {
     "source": "2d83457fb92b3586",
@@ -7540,8 +7540,8 @@
     "text": "安装或打开 **{app}**，更新 {maker} 显卡驱动程序，然后重启电脑。ReplayKit 加载后会自动切换回 {maker} 编码器。"
   },
   "settings.installTheAudioDriverNeededFor": {
-    "source": "6ceaff2c5df645e8",
-    "text": "安装分享预览所需的音频驱动程序。"
+    "source": "63a0ebeeea7e2bf1",
+    "text": "安装屏幕共享所需的音频驱动程序。"
   },
   "settings.installingDiscordScreenshareSupport": {
     "source": "72706add6b819838",
@@ -8220,8 +8220,8 @@
     "text": "卸载所选组件时，OBS 将关闭。"
   },
   "settings.obsWillCloseWhileTheShare": {
-    "source": "3df8d17868294e12",
-    "text": "卸载分享预览音频驱动程序时，OBS 将关闭。ReplayKit 仍保持安装。"
+    "source": "0e2f8a2e2eedf641",
+    "text": "卸载屏幕共享音频驱动程序时，OBS 将关闭。ReplayKit 仍保持安装。"
   },
   "settings.off": {
     "source": "50accd740fa2e736",
@@ -8596,8 +8596,8 @@
     "text": "录制声音音量滑块"
   },
   "settings.recordsEverythingPlayedThroughTheWindows": {
-    "source": "06ba5ceb58c8001d",
-    "text": "录制通过 Windows 默认输出设备播放的所有声音。Discord 包含在电脑音频中，共享预览音频已关闭。"
+    "source": "d3016a183883b880",
+    "text": "录制通过 Windows 默认输出设备播放的所有声音。Discord 包含在电脑音频中，屏幕共享音频已关闭。"
   },
   "settings.recordsPcAudioAndDiscordDiscord": {
     "source": "3975047a1c3ebe6b",
@@ -8616,8 +8616,8 @@
     "text": "移除失败：{error}"
   },
   "settings.removeDiscordScreenshareSharePreviewAudio": {
-    "source": "70f09f2cf9321f37",
-    "text": "要移除 Discord 屏幕共享／共享预览音频吗？"
+    "source": "4598e306433b82e1",
+    "text": "要移除 Discord 屏幕共享音频吗？"
   },
   "settings.removeGame": {
     "source": "840db8a5ced88aba",
@@ -8632,8 +8632,8 @@
     "text": "从 OBS 中移除 ReplayKit 及其已安装的组件。"
   },
   "settings.removeReplaykitOrSharePreviewAudio": {
-    "source": "597f6776c456009d",
-    "text": "移除 ReplayKit 或共享预览音频"
+    "source": "849368f43d08ec36",
+    "text": "移除 ReplayKit 或屏幕共享音频"
   },
   "settings.removeStop": {
     "source": "3f6e25cbc71bf302",
@@ -8652,8 +8652,8 @@
     "text": "正在移除 Discord 屏幕共享支持..."
   },
   "settings.removingSharePreviewAudio": {
-    "source": "ef481f457377346e",
-    "text": "正在移除共享预览音频..."
+    "source": "fcdc7e854d03cefd",
+    "text": "正在移除屏幕共享音频..."
   },
   "settings.rendering": {
     "source": "bbf763522a41c231",
@@ -8781,13 +8781,17 @@
     "source": "a0ff61dc6aea6e4e",
     "text": "选择声音"
   },
-  "settings.shareCardSoundVolume": {
-    "source": "25c4333eb6d1d390",
-    "text": "声音音量"
+  "settings.beRightBackSound": {
+    "source": "8fae6c071ccdf2dc",
+    "text": "“马上回来”声音"
   },
-  "settings.shareCardSoundVolumeSlider": {
-    "source": "ff512b3729993d4c",
-    "text": "声音音量滑块"
+  "settings.beRightBackSoundVolume": {
+    "source": "ccb51d3a82f0ebc7",
+    "text": "“马上回来”声音音量"
+  },
+  "settings.beRightBackSoundVolumeSlider": {
+    "source": "af47f39f31935609",
+    "text": "“马上回来”声音音量滑块"
   },
   "settings.keepTheCardAfterObsCloses": {
     "source": "60dabedaae281b48",
@@ -9022,16 +9026,16 @@
     "text": "重新下载后，安装文件仍无法使用。"
   },
   "settings.sharePreviewAudio": {
-    "source": "1b679b4a88a2c529",
-    "text": "共享预览音频"
+    "source": "e6c6493cb22443f6",
+    "text": "屏幕共享音频"
   },
   "settings.sharePreviewAudioOnly": {
-    "source": "0b8768e8f7b8feb1",
-    "text": "仅共享预览音频"
+    "source": "99fcc7463219ae14",
+    "text": "仅屏幕共享音频"
   },
   "settings.sharePreviewCouldNotBeDisabled": {
-    "source": "14aa57c2a55f570c",
-    "text": "无法关闭共享预览：{error}"
+    "source": "0ca616c63c9dc438",
+    "text": "无法关闭屏幕共享：{error}"
   },
   "settings.sharpPixels": {
     "source": "8a84830d749dc42b",
@@ -9354,8 +9358,8 @@
     "text": "浅色"
   },
   "settings.thisClosesObsAndInstallsThe": {
-    "source": "1c2632254e87b8a9",
-    "text": "这将关闭 OBS，安装 OBS Stream Audio 虚拟音频驱动，然后开启共享预览。ReplayKit 的其余部分保持不变。"
+    "source": "6e106b63e011af80",
+    "text": "这将关闭 OBS，安装 OBS Stream Audio 虚拟音频驱动，然后开启屏幕共享。ReplayKit 的其余部分保持不变。"
   },
   "settings.thisClosesObsAndUninstallsThe": {
     "source": "bc915d988e5e46da",
@@ -9762,8 +9766,8 @@
     "text": "启用 Discord 屏幕共享"
   },
   "setup.enableDiscordScreenshareSharePreview": {
-    "source": "0fac908a70f760c0",
-    "text": "启用 Discord 屏幕共享（分享预览）"
+    "source": "2c3f50eac8b41589",
+    "text": "为 Discord 启用屏幕共享"
   },
   "setup.enableObsWebsocket": {
     "source": "850789894cbc103d",
@@ -10126,8 +10130,8 @@
     "text": "安装不完整：{count} 个步骤需要处理。请解决日志中的警告后重新运行安装程序。"
   },
   "setup.sharePreviewStaysOff": {
-    "source": "8cb35a1a0d1fd7a9",
-    "text": "共享预览保持关闭。"
+    "source": "b68f2c4f486badb6",
+    "text": "屏幕共享保持关闭。"
   },
   "setup.skipDiscordScreenshare": {
     "source": "439e6659a820e632",
@@ -10510,8 +10514,8 @@
     "text": "保存剪辑"
   },
   "shell.setUpSharePreview": {
-    "source": "b090d523c8b2fd23",
-    "text": "设置共享预览"
+    "source": "b65db834459e9c17",
+    "text": "设置屏幕共享"
   },
   "shell.settings": {
     "source": "83909f82446ee9c3",
@@ -10522,12 +10526,12 @@
     "text": "安装"
   },
   "shell.sharePreviewOff": {
-    "source": "33cd8963a8c41919",
-    "text": "共享预览：关"
+    "source": "937e0280c625e28f",
+    "text": "屏幕共享：关"
   },
   "shell.sharePreviewOn": {
-    "source": "3977d69891657d63",
-    "text": "共享预览：开"
+    "source": "d5dc050fb4fb330b",
+    "text": "屏幕共享：开"
   },
   "shell.streamableAnonymous": {
     "source": "a788f94e631febb7",

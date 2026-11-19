@@ -1057,20 +1057,6 @@
           <div class="label" data-i18n="settings.shareCardSoundFile"></div>
           <div class="field-wrap"><div class="projector-action-row"><button class="btn" type="button" id="shareCoverSoundPick" data-i18n="settings.chooseSound"></button><button class="btn" type="button" id="shareCoverSoundRemove" data-i18n="common.remove"></button></div></div>
         </div>
-        <div class="form-row" id="shareCoverVolumeRow">
-          <div class="label" data-i18n="settings.shareCardSoundVolume"></div>
-          <div class="field-wrap">
-            <div class="volume-control">
-              <input class="text-input volume-value" id="shareCoverSoundVolumeValue" type="text" inputmode="numeric" autocomplete="off" aria-label="Card sound volume" data-i18n-aria-label="settings.shareCardSoundVolume">
-              <div class="volume-slider-wrap">
-                <input class="volume-slider rk-range" id="shareCoverSoundVolume" type="range" data-limit="share_cover_sound_volume" step="1" aria-label="Card sound volume slider" data-i18n-aria-label="settings.shareCardSoundVolumeSlider">
-              </div>
-            </div>
-            <button class="icon-btn field-reset" type="button" id="resetShareCoverSoundVolume" title="Reset to default" data-i18n-title="common.resetToDefault">
-              <svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg>
-            </button>
-          </div>
-        </div>
         <div class="form-row">
           <div class="label"><span data-i18n="settings.keepTheCardAfterObsCloses"></span><span class="setting-description" data-i18n="settings.keepTheCardNote"></span></div>
           <div class="field-wrap"><div class="combo" id="shareWindowKeep" tabindex="0" role="combobox" aria-expanded="false"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button><div class="combo-menu" role="listbox"></div></div></div>
@@ -1172,6 +1158,20 @@
               </div>
             </div>
             <button class="icon-btn field-reset" type="button" id="resetRecordingSoundVolume" title="Reset to default" data-i18n-title="common.resetToDefault">
+              <svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg>
+            </button>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="label" data-i18n="settings.beRightBackSound"></div>
+          <div class="field-wrap">
+            <div class="volume-control">
+              <input class="text-input volume-value" id="shareCoverSoundVolumeValue" type="text" inputmode="numeric" autocomplete="off" aria-label="Be Right Back sound volume" data-i18n-aria-label="settings.beRightBackSoundVolume">
+              <div class="volume-slider-wrap">
+                <input class="volume-slider rk-range" id="shareCoverSoundVolume" type="range" data-limit="share_cover_sound_volume" step="1" aria-label="Be Right Back sound volume slider" data-i18n-aria-label="settings.beRightBackSoundVolumeSlider">
+              </div>
+            </div>
+            <button class="icon-btn field-reset" type="button" id="resetShareCoverSoundVolume" title="Reset to default" data-i18n-title="common.resetToDefault">
               <svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg>
             </button>
           </div>
@@ -2226,7 +2226,6 @@
     shareCoverSoundFileRow: document.getElementById("shareCoverSoundFileRow"),
     shareCoverSoundPick: document.getElementById("shareCoverSoundPick"),
     shareCoverSoundRemove: document.getElementById("shareCoverSoundRemove"),
-    shareCoverVolumeRow: document.getElementById("shareCoverVolumeRow"),
     shareCoverSoundVolume: document.getElementById("shareCoverSoundVolume"),
     shareCoverSoundVolumeValue: document.getElementById("shareCoverSoundVolumeValue"),
     shareWindowKeep: document.getElementById("shareWindowKeep"),
@@ -4915,7 +4914,6 @@
     els.shareCoverSoundRow.hidden = !cardSound;
     els.shareCoverSoundFileRow.hidden = !cardSound || sound !== "custom";
     els.shareCoverSoundRemove.disabled = !shareCoverStatus.hasSound;
-    els.shareCoverVolumeRow.hidden = cardSound && sound === "off";
     if (window.RKShareCardEditor) RKShareCardEditor.refresh();
   }
   async function refreshShareCover() {

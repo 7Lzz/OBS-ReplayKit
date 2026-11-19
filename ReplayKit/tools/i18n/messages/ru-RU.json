@@ -2385,8 +2385,8 @@
     "text": "Показать все"
   },
   "common.sharePreview": {
-    "source": "1faa5322e045dd37",
-    "text": "Предпросмотр общего доступа"
+    "source": "97a1c94589647387",
+    "text": "Демонстрация экрана"
   },
   "common.signInInTheStreamableWindow": {
     "source": "e764eeafd8f574a7",
@@ -2597,16 +2597,16 @@
     "text": "Хранение {days} д"
   },
   "controls.disableSharePreview": {
-    "source": "834d472cbc7f25ba",
-    "text": "Отключить предпросмотр для демонстрации"
+    "source": "3137cab16c8d5e0a",
+    "text": "Отключить демонстрацию экрана"
   },
   "controls.disabling": {
     "source": "2fd59055f990ecfe",
     "text": "Выключение..."
   },
   "controls.enableSharePreview": {
-    "source": "e62362122b49632e",
-    "text": "Включить предпросмотр для демонстрации"
+    "source": "56c765cced08dc4d",
+    "text": "Включить демонстрацию экрана"
   },
   "controls.enabling": {
     "source": "83f57eed999ef9ad",
@@ -6137,16 +6137,16 @@
     "text": "Не удалось определить допустимый размер окна проектора."
   },
   "screenshare.discordProjectorIsNotTheActive": {
-    "source": "bea3a5075aee0b82",
-    "text": "Проектор Discord не в активном режиме предпросмотра для демонстрации."
+    "source": "4d1e936bb23ae0c4",
+    "text": "Проектор Discord не является активным режимом демонстрации экрана."
   },
   "screenshare.discordScreenshareSupportIsDisabled": {
     "source": "fb0de0d5feb53f24",
     "text": "Поддержка демонстрации экрана Discord отключена."
   },
   "screenshare.missingSharePreviewBody": {
-    "source": "32888b97345fca89",
-    "text": "Отсутствует тело предпросмотра для демонстрации."
+    "source": "1455b12e2a205e26",
+    "text": "Отсутствует тело демонстрации экрана."
   },
   "screenshare.monitorWorkAreaIsInvalid": {
     "source": "efbae713290b7567",
@@ -6165,16 +6165,16 @@
     "text": "Окно проектора OBS перемещено, но Windows отклонила запрос на скрытие с панели задач."
   },
   "screenshare.theShareWindowIsMissing": {
-    "source": "b5f7a930d8477eb4",
-    "text": "Программа окна Share Preview отсутствует ({path}). Запустите установщик ReplayKit снова."
+    "source": "614721c15e3ab526",
+    "text": "Программа окна демонстрации экрана отсутствует ({path}). Запустите установщик ReplayKit снова."
   },
   "screenshare.theShareWindowCouldNotStart": {
-    "source": "964d6e4a8ff066b8",
-    "text": "Не удалось запустить окно Share Preview. Выключите и снова включите Share Preview, а если ошибка повторяется, проверьте журналы ReplayKit."
+    "source": "c6fdf63ee4646d3f",
+    "text": "Не удалось запустить окно демонстрации экрана. Выключите и снова включите демонстрацию экрана, а если ошибка повторяется, проверьте журналы ReplayKit."
   },
   "screenshare.theShareWindowDidNotClose": {
-    "source": "df55f2f86a7f167f",
-    "text": "Окно Share Preview не закрылось, даже после команды завершиться."
+    "source": "6753d9127bc1caff",
+    "text": "Окно демонстрации экрана не закрылось, даже после команды завершиться."
   },
   "screenshare.coverDefaultText": {
     "source": "a99e83da4583ab31",
@@ -6210,12 +6210,12 @@
     "text": "Этот звук не подошёл. Выберите другой аудиофайл."
   },
   "screenshare.turnOnSharePreviewFirst": {
-    "source": "bd28264ea2b20433",
-    "text": "Сначала включите Share Preview."
+    "source": "a110f4ef767f5aea",
+    "text": "Сначала включите демонстрацию экрана."
   },
   "screenshare.obsStreamAudioPlaybackEndpointIs": {
-    "source": "67f2ce393de09ce9",
-    "text": "Конечная точка воспроизведения OBS Stream Audio неактивна. Установите или включите VB-Audio Cable, затем запустите предпросмотр для демонстрации снова."
+    "source": "a945afc4f6856138",
+    "text": "Конечная точка воспроизведения OBS Stream Audio неактивна. Установите или включите VB-Audio Cable, затем запустите демонстрацию экрана снова."
   },
   "screenshare.obsVideoSettingsDidNotInclude": {
     "source": "da283b2911048744",
@@ -6230,8 +6230,8 @@
     "text": "Границы монитора источника проектора некорректны."
   },
   "screenshare.sharePreviewEnabledMustBeA": {
-    "source": "46cebaccaa5c1840",
-    "text": "Параметр включения предпросмотра общего доступа должен быть логическим значением JSON."
+    "source": "cb28470ed021d2d5",
+    "text": "Параметр включения демонстрации экрана должен быть логическим значением JSON."
   },
   "screenshare.theObsProjectorWindowChangeDid": {
     "source": "243400152e4ba38f",
@@ -6546,8 +6546,8 @@
     "text": "Выберите, что удалить и сохранять ли настройки."
   },
   "settings.chooseWhatYouShareOnDiscord": {
-    "source": "e7204bc67854d42c",
-    "text": "Выберите, чем вы делитесь в Discord, и управляйте окном предпросмотра."
+    "source": "5fabcc3c7473a023",
+    "text": "Выберите, чем вы делитесь в Discord, и управляйте окном демонстрации экрана."
   },
   "settings.chooseWhenYourMouseCursorShows": {
     "source": "8820c52f85fc3389",
@@ -7258,12 +7258,12 @@
     "text": "Включить размытие в движении для источников захвата"
   },
   "settings.enableSharePreviewBeforeReparkingThe": {
-    "source": "269179265c7003ff",
-    "text": "Включите предпросмотр для демонстрации перед перепарковкой проектора."
+    "source": "30b603f2bbfebd12",
+    "text": "Включите демонстрацию экрана перед перепарковкой проектора."
   },
   "settings.enableSharePreviewBeforeShowingThe": {
-    "source": "a19ddb144187a6f5",
-    "text": "Включите предпросмотр для демонстрации перед показом проектора."
+    "source": "049dd712c96f09fc",
+    "text": "Включите демонстрацию экрана перед показом проектора."
   },
   "settings.encoderDidNotLoad": {
     "source": "4700fc8a8876b5ed",
@@ -7534,8 +7534,8 @@
     "text": "Ползунок чувствительности входа"
   },
   "settings.installDiscordScreenshareSharePreviewAudio": {
-    "source": "db1b17fd5779cddb",
-    "text": "Установить звук демонстрации экрана Discord / предпросмотра для демонстрации?"
+    "source": "157785fd77200cb8",
+    "text": "Установить звук демонстрации экрана для Discord?"
   },
   "settings.installFailedError": {
     "source": "2d83457fb92b3586",
@@ -7546,8 +7546,8 @@
     "text": "Установите или откройте **{app}**, обновите драйвер видеокарты {maker}, затем перезагрузите ПК. ReplayKit сам переключится обратно на кодировщик {maker}, когда он загрузится."
   },
   "settings.installTheAudioDriverNeededFor": {
-    "source": "6ceaff2c5df645e8",
-    "text": "Установите аудиодрайвер, нужный для предпросмотра для демонстрации."
+    "source": "63a0ebeeea7e2bf1",
+    "text": "Установите аудиодрайвер, нужный для демонстрации экрана."
   },
   "settings.installingDiscordScreenshareSupport": {
     "source": "72706add6b819838",
@@ -8226,8 +8226,8 @@
     "text": "OBS закроется, пока выбранные компоненты удаляются."
   },
   "settings.obsWillCloseWhileTheShare": {
-    "source": "3df8d17868294e12",
-    "text": "OBS закроется, пока удаляется драйвер звука предпросмотра для демонстрации. ReplayKit останется установленным."
+    "source": "0e2f8a2e2eedf641",
+    "text": "OBS закроется, пока удаляется драйвер звука демонстрации экрана. ReplayKit останется установленным."
   },
   "settings.off": {
     "source": "50accd740fa2e736",
@@ -8602,8 +8602,8 @@
     "text": "Ползунок громкости звука записи"
   },
   "settings.recordsEverythingPlayedThroughTheWindows": {
-    "source": "06ba5ceb58c8001d",
-    "text": "Записывает всё, что воспроизводится через устройство вывода по умолчанию в Windows. Discord входит в звук ПК, звук предпросмотра общего доступа выключен."
+    "source": "d3016a183883b880",
+    "text": "Записывает всё, что воспроизводится через устройство вывода по умолчанию в Windows. Discord входит в звук ПК, звук демонстрации экрана выключен."
   },
   "settings.recordsPcAudioAndDiscordDiscord": {
     "source": "3975047a1c3ebe6b",
@@ -8622,8 +8622,8 @@
     "text": "Не удалось удалить: {error}"
   },
   "settings.removeDiscordScreenshareSharePreviewAudio": {
-    "source": "70f09f2cf9321f37",
-    "text": "Удалить демонстрацию экрана Discord и звук предпросмотра общего доступа?"
+    "source": "4598e306433b82e1",
+    "text": "Удалить звук демонстрации экрана для Discord?"
   },
   "settings.removeGame": {
     "source": "840db8a5ced88aba",
@@ -8638,8 +8638,8 @@
     "text": "Удалить ReplayKit и его компоненты из OBS."
   },
   "settings.removeReplaykitOrSharePreviewAudio": {
-    "source": "597f6776c456009d",
-    "text": "Удалить ReplayKit или звук предпросмотра общего доступа"
+    "source": "849368f43d08ec36",
+    "text": "Удалить ReplayKit или звук демонстрации экрана"
   },
   "settings.removeStop": {
     "source": "3f6e25cbc71bf302",
@@ -8658,8 +8658,8 @@
     "text": "Удаляется поддержка демонстрации экрана Discord..."
   },
   "settings.removingSharePreviewAudio": {
-    "source": "ef481f457377346e",
-    "text": "Удаляется звук предпросмотра общего доступа..."
+    "source": "fcdc7e854d03cefd",
+    "text": "Удаляется звук демонстрации экрана..."
   },
   "settings.rendering": {
     "source": "bbf763522a41c231",
@@ -8790,13 +8790,17 @@
     "source": "a0ff61dc6aea6e4e",
     "text": "Выбрать звук"
   },
-  "settings.shareCardSoundVolume": {
-    "source": "25c4333eb6d1d390",
-    "text": "Громкость звука"
+  "settings.beRightBackSound": {
+    "source": "8fae6c071ccdf2dc",
+    "text": "Звук «Скоро вернусь»"
   },
-  "settings.shareCardSoundVolumeSlider": {
-    "source": "ff512b3729993d4c",
-    "text": "Ползунок громкости звука"
+  "settings.beRightBackSoundVolume": {
+    "source": "ccb51d3a82f0ebc7",
+    "text": "Громкость звука «Скоро вернусь»"
+  },
+  "settings.beRightBackSoundVolumeSlider": {
+    "source": "af47f39f31935609",
+    "text": "Ползунок громкости звука «Скоро вернусь»"
   },
   "settings.keepTheCardAfterObsCloses": {
     "source": "60dabedaae281b48",
@@ -9031,16 +9035,16 @@
     "text": "Файл установки по-прежнему непригоден даже после повторной загрузки."
   },
   "settings.sharePreviewAudio": {
-    "source": "1b679b4a88a2c529",
-    "text": "Звук предпросмотра общего доступа"
+    "source": "e6c6493cb22443f6",
+    "text": "Звук демонстрации экрана"
   },
   "settings.sharePreviewAudioOnly": {
-    "source": "0b8768e8f7b8feb1",
-    "text": "Только звук предпросмотра общего доступа"
+    "source": "99fcc7463219ae14",
+    "text": "Только звук демонстрации экрана"
   },
   "settings.sharePreviewCouldNotBeDisabled": {
-    "source": "14aa57c2a55f570c",
-    "text": "Не удалось выключить предпросмотр общего доступа: {error}"
+    "source": "0ca616c63c9dc438",
+    "text": "Не удалось выключить демонстрацию экрана: {error}"
   },
   "settings.sharpPixels": {
     "source": "8a84830d749dc42b",
@@ -9363,8 +9367,8 @@
     "text": "Светлая"
   },
   "settings.thisClosesObsAndInstallsThe": {
-    "source": "1c2632254e87b8a9",
-    "text": "Закрывает OBS, устанавливает виртуальный аудиодрайвер OBS Stream Audio и включает предпросмотр общего доступа. Остальные части ReplayKit не меняются."
+    "source": "6e106b63e011af80",
+    "text": "Закрывает OBS, устанавливает виртуальный аудиодрайвер OBS Stream Audio и включает демонстрацию экрана. Остальные части ReplayKit не меняются."
   },
   "settings.thisClosesObsAndUninstallsThe": {
     "source": "bc915d988e5e46da",
@@ -9771,8 +9775,8 @@
     "text": "Включить демонстрацию экрана Discord"
   },
   "setup.enableDiscordScreenshareSharePreview": {
-    "source": "0fac908a70f760c0",
-    "text": "Включить демонстрацию экрана Discord (предпросмотр)"
+    "source": "2c3f50eac8b41589",
+    "text": "Включить демонстрацию экрана для Discord"
   },
   "setup.enableObsWebsocket": {
     "source": "850789894cbc103d",
@@ -10135,8 +10139,8 @@
     "text": "Установка не завершена: шагов, требующих внимания: {count}. После устранения предупреждений из журнала запустите установщик снова."
   },
   "setup.sharePreviewStaysOff": {
-    "source": "8cb35a1a0d1fd7a9",
-    "text": "Предпросмотр общего доступа остаётся выключенным."
+    "source": "b68f2c4f486badb6",
+    "text": "Демонстрация экрана остаётся выключенной."
   },
   "setup.skipDiscordScreenshare": {
     "source": "439e6659a820e632",
@@ -10519,8 +10523,8 @@
     "text": "Сохранить клип"
   },
   "shell.setUpSharePreview": {
-    "source": "b090d523c8b2fd23",
-    "text": "Настроить предпросмотр общего доступа"
+    "source": "b65db834459e9c17",
+    "text": "Настроить демонстрацию экрана"
   },
   "shell.settings": {
     "source": "83909f82446ee9c3",
@@ -10531,12 +10535,12 @@
     "text": "Установка"
   },
   "shell.sharePreviewOff": {
-    "source": "33cd8963a8c41919",
-    "text": "Предпросмотр общего доступа: выкл."
+    "source": "937e0280c625e28f",
+    "text": "Демонстрация экрана: выкл."
   },
   "shell.sharePreviewOn": {
-    "source": "3977d69891657d63",
-    "text": "Предпросмотр общего доступа: вкл."
+    "source": "d5dc050fb4fb330b",
+    "text": "Демонстрация экрана: вкл."
   },
   "shell.streamableAnonymous": {
     "source": "a788f94e631febb7",

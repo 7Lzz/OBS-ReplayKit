@@ -2384,8 +2384,8 @@
     "text": "Ver todo"
   },
   "common.sharePreview": {
-    "source": "1faa5322e045dd37",
-    "text": "Vista previa de compartir"
+    "source": "97a1c94589647387",
+    "text": "Compartir pantalla"
   },
   "common.signInInTheStreamableWindow": {
     "source": "e764eeafd8f574a7",
@@ -2596,16 +2596,16 @@
     "text": "{days} d de retención"
   },
   "controls.disableSharePreview": {
-    "source": "834d472cbc7f25ba",
-    "text": "Desactivar vista previa de compartir"
+    "source": "3137cab16c8d5e0a",
+    "text": "Desactivar Compartir pantalla"
   },
   "controls.disabling": {
     "source": "2fd59055f990ecfe",
     "text": "Desactivando..."
   },
   "controls.enableSharePreview": {
-    "source": "e62362122b49632e",
-    "text": "Activar Vista previa de compartir"
+    "source": "56c765cced08dc4d",
+    "text": "Activar Compartir pantalla"
   },
   "controls.enabling": {
     "source": "83f57eed999ef9ad",
@@ -6136,16 +6136,16 @@
     "text": "No se pudo determinar un tamaño válido para la ventana del proyector."
   },
   "screenshare.discordProjectorIsNotTheActive": {
-    "source": "bea3a5075aee0b82",
-    "text": "El proyector de Discord no es el modo activo de Vista previa de compartir."
+    "source": "4d1e936bb23ae0c4",
+    "text": "El proyector de Discord no es el modo activo de Compartir pantalla."
   },
   "screenshare.discordScreenshareSupportIsDisabled": {
     "source": "fb0de0d5feb53f24",
     "text": "El soporte para compartir pantalla de Discord está desactivado."
   },
   "screenshare.missingSharePreviewBody": {
-    "source": "32888b97345fca89",
-    "text": "Falta el cuerpo de la vista previa de compartir."
+    "source": "1455b12e2a205e26",
+    "text": "Falta el cuerpo de Compartir pantalla."
   },
   "screenshare.monitorWorkAreaIsInvalid": {
     "source": "efbae713290b7567",
@@ -6164,16 +6164,16 @@
     "text": "Se movió la ventana del proyector de OBS, pero Windows rechazó la solicitud de ocultarla en la barra de tareas."
   },
   "screenshare.theShareWindowIsMissing": {
-    "source": "b5f7a930d8477eb4",
-    "text": "Falta el programa de la ventana de Share Preview ({path}). Vuelve a ejecutar el instalador de ReplayKit."
+    "source": "614721c15e3ab526",
+    "text": "Falta el programa de la ventana de Compartir pantalla ({path}). Vuelve a ejecutar el instalador de ReplayKit."
   },
   "screenshare.theShareWindowCouldNotStart": {
-    "source": "964d6e4a8ff066b8",
-    "text": "No se pudo iniciar la ventana de Share Preview. Desactiva Share Preview y vuelve a activarla, y revisa los registros de ReplayKit si sigue fallando."
+    "source": "c6fdf63ee4646d3f",
+    "text": "No se pudo iniciar la ventana de Compartir pantalla. Desactiva Compartir pantalla y vuelve a activarlo, y revisa los registros de ReplayKit si sigue fallando."
   },
   "screenshare.theShareWindowDidNotClose": {
-    "source": "df55f2f86a7f167f",
-    "text": "La ventana de Share Preview no se cerró, ni siquiera después de indicarle que terminara."
+    "source": "6753d9127bc1caff",
+    "text": "La ventana de Compartir pantalla no se cerró, ni siquiera después de indicarle que terminara."
   },
   "screenshare.coverDefaultText": {
     "source": "a99e83da4583ab31",
@@ -6208,12 +6208,12 @@
     "text": "No se pudo usar ese sonido. Elige otro archivo de audio."
   },
   "screenshare.turnOnSharePreviewFirst": {
-    "source": "bd28264ea2b20433",
-    "text": "Activa primero Share Preview."
+    "source": "a110f4ef767f5aea",
+    "text": "Activa primero Compartir pantalla."
   },
   "screenshare.obsStreamAudioPlaybackEndpointIs": {
-    "source": "67f2ce393de09ce9",
-    "text": "El punto de reproducción de OBS Stream Audio no está activo. Instale o active VB-Audio Cable y ejecute de nuevo la Vista previa de compartir."
+    "source": "a945afc4f6856138",
+    "text": "El punto de reproducción de OBS Stream Audio no está activo. Instale o active VB-Audio Cable y ejecute de nuevo Compartir pantalla."
   },
   "screenshare.obsVideoSettingsDidNotInclude": {
     "source": "da283b2911048744",
@@ -6228,8 +6228,8 @@
     "text": "Los límites del monitor de origen del proyector no son válidos."
   },
   "screenshare.sharePreviewEnabledMustBeA": {
-    "source": "46cebaccaa5c1840",
-    "text": "El valor de vista previa de compartir activada debe ser un booleano JSON."
+    "source": "cb28470ed021d2d5",
+    "text": "El valor de Compartir pantalla activado debe ser un booleano JSON."
   },
   "screenshare.theObsProjectorWindowChangeDid": {
     "source": "243400152e4ba38f",
@@ -6544,8 +6544,8 @@
     "text": "Elige qué quitar y si quieres conservar tus ajustes."
   },
   "settings.chooseWhatYouShareOnDiscord": {
-    "source": "e7204bc67854d42c",
-    "text": "Elige qué compartes en Discord y gestiona la ventana de vista previa de compartir."
+    "source": "5fabcc3c7473a023",
+    "text": "Elige qué compartes en Discord y gestiona la ventana de Compartir pantalla."
   },
   "settings.chooseWhenYourMouseCursorShows": {
     "source": "8820c52f85fc3389",
@@ -7256,12 +7256,12 @@
     "text": "Activar desenfoque de movimiento en las fuentes de captura"
   },
   "settings.enableSharePreviewBeforeReparkingThe": {
-    "source": "269179265c7003ff",
-    "text": "Active Vista previa de compartir antes de volver a anclar el proyector."
+    "source": "30b603f2bbfebd12",
+    "text": "Active Compartir pantalla antes de volver a anclar el proyector."
   },
   "settings.enableSharePreviewBeforeShowingThe": {
-    "source": "a19ddb144187a6f5",
-    "text": "Active Vista previa de compartir antes de mostrar el proyector."
+    "source": "049dd712c96f09fc",
+    "text": "Active Compartir pantalla antes de mostrar el proyector."
   },
   "settings.encoderDidNotLoad": {
     "source": "4700fc8a8876b5ed",
@@ -7532,8 +7532,8 @@
     "text": "Control deslizante de sensibilidad de entrada"
   },
   "settings.installDiscordScreenshareSharePreviewAudio": {
-    "source": "db1b17fd5779cddb",
-    "text": "¿Instalar el audio de compartir pantalla de Discord / Vista previa de compartir?"
+    "source": "157785fd77200cb8",
+    "text": "¿Instalar el audio de Compartir pantalla para Discord?"
   },
   "settings.installFailedError": {
     "source": "2d83457fb92b3586",
@@ -7544,8 +7544,8 @@
     "text": "Instale o abra **{app}**, actualice el controlador gráfico de {maker} y reinicie el PC. ReplayKit vuelve al codificador de {maker} por sí solo cuando se cargue."
   },
   "settings.installTheAudioDriverNeededFor": {
-    "source": "6ceaff2c5df645e8",
-    "text": "Instale el controlador de audio necesario para la Vista previa de compartir."
+    "source": "63a0ebeeea7e2bf1",
+    "text": "Instale el controlador de audio necesario para Compartir pantalla."
   },
   "settings.installingDiscordScreenshareSupport": {
     "source": "72706add6b819838",
@@ -8224,8 +8224,8 @@
     "text": "OBS se cerrará mientras se eliminan los componentes seleccionados."
   },
   "settings.obsWillCloseWhileTheShare": {
-    "source": "3df8d17868294e12",
-    "text": "OBS se cerrará mientras se elimina el controlador de audio de la Vista previa de compartir. ReplayKit sigue instalado."
+    "source": "0e2f8a2e2eedf641",
+    "text": "OBS se cerrará mientras se elimina el controlador de audio de Compartir pantalla. ReplayKit sigue instalado."
   },
   "settings.off": {
     "source": "50accd740fa2e736",
@@ -8600,8 +8600,8 @@
     "text": "Control deslizante del volumen del sonido de grabación"
   },
   "settings.recordsEverythingPlayedThroughTheWindows": {
-    "source": "06ba5ceb58c8001d",
-    "text": "Graba todo lo que se reproduce a través del dispositivo de salida predeterminado de Windows. Discord se incluye en el audio del PC y el audio de la Vista previa de compartir está desactivado."
+    "source": "d3016a183883b880",
+    "text": "Graba todo lo que se reproduce a través del dispositivo de salida predeterminado de Windows. Discord se incluye en el audio del PC y el audio de Compartir pantalla está desactivado."
   },
   "settings.recordsPcAudioAndDiscordDiscord": {
     "source": "3975047a1c3ebe6b",
@@ -8620,8 +8620,8 @@
     "text": "La eliminación falló: {error}"
   },
   "settings.removeDiscordScreenshareSharePreviewAudio": {
-    "source": "70f09f2cf9321f37",
-    "text": "¿Quitar el audio de compartir pantalla de Discord / Vista previa de compartir?"
+    "source": "4598e306433b82e1",
+    "text": "¿Quitar el audio de Compartir pantalla para Discord?"
   },
   "settings.removeGame": {
     "source": "840db8a5ced88aba",
@@ -8636,8 +8636,8 @@
     "text": "Quita ReplayKit y sus componentes instalados de OBS."
   },
   "settings.removeReplaykitOrSharePreviewAudio": {
-    "source": "597f6776c456009d",
-    "text": "Quitar ReplayKit o el audio de la Vista previa de compartir"
+    "source": "849368f43d08ec36",
+    "text": "Quitar ReplayKit o el audio de Compartir pantalla"
   },
   "settings.removeStop": {
     "source": "3f6e25cbc71bf302",
@@ -8656,8 +8656,8 @@
     "text": "Quitando el soporte para compartir pantalla de Discord..."
   },
   "settings.removingSharePreviewAudio": {
-    "source": "ef481f457377346e",
-    "text": "Quitando el audio de la Vista previa de compartir..."
+    "source": "fcdc7e854d03cefd",
+    "text": "Quitando el audio de Compartir pantalla..."
   },
   "settings.rendering": {
     "source": "bbf763522a41c231",
@@ -8787,13 +8787,17 @@
     "source": "a0ff61dc6aea6e4e",
     "text": "Elegir sonido"
   },
-  "settings.shareCardSoundVolume": {
-    "source": "25c4333eb6d1d390",
-    "text": "Volumen del sonido"
+  "settings.beRightBackSound": {
+    "source": "8fae6c071ccdf2dc",
+    "text": "Sonido de «Ahora vuelvo»"
   },
-  "settings.shareCardSoundVolumeSlider": {
-    "source": "ff512b3729993d4c",
-    "text": "Control deslizante del volumen del sonido"
+  "settings.beRightBackSoundVolume": {
+    "source": "ccb51d3a82f0ebc7",
+    "text": "Volumen del sonido de «Ahora vuelvo»"
+  },
+  "settings.beRightBackSoundVolumeSlider": {
+    "source": "af47f39f31935609",
+    "text": "Control deslizante del volumen del sonido de «Ahora vuelvo»"
   },
   "settings.keepTheCardAfterObsCloses": {
     "source": "60dabedaae281b48",
@@ -9028,16 +9032,16 @@
     "text": "El archivo de instalación sigue sin poder usarse tras descargarlo de nuevo."
   },
   "settings.sharePreviewAudio": {
-    "source": "1b679b4a88a2c529",
-    "text": "Audio de la Vista previa de compartir"
+    "source": "e6c6493cb22443f6",
+    "text": "Audio de Compartir pantalla"
   },
   "settings.sharePreviewAudioOnly": {
-    "source": "0b8768e8f7b8feb1",
-    "text": "Solo audio de la Vista previa de compartir"
+    "source": "99fcc7463219ae14",
+    "text": "Solo audio de Compartir pantalla"
   },
   "settings.sharePreviewCouldNotBeDisabled": {
-    "source": "14aa57c2a55f570c",
-    "text": "No se pudo desactivar la vista previa de compartir: {error}"
+    "source": "0ca616c63c9dc438",
+    "text": "No se pudo desactivar Compartir pantalla: {error}"
   },
   "settings.sharpPixels": {
     "source": "8a84830d749dc42b",
@@ -9360,8 +9364,8 @@
     "text": "Claro"
   },
   "settings.thisClosesObsAndInstallsThe": {
-    "source": "1c2632254e87b8a9",
-    "text": "Esto cierra OBS e instala el controlador de audio virtual OBS Stream Audio, y luego activa la Vista previa de compartir. El resto de ReplayKit no cambia."
+    "source": "6e106b63e011af80",
+    "text": "Esto cierra OBS e instala el controlador de audio virtual OBS Stream Audio, y luego activa Compartir pantalla. El resto de ReplayKit no cambia."
   },
   "settings.thisClosesObsAndUninstallsThe": {
     "source": "bc915d988e5e46da",
@@ -9768,8 +9772,8 @@
     "text": "Activar compartir pantalla de Discord"
   },
   "setup.enableDiscordScreenshareSharePreview": {
-    "source": "0fac908a70f760c0",
-    "text": "Activar compartir pantalla de Discord (Vista previa de compartir)"
+    "source": "2c3f50eac8b41589",
+    "text": "Activar Compartir pantalla para Discord"
   },
   "setup.enableObsWebsocket": {
     "source": "850789894cbc103d",
@@ -10132,8 +10136,8 @@
     "text": "La instalación está incompleta: {count} paso(s) necesitan atención. Ejecute de nuevo el instalador después de resolver las advertencias del registro."
   },
   "setup.sharePreviewStaysOff": {
-    "source": "8cb35a1a0d1fd7a9",
-    "text": "La Vista previa de compartir se mantiene desactivada."
+    "source": "b68f2c4f486badb6",
+    "text": "Compartir pantalla se mantiene desactivado."
   },
   "setup.skipDiscordScreenshare": {
     "source": "439e6659a820e632",
@@ -10516,8 +10520,8 @@
     "text": "Guardar clip"
   },
   "shell.setUpSharePreview": {
-    "source": "b090d523c8b2fd23",
-    "text": "Configurar la Vista previa de compartir"
+    "source": "b65db834459e9c17",
+    "text": "Configurar Compartir pantalla"
   },
   "shell.settings": {
     "source": "83909f82446ee9c3",
@@ -10528,12 +10532,12 @@
     "text": "Instalación"
   },
   "shell.sharePreviewOff": {
-    "source": "33cd8963a8c41919",
-    "text": "Vista previa de compartir: desactivada"
+    "source": "937e0280c625e28f",
+    "text": "Compartir pantalla: desactivado"
   },
   "shell.sharePreviewOn": {
-    "source": "3977d69891657d63",
-    "text": "Vista previa de compartir: activada"
+    "source": "d5dc050fb4fb330b",
+    "text": "Compartir pantalla: activado"
   },
   "shell.streamableAnonymous": {
     "source": "a788f94e631febb7",

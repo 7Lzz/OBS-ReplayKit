@@ -2382,8 +2382,8 @@
     "text": "すべて見る"
   },
   "common.sharePreview": {
-    "source": "1faa5322e045dd37",
-    "text": "共有プレビュー"
+    "source": "97a1c94589647387",
+    "text": "画面共有"
   },
   "common.signInInTheStreamableWindow": {
     "source": "e764eeafd8f574a7",
@@ -2594,16 +2594,16 @@
     "text": "{days} 日間保持"
   },
   "controls.disableSharePreview": {
-    "source": "834d472cbc7f25ba",
-    "text": "共有プレビューを無効にする"
+    "source": "3137cab16c8d5e0a",
+    "text": "画面共有を無効にする"
   },
   "controls.disabling": {
     "source": "2fd59055f990ecfe",
     "text": "無効化中..."
   },
   "controls.enableSharePreview": {
-    "source": "e62362122b49632e",
-    "text": "共有プレビューを有効にする"
+    "source": "56c765cced08dc4d",
+    "text": "画面共有を有効にする"
   },
   "controls.enabling": {
     "source": "83f57eed999ef9ad",
@@ -6134,16 +6134,16 @@
     "text": "有効なプロジェクターのウィンドウサイズを決められませんでした。"
   },
   "screenshare.discordProjectorIsNotTheActive": {
-    "source": "bea3a5075aee0b82",
-    "text": "Discord プロジェクターは共有プレビューのモードになっていません。"
+    "source": "4d1e936bb23ae0c4",
+    "text": "Discord プロジェクターは画面共有のモードになっていません。"
   },
   "screenshare.discordScreenshareSupportIsDisabled": {
     "source": "fb0de0d5feb53f24",
     "text": "Discord 画面共有のサポートは無効です。"
   },
   "screenshare.missingSharePreviewBody": {
-    "source": "32888b97345fca89",
-    "text": "共有プレビューの本文がありません。"
+    "source": "1455b12e2a205e26",
+    "text": "画面共有の本文がありません。"
   },
   "screenshare.monitorWorkAreaIsInvalid": {
     "source": "efbae713290b7567",
@@ -6162,16 +6162,16 @@
     "text": "OBS のプロジェクターウィンドウは移動されましたが、Windows がタスクバーを隠す要求を拒否しました。"
   },
   "screenshare.theShareWindowIsMissing": {
-    "source": "b5f7a930d8477eb4",
-    "text": "Share Preview ウィンドウのプログラムが見つかりません ({path})。ReplayKit のインストーラーをもう一度実行してください。"
+    "source": "614721c15e3ab526",
+    "text": "画面共有ウィンドウのプログラムが見つかりません ({path})。ReplayKit のインストーラーをもう一度実行してください。"
   },
   "screenshare.theShareWindowCouldNotStart": {
-    "source": "964d6e4a8ff066b8",
-    "text": "Share Preview ウィンドウを起動できませんでした。Share Preview をオフにしてからもう一度オンにし、失敗が続く場合は ReplayKit のログを確認してください。"
+    "source": "c6fdf63ee4646d3f",
+    "text": "画面共有ウィンドウを起動できませんでした。画面共有をオフにしてからもう一度オンにし、失敗が続く場合は ReplayKit のログを確認してください。"
   },
   "screenshare.theShareWindowDidNotClose": {
-    "source": "df55f2f86a7f167f",
-    "text": "Share Preview ウィンドウは、終了するよう指示した後も閉じませんでした。"
+    "source": "6753d9127bc1caff",
+    "text": "画面共有ウィンドウは、終了するよう指示した後も閉じませんでした。"
   },
   "screenshare.coverDefaultText": {
     "source": "a99e83da4583ab31",
@@ -6204,12 +6204,12 @@
     "text": "そのサウンドは使えませんでした。別のオーディオファイルを選んでください。"
   },
   "screenshare.turnOnSharePreviewFirst": {
-    "source": "bd28264ea2b20433",
-    "text": "先に Share Preview をオンにしてください。"
+    "source": "a110f4ef767f5aea",
+    "text": "先に画面共有をオンにしてください。"
   },
   "screenshare.obsStreamAudioPlaybackEndpointIs": {
-    "source": "67f2ce393de09ce9",
-    "text": "OBS Stream Audio の再生エンドポイントがアクティブではありません。VB-Audio Cable をインストールまたは有効にしてから、共有プレビューをもう一度実行してください。"
+    "source": "a945afc4f6856138",
+    "text": "OBS Stream Audio の再生エンドポイントがアクティブではありません。VB-Audio Cable をインストールまたは有効にしてから、画面共有をもう一度実行してください。"
   },
   "screenshare.obsVideoSettingsDidNotInclude": {
     "source": "da283b2911048744",
@@ -6224,8 +6224,8 @@
     "text": "プロジェクターのソースモニターの範囲が無効です。"
   },
   "screenshare.sharePreviewEnabledMustBeA": {
-    "source": "46cebaccaa5c1840",
-    "text": "共有プレビューの有効化は JSON の真偽値である必要があります。"
+    "source": "cb28470ed021d2d5",
+    "text": "画面共有の有効化は JSON の真偽値である必要があります。"
   },
   "screenshare.theObsProjectorWindowChangeDid": {
     "source": "243400152e4ba38f",
@@ -6540,8 +6540,8 @@
     "text": "削除する項目と、設定を残すかどうかを選択します。"
   },
   "settings.chooseWhatYouShareOnDiscord": {
-    "source": "e7204bc67854d42c",
-    "text": "Discord で共有する内容を選択し、共有プレビューウィンドウを管理します。"
+    "source": "5fabcc3c7473a023",
+    "text": "Discord で共有する内容を選択し、画面共有ウィンドウを管理します。"
   },
   "settings.chooseWhenYourMouseCursorShows": {
     "source": "8820c52f85fc3389",
@@ -7252,12 +7252,12 @@
     "text": "キャプチャソースでモーションブラーを有効にする"
   },
   "settings.enableSharePreviewBeforeReparkingThe": {
-    "source": "269179265c7003ff",
-    "text": "プロジェクターを再配置する前に共有プレビューを有効にしてください。"
+    "source": "30b603f2bbfebd12",
+    "text": "プロジェクターを再配置する前に画面共有を有効にしてください。"
   },
   "settings.enableSharePreviewBeforeShowingThe": {
-    "source": "a19ddb144187a6f5",
-    "text": "プロジェクターを表示する前に共有プレビューを有効にしてください。"
+    "source": "049dd712c96f09fc",
+    "text": "プロジェクターを表示する前に画面共有を有効にしてください。"
   },
   "settings.encoderDidNotLoad": {
     "source": "4700fc8a8876b5ed",
@@ -7528,8 +7528,8 @@
     "text": "入力感度のスライダー"
   },
   "settings.installDiscordScreenshareSharePreviewAudio": {
-    "source": "db1b17fd5779cddb",
-    "text": "Discord 画面共有 / 共有プレビューの音声をインストールしますか？"
+    "source": "157785fd77200cb8",
+    "text": "Discord 用の画面共有の音声をインストールしますか？"
   },
   "settings.installFailedError": {
     "source": "2d83457fb92b3586",
@@ -7540,8 +7540,8 @@
     "text": "**{app}** をインストールまたは開き、{maker} のグラフィックスドライバーを更新してから PC を再起動してください。読み込まれると、ReplayKit は自動的に {maker} のエンコーダーに切り替わります。"
   },
   "settings.installTheAudioDriverNeededFor": {
-    "source": "6ceaff2c5df645e8",
-    "text": "共有プレビューに必要な音声ドライバーをインストールします。"
+    "source": "63a0ebeeea7e2bf1",
+    "text": "画面共有に必要な音声ドライバーをインストールします。"
   },
   "settings.installingDiscordScreenshareSupport": {
     "source": "72706add6b819838",
@@ -8220,8 +8220,8 @@
     "text": "選択したコンポーネントを削除するあいだ、OBS は終了します。"
   },
   "settings.obsWillCloseWhileTheShare": {
-    "source": "3df8d17868294e12",
-    "text": "共有プレビューの音声ドライバーを削除するあいだ、OBS は終了します。ReplayKit はインストールされたままです。"
+    "source": "0e2f8a2e2eedf641",
+    "text": "画面共有の音声ドライバーを削除するあいだ、OBS は終了します。ReplayKit はインストールされたままです。"
   },
   "settings.off": {
     "source": "50accd740fa2e736",
@@ -8596,8 +8596,8 @@
     "text": "録画の音量スライダー"
   },
   "settings.recordsEverythingPlayedThroughTheWindows": {
-    "source": "06ba5ceb58c8001d",
-    "text": "Windows の既定の出力デバイスで再生される音をすべて録音します。Discord は PC 音声に含まれ、共有プレビューの音声はオフになります。"
+    "source": "d3016a183883b880",
+    "text": "Windows の既定の出力デバイスで再生される音をすべて録音します。Discord は PC 音声に含まれ、画面共有の音声はオフになります。"
   },
   "settings.recordsPcAudioAndDiscordDiscord": {
     "source": "3975047a1c3ebe6b",
@@ -8616,8 +8616,8 @@
     "text": "削除に失敗しました: {error}"
   },
   "settings.removeDiscordScreenshareSharePreviewAudio": {
-    "source": "70f09f2cf9321f37",
-    "text": "Discord の画面共有 / 共有プレビューの音声を削除しますか?"
+    "source": "4598e306433b82e1",
+    "text": "Discord 用の画面共有の音声を削除しますか?"
   },
   "settings.removeGame": {
     "source": "840db8a5ced88aba",
@@ -8632,8 +8632,8 @@
     "text": "OBS から ReplayKit とそのインストール済みのコンポーネントを削除します。"
   },
   "settings.removeReplaykitOrSharePreviewAudio": {
-    "source": "597f6776c456009d",
-    "text": "ReplayKit または共有プレビューの音声を削除"
+    "source": "849368f43d08ec36",
+    "text": "ReplayKit または画面共有の音声を削除"
   },
   "settings.removeStop": {
     "source": "3f6e25cbc71bf302",
@@ -8652,8 +8652,8 @@
     "text": "Discord の画面共有のサポートを削除しています..."
   },
   "settings.removingSharePreviewAudio": {
-    "source": "ef481f457377346e",
-    "text": "共有プレビューの音声を削除しています..."
+    "source": "fcdc7e854d03cefd",
+    "text": "画面共有の音声を削除しています..."
   },
   "settings.rendering": {
     "source": "bbf763522a41c231",
@@ -8781,13 +8781,17 @@
     "source": "a0ff61dc6aea6e4e",
     "text": "サウンドを選ぶ"
   },
-  "settings.shareCardSoundVolume": {
-    "source": "25c4333eb6d1d390",
-    "text": "サウンドの音量"
+  "settings.beRightBackSound": {
+    "source": "8fae6c071ccdf2dc",
+    "text": "「すぐ戻ります」の音声"
   },
-  "settings.shareCardSoundVolumeSlider": {
-    "source": "ff512b3729993d4c",
-    "text": "サウンドの音量スライダー"
+  "settings.beRightBackSoundVolume": {
+    "source": "ccb51d3a82f0ebc7",
+    "text": "「すぐ戻ります」音声の音量"
+  },
+  "settings.beRightBackSoundVolumeSlider": {
+    "source": "af47f39f31935609",
+    "text": "「すぐ戻ります」音声の音量スライダー"
   },
   "settings.keepTheCardAfterObsCloses": {
     "source": "60dabedaae281b48",
@@ -9022,16 +9026,16 @@
     "text": "セットアップファイルを再ダウンロードしても使用できません。"
   },
   "settings.sharePreviewAudio": {
-    "source": "1b679b4a88a2c529",
-    "text": "共有プレビューの音声"
+    "source": "e6c6493cb22443f6",
+    "text": "画面共有の音声"
   },
   "settings.sharePreviewAudioOnly": {
-    "source": "0b8768e8f7b8feb1",
-    "text": "共有プレビューの音声のみ"
+    "source": "99fcc7463219ae14",
+    "text": "画面共有の音声のみ"
   },
   "settings.sharePreviewCouldNotBeDisabled": {
-    "source": "14aa57c2a55f570c",
-    "text": "共有プレビューを無効にできませんでした: {error}"
+    "source": "0ca616c63c9dc438",
+    "text": "画面共有を無効にできませんでした: {error}"
   },
   "settings.sharpPixels": {
     "source": "8a84830d749dc42b",
@@ -9354,8 +9358,8 @@
     "text": "ライト"
   },
   "settings.thisClosesObsAndInstallsThe": {
-    "source": "1c2632254e87b8a9",
-    "text": "OBS を閉じ、OBS Stream Audio の仮想オーディオドライバーをインストールしてから、共有プレビューをオンにします。ReplayKit のそのほかの部分はそのままです。"
+    "source": "6e106b63e011af80",
+    "text": "OBS を閉じ、OBS Stream Audio の仮想オーディオドライバーをインストールしてから、画面共有をオンにします。ReplayKit のそのほかの部分はそのままです。"
   },
   "settings.thisClosesObsAndUninstallsThe": {
     "source": "bc915d988e5e46da",
@@ -9762,8 +9766,8 @@
     "text": "Discord 画面共有を有効にする"
   },
   "setup.enableDiscordScreenshareSharePreview": {
-    "source": "0fac908a70f760c0",
-    "text": "Discord 画面共有 (共有プレビュー) を有効にする"
+    "source": "2c3f50eac8b41589",
+    "text": "Discord 用の画面共有を有効にする"
   },
   "setup.enableObsWebsocket": {
     "source": "850789894cbc103d",
@@ -10126,8 +10130,8 @@
     "text": "セットアップが完了していません。{count} 件の手順に対応が必要です。ログの警告を解消してから、インストーラーをもう一度実行してください。"
   },
   "setup.sharePreviewStaysOff": {
-    "source": "8cb35a1a0d1fd7a9",
-    "text": "共有プレビューはオフのままです。"
+    "source": "b68f2c4f486badb6",
+    "text": "画面共有はオフのままです。"
   },
   "setup.skipDiscordScreenshare": {
     "source": "439e6659a820e632",
@@ -10510,8 +10514,8 @@
     "text": "クリップを保存"
   },
   "shell.setUpSharePreview": {
-    "source": "b090d523c8b2fd23",
-    "text": "共有プレビューをセットアップ"
+    "source": "b65db834459e9c17",
+    "text": "画面共有をセットアップ"
   },
   "shell.settings": {
     "source": "83909f82446ee9c3",
@@ -10522,12 +10526,12 @@
     "text": "セットアップ"
   },
   "shell.sharePreviewOff": {
-    "source": "33cd8963a8c41919",
-    "text": "共有プレビュー: オフ"
+    "source": "937e0280c625e28f",
+    "text": "画面共有: オフ"
   },
   "shell.sharePreviewOn": {
-    "source": "3977d69891657d63",
-    "text": "共有プレビュー: オン"
+    "source": "d5dc050fb4fb330b",
+    "text": "画面共有: オン"
   },
   "shell.streamableAnonymous": {
     "source": "a788f94e631febb7",

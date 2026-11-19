@@ -2383,8 +2383,8 @@
     "text": "Alle anzeigen"
   },
   "common.sharePreview": {
-    "source": "1faa5322e045dd37",
-    "text": "Freigabevorschau"
+    "source": "97a1c94589647387",
+    "text": "Bildschirmfreigabe"
   },
   "common.signInInTheStreamableWindow": {
     "source": "e764eeafd8f574a7",
@@ -2595,16 +2595,16 @@
     "text": "{days} T. Aufbewahrung"
   },
   "controls.disableSharePreview": {
-    "source": "834d472cbc7f25ba",
-    "text": "Freigabevorschau deaktivieren"
+    "source": "3137cab16c8d5e0a",
+    "text": "Bildschirmfreigabe deaktivieren"
   },
   "controls.disabling": {
     "source": "2fd59055f990ecfe",
     "text": "Wird deaktiviert..."
   },
   "controls.enableSharePreview": {
-    "source": "e62362122b49632e",
-    "text": "Freigabevorschau aktivieren"
+    "source": "56c765cced08dc4d",
+    "text": "Bildschirmfreigabe aktivieren"
   },
   "controls.enabling": {
     "source": "83f57eed999ef9ad",
@@ -6135,16 +6135,16 @@
     "text": "Es konnte keine gültige Fenstergröße für den Projektor ermittelt werden."
   },
   "screenshare.discordProjectorIsNotTheActive": {
-    "source": "bea3a5075aee0b82",
-    "text": "Der Discord-Projektor ist nicht der aktive Modus der Freigabevorschau."
+    "source": "4d1e936bb23ae0c4",
+    "text": "Der Discord-Projektor ist nicht der aktive Modus der Bildschirmfreigabe."
   },
   "screenshare.discordScreenshareSupportIsDisabled": {
     "source": "fb0de0d5feb53f24",
     "text": "Die Unterstützung für die Discord-Bildschirmfreigabe ist deaktiviert."
   },
   "screenshare.missingSharePreviewBody": {
-    "source": "32888b97345fca89",
-    "text": "Inhalt der Freigabevorschau fehlt."
+    "source": "1455b12e2a205e26",
+    "text": "Inhalt der Bildschirmfreigabe fehlt."
   },
   "screenshare.monitorWorkAreaIsInvalid": {
     "source": "efbae713290b7567",
@@ -6163,16 +6163,16 @@
     "text": "Das OBS-Projektorfenster wurde verschoben, aber Windows hat die Anfrage zum Ausblenden der Taskleiste abgelehnt."
   },
   "screenshare.theShareWindowIsMissing": {
-    "source": "b5f7a930d8477eb4",
-    "text": "Das Programm des Share-Preview-Fensters fehlt ({path}). Führe das ReplayKit-Installationsprogramm erneut aus."
+    "source": "614721c15e3ab526",
+    "text": "Das Programm des Bildschirmfreigabe-Fensters fehlt ({path}). Führe das ReplayKit-Installationsprogramm erneut aus."
   },
   "screenshare.theShareWindowCouldNotStart": {
-    "source": "964d6e4a8ff066b8",
-    "text": "Das Share-Preview-Fenster konnte nicht gestartet werden. Schalte Share Preview aus und wieder ein und sieh in den ReplayKit-Protokollen nach, wenn es weiter fehlschlägt."
+    "source": "c6fdf63ee4646d3f",
+    "text": "Das Bildschirmfreigabe-Fenster konnte nicht gestartet werden. Schalte die Bildschirmfreigabe aus und wieder ein und sieh in den ReplayKit-Protokollen nach, wenn es weiter fehlschlägt."
   },
   "screenshare.theShareWindowDidNotClose": {
-    "source": "df55f2f86a7f167f",
-    "text": "Das Share-Preview-Fenster hat sich nicht geschlossen, auch nachdem es beendet werden sollte."
+    "source": "6753d9127bc1caff",
+    "text": "Das Bildschirmfreigabe-Fenster hat sich nicht geschlossen, auch nachdem es beendet werden sollte."
   },
   "screenshare.coverDefaultText": {
     "source": "a99e83da4583ab31",
@@ -6206,12 +6206,12 @@
     "text": "Dieser Ton konnte nicht verwendet werden. Wähle eine andere Audiodatei."
   },
   "screenshare.turnOnSharePreviewFirst": {
-    "source": "bd28264ea2b20433",
-    "text": "Schalte zuerst Share Preview ein."
+    "source": "a110f4ef767f5aea",
+    "text": "Schalte zuerst die Bildschirmfreigabe ein."
   },
   "screenshare.obsStreamAudioPlaybackEndpointIs": {
-    "source": "67f2ce393de09ce9",
-    "text": "Der Wiedergabeendpunkt für OBS-Stream-Audio ist nicht aktiv. VB-Audio Cable installieren oder aktivieren und die Freigabevorschau erneut starten."
+    "source": "a945afc4f6856138",
+    "text": "Der Wiedergabeendpunkt für OBS-Stream-Audio ist nicht aktiv. VB-Audio Cable installieren oder aktivieren und die Bildschirmfreigabe erneut starten."
   },
   "screenshare.obsVideoSettingsDidNotInclude": {
     "source": "da283b2911048744",
@@ -6226,8 +6226,8 @@
     "text": "Die Monitorgrenzen der Projektorquelle sind ungültig."
   },
   "screenshare.sharePreviewEnabledMustBeA": {
-    "source": "46cebaccaa5c1840",
-    "text": "Die Option „Freigabevorschau aktiviert“ muss ein JSON-Wahrheitswert sein."
+    "source": "cb28470ed021d2d5",
+    "text": "Die Option „Bildschirmfreigabe aktiviert“ muss ein JSON-Wahrheitswert sein."
   },
   "screenshare.theObsProjectorWindowChangeDid": {
     "source": "243400152e4ba38f",
@@ -6542,8 +6542,8 @@
     "text": "Legt fest, was entfernt wird und ob die Einstellungen erhalten bleiben."
   },
   "settings.chooseWhatYouShareOnDiscord": {
-    "source": "e7204bc67854d42c",
-    "text": "Legt fest, was auf Discord geteilt wird, und verwaltet das Fenster der Freigabevorschau."
+    "source": "5fabcc3c7473a023",
+    "text": "Legt fest, was auf Discord geteilt wird, und verwaltet das Fenster der Bildschirmfreigabe."
   },
   "settings.chooseWhenYourMouseCursorShows": {
     "source": "8820c52f85fc3389",
@@ -7254,12 +7254,12 @@
     "text": "Bewegungsunschärfe für Aufnahmequellen aktivieren"
   },
   "settings.enableSharePreviewBeforeReparkingThe": {
-    "source": "269179265c7003ff",
-    "text": "Freigabevorschau aktivieren, bevor der Projektor erneut geparkt wird."
+    "source": "30b603f2bbfebd12",
+    "text": "Bildschirmfreigabe aktivieren, bevor der Projektor erneut geparkt wird."
   },
   "settings.enableSharePreviewBeforeShowingThe": {
-    "source": "a19ddb144187a6f5",
-    "text": "Freigabevorschau aktivieren, bevor der Projektor angezeigt wird."
+    "source": "049dd712c96f09fc",
+    "text": "Bildschirmfreigabe aktivieren, bevor der Projektor angezeigt wird."
   },
   "settings.encoderDidNotLoad": {
     "source": "4700fc8a8876b5ed",
@@ -7530,8 +7530,8 @@
     "text": "Schieberegler für die Eingangsempfindlichkeit"
   },
   "settings.installDiscordScreenshareSharePreviewAudio": {
-    "source": "db1b17fd5779cddb",
-    "text": "Audio für Discord-Bildschirmfreigabe / Freigabevorschau installieren?"
+    "source": "157785fd77200cb8",
+    "text": "Audio der Bildschirmfreigabe für Discord installieren?"
   },
   "settings.installFailedError": {
     "source": "2d83457fb92b3586",
@@ -7542,8 +7542,8 @@
     "text": "Installiere oder öffne **{app}**, aktualisiere den {maker}-Grafiktreiber und starte den PC neu. ReplayKit wechselt nach dem Laden automatisch wieder zum {maker}-Encoder."
   },
   "settings.installTheAudioDriverNeededFor": {
-    "source": "6ceaff2c5df645e8",
-    "text": "Den für die Freigabevorschau benötigten Audiotreiber installieren."
+    "source": "63a0ebeeea7e2bf1",
+    "text": "Den für die Bildschirmfreigabe benötigten Audiotreiber installieren."
   },
   "settings.installingDiscordScreenshareSupport": {
     "source": "72706add6b819838",
@@ -8222,8 +8222,8 @@
     "text": "OBS wird geschlossen, während die ausgewählten Komponenten entfernt werden."
   },
   "settings.obsWillCloseWhileTheShare": {
-    "source": "3df8d17868294e12",
-    "text": "OBS wird geschlossen, während der Audiotreiber der Freigabevorschau entfernt wird. ReplayKit bleibt installiert."
+    "source": "0e2f8a2e2eedf641",
+    "text": "OBS wird geschlossen, während der Audiotreiber der Bildschirmfreigabe entfernt wird. ReplayKit bleibt installiert."
   },
   "settings.off": {
     "source": "50accd740fa2e736",
@@ -8598,8 +8598,8 @@
     "text": "Schieberegler für die Lautstärke des Aufnahmetons"
   },
   "settings.recordsEverythingPlayedThroughTheWindows": {
-    "source": "06ba5ceb58c8001d",
-    "text": "Nimmt alles auf, was über das standardmäßige Ausgabegerät von Windows wiedergegeben wird. Discord ist in PC-Audio enthalten, und Audio der Freigabevorschau ist aus."
+    "source": "d3016a183883b880",
+    "text": "Nimmt alles auf, was über das standardmäßige Ausgabegerät von Windows wiedergegeben wird. Discord ist in PC-Audio enthalten, und Audio der Bildschirmfreigabe ist aus."
   },
   "settings.recordsPcAudioAndDiscordDiscord": {
     "source": "3975047a1c3ebe6b",
@@ -8618,8 +8618,8 @@
     "text": "Entfernen fehlgeschlagen: {error}"
   },
   "settings.removeDiscordScreenshareSharePreviewAudio": {
-    "source": "70f09f2cf9321f37",
-    "text": "Audio für Discord-Bildschirmfreigabe / Freigabevorschau entfernen?"
+    "source": "4598e306433b82e1",
+    "text": "Audio der Bildschirmfreigabe für Discord entfernen?"
   },
   "settings.removeGame": {
     "source": "840db8a5ced88aba",
@@ -8634,8 +8634,8 @@
     "text": "ReplayKit und seine installierten Komponenten aus OBS entfernen."
   },
   "settings.removeReplaykitOrSharePreviewAudio": {
-    "source": "597f6776c456009d",
-    "text": "ReplayKit oder Audio der Freigabevorschau entfernen"
+    "source": "849368f43d08ec36",
+    "text": "ReplayKit oder Audio der Bildschirmfreigabe entfernen"
   },
   "settings.removeStop": {
     "source": "3f6e25cbc71bf302",
@@ -8654,8 +8654,8 @@
     "text": "Discord-Bildschirmfreigabe wird entfernt..."
   },
   "settings.removingSharePreviewAudio": {
-    "source": "ef481f457377346e",
-    "text": "Audio der Freigabevorschau wird entfernt..."
+    "source": "fcdc7e854d03cefd",
+    "text": "Audio der Bildschirmfreigabe wird entfernt..."
   },
   "settings.rendering": {
     "source": "bbf763522a41c231",
@@ -8784,13 +8784,17 @@
     "source": "a0ff61dc6aea6e4e",
     "text": "Ton wählen"
   },
-  "settings.shareCardSoundVolume": {
-    "source": "25c4333eb6d1d390",
-    "text": "Tonlautstärke"
+  "settings.beRightBackSound": {
+    "source": "8fae6c071ccdf2dc",
+    "text": "„Bin gleich zurück“-Ton"
   },
-  "settings.shareCardSoundVolumeSlider": {
-    "source": "ff512b3729993d4c",
-    "text": "Schieberegler für die Tonlautstärke"
+  "settings.beRightBackSoundVolume": {
+    "source": "ccb51d3a82f0ebc7",
+    "text": "Lautstärke des „Bin gleich zurück“-Tons"
+  },
+  "settings.beRightBackSoundVolumeSlider": {
+    "source": "af47f39f31935609",
+    "text": "Schieberegler für die Lautstärke des „Bin gleich zurück“-Tons"
   },
   "settings.keepTheCardAfterObsCloses": {
     "source": "60dabedaae281b48",
@@ -9025,16 +9029,16 @@
     "text": "Die Setup-Datei ist auch nach dem erneuten Herunterladen nicht verwendbar."
   },
   "settings.sharePreviewAudio": {
-    "source": "1b679b4a88a2c529",
-    "text": "Audio der Freigabevorschau"
+    "source": "e6c6493cb22443f6",
+    "text": "Audio der Bildschirmfreigabe"
   },
   "settings.sharePreviewAudioOnly": {
-    "source": "0b8768e8f7b8feb1",
-    "text": "Nur Audio der Freigabevorschau"
+    "source": "99fcc7463219ae14",
+    "text": "Nur Audio der Bildschirmfreigabe"
   },
   "settings.sharePreviewCouldNotBeDisabled": {
-    "source": "14aa57c2a55f570c",
-    "text": "Freigabevorschau konnte nicht deaktiviert werden: {error}"
+    "source": "0ca616c63c9dc438",
+    "text": "Bildschirmfreigabe konnte nicht deaktiviert werden: {error}"
   },
   "settings.sharpPixels": {
     "source": "8a84830d749dc42b",
@@ -9357,8 +9361,8 @@
     "text": "Hell"
   },
   "settings.thisClosesObsAndInstallsThe": {
-    "source": "1c2632254e87b8a9",
-    "text": "Dies schließt OBS, installiert den virtuellen Audiotreiber OBS-Stream-Audio und schaltet danach die Freigabevorschau ein. Der Rest von ReplayKit bleibt unverändert."
+    "source": "6e106b63e011af80",
+    "text": "Dies schließt OBS, installiert den virtuellen Audiotreiber OBS-Stream-Audio und schaltet danach die Bildschirmfreigabe ein. Der Rest von ReplayKit bleibt unverändert."
   },
   "settings.thisClosesObsAndUninstallsThe": {
     "source": "bc915d988e5e46da",
@@ -9765,8 +9769,8 @@
     "text": "Discord-Bildschirmfreigabe aktivieren"
   },
   "setup.enableDiscordScreenshareSharePreview": {
-    "source": "0fac908a70f760c0",
-    "text": "Discord-Bildschirmfreigabe (Freigabevorschau) aktivieren"
+    "source": "2c3f50eac8b41589",
+    "text": "Bildschirmfreigabe für Discord aktivieren"
   },
   "setup.enableObsWebsocket": {
     "source": "850789894cbc103d",
@@ -10129,8 +10133,8 @@
     "text": "Die Einrichtung ist unvollständig: {count} Schritt(e) benötigen Aufmerksamkeit. Das Installationsprogramm erneut ausführen, nachdem die Warnungen im Protokoll geklärt sind."
   },
   "setup.sharePreviewStaysOff": {
-    "source": "8cb35a1a0d1fd7a9",
-    "text": "Freigabevorschau bleibt aus."
+    "source": "b68f2c4f486badb6",
+    "text": "Bildschirmfreigabe bleibt aus."
   },
   "setup.skipDiscordScreenshare": {
     "source": "439e6659a820e632",
@@ -10513,8 +10517,8 @@
     "text": "Clip speichern"
   },
   "shell.setUpSharePreview": {
-    "source": "b090d523c8b2fd23",
-    "text": "Freigabevorschau einrichten"
+    "source": "b65db834459e9c17",
+    "text": "Bildschirmfreigabe einrichten"
   },
   "shell.settings": {
     "source": "83909f82446ee9c3",
@@ -10525,12 +10529,12 @@
     "text": "Einrichtung"
   },
   "shell.sharePreviewOff": {
-    "source": "33cd8963a8c41919",
-    "text": "Freigabevorschau: aus"
+    "source": "937e0280c625e28f",
+    "text": "Bildschirmfreigabe: aus"
   },
   "shell.sharePreviewOn": {
-    "source": "3977d69891657d63",
-    "text": "Freigabevorschau: ein"
+    "source": "d5dc050fb4fb330b",
+    "text": "Bildschirmfreigabe: ein"
   },
   "shell.streamableAnonymous": {
     "source": "a788f94e631febb7",
