@@ -1029,13 +1029,9 @@
           <div class="label" data-i18n="settings.shareCardBackground"></div>
           <div class="field-wrap"><div class="combo" id="shareCoverBackground" tabindex="0" role="combobox" aria-expanded="false"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button><div class="combo-menu" role="listbox"></div></div></div>
         </div>
-        <div class="form-row" id="shareCoverImageRow">
-          <div class="label" data-i18n="settings.shareCardImage"></div>
-          <div class="field-wrap"><div class="projector-action-row"><button class="btn" type="button" id="shareCoverImagePick" data-i18n="settings.chooseImage"></button><button class="btn" type="button" id="shareCoverImageRemove" data-i18n="common.remove"></button></div></div>
-        </div>
-        <div class="form-row" id="shareCoverVideoRow">
-          <div class="label"><span data-i18n="settings.shareCardVideo"></span><span class="setting-description" id="shareCoverVideoNote"></span></div>
-          <div class="field-wrap"><div class="projector-action-row"><button class="btn" type="button" id="shareCoverVideoPick" data-i18n="settings.chooseVideo"></button><button class="btn" type="button" id="shareCoverVideoRemove" data-i18n="common.remove"></button></div></div>
+        <div class="form-row" id="shareCoverMediaRow">
+          <div class="label"><span data-i18n="settings.shareCardMedia"></span><span class="setting-description" id="shareCoverMediaNote"></span></div>
+          <div class="field-wrap"><div class="projector-action-row"><button class="btn" type="button" id="shareCoverMediaPick" data-i18n="settings.chooseImageOrVideo"></button><button class="btn" type="button" id="shareCoverMediaRemove" data-i18n="common.remove"></button></div></div>
         </div>
         <div class="form-row tight" id="shareCoverVideoSoundRow">
           <div></div>
@@ -2213,13 +2209,10 @@
     screenshareSwitchDelay: document.getElementById("screenshareSwitchDelay"),
     screenshareSwitchDelayValue: document.getElementById("screenshareSwitchDelayValue"),
     shareCoverBackground: document.getElementById("shareCoverBackground"),
-    shareCoverImageRow: document.getElementById("shareCoverImageRow"),
-    shareCoverImagePick: document.getElementById("shareCoverImagePick"),
-    shareCoverImageRemove: document.getElementById("shareCoverImageRemove"),
-    shareCoverVideoRow: document.getElementById("shareCoverVideoRow"),
-    shareCoverVideoNote: document.getElementById("shareCoverVideoNote"),
-    shareCoverVideoPick: document.getElementById("shareCoverVideoPick"),
-    shareCoverVideoRemove: document.getElementById("shareCoverVideoRemove"),
+    shareCoverMediaRow: document.getElementById("shareCoverMediaRow"),
+    shareCoverMediaNote: document.getElementById("shareCoverMediaNote"),
+    shareCoverMediaPick: document.getElementById("shareCoverMediaPick"),
+    shareCoverMediaRemove: document.getElementById("shareCoverMediaRemove"),
     shareCoverVideoSoundRow: document.getElementById("shareCoverVideoSoundRow"),
     shareCoverVideoSound: document.getElementById("shareCoverVideoSound"),
     shareCoverImageFitLabel: document.getElementById("shareCoverImageFitLabel"),
@@ -2453,7 +2446,11 @@
     els.statusLine.classList.toggle("bad", kind === "bad");
   }
 
-  function setUpdateStatus(text, kind) {
+  // the up to date note goes away on its own, like the card shown note of Share Preview
+  let updateStatusTimer = 0;
+  function setUpdateStatus(text, kind, clearAfterMs) {
+    clearTimeout(updateStatusTimer);
+    if (clearAfterMs) updateStatusTimer = setTimeout(() => setUpdateStatus(""), clearAfterMs);
     els.updateStatusLine.textContent = text || "";
     els.updateStatusLine.classList.toggle("good", kind === "good");
     els.updateStatusLine.classList.toggle("bad", kind === "bad");
@@ -3657,7 +3654,7 @@
     setComboValue(els.screenshareGameWindow, settingOr("screenshareGameWindow"), false);
     renderScreenshareGameOverrides();
     els.screenshareAutoGameKeepFocused.checked = !!state.screenshareAutoGameKeepFocused;
-    setComboValue(els.shareCoverBackground, settingOr("share_cover_background"), false);
+    setComboValue(els.shareCoverBackground, coverComboValue(settingOr("share_cover_background")), false);
     setComboValue(els.shareCoverFit, settingOr("share_cover_fit"), false);
     els.shareCoverText.value = settingOr("share_cover_text") || "";
     els.shareCoverShowText.checked = !!settingOr("share_cover_show_text");
@@ -3780,7 +3777,7 @@
     state.screenshareGameWindow = comboValue(els.screenshareGameWindow) || "";
     state.screenshareGameOverrides = normalizeScreenshareGameOverrides(state.screenshareGameOverrides);
     state.screenshareAutoGameKeepFocused = !!els.screenshareAutoGameKeepFocused.checked;
-    state.share_cover_background = comboValue(els.shareCoverBackground) || SETTING_DEFAULTS.share_cover_background;
+    state.share_cover_background = coverBackground();
     state.share_cover_fit = comboValue(els.shareCoverFit) || SETTING_DEFAULTS.share_cover_fit;
     state.share_cover_text = els.shareCoverText.value.trim().slice(0, 80);
     state.share_cover_show_text = !!els.shareCoverShowText.checked;
@@ -4391,8 +4388,7 @@
       fillCombo(els.screenshareGameOverridePicker, data.options.screenshareGameWindows || []);
       fillCombo(els.shareCoverBackground, [
         { value:"theme", label:RK_M("settings.shareCardBackgroundTheme") },
-        { value:"image", label:RK_M("settings.shareCardBackgroundImage") },
-        { value:"video", label:RK_M("settings.shareCardBackgroundVideo") },
+        { value:"media", label:RK_M("settings.shareCardBackgroundMedia") },
         { value:"lastframe", label:RK_M("settings.shareCardBackgroundLastFrame") },
       ]);
       fillShareCoverFit();
@@ -4623,7 +4619,7 @@
     try {
       const data = await helperJson("update/check?manual=1&t=" + Date.now());
       if (!data.updateAvailable && !data.repairRequired) {
-        setUpdateStatus(data.message || (data.installedVersion ? RK_M("settings.replaykitIsUpToDateVersion", { version: data.installedVersion }) : RK_M("common.replaykitIsUpToDate")), "good");
+        setUpdateStatus(data.message || (data.installedVersion ? RK_M("settings.replaykitIsUpToDateVersion", { version: data.installedVersion }) : RK_M("common.replaykitIsUpToDate")), "good", 3000);
         return;
       }
       setUpdateReleaseLink(data.releaseUrl, true);
@@ -4885,9 +4881,17 @@
   });
   // the card of the share window: the rows that apply to the picked background and sound, the card editor, and the buttons that pick or drop an image or a sound
   let shareCoverStatus = { hasImage:false, hasVideo:false, videoHasSound:false, hasSound:false, hasDefaultSound:false, hasCard:false };
+  // an own image and an own video are one choice in the list, while the setting keeps which of the two was picked, since the helper keeps only the last pick
+  function coverComboValue(background) { return background === "image" || background === "video" ? "media" : background; }
+  function coverBackground() {
+    const picked = comboValue(els.shareCoverBackground) || SETTING_DEFAULTS.share_cover_background;
+    if (picked !== "media") return picked;
+    if (state.share_cover_background === "image" || state.share_cover_background === "video") return state.share_cover_background;
+    return shareCoverStatus.hasVideo ? "video" : "image";
+  }
   // the fit choice serves an own image and an own video, so its words follow the one that is picked
   function fillShareCoverFit() {
-    const video = comboValue(els.shareCoverBackground) === "video";
+    const video = coverBackground() === "video";
     els.shareCoverImageFitLabel.hidden = video;
     els.shareCoverVideoFitLabel.hidden = !video;
     fillCombo(els.shareCoverFit, [
@@ -4896,16 +4900,14 @@
     ]);
   }
   function syncShareCoverRows() {
-    const background = comboValue(els.shareCoverBackground);
+    const background = coverBackground();
     const sound = comboValue(els.shareCoverSound);
     const video = background === "video";
-    els.shareCoverImageRow.hidden = background !== "image";
-    els.shareCoverVideoRow.hidden = !video;
-    els.shareCoverVideoNote.textContent = shareCoverStatus.maxVideoSeconds ? RK_M("settings.shareCardVideoNote", { count: shareCoverStatus.maxVideoSeconds }) : "";
+    els.shareCoverMediaRow.hidden = background !== "image" && !video;
+    els.shareCoverMediaNote.textContent = shareCoverStatus.maxVideoSeconds ? RK_M("settings.shareCardMediaNote", { count: shareCoverStatus.maxVideoSeconds }) : "";
     els.shareCoverFitRow.hidden = background !== "image" && !video;
     fillShareCoverFit();
-    els.shareCoverImageRemove.disabled = !shareCoverStatus.hasImage;
-    els.shareCoverVideoRemove.disabled = !shareCoverStatus.hasVideo;
+    els.shareCoverMediaRemove.disabled = !shareCoverStatus.hasImage && !shareCoverStatus.hasVideo;
     // the sound of a picked video plays in place of the card sound, the way the helper picks it, so the card sound rows only show while it does not
     const videoHasSound = video && shareCoverStatus.hasVideo && shareCoverStatus.videoHasSound;
     const cardSound = !(videoHasSound && els.shareCoverVideoSound.checked);
@@ -4930,11 +4932,14 @@
       state[key] = saved[key];
       originalState[key] = saved[key];
     });
-    setComboValue(els.shareCoverBackground, state.share_cover_background, false);
+    setComboValue(els.shareCoverBackground, coverComboValue(state.share_cover_background), false);
     setComboValue(els.shareCoverSound, state.share_cover_sound, false);
   }
-  // the same status line as the updates row: green when the card went up, red when an action failed
-  function setShareCoverStatus(text, kind) {
+  // the same status line as the updates row: green when the card went up, red when an action failed; the card shown note goes away on its own
+  let shareCoverStatusTimer = 0;
+  function setShareCoverStatus(text, kind, clearAfterMs) {
+    clearTimeout(shareCoverStatusTimer);
+    if (clearAfterMs) shareCoverStatusTimer = setTimeout(() => setShareCoverStatus(""), clearAfterMs);
     els.shareCoverStatus.textContent = text || "";
     els.shareCoverStatus.classList.toggle("good", kind === "good");
     els.shareCoverStatus.classList.toggle("bad", kind === "bad");
@@ -4943,14 +4948,14 @@
     button.disabled = true;
     setShareCoverStatus(busyText || "");
     // the editor lets go of the video it plays while the helper replaces or deletes the file
-    const holdsVideo = path.startsWith("share/cover/video") && !!window.RKShareCardEditor;
+    const holdsVideo = path.startsWith("share/cover/media") && !!window.RKShareCardEditor;
     if (holdsVideo) RKShareCardEditor.holdVideo(true);
     try {
       const result = await helperJson(path, { method:"POST" });
       if (busyText) setShareCoverStatus("");
       takeSavedCoverSettings(result.settings);
       if (result.cover) shareCoverStatus = result.cover;
-      if (path === "share/cover/show") setShareCoverStatus(RK_M("settings.shareCardShown"), "good");
+      if (path === "share/cover/show") setShareCoverStatus(RK_M("settings.shareCardShown"), "good", 3000);
       await refreshShareCover();
     } catch (error) {
       setShareCoverStatus(error.message, "bad");
@@ -4966,10 +4971,8 @@
   els.shareCoverShowText.addEventListener("change", () => { readUi(); syncShareCoverRows(); markDirty(); });
   els.shareCoverVideoSound.addEventListener("change", () => { readUi(); syncShareCoverRows(); markDirty(); });
   els.shareCoverText.addEventListener("input", () => { readUi(); syncShareCoverRows(); markDirty(); });
-  els.shareCoverImagePick.addEventListener("click", () => runShareCoverAction(els.shareCoverImagePick, "share/cover/image"));
-  els.shareCoverImageRemove.addEventListener("click", () => runShareCoverAction(els.shareCoverImageRemove, "share/cover/image/remove"));
-  els.shareCoverVideoPick.addEventListener("click", () => runShareCoverAction(els.shareCoverVideoPick, "share/cover/video", RK_M("settings.preparingTheVideo")));
-  els.shareCoverVideoRemove.addEventListener("click", () => runShareCoverAction(els.shareCoverVideoRemove, "share/cover/video/remove"));
+  els.shareCoverMediaPick.addEventListener("click", () => runShareCoverAction(els.shareCoverMediaPick, "share/cover/media", RK_M("settings.preparingTheBackground")));
+  els.shareCoverMediaRemove.addEventListener("click", () => runShareCoverAction(els.shareCoverMediaRemove, "share/cover/media/remove"));
   els.shareCoverSoundPick.addEventListener("click", () => runShareCoverAction(els.shareCoverSoundPick, "share/cover/sound"));
   els.shareCoverSoundRemove.addEventListener("click", () => runShareCoverAction(els.shareCoverSoundRemove, "share/cover/sound/remove"));
   els.shareCoverShowBtn.addEventListener("click", () => runShareCoverAction(els.shareCoverShowBtn, "share/cover/show"));

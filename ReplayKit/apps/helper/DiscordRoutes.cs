@@ -116,29 +116,18 @@ namespace ReplayKitHelper
                 JObject result;
                 switch (path)
                 {
-                    case "/share/cover/image":
+                    case "/share/cover/media":
                     {
-                        string picked = FilePickers.PickPath(false, FilePickers.ImagesFilter, "");
+                        string picked = FilePickers.PickPath(false, FilePickers.ImagesAndVideosFilter, "");
                         if (string.IsNullOrEmpty(picked)) { HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["changed"] = false }); return false; }
-                        result = ShareCover.ImportImage(picked);
-                        if (result["ok"]?.Value<bool>() == true) result["settings"] = SetCoverSetting("share_cover_background", "image");
+                        result = ShareCover.ImportMedia(picked);
+                        if (result["ok"]?.Value<bool>() == true) result["settings"] = SetCoverSetting("share_cover_background", result["background"].Value<string>());
                         break;
                     }
-                    case "/share/cover/image/remove":
+                    case "/share/cover/media/remove":
                         ShareCover.Remove(ShareCover.ImagePath);
-                        result = new JObject { ["ok"] = true, ["settings"] = SetCoverSetting("share_cover_background", "theme", onlyFrom: "image") };
-                        break;
-                    case "/share/cover/video":
-                    {
-                        string picked = FilePickers.PickPath(false, FilePickers.VideoFilter, "");
-                        if (string.IsNullOrEmpty(picked)) { HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["changed"] = false }); return false; }
-                        result = ShareCover.ImportVideo(picked);
-                        if (result["ok"]?.Value<bool>() == true) result["settings"] = SetCoverSetting("share_cover_background", "video");
-                        break;
-                    }
-                    case "/share/cover/video/remove":
                         ShareCover.RemoveVideo();
-                        result = new JObject { ["ok"] = true, ["settings"] = SetCoverSetting("share_cover_background", "theme", onlyFrom: "video") };
+                        result = new JObject { ["ok"] = true, ["settings"] = SetCoverSetting("share_cover_background", "theme", "image", "video") };
                         break;
                     case "/share/cover/sound":
                     {
@@ -150,7 +139,7 @@ namespace ReplayKitHelper
                     }
                     case "/share/cover/sound/remove":
                         ShareCover.Remove(ShareCover.SoundPath);
-                        result = new JObject { ["ok"] = true, ["settings"] = SetCoverSetting("share_cover_sound", "default", onlyFrom: "custom") };
+                        result = new JObject { ["ok"] = true, ["settings"] = SetCoverSetting("share_cover_sound", "default", "custom") };
                         break;
                     case "/share/cover/show":
                         if (SettingsLiveApply.GetSharePreviewFlags()["enabled"]?.Value<bool>() != true)
@@ -175,13 +164,13 @@ namespace ReplayKitHelper
         }
 
         // saves one card setting the way any saved setting is merged, then draws the card again for a running share window
-        private static JObject SetCoverSetting(string key, string value, string onlyFrom = null)
+        private static JObject SetCoverSetting(string key, string value, params string[] onlyFrom)
         {
             JObject settings;
             lock (SettingsStore.Gate)
             {
                 settings = ReplaykitSettings.ReadSettings();
-                if (onlyFrom == null || settings[key]?.Value<string>() == onlyFrom)
+                if (onlyFrom.Length == 0 || onlyFrom.Contains(settings[key]?.Value<string>()))
                 {
                     settings[key] = value;
                     settings = ReplaykitSettings.Normalize(settings);

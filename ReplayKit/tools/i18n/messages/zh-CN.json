@@ -8691,31 +8691,35 @@
     "source": "8fd954f2b25eb2ab",
     "text": "主题颜色"
   },
-  "settings.shareCardBackgroundImage": {
-    "source": "cbff02b1de749e35",
-    "text": "我自己的图片"
+  "settings.shareCardBackgroundMedia": {
+    "source": "393c30d03708379c",
+    "text": "我自己的图片或视频"
   },
-  "settings.shareCardBackgroundVideo": {
-    "source": "22e2d372c23ded94",
-    "text": "我自己的视频"
+  "settings.shareCardMedia": {
+    "source": "99cdace4baf59e2c",
+    "text": "图片或视频"
+  },
+  "settings.shareCardMediaNote": {
+    "source": "a1f8f310e1037f59",
+    "text": {
+      "other": "视频或 GIF 最长 {count} 秒。卡片显示时会循环播放。"
+    }
+  },
+  "settings.chooseImageOrVideo": {
+    "source": "79ac8ed8ac69d611",
+    "text": "选择图片或视频"
+  },
+  "settings.preparingTheBackground": {
+    "source": "41fe6cee11ce9261",
+    "text": "正在准备背景…"
+  },
+  "common.imagesAndVideos": {
+    "source": "90f2284ffca1f18c",
+    "text": "图片和视频"
   },
   "settings.shareCardBackgroundLastFrame": {
     "source": "97a18995a9e7d1ac",
     "text": "最后一帧游戏画面（调暗）"
-  },
-  "settings.shareCardImage": {
-    "source": "fc6eaa65315f601d",
-    "text": "图片"
-  },
-  "settings.shareCardVideo": {
-    "source": "72bcb013ed85a48f",
-    "text": "视频"
-  },
-  "settings.shareCardVideoNote": {
-    "source": "28d20feb72ee87b8",
-    "text": {
-      "other": "最长 {count} 秒。卡片显示时会循环播放。"
-    }
   },
   "settings.shareCardImageFit": {
     "source": "32cc0d85750055d1",
@@ -8749,10 +8753,6 @@
     "source": "61a5acb3c6f9c5e5",
     "text": "播放视频的声音"
   },
-  "settings.preparingTheVideo": {
-    "source": "c5189c7b293438a5",
-    "text": "正在准备视频…"
-  },
   "settings.shareCardSound": {
     "source": "4e1288ba9755d7cd",
     "text": "声音"
@@ -8780,10 +8780,6 @@
   "settings.chooseSound": {
     "source": "a0ff61dc6aea6e4e",
     "text": "选择声音"
-  },
-  "settings.chooseVideo": {
-    "source": "82083c3e0b302074",
-    "text": "选择视频"
   },
   "settings.shareCardSoundVolume": {
     "source": "25c4333eb6d1d390",

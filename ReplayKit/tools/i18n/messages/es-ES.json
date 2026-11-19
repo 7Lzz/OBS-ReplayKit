@@ -8695,33 +8695,37 @@
     "source": "8fd954f2b25eb2ab",
     "text": "Color del tema"
   },
-  "settings.shareCardBackgroundImage": {
-    "source": "cbff02b1de749e35",
-    "text": "Mi propia imagen"
+  "settings.shareCardBackgroundMedia": {
+    "source": "393c30d03708379c",
+    "text": "Mi propia imagen o video"
   },
-  "settings.shareCardBackgroundVideo": {
-    "source": "22e2d372c23ded94",
-    "text": "Mi propio video"
+  "settings.shareCardMedia": {
+    "source": "99cdace4baf59e2c",
+    "text": "Imagen o video"
+  },
+  "settings.shareCardMediaNote": {
+    "source": "a1f8f310e1037f59",
+    "text": {
+      "one": "Un video o GIF puede durar hasta {count} segundo. Se repite en bucle mientras se ve la tarjeta.",
+      "many": "Un video o GIF puede durar hasta {count} segundos. Se repite en bucle mientras se ve la tarjeta.",
+      "other": "Un video o GIF puede durar hasta {count} segundos. Se repite en bucle mientras se ve la tarjeta."
+    }
+  },
+  "settings.chooseImageOrVideo": {
+    "source": "79ac8ed8ac69d611",
+    "text": "Elegir imagen o video"
+  },
+  "settings.preparingTheBackground": {
+    "source": "41fe6cee11ce9261",
+    "text": "Preparando el fondo..."
+  },
+  "common.imagesAndVideos": {
+    "source": "90f2284ffca1f18c",
+    "text": "Imágenes y vídeos"
   },
   "settings.shareCardBackgroundLastFrame": {
     "source": "97a18995a9e7d1ac",
     "text": "Último fotograma del juego, atenuado"
-  },
-  "settings.shareCardImage": {
-    "source": "fc6eaa65315f601d",
-    "text": "Imagen"
-  },
-  "settings.shareCardVideo": {
-    "source": "72bcb013ed85a48f",
-    "text": "Video"
-  },
-  "settings.shareCardVideoNote": {
-    "source": "28d20feb72ee87b8",
-    "text": {
-      "one": "Hasta {count} segundo. Se repite en bucle mientras se ve la tarjeta.",
-      "many": "Hasta {count} segundos. Se repite en bucle mientras se ve la tarjeta.",
-      "other": "Hasta {count} segundos. Se repite en bucle mientras se ve la tarjeta."
-    }
   },
   "settings.shareCardImageFit": {
     "source": "32cc0d85750055d1",
@@ -8755,10 +8759,6 @@
     "source": "61a5acb3c6f9c5e5",
     "text": "Reproducir el sonido del video"
   },
-  "settings.preparingTheVideo": {
-    "source": "c5189c7b293438a5",
-    "text": "Preparando el video..."
-  },
   "settings.shareCardSound": {
     "source": "4e1288ba9755d7cd",
     "text": "Sonido"
@@ -8786,10 +8786,6 @@
   "settings.chooseSound": {
     "source": "a0ff61dc6aea6e4e",
     "text": "Elegir sonido"
-  },
-  "settings.chooseVideo": {
-    "source": "82083c3e0b302074",
-    "text": "Elegir video"
   },
   "settings.shareCardSoundVolume": {
     "source": "25c4333eb6d1d390",

@@ -201,8 +201,34 @@ namespace ReplayKitHelper
             }
         }
 
+        // one pick for the own image or video: a still image is saved as the image, while a gif with more than one frame and any video are converted to the looping card video, since the png the card draws keeps only the first frame; the other kind is dropped so the background is always the last pick
+        public static JObject ImportMedia(string source)
+        {
+            bool still = IsStillImage(source);
+            var result = still ? ImportImage(source) : ImportVideo(source);
+            if (result["ok"]?.Value<bool>() != true) return result;
+            if (still) RemoveVideo();
+            else Remove(ImagePath);
+            result["background"] = still ? "image" : "video";
+            return result;
+        }
+
+        private static bool IsStillImage(string source)
+        {
+            try
+            {
+                using (var picked = Image.FromFile(source))
+                    return !picked.RawFormat.Equals(ImageFormat.Gif) || picked.GetFrameCount(FrameDimension.Time) <= 1;
+            }
+            catch (Exception ex) when (ex is OutOfMemoryException || ex is IOException || ex is ArgumentException || ex is UnauthorizedAccessException || ex is System.Runtime.InteropServices.ExternalException)
+            {
+                // gdi+ reports a file that is not an image as out of memory, and anything it cannot read goes to ffmpeg as a video
+                return false;
+            }
+        }
+
         // the picked image, scaled down to 4k at most and saved as a png in user-data, so the card never reads a file the user moves or deletes later
-        public static JObject ImportImage(string source)
+        private static JObject ImportImage(string source)
         {
             try
             {
@@ -258,7 +284,7 @@ namespace ReplayKitHelper
         }
 
         // the picked video converted for the share window: h.264 in mp4, which media foundation on every windows decodes, no bigger or faster than the card is presented, and its sound as a wav; a picture longer than MaxVideoSeconds is refused rather than cut, while its sound may run on past the picture up to MaxSoundSeconds and then loops on its own
-        public static JObject ImportVideo(string source)
+        private static JObject ImportVideo(string source)
         {
             string ffmpeg = Compression.FindCompressionFfmpeg();
             string ffprobe = Compression.FindCompressionFfprobe();

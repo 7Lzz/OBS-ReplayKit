@@ -70,6 +70,8 @@ namespace ReplayKitHelper
 
         internal static string VideoFilter => Locales.Message("common.videos") + "|*.mp4;*.m4v;*.mov;*.mkv;*.webm|" + AllFiles;
 
+        internal static string ImagesAndVideosFilter => Locales.Message("common.imagesAndVideos") + "|*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.mp4;*.m4v;*.mov;*.mkv;*.webm|" + AllFiles;
+
         // the catch-all filter entry shared by every picker, pattern kept
         private static string AllFiles => Locales.Message("helper.allFiles") + "|*.*";
 

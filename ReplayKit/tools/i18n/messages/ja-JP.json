@@ -8691,31 +8691,35 @@
     "source": "8fd954f2b25eb2ab",
     "text": "テーマの色"
   },
-  "settings.shareCardBackgroundImage": {
-    "source": "cbff02b1de749e35",
-    "text": "自分の画像"
+  "settings.shareCardBackgroundMedia": {
+    "source": "393c30d03708379c",
+    "text": "自分の画像または動画"
   },
-  "settings.shareCardBackgroundVideo": {
-    "source": "22e2d372c23ded94",
-    "text": "自分の動画"
+  "settings.shareCardMedia": {
+    "source": "99cdace4baf59e2c",
+    "text": "画像または動画"
+  },
+  "settings.shareCardMediaNote": {
+    "source": "a1f8f310e1037f59",
+    "text": {
+      "other": "動画と GIF は最長 {count} 秒です。カードが表示されている間、ループ再生されます。"
+    }
+  },
+  "settings.chooseImageOrVideo": {
+    "source": "79ac8ed8ac69d611",
+    "text": "画像または動画を選択"
+  },
+  "settings.preparingTheBackground": {
+    "source": "41fe6cee11ce9261",
+    "text": "背景を準備しています..."
+  },
+  "common.imagesAndVideos": {
+    "source": "90f2284ffca1f18c",
+    "text": "画像と動画"
   },
   "settings.shareCardBackgroundLastFrame": {
     "source": "97a18995a9e7d1ac",
     "text": "最後のゲーム画面（暗く）"
-  },
-  "settings.shareCardImage": {
-    "source": "fc6eaa65315f601d",
-    "text": "画像"
-  },
-  "settings.shareCardVideo": {
-    "source": "72bcb013ed85a48f",
-    "text": "動画"
-  },
-  "settings.shareCardVideoNote": {
-    "source": "28d20feb72ee87b8",
-    "text": {
-      "other": "最長 {count} 秒。カードが表示されている間、ループ再生されます。"
-    }
   },
   "settings.shareCardImageFit": {
     "source": "32cc0d85750055d1",
@@ -8749,10 +8753,6 @@
     "source": "61a5acb3c6f9c5e5",
     "text": "動画の音声を再生"
   },
-  "settings.preparingTheVideo": {
-    "source": "c5189c7b293438a5",
-    "text": "動画を準備しています..."
-  },
   "settings.shareCardSound": {
     "source": "4e1288ba9755d7cd",
     "text": "サウンド"
@@ -8780,10 +8780,6 @@
   "settings.chooseSound": {
     "source": "a0ff61dc6aea6e4e",
     "text": "サウンドを選ぶ"
-  },
-  "settings.chooseVideo": {
-    "source": "82083c3e0b302074",
-    "text": "動画を選択"
   },
   "settings.shareCardSoundVolume": {
     "source": "25c4333eb6d1d390",

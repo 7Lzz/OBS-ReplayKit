@@ -8693,32 +8693,36 @@
     "source": "8fd954f2b25eb2ab",
     "text": "Designfarbe"
   },
-  "settings.shareCardBackgroundImage": {
-    "source": "cbff02b1de749e35",
-    "text": "Eigenes Bild"
+  "settings.shareCardBackgroundMedia": {
+    "source": "393c30d03708379c",
+    "text": "Eigenes Bild oder Video"
   },
-  "settings.shareCardBackgroundVideo": {
-    "source": "22e2d372c23ded94",
-    "text": "Eigenes Video"
+  "settings.shareCardMedia": {
+    "source": "99cdace4baf59e2c",
+    "text": "Bild oder Video"
+  },
+  "settings.shareCardMediaNote": {
+    "source": "a1f8f310e1037f59",
+    "text": {
+      "one": "Ein Video oder GIF darf bis zu {count} Sekunde lang sein. Es läuft in Schleife, solange die Karte zu sehen ist.",
+      "other": "Ein Video oder GIF darf bis zu {count} Sekunden lang sein. Es läuft in Schleife, solange die Karte zu sehen ist."
+    }
+  },
+  "settings.chooseImageOrVideo": {
+    "source": "79ac8ed8ac69d611",
+    "text": "Bild oder Video auswählen"
+  },
+  "settings.preparingTheBackground": {
+    "source": "41fe6cee11ce9261",
+    "text": "Hintergrund wird vorbereitet..."
+  },
+  "common.imagesAndVideos": {
+    "source": "90f2284ffca1f18c",
+    "text": "Bilder und Videos"
   },
   "settings.shareCardBackgroundLastFrame": {
     "source": "97a18995a9e7d1ac",
     "text": "Letztes Spielbild, abgedunkelt"
-  },
-  "settings.shareCardImage": {
-    "source": "fc6eaa65315f601d",
-    "text": "Bild"
-  },
-  "settings.shareCardVideo": {
-    "source": "72bcb013ed85a48f",
-    "text": "Video"
-  },
-  "settings.shareCardVideoNote": {
-    "source": "28d20feb72ee87b8",
-    "text": {
-      "one": "Bis zu {count} Sekunde. Es läuft in Schleife, solange die Karte zu sehen ist.",
-      "other": "Bis zu {count} Sekunden. Es läuft in Schleife, solange die Karte zu sehen ist."
-    }
   },
   "settings.shareCardImageFit": {
     "source": "32cc0d85750055d1",
@@ -8752,10 +8756,6 @@
     "source": "61a5acb3c6f9c5e5",
     "text": "Ton des Videos abspielen"
   },
-  "settings.preparingTheVideo": {
-    "source": "c5189c7b293438a5",
-    "text": "Video wird vorbereitet..."
-  },
   "settings.shareCardSound": {
     "source": "4e1288ba9755d7cd",
     "text": "Ton"
@@ -8783,10 +8783,6 @@
   "settings.chooseSound": {
     "source": "a0ff61dc6aea6e4e",
     "text": "Ton wählen"
-  },
-  "settings.chooseVideo": {
-    "source": "82083c3e0b302074",
-    "text": "Video auswählen"
   },
   "settings.shareCardSoundVolume": {
     "source": "25c4333eb6d1d390",
