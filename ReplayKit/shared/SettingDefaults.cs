@@ -52,7 +52,7 @@ namespace ReplayKitShared
         public const string ShareCoverBoxColor = "#00000096";
         public const bool ShareCoverVideoSound = true;
         public const string ShareCoverSound = "default";
-        public const int ShareCoverSoundVolume = 80;
+        public const int ShareCoverSoundVolume = 25;
         public const string ScreenshareCaptureMode = "hybrid_auto";
         public const string ScreenshareGameWindow = "";
         public const bool ScreenshareAutoGameKeepFocused = true;
