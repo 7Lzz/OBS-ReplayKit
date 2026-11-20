@@ -97,7 +97,7 @@ You can configure desktop, microphone, and Discord audio separately, including w
 
 If you share your whole screen or another window in Discord instead, ReplayKit pauses the Screenshare audio so viewers don't hear the sound twice.
 
-Games in your **Auto Game List** get a **Game Out of Focus** card: while the game is open but you're in another window, your stream and clips show a blurred, dimmed picture of the game instead of your desktop. You can turn it off in Settings.
+Games in your **Auto Game List** get a **Game Out of Focus** card if toggled on: while the game is open but you're in another window, your stream and clips show a blurred, dimmed picture of the game instead of your desktop.
 
 ### Updating or uninstalling
 

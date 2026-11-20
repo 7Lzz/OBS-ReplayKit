@@ -55,9 +55,9 @@ namespace ReplayKitShared
         public const int ShareCoverSoundVolume = 80;
         public const string ScreenshareCaptureMode = "hybrid_auto";
         public const string ScreenshareGameWindow = "";
-        public const bool ScreenshareAutoGameKeepFocused = false;
+        public const bool ScreenshareAutoGameKeepFocused = true;
         // the game out of focus card stands in for a listed game that is open but not in front
-        public const bool ScreenshareAutoGameOutOfFocus = true;
+        public const bool ScreenshareAutoGameOutOfFocus = false;
         public const bool MotionBlurEnabled = false;
         public const double MotionBlurStrength = 0.075;
     }
