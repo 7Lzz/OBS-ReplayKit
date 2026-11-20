@@ -47,7 +47,7 @@ bool ReadPlacement(const QJsonObject &layout, const char *name, Placement &out)
 	return std::isfinite(out.x) && std::isfinite(out.y) && std::isfinite(out.scale) && std::isfinite(out.rotation) && out.scale > 0.0;
 }
 
-// how the helper says the card is drawn apart from the theme: sizes in pixels of a 1080 pixel tall card at size 100, the text weight, how strong the logo shows, and the plate and light text colours
+// how the helper says the card is drawn apart from the theme: sizes in pixels of a 1080 pixel tall card at size 100, the text weight, how strong the logo shows, and the colour of the logo over a picture
 struct Look {
 	qreal logo = 0.0;
 	qreal text = 0.0;
@@ -57,7 +57,6 @@ struct Look {
 	qreal plateY = 0.0;
 	qreal plateRadius = 0.0;
 	qreal logoOpacity = 0.0;
-	QColor plate;
 	QColor lightText;
 };
 
@@ -73,18 +72,23 @@ bool ReadNumber(const QJsonObject &given, const char *name, qreal low, qreal hig
 bool ReadLook(const QJsonObject &given, Look &out)
 {
 	constexpr qreal kHuge = 100000.0;
-	qreal opacity = 0.0;
 	if (!ReadNumber(given, "logo", 1.0, kHuge, out.logo) || !ReadNumber(given, "text", 1.0, kHuge, out.text) ||
 	    !ReadNumber(given, "textWeight", 100.0, 900.0, out.textWeight) || !ReadNumber(given, "logoOpacity", 0.0, 1.0, out.logoOpacity) ||
 	    !ReadNumber(given, "plateX", 0.0, kHuge, out.plateX) || !ReadNumber(given, "plateY", 0.0, kHuge, out.plateY) ||
-	    !ReadNumber(given, "plateRadius", 0.0, kHuge, out.plateRadius) || !ReadNumber(given, "plateOpacity", 0.0, 255.0, opacity) ||
-	    !ReadNumber(given, "themeText", 1.0, kHuge, out.themeText))
+	    !ReadNumber(given, "plateRadius", 0.0, kHuge, out.plateRadius) || !ReadNumber(given, "themeText", 1.0, kHuge, out.themeText))
 		return false;
-	out.plate = QColor(given.value(QStringLiteral("plateColor")).toString());
 	out.lightText = QColor(given.value(QStringLiteral("lightText")).toString());
-	if (!out.plate.isValid() || !out.lightText.isValid())
+	return out.lightText.isValid();
+}
+
+// a colour of the request with its opacity from 0 to 1 beside it
+bool ReadColor(const QJsonObject &request, const char *colour, const char *opacity, QColor &out)
+{
+	qreal alpha = 0.0;
+	out = QColor(request.value(QLatin1String(colour)).toString());
+	if (!out.isValid() || !ReadNumber(request, opacity, 0.0, 1.0, alpha))
 		return false;
-	out.plate.setAlpha(qRound(opacity));
+	out.setAlphaF(float(alpha));
 	return true;
 }
 
@@ -163,6 +167,9 @@ bool RenderShareCard(const std::string &json)
 	Look look;
 	if (!ReadLook(request.value(QStringLiteral("look")).toObject(), look))
 		return Refuse("the card look is not valid");
+	QColor textColor, boxColor;
+	if (!ReadColor(request, "textColor", "textOpacity", textColor) || !ReadColor(request, "boxColor", "boxOpacity", boxColor))
+		return Refuse("the text colours are not valid");
 
 	QImage card(width, height, QImage::Format_ARGB32);
 	card.fill(ownGround ? ground : QColor(Qt::transparent));
@@ -180,7 +187,7 @@ bool RenderShareCard(const std::string &json)
 		painter.drawImage(QRectF((width - drawn.width()) / 2.0, (height - drawn.height()) / 2.0, drawn.width(), drawn.height()), picture);
 	}
 
-	// the logo and the text take the theme text colour on the theme card and the light text over a picture, a video or the last frame
+	// the logo takes the theme text colour on the theme card and the light text over a picture, a video or the last frame; the helper picks the text colour
 	const QColor foreground = background == QStringLiteral("theme") ? ink : look.lightText;
 	if (icon) {
 		QSvgRenderer svg(IconPath(QStringLiteral("share/obs-logo-outline.svg")));
@@ -204,17 +211,17 @@ bool RenderShareCard(const std::string &json)
 		const qreal textHeight = metrics.height();
 		painter.save();
 		PlaceAt(painter, textAt, width, height);
-		// a picked image or video can be any colour under the text, so it gets a dark plate to stay readable
+		// a picked image or video can be any colour under the text, so the text gets a box behind it to stay readable
 		if (background == QStringLiteral("image") || background == QStringLiteral("video")) {
 			const qreal padX = look.plateX * unit * size;
 			const qreal padY = look.plateY * unit * size;
 			const qreal radius = look.plateRadius * unit * size;
 			painter.setPen(Qt::NoPen);
-			painter.setBrush(look.plate);
+			painter.setBrush(boxColor);
 			painter.drawRoundedRect(QRectF(-textWidth / 2.0 - padX, -textHeight / 2.0 - padY, textWidth + 2 * padX, textHeight + 2 * padY), radius, radius);
 		}
 		painter.setFont(font);
-		painter.setPen(foreground);
+		painter.setPen(textColor);
 		painter.drawText(QRectF(-textWidth, -textHeight / 2.0, 2 * textWidth, textHeight), Qt::AlignHCenter | Qt::AlignVCenter, text);
 		painter.restore();
 	}

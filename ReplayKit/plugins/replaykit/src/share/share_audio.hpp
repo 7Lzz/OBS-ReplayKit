@@ -10,5 +10,9 @@ void ShareAudioRefresh();
 // stops every relay and lets go of the sources, before obs tears its scenes down
 void ShareAudioStop();
 QJsonObject ShareAudioProbe();
+// the helper says whether discord streams something else with its sound, which already carries desktop audio; the lua monitoring sync asks it through the replaykit_share_audio_held proc and leaves desktop audio unmonitored while it holds, and a hold the helper stops repeating runs out after 10 s
+void ShareAudioSetHeld(bool held);
+// registers that proc; called once from obs_module_load
+void ShareAudioRegisterHold();
 
 } // namespace rk

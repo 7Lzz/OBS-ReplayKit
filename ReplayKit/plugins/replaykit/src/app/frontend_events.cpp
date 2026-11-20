@@ -28,6 +28,7 @@
 #include "core/window_state.hpp"
 #include "layout/controls_dock.hpp"
 #include "layout/ui_layout.hpp"
+#include "overlays/focus_card.hpp"
 #include "notify/clip_toast.hpp"
 #include "notify/notify_button.hpp"
 #include "share/share_link.hpp"
@@ -133,6 +134,7 @@ void OnFrontendEvent(enum obs_frontend_event event, void *)
 {
 	if (event == OBS_FRONTEND_EVENT_SCRIPTING_SHUTDOWN) {
 		ShareLinkStop();
+		FocusCardStop();
 		ClipBufferShutdown();
 		return;
 	}
@@ -152,6 +154,7 @@ void OnFrontendEvent(enum obs_frontend_event event, void *)
 		if (g_geoPollTimer)
 			g_geoPollTimer->stop();
 		ShellStop();
+		FocusCardStop();
 		ClipBufferShutdown();
 		ClearShellBootMark();
 		// final geometry capture while the windows are still up and positioned (CloseCefWidgets deletes Clips next).
@@ -165,6 +168,8 @@ void OnFrontendEvent(enum obs_frontend_event event, void *)
 
 	ClipBufferOnFrontendEvent(event);
 	CaptureContextEvent(event);
+	if (event == OBS_FRONTEND_EVENT_SCENE_COLLECTION_CHANGED)
+		FocusCardEnsureScenes();
 	if (event == OBS_FRONTEND_EVENT_REPLAY_BUFFER_SAVED) {
 		char *path = obs_frontend_get_last_replay();
 		CaptureContextReplayFile(path ? path : "");
@@ -210,6 +215,7 @@ void OnFrontendEvent(enum obs_frontend_event event, void *)
 	PrewarmCefBrowser();
 	ReportEncoders();
 	CaptureContextStart();
+	FocusCardStart();
 	PublishMainWindow();
 	InstallMainWindowCloseFilter();
 	// obs restores its saved dock state during init, so the dock half of the layout has to wait for this event; the chrome half already ran from obs_module_post_load and is simply re-asserted here

@@ -25,12 +25,12 @@ namespace ReplayKitHelper
         private const int MaxVideoFps = 30;
         private static readonly object Gate = new object();
         private static string appliedSignature;
-        // how the card is drawn apart from the theme: the sizes at size 100 in pixels of a 1080 pixel tall card (the logo side, the text height, the larger text height of the theme card, the plate a picked image puts behind the text), the weight of the text, how strong the outline logo shows, and the colours of that plate (opacity 0 to 255) and of the text over an image or the last frame; the plugin draws the card with them and the card editor of the settings page shows the same, while the moving ground of the theme card is the shader in ui/_share-motion.html
+        // how the card is drawn apart from the theme and the share_cover colours: the sizes at size 100 in pixels of a 1080 pixel tall card (the logo side, the text height, the larger text height of the theme card, the plate a picked image puts behind the text), the weight of the text, how strong the outline logo shows, and the colour the logo takes over an image, a video or the last frame; the plugin draws the card with them and the card editor of the settings page shows the same, while the moving ground of the theme card is the shader in ui/_share-motion.html
         private static readonly JObject Look = new JObject
         {
             ["logo"] = 220, ["text"] = 120, ["themeText"] = 148, ["textWeight"] = 700, ["logoOpacity"] = 0.85,
             ["plateX"] = 56, ["plateY"] = 28, ["plateRadius"] = 24,
-            ["plateColor"] = "#000000", ["plateOpacity"] = 150, ["lightText"] = "#f2f2f2",
+            ["lightText"] = "#f2f2f2",
         };
 
         public static string ImagePath => StateLayout.PathFor(AppConfig.GetReplayKitRoot(), StateLayout.ShareCoverImageFile);
@@ -112,6 +112,10 @@ namespace ReplayKitHelper
             };
         }
 
+        // a #rrggbb or #rrggbbaa setting as the #rrggbb colour and the opacity from 0 to 1 the plugin draws with
+        private static (string Color, double Opacity) SplitOpacity(string value) =>
+            value.Length == 9 ? (value.Substring(0, 7), Convert.ToInt32(value.Substring(7, 2), 16) / 255.0) : (value, 1.0);
+
         private static string Stamp(string path) => path != null && File.Exists(path) ? new FileInfo(path).Length + ":" + File.GetLastWriteTimeUtc(path).Ticks : "";
 
         // the sound the card plays now, or null for none; a video background plays the sound of its video while share_cover_video_sound is on and the video has one, and the card sound otherwise
@@ -152,9 +156,10 @@ namespace ReplayKitHelper
                 if (background == "image" && !File.Exists(ImagePath)) background = "theme";
                 if (background == "video" && !File.Exists(selected.Video)) background = "theme";
                 var colors = SettingsHttp.ActiveMenuColors(settings);
-                bool showText = settings["share_cover_show_text"]?.Value<bool>() ?? SettingDefaults.ShareCoverShowText;
-                string custom = (settings["share_cover_text"]?.Value<string>() ?? "").Trim();
-                string text = !showText ? "" : custom.Length > 0 ? custom : Locales.Message("screenshare.coverDefaultText");
+                var written = settings["share_cover_text"];
+                string text = written == null || written.Type == JTokenType.Null ? Locales.Message("screenshare.coverDefaultText") : written.Value<string>().Trim();
+                var textColor = SplitOpacity(settings["share_cover_text_color"]?.Value<string>() ?? SettingDefaults.ShareCoverTextColor);
+                var boxColor = SplitOpacity(settings["share_cover_box_color"]?.Value<string>() ?? SettingDefaults.ShareCoverBoxColor);
                 var request = new JObject
                 {
                     ["out"] = CardPath,
@@ -166,6 +171,11 @@ namespace ReplayKitHelper
                     ["image"] = background == "image" ? ImagePath : "",
                     ["fit"] = settings["share_cover_fit"]?.Value<string>() ?? SettingDefaults.ShareCoverFit,
                     ["text"] = text,
+                    ["textColor"] = textColor.Color,
+                    ["textOpacity"] = textColor.Opacity,
+                    // the box behind the text is only drawn over a picked image or video, which can be any colour under it
+                    ["boxColor"] = boxColor.Color,
+                    ["boxOpacity"] = boxColor.Opacity,
                     // the default card has the obs icon over its text; a picked image or video is the picture itself
                     ["icon"] = background == "theme" || background == "lastframe",
                     ["layout"] = settings["share_cover_layout"] as JObject ?? ReplaykitSettings.DefaultShareCoverLayout(),

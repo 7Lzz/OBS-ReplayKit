@@ -24,6 +24,13 @@ namespace ReplayKitShared
         public const string MotionBlurFilterKind = "shader_filter";
         // the blur the motion blur filter used before obs-shaderfilter, still matched so it gets replaced
         public const string RetiredMotionBlurFilterKind = "obs_composite_blur";
+        // the three captures of the scene collection, which the capture switch script shows one at a time; scripts/sync_shared.ps1 writes them out for the plugin and lua
+        public const string DisplayCaptureSourceName = "Display Capture";
+        public const string GameCaptureSourceName = "Game Capture";
+        public const string WindowCaptureSourceName = "Window Capture";
+        // the card the capture switch script shows over the captures while a game of the auto game list is open but not in front; the plugin registers its kind and puts it into every scene with a capture, and scripts/sync_shared.ps1 writes both names out for the plugin and lua
+        public const string FocusCardSourceName = "Game Out of Focus";
+        public const string FocusCardSourceKind = "replaykit-focus-card";
 
         // the bongo cat is sized against a 1080 high content area, the input overlay group against a 1440 high one, and the input overlay keeps a 15 px left and 16 px bottom margin at 1080
         private const double BongoRefHeight = 1080.0;
@@ -45,9 +52,9 @@ namespace ReplayKitShared
         // the fixed uuid of the managed motion blur filter on each capture source
         public static readonly IReadOnlyDictionary<string, string> MotionBlurFilterUuids = new Dictionary<string, string>
         {
-            ["Display Capture"] = "e371efc8-8c99-44cb-95e7-94381d9c9e41",
-            ["Game Capture"] = "26bc5a11-5315-4390-b028-f77667c7fda3",
-            ["Window Capture"] = "9b73d6cb-b65e-44a1-895f-4e2f326a8d77",
+            [DisplayCaptureSourceName] = "e371efc8-8c99-44cb-95e7-94381d9c9e41",
+            [GameCaptureSourceName] = "26bc5a11-5315-4390-b028-f77667c7fda3",
+            [WindowCaptureSourceName] = "9b73d6cb-b65e-44a1-895f-4e2f326a8d77",
         };
 
         public static int Opacity(int percent) => percent < 0 ? 0 : percent > 100 ? 100 : percent;

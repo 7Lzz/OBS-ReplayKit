@@ -2500,7 +2500,7 @@
     "text": "Text"
   },
   "common.textColor": {
-    "context": "Screen reader label in Settings > Appearance. Also used in the Settings window, the tools panel of the clip editor (subtitles, elements, audio).",
+    "context": "Screen reader label in Settings > Appearance. Also used in the Settings window, the tools panel of the clip editor (subtitles, elements, audio), and Settings > Screenshare for the text of the card Discord viewers see while OBS is away.",
     "text": "Text color"
   },
   "common.thatFileCouldNotBeUsed": {
@@ -6176,7 +6176,7 @@
     "text": "The Screenshare window did not close, even after it was told to end."
   },
   "screenshare.coverDefaultText": {
-    "context": "The text of the card Discord viewers see while OBS is closed or restarting, drawn large on the stream; also the placeholder of the card text field.",
+    "context": "The text of the card Discord viewers see while OBS is closed or restarting, drawn large on the stream; also the text the card text field starts with.",
     "text": "Be right back"
   },
   "screenshare.theImageCouldNotBeUsed": {
@@ -8748,10 +8748,6 @@
   "settings.shareCardText": {
     "context": "On the Screenshare page of ReplayKit Settings, in the box about the card Discord viewers see while OBS is closed or restarting. Label of the text field for the card text.",
     "text": "Text"
-  },
-  "settings.showTheText": {
-    "context": "On the Screenshare page of ReplayKit Settings, in the box about the card Discord viewers see while OBS is closed or restarting. Checkbox.",
-    "text": "Show the text"
   },
   "settings.playTheSoundOfTheVideo": {
     "context": "On the Screenshare page of ReplayKit Settings, in the box about the card Discord viewers see while OBS is closed or restarting. Checkbox: the picked video plays its own sound on the stream in place of the card sound.",
@@ -11511,5 +11507,33 @@
   "wizard.welcomeToObsReplaykit": {
     "context": "Heading in the first-run setup wizard.",
     "text": "Welcome to OBS ReplayKit"
+  },
+  "common.textBackgroundColor": {
+    "context": "On the Screenshare page of ReplayKit Settings, in the box about the card Discord viewers see while OBS is closed or restarting. Label of the colour of the box behind the card text, shown over an own image or video; its colour picker also sets how see-through the box is.",
+    "text": "Text background color"
+  },
+  "settings.shareCardTextColorHex": {
+    "context": "On the Screenshare page of ReplayKit Settings, in the box about the card Discord viewers see while OBS is closed or restarting. Screen reader label of the hex field of the card text colour.",
+    "text": "Text color hex"
+  },
+  "settings.shareCardTextBackgroundHex": {
+    "context": "On the Screenshare page of ReplayKit Settings, in the box about the card Discord viewers see while OBS is closed or restarting. Screen reader label of the hex field of the colour of the box behind the card text.",
+    "text": "Text background color hex"
+  },
+  "capture.gameOutOfFocus": {
+    "context": "Drawn large on the recording, the clips and the Discord stream, over the last game picture blurred and dimmed, while a game from the Auto Game List is open but another window is in front of it or it is minimized.",
+    "text": "Game Out of Focus"
+  },
+  "settings.autoGameListOutOfFocusNote": {
+    "context": "Note of the Show Game Out of Focus switch under the Auto Game List in Settings > Screenshare > Discord Screenshare. 'Keep Game Focus' is the name of the switch above it, which is greyed out while this one is on.",
+    "text": "While a game from this list is open but you are not in it, the stream and clips show a Game Out of Focus card instead of the desktop. Keep Game Focus does nothing while this is on."
+  },
+  "capture.videoUnavailable": {
+    "context": "Smaller line under 'Game Out of Focus' on the recording, the clips and the Discord stream, while a game from the Auto Game List is open but not in focus.",
+    "text": "Video Unavailable"
+  },
+  "settings.showGameOutOfFocus": {
+    "context": "Switch in Settings > Screenshare > Discord Screenshare, under the Auto Game List. 'Game Out of Focus' is the card the stream and clips show, translated the way that card is.",
+    "text": "Show Game Out of Focus"
   }
 }

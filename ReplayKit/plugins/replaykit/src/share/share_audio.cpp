@@ -27,6 +27,19 @@ struct Tap {
 std::mutex g_tapsLock;
 std::vector<std::unique_ptr<Tap>> g_taps;
 std::atomic<bool> g_stopped{false};
+// the helper repeats the hold every 2 s, so one that stopped or hangs lets go of it once this tick passes
+constexpr uint64_t kHoldMs = 10000;
+std::atomic<uint64_t> g_heldUntil{0};
+
+bool Held()
+{
+	return GetTickCount64() < g_heldUntil.load();
+}
+
+void HeldProc(void *, calldata_t *data)
+{
+	calldata_set_bool(data, "held", Held());
+}
 
 void OnAudio(void *param, obs_source_t *source, const struct audio_data *data, bool)
 {
@@ -198,7 +211,18 @@ QJsonObject ShareAudioProbe()
 		taps.append(entry);
 	}
 	out["relays"] = taps;
+	out["held"] = Held();
 	return out;
+}
+
+void ShareAudioSetHeld(bool held)
+{
+	g_heldUntil.store(held ? GetTickCount64() + kHoldMs : 0);
+}
+
+void ShareAudioRegisterHold()
+{
+	proc_handler_add(obs_get_proc_handler(), "void replaykit_share_audio_held(out bool held)", HeldProc, nullptr);
 }
 
 } // namespace rk

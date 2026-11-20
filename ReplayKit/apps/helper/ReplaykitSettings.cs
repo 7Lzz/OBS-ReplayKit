@@ -197,8 +197,9 @@ namespace ReplayKitHelper
                 ["share_window_keep"] = SettingDefaults.ShareWindowKeep,
                 ["share_cover_background"] = SettingDefaults.ShareCoverBackground,
                 ["share_cover_fit"] = SettingDefaults.ShareCoverFit,
-                ["share_cover_text"] = SettingDefaults.ShareCoverText,
-                ["share_cover_show_text"] = SettingDefaults.ShareCoverShowText,
+                ["share_cover_text"] = JValue.CreateNull(),
+                ["share_cover_text_color"] = SettingDefaults.ShareCoverTextColor,
+                ["share_cover_box_color"] = SettingDefaults.ShareCoverBoxColor,
                 ["share_cover_video_sound"] = SettingDefaults.ShareCoverVideoSound,
                 ["share_cover_sound"] = SettingDefaults.ShareCoverSound,
                 ["share_cover_sound_volume"] = SettingDefaults.ShareCoverSoundVolume,
@@ -207,6 +208,7 @@ namespace ReplayKitHelper
                 ["screenshareGameWindow"] = SettingDefaults.ScreenshareGameWindow,
                 ["screenshareGameOverrides"] = new JArray(),
                 ["screenshareAutoGameKeepFocused"] = SettingDefaults.ScreenshareAutoGameKeepFocused,
+                ["screenshareAutoGameOutOfFocus"] = SettingDefaults.ScreenshareAutoGameOutOfFocus,
                 ["screenshareSwitchDelaySeconds"] = 1.0,
                 // "default" = leave obs/replaykit icons alone; "custom" = use appIconCustomPath; anything else = a filename in the bundled icons/ folder.
                 ["appIcon"] = "default",
@@ -502,6 +504,34 @@ namespace ReplayKitHelper
         internal const int ShareCoverLayoutRotationMin = -180;
         internal const int ShareCoverLayoutRotationMax = 180;
 
+        // the card text: null is the be right back message in the language obs runs in, so a card nobody wrote on follows a language change, and an empty text is a card with no text; a settings file from before share_cover_show_text was dropped keeps what its card showed, a hidden text becoming the empty one
+        internal static JToken NormalizeShareCoverText(JObject raw)
+        {
+            var token = raw?["share_cover_text"];
+            string text = token == null || token.Type == JTokenType.Null ? null : token.ToString().Trim();
+            if (text != null && (text.Length > SettingLimits.ShareCoverTextMaxLength || Regex.IsMatch(text, @"[\x00-\x1F]"))) throw new InvalidOperationException("Invalid text setting: share_cover_text");
+            var shown = raw?["share_cover_show_text"];
+            if (shown != null)
+            {
+                if (!GetBoolSetting(raw, "share_cover_show_text", true)) return "";
+                // the old schema saved an empty text for the default one
+                if (text == "") text = null;
+            }
+            return text == null ? JValue.CreateNull() : (JToken)text;
+        }
+
+        // a #rrggbb colour or a #rrggbbaa one with its opacity in the last byte, the form the shared colour picker gives; an opaque one is kept as #rrggbb the way the picker writes it, and an empty one counts as unset like an empty text setting
+        internal static string GetAlphaColorSetting(JObject data, string key, string defaultValue)
+        {
+            var token = data[key];
+            if (token == null || token.Type == JTokenType.Null) return defaultValue;
+            string v = token.ToString().Trim().ToLowerInvariant();
+            if (v.Length == 0) return defaultValue;
+            if (Regex.IsMatch(v, "^#[0-9a-f]{6}$")) return v;
+            if (Regex.IsMatch(v, "^#[0-9a-f]{8}$")) return v.EndsWith("ff", StringComparison.Ordinal) ? v.Substring(0, 7) : v;
+            throw new InvalidOperationException("Invalid color setting: " + key);
+        }
+
         // the default card: the text in the middle and the logo in the lower left, large enough that its outline still shows on a 720p stream
         internal static JObject DefaultShareCoverLayout() => new JObject
         {
@@ -723,8 +753,9 @@ namespace ReplayKitHelper
                 ["share_window_keep"] = GetEnumSetting(data, "share_window_keep", defaults["share_window_keep"].Value<string>(), SettingLimits.ShareWindowKeepChoices),
                 ["share_cover_background"] = GetEnumSetting(data, "share_cover_background", defaults["share_cover_background"].Value<string>(), SettingLimits.ShareCoverBackgrounds),
                 ["share_cover_fit"] = GetEnumSetting(data, "share_cover_fit", defaults["share_cover_fit"].Value<string>(), SettingLimits.ShareCoverFits),
-                ["share_cover_text"] = GetTextSetting(data, "share_cover_text", defaults["share_cover_text"].Value<string>(), SettingLimits.ShareCoverTextMaxLength),
-                ["share_cover_show_text"] = GetBoolSetting(data, "share_cover_show_text", defaults["share_cover_show_text"].Value<bool>()),
+                ["share_cover_text"] = NormalizeShareCoverText(raw),
+                ["share_cover_text_color"] = GetAlphaColorSetting(data, "share_cover_text_color", defaults["share_cover_text_color"].Value<string>()),
+                ["share_cover_box_color"] = GetAlphaColorSetting(data, "share_cover_box_color", defaults["share_cover_box_color"].Value<string>()),
                 ["share_cover_video_sound"] = GetBoolSetting(data, "share_cover_video_sound", defaults["share_cover_video_sound"].Value<bool>()),
                 ["share_cover_sound"] = GetEnumSetting(data, "share_cover_sound", defaults["share_cover_sound"].Value<string>(), SettingLimits.ShareCoverSounds),
                 ["share_cover_sound_volume"] = GetIntSetting(data, "share_cover_sound_volume", defaults["share_cover_sound_volume"].Value<int>(), SettingLimits.SoundVolumeMin, SettingLimits.SoundVolumeMax),
@@ -733,6 +764,7 @@ namespace ReplayKitHelper
                 ["screenshareGameWindow"] = GetTextSetting(data, "screenshareGameWindow", defaults["screenshareGameWindow"].Value<string>(), SettingLimits.ScreenshareGameWindowMaxLength),
                 ["screenshareGameOverrides"] = NormalizeScreenshareGameOverrides(data["screenshareGameOverrides"]),
                 ["screenshareAutoGameKeepFocused"] = GetBoolSetting(data, "screenshareAutoGameKeepFocused", defaults["screenshareAutoGameKeepFocused"].Value<bool>()),
+                ["screenshareAutoGameOutOfFocus"] = GetBoolSetting(data, "screenshareAutoGameOutOfFocus", defaults["screenshareAutoGameOutOfFocus"].Value<bool>()),
                 ["screenshareSwitchDelaySeconds"] = GetFloatSetting(data, "screenshareSwitchDelaySeconds", defaults["screenshareSwitchDelaySeconds"].Value<double>(), SwitchDelaySecondsMin, SwitchDelaySecondsMax),
                 ["appIcon"] = NormalizeAppIcon(data["appIcon"]?.ToString(), StripWrappingQuotes(data["appIconCustomPath"]?.ToString())),
                 ["appIconCustomPath"] = StripWrappingQuotes(GetTextSetting(data, "appIconCustomPath", defaults["appIconCustomPath"].Value<string>(), 1024)),

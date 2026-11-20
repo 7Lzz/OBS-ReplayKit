@@ -995,6 +995,10 @@
           <div></div>
           <div class="check-row"><input aria-label="Keep Game Focus" id="screenshareAutoGameKeepFocused" type="checkbox" data-i18n-aria-label="settings.keepGameFocus"/><span><span data-i18n="settings.keepGameFocus"></span><span class="control-note" data-i18n="settings.whenThisIsOnAndA"></span></span></div>
         </div>
+        <div class="form-row tight" id="screenshareAutoGameOutOfFocusRow">
+          <div></div>
+          <div class="check-row"><input id="screenshareAutoGameOutOfFocus" type="checkbox" data-i18n-aria-label="settings.showGameOutOfFocus"/><span><span data-i18n="settings.showGameOutOfFocus"></span><span class="control-note" data-i18n="settings.autoGameListOutOfFocusNote"></span></span></div>
+        </div>
         <div class="form-row" id="screenshareSwitchDelayRow">
           <div class="label"><span data-i18n="settings.switchSpeed"></span> <span class="control-note" data-i18n="settings.howManySecondsReplaykitWaitsAfter"></span></div>
           <div class="field-wrap">
@@ -1043,11 +1047,31 @@
         </div>
         <div class="form-row">
           <div class="label" data-i18n="settings.shareCardText"></div>
-          <div class="field-wrap"><input class="text-input" id="shareCoverText" type="text" maxlength="80" autocomplete="off" data-i18n-placeholder="screenshare.coverDefaultText" aria-label="Card text" data-i18n-aria-label="settings.shareCardText"></div>
+          <div class="field-wrap"><input class="text-input" id="shareCoverText" type="text" maxlength="80" autocomplete="off" aria-label="Card text" data-i18n-aria-label="settings.shareCardText"></div>
         </div>
-        <div class="form-row tight">
-          <div></div>
-          <div class="check-row"><input aria-label="Show the text" id="shareCoverShowText" type="checkbox" data-i18n-aria-label="settings.showTheText"/><span><span data-i18n="settings.showTheText"></span></span></div>
+        <div class="form-row">
+          <div class="label" data-i18n="common.textColor"></div>
+          <div class="field-wrap">
+            <div class="color-control">
+              <button class="color-picker" id="shareCoverTextColor" type="button" data-i18n-aria-label="common.textColor"></button>
+              <input class="text-input color-value" id="shareCoverTextColorValue" type="text" maxlength="9" spellcheck="false" autocomplete="off" data-i18n-aria-label="settings.shareCardTextColorHex">
+            </div>
+            <button class="icon-btn field-reset" type="button" id="resetShareCoverTextColor" title="Reset to default" data-i18n-title="common.resetToDefault">
+              <svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg>
+            </button>
+          </div>
+        </div>
+        <div class="form-row" id="shareCoverBoxColorRow">
+          <div class="label" data-i18n="common.textBackgroundColor"></div>
+          <div class="field-wrap">
+            <div class="color-control">
+              <button class="color-picker" id="shareCoverBoxColor" type="button" data-i18n-aria-label="common.textBackgroundColor"></button>
+              <input class="text-input color-value" id="shareCoverBoxColorValue" type="text" maxlength="9" spellcheck="false" autocomplete="off" data-i18n-aria-label="settings.shareCardTextBackgroundHex">
+            </div>
+            <button class="icon-btn field-reset" type="button" id="resetShareCoverBoxColor" title="Reset to default" data-i18n-title="common.resetToDefault">
+              <svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg>
+            </button>
+          </div>
         </div>
         <div class="form-row" id="shareCoverSoundRow">
           <div class="label"><span data-i18n="settings.shareCardSound"></span><span class="setting-description" data-i18n="settings.shareCardSoundNote"></span></div>
@@ -2204,6 +2228,8 @@
     screenshareGameOverrideList: document.getElementById("screenshareGameOverrideList"),
     screenshareAutoGameKeepFocused: document.getElementById("screenshareAutoGameKeepFocused"),
     screenshareAutoGameKeepFocusedRow: document.getElementById("screenshareAutoGameKeepFocusedRow"),
+    screenshareAutoGameOutOfFocus: document.getElementById("screenshareAutoGameOutOfFocus"),
+    screenshareAutoGameOutOfFocusRow: document.getElementById("screenshareAutoGameOutOfFocusRow"),
     sidebarVersion: document.getElementById("sidebarVersion"),
     sidebarGithubLink: document.getElementById("sidebarGithubLink"),
     screenshareSwitchDelay: document.getElementById("screenshareSwitchDelay"),
@@ -2220,7 +2246,11 @@
     shareCoverFitRow: document.getElementById("shareCoverFitRow"),
     shareCoverFit: document.getElementById("shareCoverFit"),
     shareCoverText: document.getElementById("shareCoverText"),
-    shareCoverShowText: document.getElementById("shareCoverShowText"),
+    shareCoverTextColor: document.getElementById("shareCoverTextColor"),
+    shareCoverTextColorValue: document.getElementById("shareCoverTextColorValue"),
+    shareCoverBoxColorRow: document.getElementById("shareCoverBoxColorRow"),
+    shareCoverBoxColor: document.getElementById("shareCoverBoxColor"),
+    shareCoverBoxColorValue: document.getElementById("shareCoverBoxColorValue"),
     shareCoverSoundRow: document.getElementById("shareCoverSoundRow"),
     shareCoverSound: document.getElementById("shareCoverSound"),
     shareCoverSoundFileRow: document.getElementById("shareCoverSoundFileRow"),
@@ -3309,8 +3339,12 @@
     els.screenshareGameWindowRow.classList.toggle("is-disabled", !needsWindow);
     setComboDisabled(els.screenshareGameOverridePicker, !usesAutoList);
     els.screenshareGameOverridesRow.classList.toggle("is-disabled", !usesAutoList);
-    els.screenshareAutoGameKeepFocusedRow.classList.toggle("is-disabled", !usesAutoList);
-    els.screenshareAutoGameKeepFocused.disabled = !usesAutoList;
+    // the game out of focus card takes the place of the game whenever it is not in front, so keep game focus does nothing while it is on
+    const keepFocusUsed = usesAutoList && !els.screenshareAutoGameOutOfFocus.checked;
+    els.screenshareAutoGameKeepFocusedRow.classList.toggle("is-disabled", !keepFocusUsed);
+    els.screenshareAutoGameKeepFocused.disabled = !keepFocusUsed;
+    els.screenshareAutoGameOutOfFocusRow.classList.toggle("is-disabled", !usesAutoList);
+    els.screenshareAutoGameOutOfFocus.disabled = !usesAutoList;
     els.screenshareSwitchDelayRow.classList.toggle("is-disabled", !usesAutoList);
     els.screenshareSwitchDelay.disabled = !usesAutoList;
     els.screenshareSwitchDelayValue.disabled = !usesAutoList;
@@ -3653,10 +3687,12 @@
     setComboValue(els.screenshareGameWindow, settingOr("screenshareGameWindow"), false);
     renderScreenshareGameOverrides();
     els.screenshareAutoGameKeepFocused.checked = !!state.screenshareAutoGameKeepFocused;
+    els.screenshareAutoGameOutOfFocus.checked = !!settingOr("screenshareAutoGameOutOfFocus");
     setComboValue(els.shareCoverBackground, coverComboValue(settingOr("share_cover_background")), false);
     setComboValue(els.shareCoverFit, settingOr("share_cover_fit"), false);
-    els.shareCoverText.value = settingOr("share_cover_text") || "";
-    els.shareCoverShowText.checked = !!settingOr("share_cover_show_text");
+    els.shareCoverText.value = coverText();
+    syncCoverColor(els.shareCoverTextColor, els.shareCoverTextColorValue, "share_cover_text_color");
+    syncCoverColor(els.shareCoverBoxColor, els.shareCoverBoxColorValue, "share_cover_box_color");
     els.shareCoverVideoSound.checked = !!settingOr("share_cover_video_sound");
     setComboValue(els.shareCoverSound, settingOr("share_cover_sound"), false);
     syncVolumeControl(els.shareCoverSoundVolume, els.shareCoverSoundVolumeValue, settingOr("share_cover_sound_volume"));
@@ -3776,10 +3812,10 @@
     state.screenshareGameWindow = comboValue(els.screenshareGameWindow) || "";
     state.screenshareGameOverrides = normalizeScreenshareGameOverrides(state.screenshareGameOverrides);
     state.screenshareAutoGameKeepFocused = !!els.screenshareAutoGameKeepFocused.checked;
+    state.screenshareAutoGameOutOfFocus = !!els.screenshareAutoGameOutOfFocus.checked;
     state.share_cover_background = coverBackground();
     state.share_cover_fit = comboValue(els.shareCoverFit) || SETTING_DEFAULTS.share_cover_fit;
-    state.share_cover_text = els.shareCoverText.value.trim().slice(0, 80);
-    state.share_cover_show_text = !!els.shareCoverShowText.checked;
+    state.share_cover_text = coverTextValue(els.shareCoverText.value);
     state.share_cover_video_sound = !!els.shareCoverVideoSound.checked;
     state.share_cover_sound = comboValue(els.shareCoverSound) || SETTING_DEFAULTS.share_cover_sound;
     state.share_cover_sound_volume = clampVolume(els.shareCoverSoundVolume.value);
@@ -4014,8 +4050,10 @@
   // the mic controls write straight into state (the host contract is get/set/onChange), so saving, undo and the dirty check treat them like every other field
   if (window.RKMic) RKMic.init({ get:(k) => state[k], set:(k, v) => { state[k] = v; }, onChange:() => markDirty() });
   // the card editor writes the layout straight into state too, so saving, undo and the dirty check treat it like every other field
-  if (window.RKShareCardEditor) RKShareCardEditor.init({ get:settingOr, set:(k, v) => { state[k] = v; }, onChange:() => markDirty() });
+  // settingOr reads an empty value as the default, but an empty card text is a card with no text
+  if (window.RKShareCardEditor) RKShareCardEditor.init({ get:(k) => k === "share_cover_text" ? state[k] : settingOr(k), set:(k, v) => { state[k] = v; }, onChange:() => markDirty() });
   els.screenshareGameOverridePicker.addEventListener("combochange", syncScreenshareCaptureFields);
+  els.screenshareAutoGameOutOfFocus.addEventListener("change", syncScreenshareCaptureFields);
   els.addScreenshareGameOverride.addEventListener("click", addScreenshareGameOverride);
   {
     // capture Source dropdown reset -- setComboValue(..., true) fires combochange, which readUi()s the new value into state and re-syncs the dependent rows.
@@ -4271,7 +4309,7 @@
     markDirty();
   }, { passive: false });
 
-  [els.obsStartupEnabled, els.runObsAsAdmin, els.disableObsCloseWarning, els.disableObsCrashPopup, els.quitOnClose, els.disableSleeping, els.startMinimized, els.pinObsTrayIcon, els.clipNotificationEnabled, els.recordingNotificationEnabled, els.linkNotificationEnabled, els.autoCopyLink, els.compressSkipFavorites, els.developmentMode, els.sdkMode, els.checkObsUpdates, els.logInterfaceEvents, els.overlayFlipH, els.motionBlurEnabled, els.trimGpuEncode, els.showCodecTags, els.gameRecognition, els.discordRichPresence, els.recordingSeparateAudioTracks, els.editorAutoplay, els.editorLoopPreview, els.editorWheelZoom, els.hideNotificationsFromCapture, els.showCursorDisplayCapture, els.showCursorGameCapture, els.showCursorWindowCapture, els.debugLoggingEnabled, els.autoDeleteLogsOnLaunch, els.screenshareAutoGameKeepFocused, els.bongoLive2d, els.bongoTrack, els.bongoBreath, els.bongoBlink, els.bongoFaces, els.bongoRelativeMouse].forEach((input) => {
+  [els.obsStartupEnabled, els.runObsAsAdmin, els.disableObsCloseWarning, els.disableObsCrashPopup, els.quitOnClose, els.disableSleeping, els.startMinimized, els.pinObsTrayIcon, els.clipNotificationEnabled, els.recordingNotificationEnabled, els.linkNotificationEnabled, els.autoCopyLink, els.compressSkipFavorites, els.developmentMode, els.sdkMode, els.checkObsUpdates, els.logInterfaceEvents, els.overlayFlipH, els.motionBlurEnabled, els.trimGpuEncode, els.showCodecTags, els.gameRecognition, els.discordRichPresence, els.recordingSeparateAudioTracks, els.editorAutoplay, els.editorLoopPreview, els.editorWheelZoom, els.hideNotificationsFromCapture, els.showCursorDisplayCapture, els.showCursorGameCapture, els.showCursorWindowCapture, els.debugLoggingEnabled, els.autoDeleteLogsOnLaunch, els.screenshareAutoGameKeepFocused, els.screenshareAutoGameOutOfFocus, els.bongoLive2d, els.bongoTrack, els.bongoBreath, els.bongoBlink, els.bongoFaces, els.bongoRelativeMouse].forEach((input) => {
     input.addEventListener("change", () => {
       readUi();
       markDirty();
@@ -4882,6 +4920,28 @@
   let shareCoverStatus = { hasImage:false, hasVideo:false, videoHasSound:false, hasSound:false, hasDefaultSound:false, hasCard:false };
   // an own image and an own video are one choice in the list, while the setting keeps which of the two was picked, since the helper keeps only the last pick
   function coverComboValue(background) { return background === "image" || background === "video" ? "media" : background; }
+  // the card text as its field shows it: an unset text is the be right back message in the language of the page, and an empty one is a card with no text
+  function coverText() {
+    const text = state.share_cover_text;
+    return text === null || text === undefined ? RK_M("screenshare.coverDefaultText") : String(text);
+  }
+  // a field that still holds the be right back message keeps the text unset, so the card follows the language obs runs in
+  function coverTextValue(value) {
+    const text = String(value || "").trim().slice(0, 80);
+    return text === RK_M("screenshare.coverDefaultText") ? null : text;
+  }
+  // a card colour with its opacity, #rrggbb or #rrggbbaa from the shared colour picker; the dot shows it with its opacity the way the editor shows its colours
+  function coverColor(key) {
+    return RKColor.cleanAlphaColor(state[key], SETTING_DEFAULTS[key]);
+  }
+  function syncCoverColor(picker, input, key) {
+    const value = coverColor(key);
+    picker.dataset.value = value;
+    picker.dataset.tooltip = value;
+    picker.style.setProperty("--color", RKColor.toCss(value));
+    if (document.activeElement !== input) input.value = value;
+    refreshFieldResetState(key, SETTING_DEFAULTS[key]);
+  }
   function coverBackground() {
     const picked = comboValue(els.shareCoverBackground) || SETTING_DEFAULTS.share_cover_background;
     if (picked !== "media") return picked;
@@ -4905,6 +4965,8 @@
     els.shareCoverMediaRow.hidden = background !== "image" && !video;
     els.shareCoverMediaNote.textContent = shareCoverStatus.maxVideoSeconds ? RK_M("settings.shareCardMediaNote", { count: shareCoverStatus.maxVideoSeconds }) : "";
     els.shareCoverFitRow.hidden = background !== "image" && !video;
+    // the box behind the text is only drawn over an own image or video
+    els.shareCoverBoxColorRow.hidden = background !== "image" && !video;
     fillShareCoverFit();
     els.shareCoverMediaRemove.disabled = !shareCoverStatus.hasImage && !shareCoverStatus.hasVideo;
     // the sound of a picked video plays in place of the card sound, the way the helper picks it, so the card sound rows only show while it does not
@@ -4966,9 +5028,37 @@
   [els.shareCoverBackground, els.shareCoverFit, els.shareCoverSound, els.shareWindowKeep].forEach((combo) => {
     combo.addEventListener("combochange", () => { readUi(); syncShareCoverRows(); markDirty(); });
   });
-  els.shareCoverShowText.addEventListener("change", () => { readUi(); syncShareCoverRows(); markDirty(); });
   els.shareCoverVideoSound.addEventListener("change", () => { readUi(); syncShareCoverRows(); markDirty(); });
   els.shareCoverText.addEventListener("input", () => { readUi(); syncShareCoverRows(); markDirty(); });
+  [
+    [els.shareCoverTextColor, els.shareCoverTextColorValue, "share_cover_text_color", "resetShareCoverTextColor"],
+    [els.shareCoverBoxColor, els.shareCoverBoxColorValue, "share_cover_box_color", "resetShareCoverBoxColor"],
+  ].forEach(([picker, input, key, resetId]) => {
+    const def = SETTING_DEFAULTS[key];
+    const take = (value) => {
+      state[key] = value;
+      syncCoverColor(picker, input, key);
+      markDirty();
+      if (window.RKShareCardEditor) RKShareCardEditor.refresh();
+    };
+    // the shared picker carries the opacity, as in the editor
+    picker.addEventListener("click", () => openColorDialog(coverColor(key), picker.getAttribute("aria-label"), take, { alpha:true, anchor:picker }));
+    input.addEventListener("keydown", (e) => { if (e.key === "Enter") input.blur(); });
+    input.addEventListener("change", () => {
+      const text = input.value.trim();
+      const value = RKColor.cleanAlphaColor(text.charAt(0) === "#" ? text : "#" + text, null);
+      // a hex that is no colour shows the colour the card has again
+      if (value) take(value);
+      else syncCoverColor(picker, input, key);
+    });
+    input.addEventListener("blur", () => syncCoverColor(picker, input, key));
+    const resetBtn = document.getElementById(resetId);
+    fieldResetBtns[key] = resetBtn;
+    resetBtn.addEventListener("click", () => {
+      if (fieldAtDefault(key, def)) return;
+      take(def);
+    });
+  });
   els.shareCoverMediaPick.addEventListener("click", () => runShareCoverAction(els.shareCoverMediaPick, "share/cover/media", RK_M("settings.preparingTheBackground")));
   els.shareCoverMediaRemove.addEventListener("click", () => runShareCoverAction(els.shareCoverMediaRemove, "share/cover/media/remove"));
   els.shareCoverSoundPick.addEventListener("click", () => runShareCoverAction(els.shareCoverSoundPick, "share/cover/sound"));

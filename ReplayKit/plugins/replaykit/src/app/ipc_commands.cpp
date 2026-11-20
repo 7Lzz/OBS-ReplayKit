@@ -19,6 +19,7 @@
 #include "core/state.hpp"
 #include "core/window_state.hpp"
 #include "notify/notify_button.hpp"
+#include "share/share_audio.hpp"
 #include "shell/shell_account.hpp"
 #include "shell/shell_grip.hpp"
 #include "shell/shell_history.hpp"
@@ -329,6 +330,8 @@ void PipeDispatchLine(const std::string &line)
 	} else if (line == "SHELLRESIZE right" || line == "SHELLRESIZE bottom" || line == "SHELLRESIZE corner") {
 		const Qt::Edges edges = line == "SHELLRESIZE right" ? Qt::Edges(Qt::RightEdge) : line == "SHELLRESIZE bottom" ? Qt::Edges(Qt::BottomEdge) : (Qt::RightEdge | Qt::BottomEdge);
 		QMetaObject::invokeMethod(g_callbacks, [edges]() { ShellStartEdgeResize(edges); }, Qt::QueuedConnection);
+	} else if (line == "SHAREAUDIOHOLD 0" || line == "SHAREAUDIOHOLD 1") {
+		ShareAudioSetHeld(line.back() == '1');
 	} else if (line == "ALLOWCLOSE") {
 		// a real restart/exit is coming -- let the next WM_CLOSE through the close-to-tray filter for 60s, and ack so the helper knows the filter saw it before it posts the close.
 		g_allowCloseUntilMs.store(GetTickCount64() + 60000);

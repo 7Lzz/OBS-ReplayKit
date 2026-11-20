@@ -203,8 +203,20 @@ local function ensure_desktop_audio_projector_monitoring(log_missing, log_unchan
         OBS_MONITORING_TYPE_MONITOR_AND_OUTPUT, "Monitor and Output - Projector audio", log_missing, log_unchanged, true, refresh_when_unchanged)
 end
 
+-- the helper tells the plugin while discord streams something other than the share window with its sound, which already carries desktop audio, so monitoring it too would make viewers hear it twice; without the plugin nothing is held
+local function share_audio_held()
+    local cd = obs.calldata_create()
+    local called = obs.proc_handler_call(obs.obs_get_proc_handler(), "replaykit_share_audio_held", cd)
+    local held = called and obs.calldata_bool(cd, "held")
+    obs.calldata_destroy(cd)
+    return held == true
+end
+
 local function ensure_desktop_audio_monitoring_for_current_mode(log_missing, log_unchanged, refresh_when_unchanged)
     if active_discord_output_mode == MODE_PROJECTOR and active_projector_enabled then
+        if share_audio_held() then
+            return ensure_desktop_audio_not_monitored("Monitor Off - Discord streams something else with its sound", log_missing, log_unchanged, refresh_when_unchanged)
+        end
         return ensure_desktop_audio_projector_monitoring(log_missing, log_unchanged, refresh_when_unchanged)
     end
     return ensure_desktop_audio_not_monitored("Monitor Off - Share Preview disabled", log_missing, log_unchanged, refresh_when_unchanged)

@@ -8754,10 +8754,6 @@
     "source": "c028d4bda5c6fda7",
     "text": "Текст"
   },
-  "settings.showTheText": {
-    "source": "d17c8c9bbb4640bc",
-    "text": "Показывать текст"
-  },
   "settings.playTheSoundOfTheVideo": {
     "source": "61a5acb3c6f9c5e5",
     "text": "Воспроизводить звук видео"
@@ -11526,5 +11522,33 @@
   "wizard.welcomeToObsReplaykit": {
     "source": "3380809f0ee49121",
     "text": "Добро пожаловать в OBS ReplayKit"
+  },
+  "common.textBackgroundColor": {
+    "source": "5957df3e840c5bb7",
+    "text": "Цвет фона текста"
+  },
+  "settings.shareCardTextColorHex": {
+    "source": "b4174234fc238477",
+    "text": "HEX цвета текста"
+  },
+  "settings.shareCardTextBackgroundHex": {
+    "source": "f0e584b8d92dadb7",
+    "text": "HEX цвета фона текста"
+  },
+  "capture.gameOutOfFocus": {
+    "source": "b6c1a20901e645b8",
+    "text": "Игра не в фокусе"
+  },
+  "settings.autoGameListOutOfFocusNote": {
+    "source": "f3a2c07856ad8e2d",
+    "text": "Пока игра из этого списка открыта, но вы не в ней, трансляция и клипы показывают карточку «Игра не в фокусе» вместо рабочего стола. Пока это включено, «Сохранять фокус на игре» не действует."
+  },
+  "capture.videoUnavailable": {
+    "source": "1371e9f5bfce72a0",
+    "text": "Видео недоступно"
+  },
+  "settings.showGameOutOfFocus": {
+    "source": "abd2f59f183da4cd",
+    "text": "Показывать «Игра не в фокусе»"
   }
 }

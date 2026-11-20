@@ -256,7 +256,7 @@ namespace ReplayKitHelper
         {
             "shareMode", "discord_screenshare_enabled", "discord_output_mode", "discord_projector_enabled",
             "discord_projector_width", "discord_projector_height", "discord_projector_visible_pixels",
-            "discord_projector_monitor_index", "discord_projector_edge", "discord_projector_title_hint", "discord_projector_hide_taskbar", "share_window_keep", "share_cover_background", "share_cover_fit", "share_cover_text", "share_cover_show_text", "share_cover_video_sound", "share_cover_sound", "share_cover_sound_volume", "share_cover_layout",
+            "discord_projector_monitor_index", "discord_projector_edge", "discord_projector_title_hint", "discord_projector_hide_taskbar", "share_window_keep", "share_cover_background", "share_cover_fit", "share_cover_text", "share_cover_text_color", "share_cover_box_color", "share_cover_video_sound", "share_cover_sound", "share_cover_sound_volume", "share_cover_layout",
         };
 
         internal static bool TestDiscordOutputOnlyRequest(JObject incoming)
@@ -270,7 +270,7 @@ namespace ReplayKitHelper
         }
 
         internal static readonly string[] ScreenshareCaptureOnlyAllowedKeys =
-            { "screenshareCaptureMode", "screenshareGameWindow", "screenshareGameOverrides", "screenshareAutoGameKeepFocused", "screenshareSwitchDelaySeconds" };
+            { "screenshareCaptureMode", "screenshareGameWindow", "screenshareGameOverrides", "screenshareAutoGameKeepFocused", "screenshareAutoGameOutOfFocus", "screenshareSwitchDelaySeconds" };
 
         internal static bool TestScreenshareCaptureOnlyRequest(JObject incoming)
         {
@@ -645,7 +645,7 @@ namespace ReplayKitHelper
 
         internal static bool TestOnlyScreenshareCaptureChanged(JObject previous, JObject settings)
         {
-            var skip = new HashSet<string> { "screenshareCaptureMode", "screenshareGameWindow", "screenshareGameOverrides", "screenshareAutoGameKeepFocused", "screenshareSwitchDelaySeconds" };
+            var skip = new HashSet<string> { "screenshareCaptureMode", "screenshareGameWindow", "screenshareGameOverrides", "screenshareAutoGameKeepFocused", "screenshareAutoGameOutOfFocus", "screenshareSwitchDelaySeconds" };
             foreach (var prop in GetDefaultSettings().Properties())
             {
                 if (skip.Contains(prop.Name)) continue;
@@ -654,6 +654,7 @@ namespace ReplayKitHelper
             return previous["screenshareCaptureMode"]?.Value<string>() != settings["screenshareCaptureMode"]?.Value<string>() ||
                 previous["screenshareGameWindow"]?.Value<string>() != settings["screenshareGameWindow"]?.Value<string>() ||
                 previous["screenshareAutoGameKeepFocused"]?.Value<bool>() != settings["screenshareAutoGameKeepFocused"]?.Value<bool>() ||
+                previous["screenshareAutoGameOutOfFocus"]?.Value<bool>() != settings["screenshareAutoGameOutOfFocus"]?.Value<bool>() ||
                 previous["screenshareSwitchDelaySeconds"]?.Value<double>() != settings["screenshareSwitchDelaySeconds"]?.Value<double>() ||
                 !JToken.DeepEquals(previous["screenshareGameOverrides"], settings["screenshareGameOverrides"]);
         }

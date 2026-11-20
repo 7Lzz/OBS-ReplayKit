@@ -8745,10 +8745,6 @@
     "source": "c028d4bda5c6fda7",
     "text": "テキスト"
   },
-  "settings.showTheText": {
-    "source": "d17c8c9bbb4640bc",
-    "text": "テキストを表示"
-  },
   "settings.playTheSoundOfTheVideo": {
     "source": "61a5acb3c6f9c5e5",
     "text": "動画の音声を再生"
@@ -11502,5 +11498,33 @@
   "wizard.welcomeToObsReplaykit": {
     "source": "3380809f0ee49121",
     "text": "OBS ReplayKit へようこそ"
+  },
+  "common.textBackgroundColor": {
+    "source": "5957df3e840c5bb7",
+    "text": "テキストの背景色"
+  },
+  "settings.shareCardTextColorHex": {
+    "source": "b4174234fc238477",
+    "text": "テキストの色 (16進数)"
+  },
+  "settings.shareCardTextBackgroundHex": {
+    "source": "f0e584b8d92dadb7",
+    "text": "テキストの背景色 (16進数)"
+  },
+  "capture.gameOutOfFocus": {
+    "source": "b6c1a20901e645b8",
+    "text": "ゲームがフォーカスされていません"
+  },
+  "settings.autoGameListOutOfFocusNote": {
+    "source": "f3a2c07856ad8e2d",
+    "text": "このリストのゲームが開いていても操作していないあいだは、デスクトップの代わりに「ゲームがフォーカスされていません」のカードが配信とクリップに表示されます。これがオンのあいだは「ゲームのフォーカスを維持」は効きません。"
+  },
+  "capture.videoUnavailable": {
+    "source": "1371e9f5bfce72a0",
+    "text": "ビデオは利用できません"
+  },
+  "settings.showGameOutOfFocus": {
+    "source": "abd2f59f183da4cd",
+    "text": "「ゲームがフォーカスされていません」を表示"
   }
 }

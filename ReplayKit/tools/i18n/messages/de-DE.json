@@ -8748,10 +8748,6 @@
     "source": "c028d4bda5c6fda7",
     "text": "Text"
   },
-  "settings.showTheText": {
-    "source": "d17c8c9bbb4640bc",
-    "text": "Text anzeigen"
-  },
   "settings.playTheSoundOfTheVideo": {
     "source": "61a5acb3c6f9c5e5",
     "text": "Ton des Videos abspielen"
@@ -11510,5 +11506,33 @@
   "wizard.welcomeToObsReplaykit": {
     "source": "3380809f0ee49121",
     "text": "Willkommen bei OBS ReplayKit"
+  },
+  "common.textBackgroundColor": {
+    "source": "5957df3e840c5bb7",
+    "text": "Hintergrundfarbe des Texts"
+  },
+  "settings.shareCardTextColorHex": {
+    "source": "b4174234fc238477",
+    "text": "Textfarbe Hex"
+  },
+  "settings.shareCardTextBackgroundHex": {
+    "source": "f0e584b8d92dadb7",
+    "text": "Hintergrundfarbe des Texts Hex"
+  },
+  "capture.gameOutOfFocus": {
+    "source": "b6c1a20901e645b8",
+    "text": "Spiel nicht im Fokus"
+  },
+  "settings.autoGameListOutOfFocusNote": {
+    "source": "f3a2c07856ad8e2d",
+    "text": "Solange ein Spiel aus dieser Liste geöffnet ist, du aber nicht darin bist, zeigen Stream und Clips statt des Desktops eine Karte „Spiel nicht im Fokus“. Solange das an ist, wirkt „Spielfokus beibehalten“ nicht."
+  },
+  "capture.videoUnavailable": {
+    "source": "1371e9f5bfce72a0",
+    "text": "Video nicht verfügbar"
+  },
+  "settings.showGameOutOfFocus": {
+    "source": "abd2f59f183da4cd",
+    "text": "„Spiel nicht im Fokus“ anzeigen"
   }
 }

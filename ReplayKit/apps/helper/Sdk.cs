@@ -45,6 +45,7 @@ namespace ReplayKitHelper
             Register("share.window.state", "the share window: live or card, frames received and presented, presents per second, its texture, gpu, hold and keep times and the audio it plays", args => ShareWindow.State());
             Register("share.window.card", "shows the card of the share window for args.seconds (1 to 60), while share preview is on", ShareWindowCard);
             Register("capture.state", "reports accepted native capture evidence without exposing process paths", args => ClipGames.Status());
+            Register("discord.stream", "whether a discord client streams something other than the share window with its sound, which holds the share audio so viewers do not hear it twice, and what each discord log says", args => DiscordStreamWorker.State());
             Register("presence.state", "the discord rich presence: whether it is on and set up, the game it follows, whether discord is connected, the activity it shows and the last error", args => DiscordPresence.State());
             Register("roblox.state", "the roblox experience the roblox logs say is open now, and how many experiences have a name and icon", args => RobloxExperiences.State());
             Register("settings.get", "the settings, or only the keys named in args.keys", SettingsGet);

@@ -110,6 +110,9 @@ namespace ReplayKitHelper
         // whether the last window this helper heard from still exists, without asking it over the pipe
         public static bool KnownWindowAlive() => IsOwnWindow(Interlocked.Read(ref knownHwnd));
 
+        // the process of the last window this helper heard from, 0 before it heard from one
+        public static int KnownPid => Volatile.Read(ref knownPid);
+
         // the running window, started first when none answers; a window of another protocol (an older release still running after an update) is ended and started again
         public static Info EnsureRunning(string title, int keepSeconds)
         {

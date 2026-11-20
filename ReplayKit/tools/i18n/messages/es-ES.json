@@ -8751,10 +8751,6 @@
     "source": "c028d4bda5c6fda7",
     "text": "Texto"
   },
-  "settings.showTheText": {
-    "source": "d17c8c9bbb4640bc",
-    "text": "Mostrar el texto"
-  },
   "settings.playTheSoundOfTheVideo": {
     "source": "61a5acb3c6f9c5e5",
     "text": "Reproducir el sonido del video"
@@ -11518,5 +11514,33 @@
   "wizard.welcomeToObsReplaykit": {
     "source": "3380809f0ee49121",
     "text": "Bienvenido a OBS ReplayKit"
+  },
+  "common.textBackgroundColor": {
+    "source": "5957df3e840c5bb7",
+    "text": "Color de fondo del texto"
+  },
+  "settings.shareCardTextColorHex": {
+    "source": "b4174234fc238477",
+    "text": "Color del texto en hexadecimal"
+  },
+  "settings.shareCardTextBackgroundHex": {
+    "source": "f0e584b8d92dadb7",
+    "text": "Color de fondo del texto en hexadecimal"
+  },
+  "capture.gameOutOfFocus": {
+    "source": "b6c1a20901e645b8",
+    "text": "Juego fuera de foco"
+  },
+  "settings.autoGameListOutOfFocusNote": {
+    "source": "f3a2c07856ad8e2d",
+    "text": "Mientras un juego de esta lista esté abierto pero no estés en él, la transmisión y los clips muestran una tarjeta de «Juego fuera de foco» en lugar del escritorio. Mientras esto esté activado, «Mantener el foco del juego» no tiene efecto."
+  },
+  "capture.videoUnavailable": {
+    "source": "1371e9f5bfce72a0",
+    "text": "Vídeo no disponible"
+  },
+  "settings.showGameOutOfFocus": {
+    "source": "abd2f59f183da4cd",
+    "text": "Mostrar «Juego fuera de foco»"
   }
 }

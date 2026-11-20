@@ -214,6 +214,7 @@ namespace ReplayKitHelper
             try { DeletedHistory.Start(); } catch (Exception ex) { Log.Write("DeletedHistory.Start: " + ex.Message); }
             try { SavedClipWorker.Start(); } catch (Exception ex) { Log.Write("SavedClipWorker.Start: " + ex.Message); }
             try { DiscordPresence.Start(); } catch (Exception ex) { Log.Write("DiscordPresence.Start: " + ex.Message); }
+            try { DiscordStreamWorker.Start(); } catch (Exception ex) { Log.Write("DiscordStreamWorker.Start: " + ex.Message); }
             // the probe of the encoders waits until obs and its pages have started, since its test encodes compete with them for the machine and anything that runs the tools only needs their paths (GetToolPaths); a compress or a save that needs the encoders before then runs the probe itself
             var probe = new Thread(() =>
             {

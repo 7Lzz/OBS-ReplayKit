@@ -1,16 +1,21 @@
 obs = obslua
 ffi = require("ffi")
 
+-- the names of the captures come from shared/OverlayScene.cs, which the installer and the helper name them by
+local CAPTURE_SOURCES = replaykit_shared.capture_sources
+
 local cfg = {
-    game_source    = "Game Capture",
-    display_source = "Display Capture",
-    window_source  = "Window Capture",
+    game_source    = CAPTURE_SOURCES.game,
+    display_source = CAPTURE_SOURCES.display,
+    window_source  = CAPTURE_SOURCES.window,
     scene_name     = "",
     check_interval = 1000,
     verbose        = false,
 }
 
 local MAX_SETTINGS_BYTES = 65536
+-- the card the plugin puts into every scene with a capture, shown in place of the captures while a game of the auto game list is open but not in front
+local FOCUS_CARD_SOURCE = replaykit_shared.focus_card_source
 local DEFAULT_CAPTURE_MODE = "hybrid_auto"
 local MIN_DESKTOP_SWITCH_GRACE_MS = 50
 local MAX_DESKTOP_SWITCH_GRACE_MS = 5000
@@ -92,6 +97,10 @@ local window_stall_count       = 0
 local window_stall_limit       = WINDOW_STALL_TICKS
 local sticky_window_hwnd       = nil
 local sticky_window_exe        = nil
+-- the window of the listed game last in front, which the card stands in for until it is closed; tracked whatever keep_focused says
+local focus_game_hwnd          = nil
+-- whether the card may be showing, so leaving hybrid mode hides it once; true at load since obs saves a card that was showing when it closed
+local focus_card_maybe_shown   = true
 
 ffi.cdef[[
     typedef void*          HWND;
@@ -195,7 +204,7 @@ local function valid_exe_name(exe)
 end
 
 local function read_capture_policy()
-    local policy = { mode = DEFAULT_CAPTURE_MODE, auto_games = {}, keep_focused = false, switch_grace_ms = DEFAULT_DESKTOP_SWITCH_GRACE_MS }
+    local policy = { mode = DEFAULT_CAPTURE_MODE, auto_games = {}, keep_focused = false, focus_card = true, switch_grace_ms = DEFAULT_DESKTOP_SWITCH_GRACE_MS }
     local text = read_text(runtime_settings_path())
     if not text or text == "" then return policy end
 
@@ -206,6 +215,12 @@ local function read_capture_policy()
         policy.mode = mode
     end
     policy.keep_focused = obs.obs_data_get_bool(data, "screenshareAutoGameKeepFocused")
+    -- on unless the settings say otherwise, the default of the helper
+    if obs.obs_data_has_user_value(data, "screenshareAutoGameOutOfFocus") then
+        policy.focus_card = obs.obs_data_get_bool(data, "screenshareAutoGameOutOfFocus")
+    end
+    -- the card stands in for the game whenever it is not in front, so keeping the game shown out of focus only applies with the card off
+    if policy.focus_card then policy.keep_focused = false end
 
     -- ui stores this in seconds (decimals down to 0.05s); grace period itself runs in ms
     local delay_seconds = obs.obs_data_get_double(data, "screenshareSwitchDelaySeconds")
@@ -435,15 +450,32 @@ local function apply_switch(state, hwnd)
 
     local scenes = obs.obs_frontend_get_scenes()
     if scenes == nil then return end
-    for _, scene_source in ipairs(scenes) do
-        local name = obs.obs_source_get_name(scene_source)
-        if cfg.scene_name == "" or cfg.scene_name == name then
-            set_visible_in_scene(scene_source, cfg.game_source, state == "game")
-            set_visible_in_scene(scene_source, cfg.window_source, state == "window")
-            set_visible_in_scene(scene_source, cfg.display_source, state == "desktop")
+    local shown = { [cfg.game_source] = state == "game", [cfg.window_source] = state == "window", [cfg.display_source] = state == "desktop" }
+    if FOCUS_CARD_SOURCE then shown[FOCUS_CARD_SOURCE] = state == "away" end
+    -- what shows now is shown before the rest is hidden, so no frame of the program is empty in between, which the card would also keep as its frozen game picture
+    for _, visible in ipairs({ true, false }) do
+        for _, scene_source in ipairs(scenes) do
+            local name = obs.obs_source_get_name(scene_source)
+            if cfg.scene_name == "" or cfg.scene_name == name then
+                for source_name, wanted in pairs(shown) do
+                    if wanted == visible then set_visible_in_scene(scene_source, source_name, visible) end
+                end
+            end
         end
     end
     obs.source_list_release(scenes)
+    focus_card_maybe_shown = state == "away"
+end
+
+local function hide_focus_card()
+    if not focus_card_maybe_shown or FOCUS_CARD_SOURCE == nil then return end
+    local scenes = obs.obs_frontend_get_scenes()
+    if scenes == nil then return end
+    for _, scene_source in ipairs(scenes) do
+        set_visible_in_scene(scene_source, FOCUS_CARD_SOURCE, false)
+    end
+    obs.source_list_release(scenes)
+    focus_card_maybe_shown = false
 end
 
 local hook_check_callback
@@ -563,6 +595,30 @@ local function is_forced_game_window(hwnd, auto_games)
     return false
 end
 
+-- the listed game in front is remembered, so the card can stand in for it once another window is in front or it is minimized
+local function remember_focus_game(foreground_hwnd, auto_games)
+    if auto_game_match(foreground_hwnd, auto_games) then focus_game_hwnd = foreground_hwnd end
+end
+
+-- a remembered listed game whose window is still open but not in front, which a minimized game is too; a closed window or a game taken off the list forgets it, and without the card in obs the desktop shows as it always did
+local function away_from_focus_game(foreground_hwnd, auto_games)
+    if focus_game_hwnd == nil or FOCUS_CARD_SOURCE == nil then return false end
+    if ffi.C.IsWindow(focus_game_hwnd) == 0 then
+        focus_game_hwnd = nil
+        return false
+    end
+    local exe = get_exe_from_hwnd(focus_game_hwnd)
+    if exe == nil or not auto_games[exe] then
+        focus_game_hwnd = nil
+        return false
+    end
+    if focus_game_hwnd == foreground_hwnd then return false end
+    local card = obs.obs_get_source_by_name(FOCUS_CARD_SOURCE)
+    if card == nil then return false end
+    obs.obs_source_release(card)
+    return true, exe
+end
+
 local function sticky_auto_game_window(policy, foreground_hwnd)
     -- tracked regardless of the toggle so turning keep_focused on mid-session has an immediate target instead of only arming once the game is foregrounded again
     local foreground_match, foreground_exe = auto_game_match(foreground_hwnd, policy.auto_games)
@@ -664,6 +720,7 @@ local function is_exclusive_fullscreen(hwnd)
 end
 
 local function detect_capture_state(hwnd, policy)
+    remember_focus_game(hwnd, policy.auto_games)
     local sticky, sticky_exe, sticky_hwnd = sticky_auto_game_window(policy, hwnd)
     if sticky then return "window", sticky_exe, sticky_hwnd end
 
@@ -673,7 +730,19 @@ local function detect_capture_state(hwnd, policy)
     if fallback then return "window", fallback_exe, hwnd end
     local fullscreen, fullscreen_exe = is_exclusive_fullscreen(hwnd)
     if fullscreen then return "game", fullscreen_exe, hwnd end
+    if policy.focus_card then
+        local away, away_exe = away_from_focus_game(hwnd, policy.auto_games)
+        if away then return "away", away_exe end
+    end
     return "desktop", nil
+end
+
+local function announce_switch(state, exe)
+    if state == "away" then
+        print(string.format("[AutoSwitch] %s out of focus → GAME OUT OF FOCUS [%s]", exe or "unknown", FOCUS_CARD_SOURCE))
+    else
+        print(string.format("[AutoSwitch] → DESKTOP MODE [%s]", cfg.display_source))
+    end
 end
 
 function desktop_switch_callback()
@@ -684,16 +753,16 @@ function desktop_switch_callback()
     if policy.mode ~= "hybrid_auto" then return end
 
     local hwnd = ffi.C.GetForegroundWindow()
-    local state = detect_capture_state(hwnd, policy)
-    if state ~= "desktop" then
+    local state, exe = detect_capture_state(hwnd, policy)
+    if state ~= "desktop" and state ~= "away" then
         log("Desktop switch cancelled — capture target returned before grace elapsed")
         return
     end
 
     cancel_hook_check()
-    last_state = "desktop"
-    apply_switch("desktop")
-    print(string.format("[AutoSwitch] → DESKTOP MODE [%s]", cfg.display_source))
+    last_state = state
+    apply_switch(state)
+    announce_switch(state, exe)
 end
 
 local monitor_check_at = 0
@@ -829,6 +898,8 @@ local function check_fullscreen()
         last_window_token = nil
         reset_window_stall()
         clear_sticky_window()
+        focus_game_hwnd = nil
+        hide_focus_card()
         return
     end
 
@@ -884,15 +955,16 @@ local function check_fullscreen()
         return
     end
 
-    if last_state ~= nil and last_state ~= "desktop" then
+    -- leaving a game for the desktop or the card waits out the grace, so a quick alt tab or a popup does not flip the capture; the card gives way to the desktop at once when the game is closed
+    if last_state == "game" or last_state == "window" then
         schedule_desktop_switch()
         return
     end
-
-    if last_state ~= "desktop" then
-        last_state = "desktop"
-        apply_switch("desktop")
-        print(string.format("[AutoSwitch] → DESKTOP MODE [%s]", cfg.display_source))
+    if last_state ~= state then
+        cancel_desktop_switch()
+        last_state = state
+        apply_switch(state)
+        announce_switch(state, exe)
     end
 end
 
@@ -915,9 +987,9 @@ function script_properties()
 end
 
 function script_defaults(settings)
-    obs.obs_data_set_default_string(settings, "game_source",    "Game Capture")
-    obs.obs_data_set_default_string(settings, "display_source", "Display Capture")
-    obs.obs_data_set_default_string(settings, "window_source",  "Window Capture")
+    obs.obs_data_set_default_string(settings, "game_source",    CAPTURE_SOURCES.game)
+    obs.obs_data_set_default_string(settings, "display_source", CAPTURE_SOURCES.display)
+    obs.obs_data_set_default_string(settings, "window_source",  CAPTURE_SOURCES.window)
     obs.obs_data_set_default_string(settings, "scene_name",     "")
     obs.obs_data_set_default_int   (settings, "check_interval", 1000)
     obs.obs_data_set_default_bool  (settings, "verbose",        false)
@@ -941,6 +1013,7 @@ function script_update(settings)
     last_window_token = nil
     reset_window_stall()
     clear_sticky_window()
+    focus_game_hwnd = nil
     hook_blocked = {}
     window_fallback = {}
     graphics_api_seen = {}

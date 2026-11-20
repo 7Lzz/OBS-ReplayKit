@@ -8751,10 +8751,6 @@
     "source": "c028d4bda5c6fda7",
     "text": "Texte"
   },
-  "settings.showTheText": {
-    "source": "d17c8c9bbb4640bc",
-    "text": "Afficher le texte"
-  },
   "settings.playTheSoundOfTheVideo": {
     "source": "61a5acb3c6f9c5e5",
     "text": "Lire le son de la vidéo"
@@ -11518,5 +11514,33 @@
   "wizard.welcomeToObsReplaykit": {
     "source": "3380809f0ee49121",
     "text": "Bienvenue dans OBS ReplayKit"
+  },
+  "common.textBackgroundColor": {
+    "source": "5957df3e840c5bb7",
+    "text": "Couleur de fond du texte"
+  },
+  "settings.shareCardTextColorHex": {
+    "source": "b4174234fc238477",
+    "text": "Couleur du texte en hexadécimal"
+  },
+  "settings.shareCardTextBackgroundHex": {
+    "source": "f0e584b8d92dadb7",
+    "text": "Couleur de fond du texte en hexadécimal"
+  },
+  "capture.gameOutOfFocus": {
+    "source": "b6c1a20901e645b8",
+    "text": "Jeu en arrière-plan"
+  },
+  "settings.autoGameListOutOfFocusNote": {
+    "source": "f3a2c07856ad8e2d",
+    "text": "Tant qu'un jeu de cette liste est ouvert sans que tu sois dedans, le stream et les clips affichent une carte « Jeu en arrière-plan » à la place du bureau. Tant que c'est activé, « Garder le focus sur le jeu » n'a aucun effet."
+  },
+  "capture.videoUnavailable": {
+    "source": "1371e9f5bfce72a0",
+    "text": "Vidéo indisponible"
+  },
+  "settings.showGameOutOfFocus": {
+    "source": "abd2f59f183da4cd",
+    "text": "Afficher « Jeu en arrière-plan »"
   }
 }

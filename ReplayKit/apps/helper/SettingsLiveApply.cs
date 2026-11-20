@@ -410,7 +410,7 @@ namespace ReplayKitHelper
             applied.AddRange(capture["applied"].Values<string>());
             warnings.AddRange(capture["warnings"].Values<string>());
 
-            var mixer = SetProjectorMonitoringState(settings, shareEnabled);
+            var mixer = SetProjectorMonitoringState(settings, shareEnabled && !DiscordStreamWorker.Held);
             if (mixer["ok"]?.Value<bool>() == true)
             {
                 applied.AddRange((mixer["applied"] as JArray)?.Values<string>() ?? Enumerable.Empty<string>());
@@ -522,7 +522,9 @@ namespace ReplayKitHelper
                     warnings.Add(Locales.Message("settings.couldNotReadDesktopAudioCapture", "error", capture.Message));
                 }
             }
-            string desiredMonitorType = enabled && !deviceCapture ? "OBS_MONITORING_TYPE_MONITOR_AND_OUTPUT" : "OBS_MONITORING_TYPE_NONE";
+            // a discord stream of something else with its sound already carries desktop audio, so it is not monitored meanwhile, the same rule the lua sync follows
+            bool monitored = enabled && !DiscordStreamWorker.Held;
+            string desiredMonitorType = monitored && !deviceCapture ? "OBS_MONITORING_TYPE_MONITOR_AND_OUTPUT" : "OBS_MONITORING_TYPE_NONE";
             bool repaired = false;
 
             var actual = GetInputMonitorTypeValue(inputName);
@@ -539,7 +541,7 @@ namespace ReplayKitHelper
             if (enabled && !deviceCapture && repairMonitoring && DiscordProjector.ClearCableMute() > 0) repaired = true;
             if (repairMonitoring && !synced)
             {
-                var repair = SetProjectorMonitoringState(settings, enabled);
+                var repair = SetProjectorMonitoringState(settings, monitored);
                 if (repair["ok"]?.Value<bool>() == true)
                 {
                     repaired = true;

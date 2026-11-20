@@ -20,6 +20,7 @@
 #include "notify/clip_toast.hpp"
 #include "notify/notify_button.hpp"
 #include "notify/notify_panel.hpp"
+#include "overlays/focus_card.hpp"
 #include "ui/anchored_panel.hpp"
 #include "shell/shell.hpp"
 #include "shell/shell_state.hpp"
@@ -233,6 +234,7 @@ void PollHelperSettings()
 			ShellApplySettings(settingsBody);
 			ShellSleepApplySettings(settingsBody);
 			ClipBufferApplySettings(settingsBody);
+			FocusCardApplySettings(settingsBody);
 		}, Qt::QueuedConnection);
 	});
 }

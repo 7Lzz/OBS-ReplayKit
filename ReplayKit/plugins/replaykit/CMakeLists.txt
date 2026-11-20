@@ -12,6 +12,7 @@ find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Svg)
 set(REPLAYKIT_SOURCES
     src/plugin.cpp
     src/overlays/bongo.cpp
+    src/overlays/focus_card.cpp
     src/overlays/bongo_input.cpp
     src/overlays/bongo_model.cpp
 

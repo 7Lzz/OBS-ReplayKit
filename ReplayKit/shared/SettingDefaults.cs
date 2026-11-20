@@ -45,17 +45,19 @@ namespace ReplayKitShared
         public const bool DiscordProjectorHideTaskbar = true;
         // how long the share window keeps showing its card once obs closed for real or crashed
         public const string ShareWindowKeep = "5m";
-        // the card of the share window: its background, how an own image or video fills it, its text (empty is the default be right back), whether the text shows, whether an own video plays its own sound in place of the card sound, the card sound and how loud
+        // the card of the share window: its background, how an own image or video fills it, the colour of its text and of the box behind the text over an own image or video (#rrggbb, or #rrggbbaa with the opacity in the last byte as the shared colour picker gives it), whether an own video plays its own sound in place of the card sound, the card sound and how loud; the text itself has no constant since its default is the be right back message in the language of obs
         public const string ShareCoverBackground = "theme";
         public const string ShareCoverFit = "fit";
-        public const string ShareCoverText = "";
-        public const bool ShareCoverShowText = true;
+        public const string ShareCoverTextColor = "#ffffff";
+        public const string ShareCoverBoxColor = "#00000096";
         public const bool ShareCoverVideoSound = true;
         public const string ShareCoverSound = "default";
         public const int ShareCoverSoundVolume = 80;
         public const string ScreenshareCaptureMode = "hybrid_auto";
         public const string ScreenshareGameWindow = "";
         public const bool ScreenshareAutoGameKeepFocused = false;
+        // the game out of focus card stands in for a listed game that is open but not in front
+        public const bool ScreenshareAutoGameOutOfFocus = true;
         public const bool MotionBlurEnabled = false;
         public const double MotionBlurStrength = 0.075;
     }

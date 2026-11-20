@@ -21,7 +21,9 @@
 #include "layout/ui_layout.hpp"
 #include "notify/clip_toast.hpp"
 #include "overlays/bongo.hpp"
+#include "overlays/focus_card.hpp"
 #include "shell/shell.hpp"
+#include "share/share_audio.hpp"
 #include "share/share_link.hpp"
 
 OBS_DECLARE_MODULE()
@@ -34,6 +36,7 @@ bool obs_module_load(void)
 	GroupAudioWithHost();
 	StartProcessGroup();
 	RegisterBongo();
+	RegisterFocusCard();
 	g_callbacks = new QObject();
 	ClipBufferInit();
 	StartWorkers();
@@ -42,6 +45,7 @@ bool obs_module_load(void)
 	obs_frontend_add_event_callback(OnFrontendEvent, nullptr);
 	StartPipeServer();
 	ShareLinkStart();
+	ShareAudioRegisterHold();
 	return true;
 }
 

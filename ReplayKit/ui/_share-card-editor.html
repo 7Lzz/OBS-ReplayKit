@@ -135,11 +135,9 @@
     RKReadout.place(readouts[name], RK_M("common.sizeAndRotation", { size: layout[name].scale, rotation: layout[name].rotation }), items[name], screenEl);
   }
 
-  // the plate colour of the look as css, its opacity counted 0 to 255 as the plugin counts it
-  function plateColor(look) {
-    var hex = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(look.plateColor || "");
-    if (!hex) return "transparent";
-    return "rgba(" + parseInt(hex[1], 16) + ", " + parseInt(hex[2], 16) + ", " + parseInt(hex[3], 16) + ", " + Number(look.plateOpacity) / 255 + ")";
+  // a #rrggbb or #rrggbbaa colour of the settings as css, its opacity the way the plugin draws it
+  function colorCss(key) {
+    return window.RKColor ? RKColor.toCss(host.get(key)) : host.get(key);
   }
 
   function createMotion(mask) {
@@ -293,7 +291,7 @@
     var plate = textEl.classList.contains("has-plate");
     textEl.style.padding = plate ? look.plateY * size + "px " + look.plateX * size + "px" : "0";
     textEl.style.borderRadius = plate ? look.plateRadius * size + "px" : "0";
-    textEl.style.background = plate ? plateColor(look) : "none";
+    textEl.style.background = plate ? colorCss("share_cover_box_color") : "none";
     setItem(items.text, layout.text);
     placeReadout("icon");
     placeReadout("text");
@@ -307,13 +305,14 @@
     screenEl.style.aspectRatio = width + " / " + tall;
     showBackdrop(kind);
     items.icon.hidden = kind === "image" || kind === "video";
-    var custom = String(host.get("share_cover_text") || "").trim();
-    textEl.textContent = custom || RK_M("screenshare.coverDefaultText");
-    items.text.hidden = !host.get("share_cover_show_text");
-    // the logo and the text take the theme text colour on the theme card and the light text over a picture, a video or the last frame
-    var foreground = kind === "theme" || !cover.look ? "var(--text)" : cover.look.lightText;
-    textEl.style.color = foreground;
-    items.icon.style.color = foreground;
+    // an unset text is the be right back message and an empty one is a card with no text
+    var written = host.get("share_cover_text");
+    var text = written === null || written === undefined ? RK_M("screenshare.coverDefaultText") : String(written).trim();
+    textEl.textContent = text;
+    items.text.hidden = !text;
+    // the logo takes the theme text colour on the theme card and the light text over a picture, a video or the last frame
+    items.icon.style.color = kind === "theme" || !cover.look ? "var(--text)" : cover.look.lightText;
+    textEl.style.color = colorCss("share_cover_text_color");
     if (cover.look) {
       textEl.style.fontWeight = String(cover.look.textWeight);
       document.getElementById("sceLogo").style.opacity = String(cover.look.logoOpacity);

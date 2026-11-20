@@ -12,7 +12,7 @@ using Newtonsoft.Json.Linq;
 
 namespace ReplayKitHelper
 {
-    // client half of the ipc pipe with the native plugin (core/ipc_pipe.cpp), which is the server. replaces the old scratch-file handoff (obsreplaykit_main_window.txt / obsreplaykit_projector_windows.txt / open_clips.command / obs-allow-close). the plugin is the server because it outlives helper hot-swaps; this side just reconnects. inbound (plugin -> helper): MAINWIN <hwnd>, LOCALE <code>. outbound: OPENCLIPS, OPENSETTINGS [page], OPENSTORAGE, CLOSESTORAGE, OPENOBSSETTINGS, OPENSETUP / OPENSETUPQUIET, ALLOWCLOSE (+ ALLOWCLOSE_ACK back), LANGUAGE <code|-> (+ LANGUAGE_ACK back), SETICON <path|->, SETICONDOT <0|1>, RKICON <path>, CLIPSFULLSCREEN <0|1>, CLOSEVIEW <settings|setup|clips>, VIEWSHOWN <home|clips|settings|setup>, SHELLNAV <back|forward>, SHELLPONG <n>, CONFIRM <kind>. newline-delimited utf8 text, one message per line.
+    // client half of the ipc pipe with the native plugin (core/ipc_pipe.cpp), which is the server. replaces the old scratch-file handoff (obsreplaykit_main_window.txt / obsreplaykit_projector_windows.txt / open_clips.command / obs-allow-close). the plugin is the server because it outlives helper hot-swaps; this side just reconnects. inbound (plugin -> helper): MAINWIN <hwnd>, LOCALE <code>. outbound: OPENCLIPS, OPENSETTINGS [page], OPENSTORAGE, CLOSESTORAGE, OPENOBSSETTINGS, OPENSETUP / OPENSETUPQUIET, ALLOWCLOSE (+ ALLOWCLOSE_ACK back), LANGUAGE <code|-> (+ LANGUAGE_ACK back), SETICON <path|->, SETICONDOT <0|1>, RKICON <path>, CLIPSFULLSCREEN <0|1>, CLOSEVIEW <settings|setup|clips>, VIEWSHOWN <home|clips|settings|setup>, SHELLNAV <back|forward>, SHELLPONG <n>, CONFIRM <kind>, SHAREAUDIOHOLD <0|1>. newline-delimited utf8 text, one message per line.
     internal static class PipeClient
     {
         private const string PipeName = "OBSReplayKitIpc";
@@ -292,6 +292,9 @@ namespace ReplayKitHelper
 
         // a pick of the quick action menu, for the view it was made in; both parts are checked by the route before they get here
         public static bool SendQuickAction(string view, string id) => TryWrite("QUICKACTION " + view + " " + id);
+
+        // whether discord streams something else with its sound, which the plugin answers the lua monitoring sync with (DiscordStreamWorker)
+        public static bool SendShareAudioHold(bool held) => TryWrite("SHAREAUDIOHOLD " + (held ? "1" : "0"));
 
         // the plugin groups WASD Overlay + Mouse Overlay of the current scene into Group, which obs-websocket cannot do
         public static void SendGroupInputOverlay() => TryWrite("GROUPINPUTOVERLAY");
