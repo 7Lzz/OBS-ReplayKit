@@ -2,6 +2,7 @@
 #include "prelude.hpp"
 #include "windows/settings_window.hpp"
 
+#include "app/always_on_top.hpp"
 #include "chrome/title_keybind_badge.hpp"
 #include "core/app_icon.hpp"
 #include "core/async.hpp"
@@ -42,6 +43,7 @@ void CreateSettingsWindow()
 
 	ForceTaskbarButton(win);
 	win->show();
+	AlwaysOnTopFollow(win);
 	g_settingsWindow = win;
 	RefreshAppIcon(); // give the new window the current app icon + taskbar retag
 	// focus last, for the same reason as CreateClipsWindow

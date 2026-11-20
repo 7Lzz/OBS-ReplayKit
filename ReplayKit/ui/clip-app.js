@@ -2108,7 +2108,7 @@ const CLIP_HOVER_PROFILES = {
     if (!card) return false;
     theaterPreview = preview;
     card.classList.add("is-theater-card");
-    preview.classList.remove("is-idle");
+    if (preview._rkIdle) preview._rkIdle.bump();
     document.body.classList.add("is-clip-theater");
     syncTheaterButton(preview);
     return true;
@@ -2132,7 +2132,7 @@ const CLIP_HOVER_PROFILES = {
     const card = preview.closest(".card");
     if (card) card.classList.remove("is-theater-card");
     if (card && card._dropHoverFrame) card._dropHoverFrame();
-    preview.classList.remove("is-idle");
+    if (preview._rkIdle) preview._rkIdle.stop();
     document.body.classList.remove("is-clip-theater");
     playTheaterRestore();
     resetVideoZoom(preview.querySelector("video"));
@@ -2796,6 +2796,7 @@ const CLIP_HOVER_PROFILES = {
         : "";
       if (zoomed) video.dataset.zoom = Math.round(scale * 100) + "%";
       else video.removeAttribute("data-zoom");
+      video.dispatchEvent(new Event("rkzoom"));
     }
 
     function reset() {
@@ -2805,6 +2806,7 @@ const CLIP_HOVER_PROFILES = {
       video.style.removeProperty("transform");
       video.style.removeProperty("transform-origin");
       video.removeAttribute("data-zoom");
+      video.dispatchEvent(new Event("rkzoom"));
     }
 
     video._resetZoom = reset;
@@ -3487,17 +3489,29 @@ const CLIP_HOVER_PROFILES = {
       if (scrubbing) return;
       idleTimer = setTimeout(() => preview.classList.add("is-idle"), 2500);
     }
+    function stopIdle() {
+      preview.classList.remove("is-idle");
+      if (idleTimer) { clearTimeout(idleTimer); idleTimer = 0; }
+    }
+    // theater mode hides the bar the same way, and a key press counts as activity in both
+    preview._rkIdle = { bump: bumpIdle, stop: stopIdle };
     preview.addEventListener("mousemove", () => {
-      if (document.fullscreenElement === preview) bumpIdle();
+      if (document.fullscreenElement === preview || isTheaterPreview(preview)) bumpIdle();
+    });
+    // a zoomed in video keeps the bar out of the picture until it is zoomed back out, which shows the bar again
+    video.addEventListener("rkzoom", () => {
+      const zoomed = video.hasAttribute("data-zoom");
+      if (preview.classList.contains("is-zoomed") === zoomed) return;
+      preview.classList.toggle("is-zoomed", zoomed);
+      if (!zoomed && (document.fullscreenElement === preview || isTheaterPreview(preview))) bumpIdle();
     });
     preview.addEventListener("fullscreenchange", () => {
       const inFs = (document.fullscreenElement === preview);
       card.classList.toggle("is-fullscreen-card", inFs);
       updateFullscreenBodyState();
-      if (inFs) bumpIdle();
+      if (inFs || isTheaterPreview(preview)) bumpIdle();
       else {
-        preview.classList.remove("is-idle");
-        if (idleTimer) { clearTimeout(idleTimer); idleTimer = 0; }
+        stopIdle();
         if (!isTheaterPreview(preview)) { resetVideoZoom(video); hoverFrame.drop(); }
         resetPlaybackRate(video);
       }
@@ -3609,7 +3623,7 @@ const CLIP_HOVER_PROFILES = {
         e.stopPropagation();
         settingsWrap.classList.toggle("is-open");
         // reset the idle timer on open so the menu doesnt fade out a moment after the user opens it.
-        if (document.fullscreenElement === preview) bumpIdle();
+        if (document.fullscreenElement === preview || isTheaterPreview(preview)) bumpIdle();
       });
     }
     if (settingsMenu) {
@@ -4501,6 +4515,9 @@ const CLIP_HOVER_PROFILES = {
 
   document.addEventListener("keydown", (e) => {
     const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
+    // a key is activity on the clip being watched, the same as moving the mouse over it
+    const watched = fsEl && fsEl._rkIdle ? fsEl : theaterPreview;
+    if (watched && watched._rkIdle) watched._rkIdle.bump();
 
     if (e.key === "Escape" && !fsEl && exitTheaterMode()) {
       e.preventDefault();
@@ -6779,9 +6796,14 @@ const CLIP_HOVER_PROFILES = {
     quickSent = body;
     fetch(HELPER + "/quick-actions/state?view=" + QUICK_VIEW, { method:"POST", cache:"no-store", headers:{ "Content-Type":"application/json" }, body }).catch(() => { quickSent = ""; });
   }
-  // the sdk opens the editor on a clip the list holds, the way the menu of its card does, and closes it again with an empty name
-  window.__rkEditor = function (name) {
+  // the sdk opens the editor on a clip the list holds, the way the menu of its card does, and closes it again with an empty name; with show it picks and opens what show names in the editor already open on that clip instead
+  window.__rkEditor = function (name, show) {
     if (!name) { closeEditor(); return; }
+    if (show) {
+      const api = editorApi();
+      if (api) api.sdkShow(name, show.select, show.tab);
+      return;
+    }
     const clip = loadedClips.find((c) => c.name === name);
     if (clip) requestOpenEditor(clip);
   };

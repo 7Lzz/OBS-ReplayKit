@@ -1582,6 +1582,15 @@
     pointer-events: none;
     transition: opacity 200ms linear;
   }
+  /* theater mode hides them the same way, and a zoomed in video keeps them out of the picture in both while the cursor stays to aim the zoom */
+  .card.is-theater-card .preview.is-idle { cursor: none; }
+  .card.is-theater-card .preview:is(.is-idle, .is-zoomed) :is(.preview-controls, .progress-bar, .player-shade),
+  .preview:is(:fullscreen, .rk-fs).is-zoomed :is(.preview-controls, .progress-bar, .player-shade),
+  .preview:-webkit-full-screen.is-zoomed :is(.preview-controls, .progress-bar, .player-shade) {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 200ms linear;
+  }
 
   /* title row (name + edit pencil + delete + 3-dot menu) */
   .title-row {

@@ -6305,6 +6305,10 @@
     "source": "98b6a08b5fb6cea9",
     "text": "Gesamtes PC-Audio + Discord"
   },
+  "settings.alwaysOnTop": {
+    "source": "9c0e8c7ad37881d5",
+    "text": "Immer im Vordergrund"
+  },
   "settings.alwaysRunAsAdministrator": {
     "source": "06bb052c45b2b449",
     "text": "Immer als Administrator ausführen"
@@ -7224,6 +7228,10 @@
   "settings.followWindowsLanguage": {
     "source": "4611df7bceeadea6",
     "text": "Windows-Sprache übernehmen"
+  },
+  "settings.keepsTheObsWindowAboveOther": {
+    "source": "391075a8c85a7d72",
+    "text": "Hält das OBS-Fenster und die ReplayKit-Fenster über allen anderen Fenstern."
   },
   "settings.micSettingsReverted": {
     "source": "8090a6cb1a20a12d",

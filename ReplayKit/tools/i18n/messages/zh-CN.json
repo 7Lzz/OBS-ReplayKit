@@ -6303,6 +6303,10 @@
     "source": "98b6a08b5fb6cea9",
     "text": "所有电脑音频 + Discord"
   },
+  "settings.alwaysOnTop": {
+    "source": "9c0e8c7ad37881d5",
+    "text": "窗口置顶"
+  },
   "settings.alwaysRunAsAdministrator": {
     "source": "06bb052c45b2b449",
     "text": "始终以管理员身份运行"
@@ -7222,6 +7226,10 @@
   "settings.followWindowsLanguage": {
     "source": "4611df7bceeadea6",
     "text": "跟随 Windows 语言"
+  },
+  "settings.keepsTheObsWindowAboveOther": {
+    "source": "391075a8c85a7d72",
+    "text": "让 OBS 窗口和 ReplayKit 窗口始终显示在其他窗口之上。"
   },
   "settings.micSettingsReverted": {
     "source": "8090a6cb1a20a12d",

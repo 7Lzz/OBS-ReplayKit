@@ -138,9 +138,23 @@ QJsonObject UiEditor(const QJsonObject &args)
 	const QString name = args.value("name").toString();
 	if (name.size() > 260)
 		return Fail(QStringLiteral("args.name is the file name of a clip the clips view lists."));
+	const QString select = args.value("select").toString();
+	const QString tab = args.value("tab").toString();
+	if (!select.isEmpty() && select != QLatin1String("video"))
+		return Fail(QStringLiteral("args.select is video."));
+	if (!tab.isEmpty() && !QRegularExpression(QStringLiteral("\\A(elements|subtitles|audio|record)\\z")).match(tab).hasMatch())
+		return Fail(QStringLiteral("args.tab is elements, subtitles, audio or record."));
+	const bool show = !select.isEmpty() || !tab.isEmpty();
+	if (show && name.isEmpty())
+		return Fail(QStringLiteral("args.select and args.tab need args.name, the clip the editor is open on."));
 	if (!g_shellHost || g_shellView != ShellView::Clips)
 		return Fail(QStringLiteral("The clips view has to show first (ui.view clips)."));
-	ShellEditor(QJsonDocument(QJsonArray{name}).toJson(QJsonDocument::Compact).toStdString());
+	// appended rather than braced, for the same reason as in UiClipsSections
+	QJsonArray call;
+	call.append(name);
+	if (show)
+		call.append(QJsonObject{{"select", select}, {"tab", tab}});
+	ShellEditor(QJsonDocument(call).toJson(QJsonDocument::Compact).toStdString());
 	return QJsonObject{{"ok", true}, {"asked", true}};
 }
 
@@ -514,7 +528,7 @@ void RegisterBuiltins()
 	SdkRegister("memory.state", "committed and resident memory before and after the last hidden-window cleanup", [](const QJsonObject &) { return IdleMemory::Probe(); });
 	SdkRegister("ui.view", "shows a view: args.view is home, projector, clips, settings, setup or obs-settings", UiView);
 	SdkRegister("ui.clips-sections", "shows the sections args.open of the clips view (favorites, clips, screenshots and so on) open whatever was saved for them, without saving anything, while its page stays loaded; an empty list shows them as saved again", UiClipsSections);
-	SdkRegister("ui.editor", "opens the editor on the clip args.name the way the menu of its card does, while the clips view shows and lists that clip; without args.name it closes the editor", UiEditor);
+	SdkRegister("ui.editor", "opens the editor on the clip args.name the way the menu of its card does, while the clips view shows and lists that clip; without args.name it closes the editor; with args.select (video) or args.tab (elements, subtitles, audio or record) it picks the first piece of the video and opens that tab in the editor already open on args.name, the way clicks on them do", UiEditor);
 	SdkRegister("ui.popup", "opens a shell popup using args.name: account, notifications, clip, record, storage, reader (args.id) or close; reports the shared surface", UiPopup);
 	SdkRegister("ui.window", "shows the window of obs or sends it to the tray: args.mode is show or hide", UiWindow);
 	SdkRegister("ui.bring-forward", "restores and raises the obs window, and reports whether it became visible", UiBringForward);

@@ -2232,6 +2232,12 @@ window.__rkEditorApi = (function () {
       else if (id === "redo" && !trimSaving) trimLanes.redo();
     },
     pause() { try { trimVideo.pause(); } catch {} },
+    // the sdk picks the video and opens a tab of the bar on the left in the editor open on the clip name; false when that editor is not open or the tab is unknown
+    sdkShow(name, select, tab) {
+      if (!trimSourceClip || trimSourceClip.name !== name || !trimVeil.classList.contains("is-open")) return false;
+      if (select === "video") trimLanes.selectVideo();
+      return !tab || editorTools.showTab(tab);
+    },
     // the parts of the editor let go of their pictures, canvases and videos before the page drops the markup
     release() {
       try { editorTools.closed(); } catch {}

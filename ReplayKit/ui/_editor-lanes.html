@@ -892,7 +892,8 @@
       changed();
     }
 
-    function restoreSnap(snap) {
+    // undo and redo pass keepSelection: they take back edits only, so what is selected and its panel stay as they are unless the step took that thing away
+    function restoreSnap(snap, keepSelection) {
       if (opts.onHistoryRestore) opts.onHistoryRestore();
       selectedGap = null;
       var pps = pxPerSec();
@@ -921,12 +922,12 @@
       if (opts.onFx) opts.onFx();
       if (speedChanged) afterSpeed(pps, playX);
       opts.setBounds(snap.start, snap.end);
-      if (typeof snap.selected === "string" && snap.selected !== st.selected) {
+      if (!keepSelection && typeof snap.selected === "string" && snap.selected !== st.selected) {
         st.selected = snap.selected;
         panelClosedFor = "";
       }
-      subPicked = [];
       if (st.selected !== "video" && !find(st.selected) && !findV(st.selected) && !findSub(st.selected) && !findLayer(st.selected)) st.selected = "";
+      subPicked = keepSelection && st.selected ? subPicked.filter(function (id) { return findSub(id); }) : [];
       changed();
       if (opts.onEdit) opts.onEdit();
     }
@@ -934,7 +935,7 @@
     function undo() {
       if (st.history.length < 2) return;
       st.future.push(st.history.pop());
-      restoreSnap(st.history[st.history.length - 1]);
+      restoreSnap(st.history[st.history.length - 1], true);
       // a step from before the switch was turned off can hold a cut that was drawn in, which is handed to the video alone again
       if (releaseCut()) changed();
     }
@@ -943,7 +944,7 @@
       if (!st.future.length) return;
       var snap = st.future.pop();
       st.history.push(snap);
-      restoreSnap(snap);
+      restoreSnap(snap, true);
       if (releaseCut()) changed();
     }
 
@@ -6220,6 +6221,8 @@
       // a layer put in and selected, a clip after everything on the timeline and a picture at the playhead: { kind: "clip" | "media", ref, name, len, dur, aspect, w, gif }; the id, or empty when there is no room for it
       addLayer: function (l) { return addLayer(l); },
       clearSelection: function () { select(""); },
+      // the first piece of the video picked the way a click on it picks it
+      selectVideo: function () { select(st.vsegs.length ? st.vsegs[0].id : "video"); },
       // the undo and redo of the toolbar, for the quick action menu of the title bar
       undo: function () { undo(); },
       redo: function () { redo(); },

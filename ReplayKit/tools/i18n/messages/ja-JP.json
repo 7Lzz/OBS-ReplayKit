@@ -6303,6 +6303,10 @@
     "source": "98b6a08b5fb6cea9",
     "text": "すべての PC 音声 + Discord"
   },
+  "settings.alwaysOnTop": {
+    "source": "9c0e8c7ad37881d5",
+    "text": "常に手前に表示"
+  },
   "settings.alwaysRunAsAdministrator": {
     "source": "06bb052c45b2b449",
     "text": "常に管理者として実行"
@@ -7222,6 +7226,10 @@
   "settings.followWindowsLanguage": {
     "source": "4611df7bceeadea6",
     "text": "Windows の言語に従う"
+  },
+  "settings.keepsTheObsWindowAboveOther": {
+    "source": "391075a8c85a7d72",
+    "text": "OBS のウィンドウと ReplayKit のウィンドウを、ほかのウィンドウより手前に表示します。"
   },
   "settings.micSettingsReverted": {
     "source": "8090a6cb1a20a12d",

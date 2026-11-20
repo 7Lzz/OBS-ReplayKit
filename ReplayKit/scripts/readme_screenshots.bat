@@ -277,6 +277,9 @@ try {
     Wait-For 'the editor to open' 30 { (Invoke-Sdk 'plugin.ui.state').editorOpen.clips }
     # the film strip and the waveforms of the three tracks are made after the editor opens
     Start-Sleep -Seconds 8
+    # the picture shows the video picked with its panel on the right and the subtitles tab open on the left
+    Invoke-Sdk 'plugin.ui.editor' @{ name = $names[$editorIndex]; select = 'video'; tab = 'subtitles' } | Out-Null
+    Start-Sleep -Seconds 1
     Save-WindowPicture 'clip-editor'
     Invoke-Sdk 'plugin.ui.editor' | Out-Null
     Wait-For 'the editor to close' 20 { -not (Invoke-Sdk 'plugin.ui.state').editorOpen.clips }

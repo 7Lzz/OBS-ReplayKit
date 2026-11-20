@@ -4,6 +4,7 @@
 
 #include <QLineEdit>
 
+#include "app/always_on_top.hpp"
 #include "chrome/title_keybind_badge.hpp"
 #include "core/app_icon.hpp"
 #include "core/async.hpp"
@@ -122,6 +123,7 @@ void CreateClipsWindow()
 
 	ForceTaskbarButton(win);
 	win->show();
+	AlwaysOnTopFollow(win);
 	// retag BEFORE taking focus -- RefreshAppIcon rebuilds taskbar buttons across our windows (ITaskbarList DeleteTab/AddTab) and that drops the foreground state, so activating first left clips open but unfocused and pushed settings behind
 	RefreshAppIcon(); // give the fresh window the current app icon + taskbar retag
 	win->raise();

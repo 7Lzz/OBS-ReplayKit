@@ -116,6 +116,8 @@ namespace ReplayKitHelper
                 ["disableObsCrashPopup"] = true,
                 // when on, the native plugin turns the OBS windows X into "minimize to tray" -- real quits still go through the tray Exit / restart routes.
                 ["closeToTray"] = SettingDefaults.CloseToTray,
+                // the native plugin keeps the obs window and the windows of replaykit above other windows, the same switch as View > Always On Top of obs
+                ["alwaysOnTop"] = false,
                 // seconds the obs window stays hidden before the native plugin puts the replaykit pages to sleep (a blank page) so their renderer and gpu memory go; 0 keeps them loaded. a page holding unsaved work or a running job keeps it awake
                 ["browserSleepSeconds"] = 30,
                 ["allowSleepWhileActive"] = SettingDefaults.AllowSleepWhileActive,
@@ -694,6 +696,7 @@ namespace ReplayKitHelper
                 ["disableObsCloseWarning"] = GetBoolSetting(data, "disableObsCloseWarning", defaults["disableObsCloseWarning"].Value<bool>()),
                 ["disableObsCrashPopup"] = GetBoolSetting(data, "disableObsCrashPopup", defaults["disableObsCrashPopup"].Value<bool>()),
                 ["closeToTray"] = GetBoolSetting(data, "closeToTray", defaults["closeToTray"].Value<bool>()),
+                ["alwaysOnTop"] = GetBoolSetting(data, "alwaysOnTop", defaults["alwaysOnTop"].Value<bool>()),
                 ["browserSleepSeconds"] = GetIntSetting(data, "browserSleepSeconds", defaults["browserSleepSeconds"].Value<int>(), 0, 86400),
                 ["allowSleepWhileActive"] = GetBoolSetting(data, "allowSleepWhileActive", defaults["allowSleepWhileActive"].Value<bool>()),
                 ["pinObsTrayIcon"] = GetBoolSetting(data, "pinObsTrayIcon", defaults["pinObsTrayIcon"].Value<bool>()),

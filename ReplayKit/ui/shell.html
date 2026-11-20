@@ -546,11 +546,11 @@
     } catch (e) { rkReportError(e); }
   }
 
-  // the sdk opens the editor of the clips view on a clip by its file name, or closes it with an empty name
-  function editor(name) {
+  // the sdk opens the editor of the clips view on a clip by its file name, or closes it with an empty name; show is what to pick and open in that editor once it is open
+  function editor(name, show) {
     var f = frames.clips;
     try {
-      if (f && f.loaded && typeof f.el.contentWindow.__rkEditor === "function") f.el.contentWindow.__rkEditor(String(name || ""));
+      if (f && f.loaded && typeof f.el.contentWindow.__rkEditor === "function") f.el.contentWindow.__rkEditor(String(name || ""), show && typeof show === "object" ? { select: String(show.select || ""), tab: String(show.tab || "") } : null);
     } catch (e) { rkReportError(e); }
   }
 

@@ -16,6 +16,7 @@ set(REPLAYKIT_SOURCES
     src/overlays/bongo_input.cpp
     src/overlays/bongo_model.cpp
 
+    src/app/always_on_top.cpp
     src/app/frontend_events.cpp
     src/app/ipc_commands.cpp
     src/app/main_window_filter.cpp

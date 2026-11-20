@@ -1694,6 +1694,14 @@
 
 </div>
         </div>
+        <div class="form-row tight">
+          <div></div>
+          <div class="check-row">
+<input aria-label="Always on top" id="alwaysOnTop" type="checkbox" data-i18n-aria-label="settings.alwaysOnTop"/>
+<span><span data-i18n="settings.alwaysOnTop"></span><span class="control-note" data-i18n="settings.keepsTheObsWindowAboveOther"></span></span>
+
+</div>
+        </div>
         <div class="form-row">
           <div class="label"><span data-i18n="settings.freeMemoryWhenHidden"></span><span class="setting-description" data-i18n="settings.howLongTheObsWindowStays"></span></div>
           <div class="field-wrap"><div class="combo" id="browserSleepSeconds" tabindex="0" role="combobox" aria-expanded="false" aria-label="Free memory when hidden" data-i18n-aria-label="settings.freeMemoryWhenHidden"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button><div class="combo-menu" role="listbox"></div></div></div>
@@ -2304,6 +2312,7 @@
     disableObsCloseWarning: document.getElementById("disableObsCloseWarning"),
     disableObsCrashPopup: document.getElementById("disableObsCrashPopup"),
     quitOnClose: document.getElementById("quitOnClose"),
+    alwaysOnTop: document.getElementById("alwaysOnTop"),
     disableSleeping: document.getElementById("disableSleeping"),
     browserSleepSeconds: document.getElementById("browserSleepSeconds"),
     startMinimized: document.getElementById("startMinimized"),
@@ -3734,6 +3743,7 @@
     // the two settings are stored the other way round, as the ones that keep the old behaviour when they are on
     els.quitOnClose.checked = !settingOr("closeToTray");
     els.disableSleeping.checked = !settingOr("allowSleepWhileActive");
+    els.alwaysOnTop.checked = !!settingOr("alwaysOnTop");
     fillBrowserSleep(state.browserSleepSeconds);
     els.startMinimized.checked = !!state.startMinimized;
     els.pinObsTrayIcon.checked = !!settingOr("pinObsTrayIcon");
@@ -3850,6 +3860,7 @@
     state.disableObsCrashPopup = els.disableObsCrashPopup.checked;
     state.closeToTray = !els.quitOnClose.checked;
     state.allowSleepWhileActive = !els.disableSleeping.checked;
+    state.alwaysOnTop = els.alwaysOnTop.checked;
     state.browserSleepSeconds = parseInt(comboValue(els.browserSleepSeconds), 10) || 0;
     state.startMinimized = els.startMinimized.checked;
     state.pinObsTrayIcon = els.pinObsTrayIcon.checked;
@@ -4313,7 +4324,7 @@
     markDirty();
   }, { passive: false });
 
-  [els.obsStartupEnabled, els.runObsAsAdmin, els.disableObsCloseWarning, els.disableObsCrashPopup, els.quitOnClose, els.disableSleeping, els.startMinimized, els.pinObsTrayIcon, els.clipNotificationEnabled, els.recordingNotificationEnabled, els.linkNotificationEnabled, els.autoCopyLink, els.compressSkipFavorites, els.developmentMode, els.sdkMode, els.checkObsUpdates, els.logInterfaceEvents, els.overlayFlipH, els.motionBlurEnabled, els.trimGpuEncode, els.showCodecTags, els.gameRecognition, els.discordRichPresence, els.recordingSeparateAudioTracks, els.editorAutoplay, els.editorLoopPreview, els.editorWheelZoom, els.hideNotificationsFromCapture, els.showCursorDisplayCapture, els.showCursorGameCapture, els.showCursorWindowCapture, els.debugLoggingEnabled, els.autoDeleteLogsOnLaunch, els.screenshareAutoGameKeepFocused, els.screenshareAutoGameOutOfFocus, els.bongoLive2d, els.bongoTrack, els.bongoBreath, els.bongoBlink, els.bongoFaces, els.bongoRelativeMouse].forEach((input) => {
+  [els.obsStartupEnabled, els.runObsAsAdmin, els.disableObsCloseWarning, els.disableObsCrashPopup, els.quitOnClose, els.alwaysOnTop, els.disableSleeping, els.startMinimized, els.pinObsTrayIcon, els.clipNotificationEnabled, els.recordingNotificationEnabled, els.linkNotificationEnabled, els.autoCopyLink, els.compressSkipFavorites, els.developmentMode, els.sdkMode, els.checkObsUpdates, els.logInterfaceEvents, els.overlayFlipH, els.motionBlurEnabled, els.trimGpuEncode, els.showCodecTags, els.gameRecognition, els.discordRichPresence, els.recordingSeparateAudioTracks, els.editorAutoplay, els.editorLoopPreview, els.editorWheelZoom, els.hideNotificationsFromCapture, els.showCursorDisplayCapture, els.showCursorGameCapture, els.showCursorWindowCapture, els.debugLoggingEnabled, els.autoDeleteLogsOnLaunch, els.screenshareAutoGameKeepFocused, els.screenshareAutoGameOutOfFocus, els.bongoLive2d, els.bongoTrack, els.bongoBreath, els.bongoBlink, els.bongoFaces, els.bongoRelativeMouse].forEach((input) => {
     input.addEventListener("change", () => {
       readUi();
       markDirty();

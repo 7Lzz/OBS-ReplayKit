@@ -131,6 +131,7 @@ namespace ReplayKitHelper
         private const int BORDER_COLOR = 0x004D403C;
         private const int TEXT_COLOR = 0x00FFFFFF;
         private const int GWL_STYLE = -16, GWL_EXSTYLE = -20, GCLP_HBRBACKGROUND = -10;
+        private const long WS_EX_TOPMOST = 0x00000008L;
         private const long WS_CAPTION = 0x00C00000L, WS_THICKFRAME = 0x00040000L, WS_MINIMIZEBOX = 0x00020000L, WS_MAXIMIZEBOX = 0x00010000L, WS_SYSMENU = 0x00080000L;
         private const uint RDW_INVALIDATE = 0x0001, RDW_UPDATENOW = 0x0100, RDW_FRAME = 0x0400;
         private const uint WM_SETICON = 0x0080, WM_NCACTIVATE = 0x0086, WM_THEMECHANGED = 0x031A, WM_CLOSE = 0x0010, WM_NCLBUTTONDOWN = 0x00A1;
@@ -711,11 +712,13 @@ namespace ReplayKitHelper
             uint fgThread = fgWnd != IntPtr.Zero ? GetWindowThreadProcessId(fgWnd, out _) : 0;
 
             bool attached = fgThread != 0 && fgThread != currentThread && AttachThreadInput(currentThread, fgThread, true);
+            // the toggle only lifts a normal window; one that is topmost already (the update window, an always on top obs and what it owns) stays topmost
+            bool topmost = (GetWindowLongPtr64(hWnd, GWL_EXSTYLE).ToInt64() & WS_EX_TOPMOST) != 0;
             try
             {
                 BringWindowToTop(hWnd);
                 SetWindowPos(hWnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
-                SetWindowPos(hWnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+                if (!topmost) SetWindowPos(hWnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
                 SetForegroundWindow(hWnd);
             }
             finally

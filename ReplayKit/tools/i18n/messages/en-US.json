@@ -6306,6 +6306,10 @@
     "context": "Label in the Settings window.",
     "text": "All PC Audio + Discord"
   },
+  "settings.alwaysOnTop": {
+    "context": "Name of a setting in Settings > Windows OS > While OBS runs, and its screen reader label. The windows stay above other windows, like View > Always On Top in OBS.",
+    "text": "Always on top"
+  },
   "settings.alwaysRunAsAdministrator": {
     "context": "Screen reader label in Settings > Windows OS > Startup. Also used in the Settings window.",
     "text": "Always run as administrator"
@@ -7225,6 +7229,10 @@
   "settings.followWindowsLanguage": {
     "context": "Choice in the OBS and ReplayKit language picker that follows the Windows display language.",
     "text": "Follow Windows language"
+  },
+  "settings.keepsTheObsWindowAboveOther": {
+    "context": "Description under a setting in Settings > Windows OS > While OBS runs.",
+    "text": "Keeps the OBS window and the ReplayKit windows above other windows."
   },
   "settings.micSettingsReverted": {
     "context": "Warning after trying to apply microphone settings to OBS.",

@@ -2,6 +2,7 @@
 #include "prelude.hpp"
 #include "windows/setup_window.hpp"
 
+#include "app/always_on_top.hpp"
 #include "core/app_icon.hpp"
 #include "core/async.hpp"
 #include "core/cef_host.hpp"
@@ -48,6 +49,7 @@ void CreateSetupWindow(bool quiet)
 
 	ForceTaskbarButton(win);
 	win->show();
+	AlwaysOnTopFollow(win);
 	if (!quiet) {
 		win->raise();
 		win->activateWindow();

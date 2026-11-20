@@ -140,6 +140,8 @@ namespace ReplayKitHelper
                 FormBorderStyle = FormBorderStyle.None,
                 StartPosition = FormStartPosition.Manual,
                 ShowInTaskbar = true,
+                // always above other windows, whatever the always on top setting says, since an update in progress must never hide behind a game or obs
+                TopMost = true,
                 // pre-paint colour only -- dwm draws the border, the page paints the rest
                 BackColor = ParseColor(bgColor, DefaultBg),
                 // invisible until Reveal() fades it in -- see RevealTimeoutMs above

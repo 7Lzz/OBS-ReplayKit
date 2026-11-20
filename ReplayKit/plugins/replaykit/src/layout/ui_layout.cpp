@@ -275,7 +275,7 @@ void PrepareDocksForNextLaunch()
 	blog(LOG_INFO, "[replaykit] docks prepared for the %s layout of the next launch", wanted == UiLayout::Clean ? "clean" : "classic");
 }
 
-// the clean layout owns the window arrangement, so the View and Docks entries that rearrange it are fixed there: the toolbars and status bar pinned to what the stage is laid out for, always on top off since nothing in the clean layout could turn it back off, and every one of them disabled so no shortcut or leftover menu can flip it. runs again on the slow dock tick, since qt re-enables a dock entry whenever obs changes that docks features and browser docks add their entries late. classic needs nothing undone, a layout change always restarts obs
+// the clean layout owns the window arrangement, so the View and Docks entries that rearrange it are fixed there: the toolbars and status bar pinned to what the stage is laid out for, always on top left to the setting in Settings > Windows OS, and every one of them disabled so no shortcut or leftover menu can flip it. runs again on the slow dock tick, since qt re-enables a dock entry whenever obs changes that docks features and browser docks add their entries late. classic needs nothing undone, a layout change always restarts obs
 void LockCleanLayoutMenus()
 {
 	QMainWindow *mw = ObsMainWindowQt();
@@ -287,7 +287,7 @@ void LockCleanLayoutMenus()
 		int pinned;
 	} entries[] = {
 		{"resetUI", -1},         {"actionSceneListMode", -1}, {"actionSceneGridMode", -1}, {"toggleListboxToolbars", 0},
-		{"toggleContextBar", 1}, {"toggleSourceIcons", -1},   {"toggleStatusBar", 0},      {"actionAlwaysOnTop", 0},
+		{"toggleContextBar", 1}, {"toggleSourceIcons", -1},   {"toggleStatusBar", 0},      {"actionAlwaysOnTop", -1},
 		{"lockDocks", -1},       {"sideDocks", -1},           {"resetDocks", -1},
 	};
 	for (const auto &entry : entries) {

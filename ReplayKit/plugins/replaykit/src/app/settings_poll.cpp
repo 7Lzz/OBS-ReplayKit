@@ -4,6 +4,7 @@
 
 #include <QApplication>
 
+#include "app/always_on_top.hpp"
 #include "app/capture_context.hpp"
 #include "app/clip_buffer.hpp"
 #include "app/sdk_commands.hpp"
@@ -220,6 +221,7 @@ void PollHelperSettings()
 			if (const auto recognition = JsonBoolIfPresent(settingsBody, "gameRecognition"))
 				CaptureContextSetRecognition(*recognition);
 			SyncStartMinimized(settingsBody);
+			AlwaysOnTopApplySettings(settingsBody);
 			RegisterOpenClipsHotkey(settingsBody);
 			ApplyNotifyThemeColors(settingsBody);
 			// what is sized to its text measures again, then every widget paints with the new family
