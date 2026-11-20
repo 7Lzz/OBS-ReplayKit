@@ -57,7 +57,7 @@ Choose a theme, customize the app icon, and switch between Clean and Classic lay
 | 🔗 | **Streamable uploads** | Upload anonymously or connect your own Streamable account. |
 | 🔊 | **Audio options** | Set up desktop, microphone, and Discord audio, including separate tracks. |
 | 🎮 | **Overlays and effects** | Optional keyboard and mouse overlays, Bongo Cat, and motion blur. |
-| 🖥️ | **Share Preview** | Share your OBS scene in Discord or another compatible app. |
+| 🖥️ | **Screenshare** | Share your OBS scene in Discord or another compatible app. |
 | 🎨 | **Customization** | Change themes and preferences, with desktop notifications for saved clips and recordings. |
 
 ReplayKit uses **OBS's own replay buffer and recording system**. You still have access to your OBS scenes, settings, and recording options.
@@ -89,11 +89,15 @@ You can also use **Start Recording** and **Stop Recording** in the dock for full
 > [!IMPORTANT]
 > **Back up your OBS settings before installing.** ReplayKit changes parts of your OBS setup, including profiles, scenes, and plugins. The installer creates a backup at `%APPDATA%\obs-studio.bak.YYYYMMDD-HHMMSS`, but you should still export anything important. Read the reset and uninstall options carefully if you want to keep your existing OBS setup.
 
-### Audio and Share Preview
+### Audio and Screenshare
 
 You can configure desktop, microphone, and Discord audio separately, including which tracks they use.
 
-**Share Preview is optional.** It uses a virtual audio cable driver and a hidden ReplayKit window to let you share your OBS scene in Discord or other apps that support application window sharing. The window stays open while OBS restarts, updates or crashes and shows a "be right back" card until OBS is back, so your stream doesn't end. You don't need it for normal recording or clipping.
+**Screenshare is optional.** It uses a virtual audio cable driver and a hidden ReplayKit window to let you share your OBS scene in Discord or other apps that support application window sharing. The window stays open while OBS restarts, updates or crashes and shows a "be right back" card until OBS is back, so your stream doesn't end. You can change the card's background, text, colors and sound. You don't need it for normal recording or clipping.
+
+If you share your whole screen or another window in Discord instead, ReplayKit pauses the Screenshare audio so viewers don't hear the sound twice.
+
+Games in your **Auto Game List** get a **Game Out of Focus** card: while the game is open but you're in another window, your stream and clips show a blurred, dimmed picture of the game instead of your desktop. You can turn it off in Settings.
 
 ### Updating or uninstalling
 
