@@ -8,9 +8,9 @@ namespace ReplayKitShared
     internal static class VideoTools
     {
         // Pin the archive so later changes to the repository layout cannot break released installers.
-        public const string ArchiveUrl = "https://raw.githubusercontent.com/7Lzz/OBS-ReplayKit/dad5c037106ce8b6429e9b8a4da9ed31f323ac07/ReplayKit/downloads/ffmpeg-tools.zip";
-        public const string FfmpegSha256 = "3256173f3f8bffd7df12227c68adf68025edb1832273a9530688a7bb1ed8edec";
-        public const string FfprobeSha256 = "f0d36ecbbdd3bcfac3efa078c96c7271c2e68b3810595552ac3b7f17e9a65c52";
+        public const string ArchiveUrl = "https://raw.githubusercontent.com/7Lzz/OBS-ReplayKit/cba0a30cb3112f649dbb51dcef987ca3189654f5/ReplayKit/downloads/ffmpeg-tools.zip";
+        public const string FfmpegSha256 = "ed8f66cb877087a96f5bbb40a2944f0e764f2ad8870d5cb647360d912e62bc07";
+        public const string FfprobeSha256 = "df0199f606faa88e9ad192732a7c3987acfb647663534c297772e17730611a08";
 
         public static bool IsInstalled(string directory) =>
             IsValid(Path.Combine(directory, "ffmpeg.exe"), FfmpegSha256) &&
