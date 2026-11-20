@@ -1918,6 +1918,8 @@
   @keyframes save-ghost-in { from { opacity: 0; } to { opacity: 1; } }
   .card.is-processing .preview { cursor: default; }
   .card.is-processing .play-overlay, .card.is-processing .player-shade, .card.is-processing .preview-controls, .card.is-processing .progress-bar, .card.is-processing .center-pulse, .card.is-processing .duration-badge { display: none !important; }
+  /* its buttons are greyed out too, and setCardProcessing keeps them out of reach until the clip is done */
+  .card.is-processing .title-row .icon-mini-btn, .card.is-processing .actions > *, .card.is-processing:hover .select-clip-btn, .card.is-processing:hover .favorite-btn { opacity: .4; cursor: default; }
   .card-resize svg { width: 14px; height: 14px; fill: currentColor; display: block; pointer-events: none; }
   .rk-home .card-resize, .card.is-theater-card .card-resize { display: none; }
   /* while a drag of the corner runs the cursor stays the corner cursor wherever the pointer is, nothing under it reacts, and the cards do not play their hover motion as the rows move */

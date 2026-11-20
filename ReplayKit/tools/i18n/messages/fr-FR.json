@@ -2484,8 +2484,8 @@
     "text": "Limite de stockage"
   },
   "common.storesRecentGameplayUntilYouSave": {
-    "source": "d74039e73d8aaae0",
-    "text": "Conserve les derniers instants de jeu jusqu'à ce que vous enregistriez un clip. Disque utilise très peu de RAM et écrit sur votre disque pendant la création de clips. Mémoire enregistre les clips le plus vite mais utilise plus de RAM, et peut aider si Disque pose problème."
+    "source": "4b669f702db501a2",
+    "text": "Conserve les derniers instants de jeu jusqu'à ce que vous enregistriez un clip. Disque utilise peu de RAM. Mémoire enregistre le plus vite mais utilise plus de RAM."
   },
   "common.streamableAccount": {
     "source": "92e37626d0f39b5f",
@@ -7068,8 +7068,8 @@
     "text": "Par défaut"
   },
   "settings.deletesTheOldLogsEachTime": {
-    "source": "1ededadd8819ee7b",
-    "text": "Supprime les anciens journaux à chaque démarrage d'OBS pour qu'ils ne s'accumulent pas. Laissez cette option activée, sauf si vous voulez conserver les journaux d'une session précédente."
+    "source": "7e3aadb4faf6b5e0",
+    "text": "Supprime les anciens journaux à chaque démarrage d'OBS pour qu'ils ne s'accumulent pas."
   },
   "settings.desktopAudioIsNotTheReplaykit": {
     "source": "dc224b7bdacd7452",
@@ -7144,8 +7144,8 @@
     "text": "Rich Presence Discord"
   },
   "settings.discordRichPresenceNote": {
-    "source": "4e760cbd412f470a",
-    "text": "Affiche le jeu auquel vous jouez sur votre profil Discord, avec un lien pour obtenir ReplayKit. Nécessite « Reconnaître les jeux dans les clips » activé dans Avancé."
+    "source": "082ab1fc1205233b",
+    "text": "Affiche le jeu auquel vous jouez sur votre profil Discord. Nécessite « Reconnaître les jeux dans les clips » activé dans Avancé."
   },
   "settings.discordScreenshare": {
     "source": "0084858b433582ee",
@@ -7332,8 +7332,8 @@
     "text": "La plus nette, 36 échantillons. Par défaut."
   },
   "settings.findsTheGameYouWerePlaying": {
-    "source": "78bff2aead6f9227",
-    "text": "Détecte le jeu auquel vous jouez afin que les nouveaux clips et captures d'écran reçoivent son nom, son icône et son dossier. Désactivez-le pour masquer les icônes de jeu et le filtre de jeu ; ReplayKit cesse alors de rechercher les jeux."
+    "source": "19231e050c5b6ec4",
+    "text": "Associe les nouveaux clips au jeu auquel vous jouiez."
   },
   "settings.fixHevcPlaybackCompatibility": {
     "source": "a426c818b132fc16",
@@ -7484,12 +7484,12 @@
     "text": "Durée pendant laquelle la fenêtre d'OBS reste réduite ou dans la zone de notification avant que les pages de ReplayKit ne soient fermées pour libérer de la mémoire. Elles se rechargent à l'ouverture de la fenêtre. Les pages avec des modifications non enregistrées ou une tâche en cours restent ouvertes."
   },
   "settings.howManySecondsReplaykitWaitsAfter": {
-    "source": "d5c4e0c7c18ddaac",
-    "text": "Nombre de secondes pendant lesquelles ReplayKit attend après votre sortie d'un jeu avant de revenir à l'écran entier. Une attente courte est plus rapide. Une attente plus longue évite les scintillements quand vous changez de fenêtre un instant."
+    "source": "6bf6fd633f60c58b",
+    "text": "Durée d'attente avant de revenir à votre écran après avoir quitté un jeu."
   },
   "settings.howSmoothExportedGifsPlayHigher": {
-    "source": "bb90af927071a1f9",
-    "text": "Fluidité de lecture des GIF exportés. Une valeur plus élevée est plus fluide mais donne des fichiers plus lourds, plus longs à exporter. Chaque choix se lit à une cadence régulière."
+    "source": "1823cd06547b3fdb",
+    "text": "Fluidité de lecture des GIF exportés. Une valeur plus élevée est plus fluide mais donne des fichiers plus lourds."
   },
   "settings.hue": {
     "source": "aaea6806ac42d03b",
@@ -7592,12 +7592,12 @@
     "text": "Garder l'icône d'OBS épinglée dans la zone de notification à côté de l'horloge"
   },
   "settings.keepsReplaykitSPopUpMessages": {
-    "source": "f02096f08fb89245",
-    "text": "Empêche les messages de ReplayKit, comme 'clip enregistré', d'apparaître dans les captures d'écran et les enregistrements. Ils n'apparaissent jamais dans vos clips ni dans vos diffusions."
+    "source": "9dec75ecb5ce0dca",
+    "text": "Masque les messages de ReplayKit dans vos clips, captures d'écran et diffusions."
   },
   "settings.keepsTheLastMomentsOfYour": {
-    "source": "a8eb11ed982e3f9a",
-    "text": "Garde prêts les derniers instants de votre écran, pour que le raccourci de clip ou le bouton Clip puissent les sauvegarder. Désactivez-le et rien n'est conservé pour les clips."
+    "source": "cd549c721918e9aa",
+    "text": "Garde vos derniers instants prêts à être enregistrés en clip."
   },
   "settings.keepsYourScreenAndPcAwake": {
     "source": "0b5068e28908a131",
@@ -7692,8 +7692,8 @@
     "text": "Permet à une zone de passer en fondu entre plusieurs couleurs au lieu d'une seule couleur unie."
   },
   "settings.letsYouZoomIntoTheVideo": {
-    "source": "7557e4ec68dc0847",
-    "text": "Permet de zoomer sur la vidéo en faisant défiler dans l'éditeur, jusqu'à 4 fois, pour voir les petits détails. Désactivé, le défilement ne fait rien."
+    "source": "d1d6647834e4ad64",
+    "text": "Faites défiler sur la vidéo dans l'éditeur pour zoomer jusqu'à 4 fois."
   },
   "settings.like3DaysAgo": {
     "source": "70c998f96efacc23",
@@ -8268,8 +8268,8 @@
     "text": "Ouvre OBS et ReplayKit à la connexion à Windows."
   },
   "settings.opensObsWithAdministratorRightsThe": {
-    "source": "4527a5108c023e38",
-    "text": "Ouvre OBS avec les droits d'administrateur au prochain démarrage. Windows vous demandera votre autorisation à chaque fois. La plupart des utilisateurs n'en ont pas besoin."
+    "source": "119c25d7a4d8e8c8",
+    "text": "Lance OBS en administrateur. Windows demande à chaque fois, et la plupart n'en ont pas besoin."
   },
   "settings.output": {
     "source": "0cd3518a3335a3aa",
@@ -8668,8 +8668,8 @@
     "text": "Réparation de l'installation de ReplayKit."
   },
   "settings.repairsTheVideoTagOnHevc": {
-    "source": "b87233373493fa85",
-    "text": "Répare la balise vidéo des clips et enregistrements HEVC pour qu'ils puissent être lus sur des appareils comme les iPhone. La qualité vidéo d'origine est conservée."
+    "source": "a492c946308a23e4",
+    "text": "Permet aux clips HEVC de se lire sur iPhone et d'autres appareils."
   },
   "settings.repark": {
     "source": "40c2985c92ed985e",
@@ -8916,8 +8916,8 @@
     "text": "Ce thème enregistré n’existe plus."
   },
   "settings.savesPcAudioDiscordAndYour": {
-    "source": "7176992f35453e0d",
-    "text": "Enregistre l'audio du PC, Discord et votre microphone sur des pistes séparées, en plus de la piste mixée habituelle. Vous pouvez modifier chacune dans l'éditeur de clips. Nécessite un redémarrage d'OBS."
+    "source": "8b05f7bfb4343442",
+    "text": "Enregistre l'audio du PC, Discord et votre microphone sur des pistes séparées. Nécessite un redémarrage d'OBS."
   },
   "settings.scaleDownscale": {
     "source": "c96fd816bcb1bdda",
@@ -9092,8 +9092,8 @@
     "text": "Affichée dans le cercle du compte en haut de la fenêtre. Toute image convient et est recadrée en carré."
   },
   "settings.showsAGreyBadgeAtThe": {
-    "source": "9f1e8223ee728f49",
-    "text": "Affiche un badge gris en haut quand une version plus récente d'OBS est disponible. OBS ne se met pas à jour seul pendant que ReplayKit est installé, ceci vous en informe seulement."
+    "source": "9cb5f9c2683c7692",
+    "text": "Affiche un badge en haut quand une version plus récente d'OBS est disponible."
   },
   "settings.showsAWindowsNotificationWhenA": {
     "source": "1b1ab7b39307d283",
@@ -9504,8 +9504,8 @@
     "text": "Utilise le volume de l'audio du jeu"
   },
   "settings.usesYourGraphicsCardToSave": {
-    "source": "7d5edb8a14fc2b5b",
-    "text": "Utilise votre carte graphique pour enregistrer les vidéos modifiées beaucoup plus vite, comme les coupes précises, les sections noires et les changements de vitesse. Cela garde aussi votre jeu fluide. Si votre PC ne peut pas le faire, ReplayKit utilise à la place votre processeur."
+    "source": "16049819fb3a5dab",
+    "text": "Utilise votre carte graphique pour enregistrer les modifications plus vite."
   },
   "settings.valueDb": {
     "source": "43245c4acbec741e",
@@ -9536,8 +9536,8 @@
     "text": "Que souhaitez-vous supprimer ?"
   },
   "settings.whenThisIsOnAndA": {
-    "source": "a3c8828f681ccf6c",
-    "text": "Lorsque cette option est activée et qu'un jeu de votre liste est détecté, ReplayKit ne partage que ce jeu, même si vous passez à une autre fenêtre comme Discord, jusqu'à ce que le jeu ne soit plus détecté."
+    "source": "c11a7181e023a485",
+    "text": "Reste sur le jeu quand vous changez de fenêtre."
   },
   "settings.whichSurfaceToGiveAGradient": {
     "source": "400897802e4a1bd2",
@@ -11532,8 +11532,20 @@
     "text": "Jeu en arrière-plan"
   },
   "settings.autoGameListOutOfFocusNote": {
-    "source": "f3a2c07856ad8e2d",
-    "text": "Tant qu'un jeu de cette liste est ouvert sans que tu sois dedans, le stream et les clips affichent une carte « Jeu en arrière-plan » à la place du bureau. Tant que c'est activé, « Garder le focus sur le jeu » n'a aucun effet."
+    "source": "52d1f268bc9b1e5f",
+    "text": "Affiche une image floue du jeu à la place de votre bureau quand vous changez de fenêtre."
+  },
+  "settings.autoGameListNote": {
+    "source": "190ca5cc285e21db",
+    "text": "Ajoutez des jeux ici pour que vos clips et votre partage d'écran restent sur le jeu dès qu'il est trouvé, même quand vous changez de fenêtre."
+  },
+  "settings.autoGameListNoteCard": {
+    "source": "92c7ddc61885a788",
+    "text": "Ajoutez des jeux ici pour que vos clips et votre partage d'écran montrent le jeu pendant que vous jouez, et une image floue de celui-ci quand vous changez de fenêtre."
+  },
+  "settings.autoGameListNoteSwitch": {
+    "source": "6c65782093296da7",
+    "text": "Ajoutez des jeux ici pour que vos clips et votre partage d'écran passent sur le jeu pendant que vous jouez, même en mode fenêtré."
   },
   "capture.videoUnavailable": {
     "source": "1371e9f5bfce72a0",

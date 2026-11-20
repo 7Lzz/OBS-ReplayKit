@@ -88,10 +88,22 @@ namespace ReplayKitHelper
             return MessageCatalog.Text(Messages(code)[id], id, code, pairs);
         }
 
+        private static string _localeIni;
+
+        // finding the obs install opens the running obs and walks its modules, and every message asks for the language list, so the path of the list is found once and looked for again only once that file is gone
+        private static string LocaleIni()
+        {
+            string ini = _localeIni;
+            if (ini != null && File.Exists(ini)) return ini;
+            ini = Path.Combine(SettingsSceneJson.GetObsInstallRoot(), "data", "obs-studio", "locale.ini");
+            _localeIni = ini;
+            return ini;
+        }
+
         // replaykit's supported languages with the names from the installed obs locale list
         public static List<Language> Available()
         {
-            string ini = Path.Combine(SettingsSceneJson.GetObsInstallRoot(), "data", "obs-studio", "locale.ini");
+            string ini = LocaleIni();
             string stamp;
             try { stamp = File.Exists(ini) ? File.GetLastWriteTimeUtc(ini).Ticks.ToString() : "none"; }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { stamp = "none"; }

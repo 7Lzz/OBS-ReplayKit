@@ -40,8 +40,8 @@
   var SETTLE_SLACK_PX = 4;
   // the window sizes a shape is kept for per view, newest first, so going back to an earlier size of the window finds its shape again
   var KEPT_SIZES = 4;
-  // what is open over a page that is never part of its shape
-  var TRANSIENT = ".rk-skel-layer, .rk-skel-hidden, .modal-veil.is-open, .modal-backdrop.is-visible, .combo.is-open, .menu-dropdown.is-open, .ctx-menu.is-open";
+  // what is open over a page, or a clip that is still being saved or processed, which is never part of its shape
+  var TRANSIENT = ".rk-skel-layer, .rk-skel-hidden, .modal-veil.is-open, .modal-backdrop.is-visible, .combo.is-open, .menu-dropdown.is-open, .ctx-menu.is-open, .save-ghost, .card.is-processing";
   // a control this small reads as one block whether or not its state gives it a ground right now, so a row of icon buttons stays even
   var SMALL_CONTROL = 48;
   var STORE = "rk-skeleton:";
@@ -261,7 +261,8 @@
     root.classList.add("rk-skel-hidden");
     root.setAttribute("aria-busy", "true");
     doc.body.appendChild(c.layer);
-    c.at = performance.now();
+    // a page of the obs window covered while it loads takes over the placeholder the shell put up before the page started loading, so its time on screen counts from the start of the page
+    c.at = c.embedded && doc.readyState === "loading" ? 0 : performance.now();
     covers.push(c);
   }
 

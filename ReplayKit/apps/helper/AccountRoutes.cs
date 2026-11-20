@@ -96,7 +96,7 @@ namespace ReplayKitHelper
             if (path == "/profile-picture")
             {
                 byte[] picture = null;
-                try { if (File.Exists(ProfilePicture.FilePath)) picture = File.ReadAllBytes(ProfilePicture.FilePath); }
+                try { if (!ProfilePicture.Hidden && File.Exists(ProfilePicture.FilePath)) picture = File.ReadAllBytes(ProfilePicture.FilePath); }
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { Log.Write("/profile-picture read: " + ex.Message); }
                 if (picture == null) { HttpResponse.SendJson(stream, 404, new JObject { ["ok"] = false }); return false; }
                 HttpResponse.SendBytes(stream, 200, "OK", HttpResponse.GetNoStoreHeaders(new Dictionary<string, string> { ["Content-Type"] = "image/png" }), picture);

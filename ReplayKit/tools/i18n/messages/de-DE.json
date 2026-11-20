@@ -2483,8 +2483,8 @@
     "text": "Speicherlimit"
   },
   "common.storesRecentGameplayUntilYouSave": {
-    "source": "d74039e73d8aaae0",
-    "text": "Speichert das letzte Spielgeschehen, bis ein Clip gespeichert wird. Datenträger nutzt sehr wenig RAM und schreibt bei aktivem Clipping auf das Laufwerk. Arbeitsspeicher speichert Clips am schnellsten, nutzt aber mehr RAM und kann helfen, wenn Datenträger Probleme verursacht."
+    "source": "4b669f702db501a2",
+    "text": "Speichert das letzte Spielgeschehen, bis ein Clip gespeichert wird. Datenträger nutzt wenig RAM. Arbeitsspeicher speichert am schnellsten, nutzt aber mehr RAM."
   },
   "common.streamableAccount": {
     "source": "92e37626d0f39b5f",
@@ -7066,8 +7066,8 @@
     "text": "Standard"
   },
   "settings.deletesTheOldLogsEachTime": {
-    "source": "1ededadd8819ee7b",
-    "text": "Löscht bei jedem Start von OBS die alten Logs, damit sie sich nicht ansammeln. Eingeschaltet lassen, außer Logs aus einer früheren Sitzung sollen erhalten bleiben."
+    "source": "7e3aadb4faf6b5e0",
+    "text": "Löscht bei jedem Start von OBS die alten Logs, damit sie sich nicht ansammeln."
   },
   "settings.desktopAudioIsNotTheReplaykit": {
     "source": "dc224b7bdacd7452",
@@ -7142,8 +7142,8 @@
     "text": "Discord Rich Presence"
   },
   "settings.discordRichPresenceNote": {
-    "source": "4e760cbd412f470a",
-    "text": "Zeigt das Spiel, das du spielst, in deinem Discord-Profil, mit einem Link zu ReplayKit. „Spiele in Clips erkennen“ unter „Erweitert“ muss an sein."
+    "source": "082ab1fc1205233b",
+    "text": "Zeigt das Spiel, das du spielst, in deinem Discord-Profil. „Spiele in Clips erkennen“ unter „Erweitert“ muss an sein."
   },
   "settings.discordScreenshare": {
     "source": "0084858b433582ee",
@@ -7330,8 +7330,8 @@
     "text": "Am schärfsten, 36 Samples. Standard."
   },
   "settings.findsTheGameYouWerePlaying": {
-    "source": "78bff2aead6f9227",
-    "text": "Erkennt das gespielte Spiel, damit neue Clips und Screenshots dessen Namen, Symbol und Ordner erhalten. Wenn ausgeschaltet, werden Spielsymbole und der Spielfilter ausgeblendet, und ReplayKit sucht keine Spiele mehr."
+    "source": "19231e050c5b6ec4",
+    "text": "Versieht neue Clips mit dem gespielten Spiel."
   },
   "settings.fixHevcPlaybackCompatibility": {
     "source": "a426c818b132fc16",
@@ -7482,12 +7482,12 @@
     "text": "Wie lange das OBS-Fenster minimiert oder im Infobereich bleibt, bevor die Seiten von ReplayKit geschlossen werden, um Speicher freizugeben. Sie werden beim Öffnen des Fensters erneut geladen. Seiten mit ungespeicherten Änderungen oder einem laufenden Vorgang bleiben geöffnet."
   },
   "settings.howManySecondsReplaykitWaitsAfter": {
-    "source": "d5c4e0c7c18ddaac",
-    "text": "Wie viele Sekunden ReplayKit nach dem Verlassen eines Spiels wartet, bevor auf den gesamten Bildschirm zurückgeschaltet wird. Eine kurze Wartezeit ist schneller. Eine längere Wartezeit verhindert Flackern, wenn kurz zwischen Fenstern gewechselt wird."
+    "source": "6bf6fd633f60c58b",
+    "text": "Wie lange gewartet wird, bevor nach dem Verlassen eines Spiels wieder auf deinen Bildschirm gewechselt wird."
   },
   "settings.howSmoothExportedGifsPlayHigher": {
-    "source": "bb90af927071a1f9",
-    "text": "Wie flüssig exportierte GIFs abgespielt werden. Höhere Werte wirken flüssiger, erzeugen aber größere Dateien, deren Export länger dauert. Jede Auswahl wird mit gleichmäßigem Tempo abgespielt."
+    "source": "1823cd06547b3fdb",
+    "text": "Wie flüssig exportierte GIFs abgespielt werden. Höhere Werte wirken flüssiger, erzeugen aber größere Dateien."
   },
   "settings.hue": {
     "source": "aaea6806ac42d03b",
@@ -7590,12 +7590,12 @@
     "text": "Das OBS-Symbol im Infobereich neben der Uhr angeheftet lassen"
   },
   "settings.keepsReplaykitSPopUpMessages": {
-    "source": "f02096f08fb89245",
-    "text": "Hält Pop-up-Meldungen von ReplayKit, etwa „Clip gespeichert“, aus Screenshots und Aufnahmen heraus. Sie erscheinen nie in Clips oder Streams."
+    "source": "9dec75ecb5ce0dca",
+    "text": "Blendet Pop-ups von ReplayKit in deinen Clips, Screenshots und Streams aus."
   },
   "settings.keepsTheLastMomentsOfYour": {
-    "source": "a8eb11ed982e3f9a",
-    "text": "Hält die letzten Momente des Bildschirms bereit, damit das Clip-Tastenkürzel oder die Clip-Schaltfläche sie speichern kann. Ausgeschaltet wird nichts für Clips aufbewahrt."
+    "source": "cd549c721918e9aa",
+    "text": "Hält deine letzten Momente bereit, um sie als Clip zu speichern."
   },
   "settings.keepsYourScreenAndPcAwake": {
     "source": "0b5068e28908a131",
@@ -7690,8 +7690,8 @@
     "text": "Lässt einen Bereich zwischen Farben überblenden, statt eine einzelne Volltonfarbe zu verwenden."
   },
   "settings.letsYouZoomIntoTheVideo": {
-    "source": "7557e4ec68dc0847",
-    "text": "Ermöglicht das Heranzoomen im Video durch Scrollen darüber im Editor, bis zu 4-mal, um kleine Details zu sehen. Ausgeschaltet hat Scrollen dort keine Wirkung."
+    "source": "d1d6647834e4ad64",
+    "text": "Scrolle im Editor über dem Video, um bis zu 4-mal heranzuzoomen."
   },
   "settings.like3DaysAgo": {
     "source": "70c998f96efacc23",
@@ -8266,8 +8266,8 @@
     "text": "Öffnet OBS und ReplayKit bei der Anmeldung an Windows."
   },
   "settings.opensObsWithAdministratorRightsThe": {
-    "source": "4527a5108c023e38",
-    "text": "Öffnet OBS beim nächsten Start mit Administratorrechten. Windows fragt jedes Mal nach der Berechtigung. Die meisten brauchen das nicht."
+    "source": "119c25d7a4d8e8c8",
+    "text": "Startet OBS als Administrator. Windows fragt jedes Mal nach, und die meisten brauchen das nicht."
   },
   "settings.output": {
     "source": "0cd3518a3335a3aa",
@@ -8666,8 +8666,8 @@
     "text": "Die ReplayKit-Installation wird repariert."
   },
   "settings.repairsTheVideoTagOnHevc": {
-    "source": "b87233373493fa85",
-    "text": "Repariert das Videotag bei HEVC-Clips und -Aufnahmen, damit sie auf Geräten wie iPhones abgespielt werden können. Die ursprüngliche Videoqualität bleibt erhalten."
+    "source": "a492c946308a23e4",
+    "text": "Sorgt dafür, dass HEVC-Clips auf iPhones und anderen Geräten laufen."
   },
   "settings.repark": {
     "source": "40c2985c92ed985e",
@@ -8913,8 +8913,8 @@
     "text": "Dieses gespeicherte Design gibt es nicht mehr."
   },
   "settings.savesPcAudioDiscordAndYour": {
-    "source": "7176992f35453e0d",
-    "text": "Speichert PC-Audio, Discord und das Mikrofon als getrennte Spuren zusätzlich zur normalen gemischten Spur. Jede davon lässt sich im Clip-Editor ändern. Erfordert einen Neustart von OBS."
+    "source": "8b05f7bfb4343442",
+    "text": "Speichert PC-Audio, Discord und das Mikrofon als getrennte Spuren. Erfordert einen Neustart von OBS."
   },
   "settings.scaleDownscale": {
     "source": "c96fd816bcb1bdda",
@@ -9089,8 +9089,8 @@
     "text": "Wird im Kontokreis oben im Fenster angezeigt. Jedes Bild ist möglich und wird quadratisch zugeschnitten."
   },
   "settings.showsAGreyBadgeAtThe": {
-    "source": "9f1e8223ee728f49",
-    "text": "Zeigt oben ein graues Abzeichen, sobald eine neuere OBS-Version verfügbar ist. OBS aktualisiert sich bei installiertem ReplayKit nicht selbst, daher wird dies nur angezeigt."
+    "source": "9cb5f9c2683c7692",
+    "text": "Zeigt oben ein Abzeichen, sobald eine neuere OBS-Version verfügbar ist."
   },
   "settings.showsAWindowsNotificationWhenA": {
     "source": "1b1ab7b39307d283",
@@ -9501,8 +9501,8 @@
     "text": "Verwendet die Lautstärke des Spieltons"
   },
   "settings.usesYourGraphicsCardToSave": {
-    "source": "7d5edb8a14fc2b5b",
-    "text": "Verwendet deine Grafikkarte, um bearbeitete Videos mit präzisen Schnitten, schwarzen Abschnitten oder Tempoänderungen schneller zu speichern. So läuft auch dein Spiel flüssig weiter. Unterstützt dein PC das nicht, verwendet ReplayKit den Prozessor."
+    "source": "16049819fb3a5dab",
+    "text": "Nutzt deine Grafikkarte, um Bearbeitungen schneller zu speichern."
   },
   "settings.valueDb": {
     "source": "43245c4acbec741e",
@@ -9533,8 +9533,8 @@
     "text": "Was möchtest du entfernen?"
   },
   "settings.whenThisIsOnAndA": {
-    "source": "a3c8828f681ccf6c",
-    "text": "Wenn diese Option aktiv ist und ReplayKit ein Spiel aus deiner Liste erkennt, wird nur dieses Spiel geteilt. Das gilt auch beim Wechsel in ein anderes Fenster wie Discord, bis das Spiel nicht mehr erkannt wird."
+    "source": "c11a7181e023a485",
+    "text": "Bleibt beim Spiel, wenn du das Fenster wechselst."
   },
   "settings.whichSurfaceToGiveAGradient": {
     "source": "400897802e4a1bd2",
@@ -11524,8 +11524,20 @@
     "text": "Spiel nicht im Fokus"
   },
   "settings.autoGameListOutOfFocusNote": {
-    "source": "f3a2c07856ad8e2d",
-    "text": "Solange ein Spiel aus dieser Liste geöffnet ist, du aber nicht darin bist, zeigen Stream und Clips statt des Desktops eine Karte „Spiel nicht im Fokus“. Solange das an ist, wirkt „Spielfokus beibehalten“ nicht."
+    "source": "52d1f268bc9b1e5f",
+    "text": "Zeigt ein unscharfes Bild des Spiels statt deines Desktops, wenn du das Fenster wechselst."
+  },
+  "settings.autoGameListNote": {
+    "source": "190ca5cc285e21db",
+    "text": "Füge hier Spiele hinzu, damit deine Clips und deine Bildschirmfreigabe beim Spiel bleiben, sobald es gefunden wird, auch wenn du das Fenster wechselst."
+  },
+  "settings.autoGameListNoteCard": {
+    "source": "92c7ddc61885a788",
+    "text": "Füge hier Spiele hinzu, damit deine Clips und deine Bildschirmfreigabe beim Spielen das Spiel zeigen und ein unscharfes Bild davon, wenn du das Fenster wechselst."
+  },
+  "settings.autoGameListNoteSwitch": {
+    "source": "6c65782093296da7",
+    "text": "Füge hier Spiele hinzu, damit deine Clips und deine Bildschirmfreigabe beim Spielen zum Spiel wechseln, auch im Fenstermodus."
   },
   "capture.videoUnavailable": {
     "source": "1371e9f5bfce72a0",

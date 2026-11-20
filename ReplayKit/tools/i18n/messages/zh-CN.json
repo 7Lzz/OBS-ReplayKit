@@ -2482,8 +2482,8 @@
     "text": "存储上限"
   },
   "common.storesRecentGameplayUntilYouSave": {
-    "source": "d74039e73d8aaae0",
-    "text": "在保存剪辑之前保留最近的游戏画面。“磁盘”模式占用的内存极少，但在开启剪辑时会写入硬盘。“内存”模式保存剪辑最快，但占用更多内存，如果“磁盘”模式出现问题，可以改用它。"
+    "source": "4b669f702db501a2",
+    "text": "在保存剪辑之前保留最近的游戏画面。“磁盘”模式占用内存很少。“内存”模式保存最快，但占用更多内存。"
   },
   "common.streamableAccount": {
     "source": "92e37626d0f39b5f",
@@ -7064,8 +7064,8 @@
     "text": "默认"
   },
   "settings.deletesTheOldLogsEachTime": {
-    "source": "1ededadd8819ee7b",
-    "text": "每次 OBS 启动时删除旧日志，避免日志堆积。除非你想保留之前会话的日志，否则请保持开启。"
+    "source": "7e3aadb4faf6b5e0",
+    "text": "每次 OBS 启动时删除旧日志，避免日志堆积。"
   },
   "settings.desktopAudioIsNotTheReplaykit": {
     "source": "dc224b7bdacd7452",
@@ -7140,8 +7140,8 @@
     "text": "Discord 丰富状态"
   },
   "settings.discordRichPresenceNote": {
-    "source": "4e760cbd412f470a",
-    "text": "在你的 Discord 个人资料上显示你正在玩的游戏，并附上获取 ReplayKit 的链接。需要在“高级”中开启“识别剪辑中的游戏”。"
+    "source": "082ab1fc1205233b",
+    "text": "在你的 Discord 个人资料上显示你正在玩的游戏。需要在“高级”中开启“识别剪辑中的游戏”。"
   },
   "settings.discordScreenshare": {
     "source": "0084858b433582ee",
@@ -7328,8 +7328,8 @@
     "text": "最清晰，36 采样。默认。"
   },
   "settings.findsTheGameYouWerePlaying": {
-    "source": "78bff2aead6f9227",
-    "text": "查找你正在玩的游戏，使新片段和截图获得其名称、图标和文件夹。关闭后将隐藏游戏图标和游戏筛选，ReplayKit 也将停止查找游戏。"
+    "source": "19231e050c5b6ec4",
+    "text": "为新片段标记你当时在玩的游戏。"
   },
   "settings.fixHevcPlaybackCompatibility": {
     "source": "a426c818b132fc16",
@@ -7480,12 +7480,12 @@
     "text": "当 OBS 窗口最小化或驻留在托盘中时，ReplayKit 页面会在此时间后关闭以释放内存。窗口再次打开时会重新加载页面。有未保存更改或正在运行任务的页面会保持打开。"
   },
   "settings.howManySecondsReplaykitWaitsAfter": {
-    "source": "d5c4e0c7c18ddaac",
-    "text": "你离开游戏后，ReplayKit 需要等待多久才会切回整个屏幕。等待时间短则切换更快；等待时间长可避免短暂切换窗口时画面闪烁。"
+    "source": "6bf6fd633f60c58b",
+    "text": "离开游戏后，要等待多久才切回你的屏幕。"
   },
   "settings.howSmoothExportedGifsPlayHigher": {
-    "source": "bb90af927071a1f9",
-    "text": "导出 GIF 的播放流畅度。较高的值更流畅，但文件更大，导出也更慢。每个选项的播放速度都是一致的。"
+    "source": "1823cd06547b3fdb",
+    "text": "导出 GIF 的播放流畅度。较高的值更流畅，但文件更大。"
   },
   "settings.hue": {
     "source": "aaea6806ac42d03b",
@@ -7588,12 +7588,12 @@
     "text": "将 OBS 托盘图标固定在时钟旁边"
   },
   "settings.keepsReplaykitSPopUpMessages": {
-    "source": "f02096f08fb89245",
-    "text": "将 ReplayKit 的弹出消息（如“片段已保存”）排除在截图和录像之外。它们永远不会出现在你的片段或直播中。"
+    "source": "9dec75ecb5ce0dca",
+    "text": "在你的片段、截图和直播中隐藏 ReplayKit 弹出消息。"
   },
   "settings.keepsTheLastMomentsOfYour": {
-    "source": "a8eb11ed982e3f9a",
-    "text": "为你的屏幕保留最近的画面，以便片段快捷键或“片段”按钮将其保存。关闭后将不会为片段保留任何内容。"
+    "source": "cd549c721918e9aa",
+    "text": "保留你最近的画面，随时保存为片段。"
   },
   "settings.keepsYourScreenAndPcAwake": {
     "source": "0b5068e28908a131",
@@ -7688,8 +7688,8 @@
     "text": "使区域在颜色之间渐变，而不是使用单一纯色。"
   },
   "settings.letsYouZoomIntoTheVideo": {
-    "source": "7557e4ec68dc0847",
-    "text": "在编辑器中滚动鼠标滚轮即可放大视频，最多放大 4 倍，以查看细节。关闭后，在此处滚动无效。"
+    "source": "d1d6647834e4ad64",
+    "text": "在编辑器中于视频上滚动鼠标滚轮，最多可放大 4 倍。"
   },
   "settings.like3DaysAgo": {
     "source": "70c998f96efacc23",
@@ -8264,8 +8264,8 @@
     "text": "登录 Windows 时打开 OBS 和 ReplayKit。"
   },
   "settings.opensObsWithAdministratorRightsThe": {
-    "source": "4527a5108c023e38",
-    "text": "下次启动时以管理员权限打开 OBS。Windows 每次都会请求你的许可。大多数人不需要此功能。"
+    "source": "119c25d7a4d8e8c8",
+    "text": "以管理员身份运行 OBS。Windows 每次都会询问，大多数人不需要。"
   },
   "settings.output": {
     "source": "0cd3518a3335a3aa",
@@ -8664,8 +8664,8 @@
     "text": "正在修复 ReplayKit 安装。"
   },
   "settings.repairsTheVideoTagOnHevc": {
-    "source": "b87233373493fa85",
-    "text": "修复 HEVC 剪辑和录像的视频标签，使其可在 iPhone 等设备上播放。会保留原始视频画质。"
+    "source": "a492c946308a23e4",
+    "text": "让 HEVC 剪辑可在 iPhone 和其他设备上播放。"
   },
   "settings.repark": {
     "source": "40c2985c92ed985e",
@@ -8910,8 +8910,8 @@
     "text": "该已保存的主题已不存在。"
   },
   "settings.savesPcAudioDiscordAndYour": {
-    "source": "7176992f35453e0d",
-    "text": "将电脑音频、Discord 和麦克风分别保存为独立音轨，同时保留常规混合音轨。可在剪辑编辑器中分别调整。需要重启 OBS。"
+    "source": "8b05f7bfb4343442",
+    "text": "将电脑音频、Discord 和麦克风分别保存为独立音轨。需要重启 OBS。"
   },
   "settings.scaleDownscale": {
     "source": "c96fd816bcb1bdda",
@@ -9086,8 +9086,8 @@
     "text": "显示在窗口顶部的账户头像中。任何图片都可以，并会裁剪为正方形。"
   },
   "settings.showsAGreyBadgeAtThe": {
-    "source": "9f1e8223ee728f49",
-    "text": "有更新的 OBS 版本时，在顶部显示灰色标记。安装 ReplayKit 后 OBS 不会自动更新，此标记仅用于提醒。"
+    "source": "9cb5f9c2683c7692",
+    "text": "有更新的 OBS 版本时，在顶部显示标记。"
   },
   "settings.showsAWindowsNotificationWhenA": {
     "source": "1b1ab7b39307d283",
@@ -9498,8 +9498,8 @@
     "text": "使用游戏音频音量"
   },
   "settings.usesYourGraphicsCardToSave": {
-    "source": "7d5edb8a14fc2b5b",
-    "text": "使用显卡可大幅加快编辑视频的保存速度，例如精确剪切、黑场段落和速度变化。这也有助于游戏保持流畅运行。如果电脑无法完成此操作，ReplayKit 会改用处理器。"
+    "source": "16049819fb3a5dab",
+    "text": "使用显卡更快地保存编辑。"
   },
   "settings.valueDb": {
     "source": "43245c4acbec741e",
@@ -9530,8 +9530,8 @@
     "text": "要移除哪些内容？"
   },
   "settings.whenThisIsOnAndA": {
-    "source": "a3c8828f681ccf6c",
-    "text": "开启此选项后，如果检测到列表中的游戏，ReplayKit 将只共享该游戏，即使切换到 Discord 等其他窗口也是如此，直到检测不到该游戏为止。"
+    "source": "c11a7181e023a485",
+    "text": "切换到其他窗口时仍停留在游戏上。"
   },
   "settings.whichSurfaceToGiveAGradient": {
     "source": "400897802e4a1bd2",
@@ -11516,8 +11516,20 @@
     "text": "游戏不在焦点上"
   },
   "settings.autoGameListOutOfFocusNote": {
-    "source": "f3a2c07856ad8e2d",
-    "text": "当此列表中的游戏已打开但你不在游戏中时，直播和剪辑会显示“游戏不在焦点上”卡片，而不是桌面。开启此项时，“保持游戏焦点”不起作用。"
+    "source": "52d1f268bc9b1e5f",
+    "text": "切换到其他窗口时，显示模糊的游戏画面，而不是你的桌面。"
+  },
+  "settings.autoGameListNote": {
+    "source": "190ca5cc285e21db",
+    "text": "在此添加游戏后，只要找到该游戏，即使你切换到其他窗口，片段和屏幕共享也会一直停留在游戏上。"
+  },
+  "settings.autoGameListNoteCard": {
+    "source": "92c7ddc61885a788",
+    "text": "在此添加游戏后，玩游戏时片段和屏幕共享会显示游戏，切换到其他窗口时则显示模糊的游戏画面。"
+  },
+  "settings.autoGameListNoteSwitch": {
+    "source": "6c65782093296da7",
+    "text": "在此添加游戏后，玩游戏时片段和屏幕共享会切换到该游戏，即使在窗口模式下也是如此。"
   },
   "capture.videoUnavailable": {
     "source": "1371e9f5bfce72a0",

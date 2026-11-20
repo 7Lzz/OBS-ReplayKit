@@ -56,5 +56,9 @@ bool ShellEditorOpen(ShellView view);
 void ShellOpenDeletedHistory();
 // tells the clips view a clip save started or ended, args being the json array of the state and the saved file name
 void ShellClipSaving(const std::string &args);
+// asks the clips view to open the editor on a clip, args being the json array of its file name, or to close it with an empty name
+void ShellEditor(const std::string &args);
+// asks the clips view to show sections open whatever was saved for them, args being the json array of the list of their names; an empty list shows them as saved again
+void ShellClipsSections(const std::string &args);
 
 } // namespace rk

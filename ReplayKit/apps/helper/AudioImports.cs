@@ -235,17 +235,19 @@ namespace ReplayKitHelper
             Directory.CreateDirectory(dir);
             string audio = Path.Combine(dir, AudioName);
             string raw = Path.Combine(dir, "audio.raw");
-            string limit = (MaxSeconds + 1).ToString("0", System.Globalization.CultureInfo.InvariantCulture);
-            // only the first audio stream is used and only local files may be opened, so a playlist cannot send the read anywhere else; the same pass writes the file the page plays and the samples the waveform is drawn from
-            var argv = new List<string>
-            {
-                "-y", "-hide_banner", "-loglevel", "error", "-nostdin", "-protocol_whitelist", "file", "-i", source,
-                "-map", "0:a:0", "-t", limit, "-c:a", "aac", "-b:a", "192k", "-ar", SampleRate.ToString(System.Globalization.CultureInfo.InvariantCulture), "-ac", "2", "-movflags", "+faststart", audio,
-                "-map", "0:a:0", "-t", limit, "-ac", "1", "-ar", "8000", "-f", "s16le", raw,
-            };
+            // aac that is already at the rate and the channels every import is written with is copied as it is, which takes a fraction of a second where encoding it again takes seconds on a long clip
+            var first = Mp4Tracks.ReadFile(source)?.FirstOrDefault(t => t.Audio);
+            bool copy = first != null && first.SampleEntry == "mp4a" && first.Timescale == SampleRate && first.Channels == 2;
             Compression.NativeCaptureResult run;
             using (JobCoordinator.ReadSource(source))
-                run = Compression.InvokeNativeCapture(ffmpeg, argv, CancellationToken.None, 10 * 60 * 1000, true);
+            {
+                run = RunExtract(ffmpeg, source, audio, raw, copy);
+                if (copy && run.ExitCode != 0)
+                {
+                    Log.Write("AudioImports: copy failed for " + job.Name + ", encoding it instead");
+                    run = RunExtract(ffmpeg, source, audio, raw, false);
+                }
+            }
             if (run.ExitCode != 0)
             {
                 string text = string.Join(" ", run.Output).Trim();
@@ -260,6 +262,16 @@ namespace ReplayKitHelper
             var info = new JObject { ["name"] = job.Name, ["duration"] = Math.Round(duration, 3) };
             File.WriteAllText(Path.Combine(dir, InfoName), info.ToString(Newtonsoft.Json.Formatting.None), new UTF8Encoding(false));
             File.WriteAllText(Path.Combine(dir, ClipCache.DoneMarker), "ok");
+        }
+
+        // only the first audio stream is used and only local files may be opened, so a playlist cannot send the read anywhere else; the same pass writes the file the page plays and the samples the waveform is drawn from
+        private static Compression.NativeCaptureResult RunExtract(string ffmpeg, string source, string audio, string raw, bool copy)
+        {
+            string limit = (MaxSeconds + 1).ToString("0", System.Globalization.CultureInfo.InvariantCulture);
+            var argv = new List<string> { "-y", "-hide_banner", "-loglevel", "error", "-nostdin", "-protocol_whitelist", "file", "-i", source, "-map", "0:a:0", "-t", limit };
+            argv.AddRange(copy ? new[] { "-c:a", "copy" } : new[] { "-c:a", "aac", "-b:a", "192k", "-ar", SampleRate.ToString(System.Globalization.CultureInfo.InvariantCulture), "-ac", "2" });
+            argv.AddRange(new[] { "-movflags", "+faststart", audio, "-map", "0:a:0", "-t", limit, "-ac", "1", "-ar", "8000", "-f", "s16le", raw });
+            return Compression.InvokeNativeCapture(ffmpeg, argv, CancellationToken.None, 10 * 60 * 1000, true);
         }
 
         private static void DeleteStaging(string staging)

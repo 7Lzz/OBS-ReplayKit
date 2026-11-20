@@ -2484,8 +2484,8 @@
     "text": "Limite de armazenamento"
   },
   "common.storesRecentGameplayUntilYouSave": {
-    "source": "d74039e73d8aaae0",
-    "text": "Mantém o jogo recente até você salvar um clipe. O modo Disco usa muito pouca RAM e grava no seu disco enquanto a captura de clipes está ativada. O modo Memória salva os clipes mais rápido, mas usa mais RAM, e pode ajudar se o Disco causar problemas."
+    "source": "4b669f702db501a2",
+    "text": "Mantém o jogo recente até você salvar um clipe. O modo Disco usa pouca RAM. O modo Memória salva mais rápido, mas usa mais RAM."
   },
   "common.streamableAccount": {
     "source": "92e37626d0f39b5f",
@@ -7068,8 +7068,8 @@
     "text": "Padrão"
   },
   "settings.deletesTheOldLogsEachTime": {
-    "source": "1ededadd8819ee7b",
-    "text": "Exclui os logs antigos sempre que o OBS é iniciado, para que não se acumulem. Deixe ativado, a menos que queira manter os logs de uma sessão anterior."
+    "source": "7e3aadb4faf6b5e0",
+    "text": "Exclui os logs antigos sempre que o OBS é iniciado, para que não se acumulem."
   },
   "settings.desktopAudioIsNotTheReplaykit": {
     "source": "dc224b7bdacd7452",
@@ -7144,8 +7144,8 @@
     "text": "Rich Presence do Discord"
   },
   "settings.discordRichPresenceNote": {
-    "source": "4e760cbd412f470a",
-    "text": "Mostra o jogo que você está jogando no seu perfil do Discord, com um link para baixar o ReplayKit. Requer “Reconhecer jogos nos clipes” ativado em Avançado."
+    "source": "082ab1fc1205233b",
+    "text": "Mostra o jogo que você está jogando no seu perfil do Discord. Requer “Reconhecer jogos nos clipes” ativado em Avançado."
   },
   "settings.discordScreenshare": {
     "source": "0084858b433582ee",
@@ -7332,8 +7332,8 @@
     "text": "A mais nítida, 36 amostras. Padrão."
   },
   "settings.findsTheGameYouWerePlaying": {
-    "source": "78bff2aead6f9227",
-    "text": "Encontra o jogo que você estava jogando, para que novos clipes e capturas de tela recebam o nome, o ícone e a pasta dele. Desative para ocultar os ícones dos jogos e o filtro de jogo, e o ReplayKit deixa de procurar jogos."
+    "source": "19231e050c5b6ec4",
+    "text": "Marca novos clipes com o jogo que você estava jogando."
   },
   "settings.fixHevcPlaybackCompatibility": {
     "source": "a426c818b132fc16",
@@ -7484,12 +7484,12 @@
     "text": "Por quanto tempo a janela do OBS fica minimizada ou na bandeja antes de as páginas do ReplayKit serem fechadas para liberar memória. Elas são carregadas novamente quando a janela é aberta. Páginas com alterações não salvas ou uma tarefa em execução continuam abertas."
   },
   "settings.howManySecondsReplaykitWaitsAfter": {
-    "source": "d5c4e0c7c18ddaac",
-    "text": "Quantos segundos o ReplayKit espera depois que você sai de um jogo antes de voltar para a tela inteira. Uma espera curta é mais rápida. Uma espera mais longa evita piscadas quando você troca de janela por um momento."
+    "source": "6bf6fd633f60c58b",
+    "text": "Quanto tempo esperar antes de voltar para a sua tela depois de sair de um jogo."
   },
   "settings.howSmoothExportedGifsPlayHigher": {
-    "source": "bb90af927071a1f9",
-    "text": "Quão suaves são os GIFs exportados na reprodução. Valores mais altos parecem mais fluidos, mas geram arquivos maiores que demoram mais para exportar. Todas as opções são reproduzidas em ritmo constante."
+    "source": "1823cd06547b3fdb",
+    "text": "Quão suaves são os GIFs exportados na reprodução. Valores mais altos parecem mais fluidos, mas geram arquivos maiores."
   },
   "settings.hue": {
     "source": "aaea6806ac42d03b",
@@ -7592,12 +7592,12 @@
     "text": "Mantém o ícone do OBS na bandeja fixado ao lado do relógio"
   },
   "settings.keepsReplaykitSPopUpMessages": {
-    "source": "f02096f08fb89245",
-    "text": "Mantém as mensagens pop-up do ReplayKit, como \"clipe salvo\", fora das capturas de tela e gravações. Elas nunca aparecem nos seus clipes ou transmissões."
+    "source": "9dec75ecb5ce0dca",
+    "text": "Oculta os pop-ups do ReplayKit nos seus clipes, capturas de tela e transmissões."
   },
   "settings.keepsTheLastMomentsOfYour": {
-    "source": "a8eb11ed982e3f9a",
-    "text": "Mantém os últimos momentos da sua tela prontos, para que a tecla de atalho ou o botão Clipe possam salvá-los. Desative e nada será mantido para os clipes."
+    "source": "cd549c721918e9aa",
+    "text": "Mantém seus últimos momentos prontos para salvar como clipe."
   },
   "settings.keepsYourScreenAndPcAwake": {
     "source": "0b5068e28908a131",
@@ -7692,8 +7692,8 @@
     "text": "Permite que uma área esmaeça entre cores em vez de usar uma cor sólida."
   },
   "settings.letsYouZoomIntoTheVideo": {
-    "source": "7557e4ec68dc0847",
-    "text": "Permite ampliar o vídeo rolando o mouse sobre ele no editor, até 4 vezes, para ver detalhes pequenos. Quando está desativado, a rolagem não faz nada ali."
+    "source": "d1d6647834e4ad64",
+    "text": "Role o mouse sobre o vídeo no editor para ampliar até 4 vezes."
   },
   "settings.like3DaysAgo": {
     "source": "70c998f96efacc23",
@@ -8268,8 +8268,8 @@
     "text": "Abre o OBS e o ReplayKit quando você entrar no Windows."
   },
   "settings.opensObsWithAdministratorRightsThe": {
-    "source": "4527a5108c023e38",
-    "text": "Abre o OBS com privilégios de administrador na próxima vez que ele for iniciado. O Windows pedirá sua permissão toda vez. A maioria das pessoas não precisa disso."
+    "source": "119c25d7a4d8e8c8",
+    "text": "Executa o OBS como administrador. O Windows pergunta toda vez, e a maioria das pessoas não precisa disso."
   },
   "settings.output": {
     "source": "0cd3518a3335a3aa",
@@ -8668,8 +8668,8 @@
     "text": "Reparando a instalação do ReplayKit."
   },
   "settings.repairsTheVideoTagOnHevc": {
-    "source": "b87233373493fa85",
-    "text": "Repara a tag de vídeo de clipes e gravações HEVC para que possam ser reproduzidos em dispositivos como iPhones. Mantém a qualidade original do vídeo."
+    "source": "a492c946308a23e4",
+    "text": "Faz os clipes HEVC rodarem em iPhones e outros dispositivos."
   },
   "settings.repark": {
     "source": "40c2985c92ed985e",
@@ -8916,8 +8916,8 @@
     "text": "Esse tema salvo não existe mais."
   },
   "settings.savesPcAudioDiscordAndYour": {
-    "source": "7176992f35453e0d",
-    "text": "Salva o áudio do PC, o Discord e o seu microfone como faixas separadas, junto com a faixa mixada normal. Você pode alterar cada uma no editor de clipes. Requer reiniciar o OBS."
+    "source": "8b05f7bfb4343442",
+    "text": "Salva o áudio do PC, o Discord e o seu microfone como faixas separadas. Requer reiniciar o OBS."
   },
   "settings.scaleDownscale": {
     "source": "c96fd816bcb1bdda",
@@ -9092,8 +9092,8 @@
     "text": "Aparece no círculo da conta no topo da janela. Qualquer imagem funciona e é recortada em um quadrado."
   },
   "settings.showsAGreyBadgeAtThe": {
-    "source": "9f1e8223ee728f49",
-    "text": "Mostra um selo cinza no topo quando há um OBS mais novo disponível. O OBS não se atualiza sozinho enquanto o ReplayKit está instalado, então isto apenas avisa você."
+    "source": "9cb5f9c2683c7692",
+    "text": "Mostra um selo no topo quando há um OBS mais novo."
   },
   "settings.showsAWindowsNotificationWhenA": {
     "source": "1b1ab7b39307d283",
@@ -9504,8 +9504,8 @@
     "text": "Usa o volume do Áudio do jogo"
   },
   "settings.usesYourGraphicsCardToSave": {
-    "source": "7d5edb8a14fc2b5b",
-    "text": "Usa sua placa de vídeo para salvar vídeos editados bem mais rápido, como cortes exatos, seções pretas e mudanças de velocidade. Também mantém seu jogo rodando sem travar. Se o seu PC não conseguir fazer isso, o ReplayKit usa o processador."
+    "source": "16049819fb3a5dab",
+    "text": "Usa sua placa de vídeo para salvar as edições mais rápido."
   },
   "settings.valueDb": {
     "source": "43245c4acbec741e",
@@ -9536,8 +9536,8 @@
     "text": "O que você quer remover?"
   },
   "settings.whenThisIsOnAndA": {
-    "source": "a3c8828f681ccf6c",
-    "text": "Quando isto está ativado e um jogo da sua lista é detectado, o ReplayKit compartilha apenas esse jogo, mesmo se você trocar para outra janela como o Discord, até que o jogo não seja mais detectado."
+    "source": "c11a7181e023a485",
+    "text": "Continua no jogo quando você troca de janela."
   },
   "settings.whichSurfaceToGiveAGradient": {
     "source": "400897802e4a1bd2",
@@ -11532,8 +11532,20 @@
     "text": "Jogo fora de foco"
   },
   "settings.autoGameListOutOfFocusNote": {
-    "source": "f3a2c07856ad8e2d",
-    "text": "Enquanto um jogo desta lista estiver aberto, mas você não estiver nele, a transmissão e os clipes mostram um cartão de \"Jogo fora de foco\" no lugar da área de trabalho. Enquanto isso estiver ativado, \"Manter o foco do jogo\" não tem efeito."
+    "source": "52d1f268bc9b1e5f",
+    "text": "Mostra uma imagem desfocada do jogo no lugar da sua área de trabalho quando você troca de janela."
+  },
+  "settings.autoGameListNote": {
+    "source": "190ca5cc285e21db",
+    "text": "Adicione jogos aqui para que seus clipes e a Transmissão de tela fiquem no jogo sempre que ele for encontrado, mesmo quando você troca de janela."
+  },
+  "settings.autoGameListNoteCard": {
+    "source": "92c7ddc61885a788",
+    "text": "Adicione jogos aqui para que seus clipes e a Transmissão de tela mostrem o jogo enquanto você joga, e uma imagem desfocada dele quando você troca de janela."
+  },
+  "settings.autoGameListNoteSwitch": {
+    "source": "6c65782093296da7",
+    "text": "Adicione jogos aqui para que seus clipes e a Transmissão de tela mudem para o jogo enquanto você joga, mesmo no modo janela."
   },
   "capture.videoUnavailable": {
     "source": "1371e9f5bfce72a0",

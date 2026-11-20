@@ -344,7 +344,7 @@ namespace ReplayKitHelper
                     candidates.Add(new JObject
                     {
                         ["value"] = token, ["token"] = token, ["label"] = "[" + exe + "]: " + title,
-                        ["blurb"] = className, ["title"] = title, ["className"] = className, ["exeName"] = exe,
+                        ["title"] = title, ["className"] = className, ["exeName"] = exe,
                     });
                     return candidates.Count < 80;
                 }, IntPtr.Zero);
@@ -359,6 +359,7 @@ namespace ReplayKitHelper
             if (!string.IsNullOrWhiteSpace(savedWindow))
             {
                 bool hasSaved = items.Any(item => item["value"]?.Value<string>() == savedWindow);
+                // the saved window of Specific game is not open right now; it is marked so the Auto Game List picker, which adds running games, leaves it out
                 if (!hasSaved)
                 {
                     try
@@ -367,12 +368,12 @@ namespace ReplayKitHelper
                         items.Insert(0, new JObject
                         {
                             ["value"] = saved["token"], ["token"] = saved["token"], ["label"] = saved["label"],
-                            ["blurb"] = Locales.Message("settings.savedSelection"), ["title"] = saved["title"], ["className"] = saved["className"], ["exeName"] = saved["exeName"],
+                            ["blurb"] = Locales.Message("settings.savedSelection"), ["title"] = saved["title"], ["className"] = saved["className"], ["exeName"] = saved["exeName"], ["saved"] = true,
                         });
                     }
                     catch (InvalidOperationException)
                     {
-                        items.Insert(0, new JObject { ["value"] = savedWindow, ["label"] = GetWindowLabelFromToken(savedWindow), ["blurb"] = Locales.Message("settings.savedSelection") });
+                        items.Insert(0, new JObject { ["value"] = savedWindow, ["label"] = GetWindowLabelFromToken(savedWindow), ["blurb"] = Locales.Message("settings.savedSelection"), ["saved"] = true });
                     }
                 }
             }

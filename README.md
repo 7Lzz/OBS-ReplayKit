@@ -24,9 +24,9 @@ OBS already handles recording, streaming, and replays, but finding and sharing c
 
 The goal is simple: **one app for streaming, recording, clipping, and managing videos.** ReplayKit is free, with no ads, subscriptions, or features locked behind a premium tier. Your clips stay on your PC unless you choose to upload them.
 
-### Images
+## Screenshots
 
-Images may be outdated to the current look of the GUI.
+Images may be outdated to the current look of the GUI. Maintainers can refresh them with `ReplayKit/scripts/readme_screenshots.bat` while OBS runs with SDK mode on.
 
 ### Clip library
 
@@ -36,15 +36,15 @@ Browse saved clips, search your library, and create share links.
 
 ### Clip editor
 
-Trim clips using the video filmstrip and separate desktop, Discord, and microphone audio tracks.
+Cut clips on a timeline with the video filmstrip and separate desktop, Discord, and microphone audio tracks, and add other clips, elements, subtitles, audio, and voiceovers from the tools on the left.
 
-[![ReplayKit clip editor with a demo video preview, filmstrip timeline, and three separate audio waveforms](docs/images/clip-editor.png)](docs/images/clip-editor.png)
+[![ReplayKit clip editor with a demo video preview, the editing tools, a filmstrip timeline, and three separate audio waveforms](docs/images/clip-editor.png)](docs/images/clip-editor.png)
 
-### Appearance and layouts
+### Settings
 
-Choose a theme, customize the app icon, and switch between Clean and Classic layouts.
+Turn clipping on or off and choose the recording quality, codec, resolution, clip length, and frame rate.
 
-[![ReplayKit appearance settings showing theme presets, app icons, and layout choices](docs/images/appearance.png)](docs/images/appearance.png)
+[![ReplayKit output settings showing clipping, recording quality, codec, resolution, clip length, and frame rate](docs/images/settings.png)](docs/images/settings.png)
 
 ## Features
 

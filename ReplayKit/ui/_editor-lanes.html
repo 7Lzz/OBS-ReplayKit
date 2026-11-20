@@ -80,7 +80,7 @@
   .tl-btn.is-active { background: rgba(var(--text-rgb), .17); }
   .tl-btn.tl-delete { color: var(--red); }
   .tl-btn.tl-delete:hover:not(:disabled) { background: rgba(var(--danger-rgb), .15); }
-  .tl-btn.tl-deselect { color: var(--selected2); }
+  .tl-btn.tl-deselect .deselect-line { stroke: var(--selected2); }
   .tl-toolbar button.rk-hover-control { transform: none !important; translate: none; transition: background-color 90ms linear, border-color 90ms linear, color 90ms linear, opacity 120ms linear; }
   .tl-toolbar button.rk-hover-control > svg { flex-shrink: 0; width: 17px; height: 17px; transform: none; transition: width min(var(--anim_press, 120ms), 140ms) var(--ease_smooth, ease), height min(var(--anim_press, 120ms), 140ms) var(--ease_smooth, ease); }
   .tl-toolbar button.rk-hover-control:enabled:hover > svg { width: calc(17px * min(var(--hover_grow, 1.04), var(--rk-hover-limit, 1.04))); height: calc(17px * min(var(--hover_grow, 1.04), var(--rk-hover-limit, 1.04))); }
@@ -2218,11 +2218,19 @@
       window.addEventListener("pointercancel", up, { signal: dragEvents.signal });
     }
 
+    // where the last piece of any row ends, the video included
+    function timelineEnd() {
+      var end = D();
+      st.vsegs.forEach(function (v) { end = Math.max(end, vEnd(v)); });
+      st.layers.forEach(function (l) { end = Math.max(end, l.end); });
+      allSegs().forEach(function (h) { end = Math.max(end, segEnd(h.seg)); });
+      return end;
+    }
+
     function addLayer(l) {
       if (st.layers.length >= LAYER_MAX) return "";
-      // a clip goes in at the playhead even past the end of the video, where the saved clip may already reach; a picture has to start inside the video, since it stops at its end
-      var last = l.kind === "clip" ? Math.max(D(), windowT().end) : D();
-      var at = clamp(nowT(), 0, Math.max(0, last - LAYER_MIN));
+      // a clip goes in after everything on the timeline so it plays after the video instead of over it; a picture goes in at the playhead and has to start inside the video, since it stops at its end
+      var at = l.kind === "clip" ? r3(timelineEnd()) : clamp(nowT(), 0, Math.max(0, D() - LAYER_MIN));
       var len = l.len > 0 ? l.len : 5;
       // a clip runs its whole length, past the end of the video if it has to; a picture stops at the end
       var end = l.kind === "clip" ? at + len : Math.min(D(), at + len);
@@ -2237,6 +2245,8 @@
       layersChanged();
       paintSelection();
       renderProps();
+      // the clip lies past everything that was in view, so the whole timeline is brought into view with it
+      if (made.kind === "clip") fitView();
       return made.id;
     }
 
@@ -6207,7 +6217,7 @@
       resetSelected: function () { return resetSelected(); },
       lookPlan: lookPlan,
       layerPlan: layerPlan,
-      // a layer put at the playhead and selected: { kind: "clip" | "media", ref, name, len, dur, aspect, w, gif }; the id, or empty when there is no room for it
+      // a layer put in and selected, a clip after everything on the timeline and a picture at the playhead: { kind: "clip" | "media", ref, name, len, dur, aspect, w, gif }; the id, or empty when there is no room for it
       addLayer: function (l) { return addLayer(l); },
       clearSelection: function () { select(""); },
       // the undo and redo of the toolbar, for the quick action menu of the title bar

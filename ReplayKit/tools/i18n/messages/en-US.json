@@ -2485,7 +2485,7 @@
   },
   "common.storesRecentGameplayUntilYouSave": {
     "context": "Description under a setting in Settings > Advanced > Recording. Also used in the first-run setup wizard.",
-    "text": "Stores recent gameplay until you save a clip. Disk uses very little RAM and writes to your drive while clipping is on. Memory saves clips fastest but uses more RAM, and can help if Disk causes problems."
+    "text": "Holds recent gameplay until you save a clip. Disk uses little RAM. Memory saves fastest but uses more RAM."
   },
   "common.streamableAccount": {
     "context": "Text in the account button. Also used in the Settings window, the Streamable account menu.",
@@ -7068,7 +7068,7 @@
   },
   "settings.deletesTheOldLogsEachTime": {
     "context": "Description under a setting in Settings > Advanced > Development.",
-    "text": "Deletes the old logs each time OBS starts, so they don't pile up. Leave this on unless you want to keep logs from an earlier session."
+    "text": "Deletes old logs each time OBS starts so they don't pile up."
   },
   "settings.desktopAudioIsNotTheReplaykit": {
     "context": "Message the helper shows when an action fails or finishes in a ReplayKit window, sent by the background helper.",
@@ -7144,7 +7144,7 @@
   },
   "settings.discordRichPresenceNote": {
     "context": "Note under the Discord Rich Presence switch. Recognize games in clips is the label of a switch on the Advanced tab.",
-    "text": "Shows the game you're playing on your Discord profile, with a link to get ReplayKit. Needs Recognize games in clips in Advanced to be on."
+    "text": "Shows the game you're playing on your Discord profile. Needs Recognize games in clips in Advanced."
   },
   "settings.discordScreenshare": {
     "context": "Heading in Settings > Screenshare > Screenshare audio.",
@@ -7332,7 +7332,7 @@
   },
   "settings.findsTheGameYouWerePlaying": {
     "context": "Description under a setting in Settings > Advanced > General.",
-    "text": "Finds the game you were playing, so new clips and screenshots get its name, icon and folder. Turn it off to hide game icons and the game filter, and ReplayKit stops looking up games."
+    "text": "Tags new clips with the game you were playing."
   },
   "settings.fixHevcPlaybackCompatibility": {
     "context": "Screen reader label in Settings > Advanced > General. Also used in the Settings window.",
@@ -7484,11 +7484,11 @@
   },
   "settings.howManySecondsReplaykitWaitsAfter": {
     "context": "Description under a setting in Settings > Screenshare > Discord Screenshare.",
-    "text": "How many seconds ReplayKit waits after you leave a game before it goes back to your whole screen. A short wait is quicker. A longer wait avoids flickering when you switch windows for a moment."
+    "text": "How long to wait before switching back to your screen after you leave a game."
   },
   "settings.howSmoothExportedGifsPlayHigher": {
     "context": "Description under a setting in Settings > Video Editor > GIF export.",
-    "text": "How smooth exported GIFs play. Higher looks smoother but makes bigger files that take longer to export. Every choice plays at an even pace."
+    "text": "How smooth exported GIFs play. Higher looks smoother but makes bigger files."
   },
   "settings.hue": {
     "context": "Screen reader label in the color picker. Also used in the look and effects panel of the clip editor.",
@@ -7592,11 +7592,11 @@
   },
   "settings.keepsReplaykitSPopUpMessages": {
     "context": "Description under a setting in Settings > Notifications > Popups.",
-    "text": "Keeps ReplayKit's pop-up messages, like 'clip saved', out of screenshots and recordings. They never show up in your clips or streams."
+    "text": "Hides ReplayKit pop-ups from your clips, screenshots and streams."
   },
   "settings.keepsTheLastMomentsOfYour": {
     "context": "Description under a setting in Settings > Output > Clipping.",
-    "text": "Keeps the last moments of your screen ready, so the clip hotkey or the Clip button can save them. Turn it off and nothing is kept for clips."
+    "text": "Keeps your last moments ready to save as a clip."
   },
   "settings.keepsYourScreenAndPcAwake": {
     "context": "Description under a setting in Settings > Windows OS > While OBS runs.",
@@ -7692,7 +7692,7 @@
   },
   "settings.letsYouZoomIntoTheVideo": {
     "context": "Description under a setting in Settings > Video Editor > Preview.",
-    "text": "Lets you zoom into the video by scrolling over it in the editor, up to 4 times, to see small details. When it's off, scrolling does nothing there."
+    "text": "Scroll over the video in the editor to zoom in up to 4 times."
   },
   "settings.like3DaysAgo": {
     "context": "Label in the Settings window.",
@@ -8268,7 +8268,7 @@
   },
   "settings.opensObsWithAdministratorRightsThe": {
     "context": "Description under a setting in Settings > Windows OS > Startup.",
-    "text": "Opens OBS with administrator rights the next time it starts. Windows will ask for your permission every time. Most people don't need this."
+    "text": "Runs OBS as administrator. Windows asks every time, and most people don't need it."
   },
   "settings.output": {
     "context": "Name of a tab in the sidebar in the Settings window.",
@@ -8668,7 +8668,7 @@
   },
   "settings.repairsTheVideoTagOnHevc": {
     "context": "Description under a setting in Settings > Advanced > General.",
-    "text": "Repairs the video tag on HEVC clips and recordings so they can play on devices such as iPhones. It keeps the original video quality."
+    "text": "Makes HEVC clips play on iPhones and other devices."
   },
   "settings.repark": {
     "context": "Button label in Settings > Screenshare > Discord Screenshare. Also used in the Settings window.",
@@ -8915,7 +8915,7 @@
   },
   "settings.savesPcAudioDiscordAndYour": {
     "context": "Description under a setting in Settings > Audio > Recording Audio.",
-    "text": "Saves PC audio, Discord, and your microphone as separate tracks, along with the normal mixed track. You can change each one in the clip editor. Needs an OBS restart."
+    "text": "Saves PC audio, Discord and your mic as separate tracks. Needs an OBS restart."
   },
   "settings.scaleDownscale": {
     "context": "Option in a dropdown of the Settings window, sent by the background helper.",
@@ -9091,7 +9091,7 @@
   },
   "settings.showsAGreyBadgeAtThe": {
     "context": "Description under a setting in Settings > Advanced > Development.",
-    "text": "Shows a grey badge at the top when a newer OBS is out. OBS doesn't update itself while ReplayKit is installed, so this only lets you know."
+    "text": "Shows a badge at the top when a newer OBS is out."
   },
   "settings.showsAWindowsNotificationWhenA": {
     "context": "Description under a setting in Settings > Notifications > Popups.",
@@ -9503,7 +9503,7 @@
   },
   "settings.usesYourGraphicsCardToSave": {
     "context": "Description under a setting in Settings > Video Editor > Trimming.",
-    "text": "Uses your graphics card to save edited videos much faster, like exact cuts, black sections, and speed changes. It also keeps your game running smoothly. If your PC can't do this, ReplayKit uses your processor instead."
+    "text": "Uses your graphics card to save edits faster."
   },
   "settings.valueDb": {
     "context": "Text in the microphone settings. Keep {value} as written.",
@@ -9535,7 +9535,7 @@
   },
   "settings.whenThisIsOnAndA": {
     "context": "Description under a setting in Settings > Screenshare > Discord Screenshare.",
-    "text": "When this is on and a game from your list is detected, ReplayKit shares only that game, even if you switch to another window like Discord, until the game is no longer detected."
+    "text": "Stays on the game when you tab out."
   },
   "settings.whichSurfaceToGiveAGradient": {
     "context": "Screen reader label in Settings > Appearance. Also used in the Settings window.",
@@ -11525,8 +11525,20 @@
     "text": "Game Out of Focus"
   },
   "settings.autoGameListOutOfFocusNote": {
-    "context": "Note of the Show Game Out of Focus switch under the Auto Game List in Settings > Screenshare > Discord Screenshare. 'Keep Game Focus' is the name of the switch above it, which is greyed out while this one is on.",
-    "text": "While a game from this list is open but you are not in it, the stream and clips show a Game Out of Focus card instead of the desktop. Keep Game Focus does nothing while this is on."
+    "context": "Note of the Show Game Out of Focus switch under the Auto Game List in Settings > Screenshare > Discord Screenshare.",
+    "text": "Shows a blurred picture of the game when you tab out, instead of your desktop."
+  },
+  "settings.autoGameListNote": {
+    "context": "Description under the Auto Game List setting in Settings > Screenshare > Discord Screenshare, a list of games the user adds.",
+    "text": "Add games here so your clips and screenshare stay focused on the game whenever it's found, even when you tab out."
+  },
+  "settings.autoGameListNoteCard": {
+    "context": "Description under the Auto Game List setting in Settings > Screenshare > Discord Screenshare, a list of games the user adds. Shown while Show Game Out of Focus is on.",
+    "text": "Add games here so your clips and screenshare show the game while you play, and a blurred picture of it when you tab out."
+  },
+  "settings.autoGameListNoteSwitch": {
+    "context": "Description under the Auto Game List setting in Settings > Screenshare > Discord Screenshare, a list of games the user adds. Shown while Keep Game Focus and Show Game Out of Focus are both off.",
+    "text": "Add games here so your clips and screenshare switch to the game while you play it, even in windowed mode."
   },
   "capture.videoUnavailable": {
     "context": "Smaller line under 'Game Out of Focus' on the recording, the clips and the Discord stream, while a game from the Auto Game List is open but not in focus.",

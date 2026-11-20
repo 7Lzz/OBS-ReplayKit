@@ -25,6 +25,8 @@ namespace ReplayKitHelper
             public uint Timescale;
             // the name of the first sample entry of the track, which is the codec: mp4a for aac
             public string SampleEntry = "";
+            // the channel count of an audio sample entry, 0 when it is not one or its version keeps the count elsewhere
+            public int Channels;
         }
 
         private const uint TrackEnabled = 1;
@@ -139,11 +141,18 @@ namespace ReplayKitHelper
                 }
 
                 string sampleEntry = "";
+                int channels = 0;
                 if (TryFind(s, mdia.PayloadStart, mdia.End, "minf", out Box minf) && TryFind(s, minf.PayloadStart, minf.End, "stbl", out Box stbl) && TryFind(s, stbl.PayloadStart, stbl.End, "stsd", out Box stsd))
                 {
                     // the box starts with its version and flags and the number of entries, then the first entry with its size and its name
                     s.Seek(stsd.PayloadStart + 12, SeekOrigin.Begin);
                     if (ReadBytes(s, buf, 4)) sampleEntry = System.Text.Encoding.ASCII.GetString(buf, 0, 4);
+                    // an audio entry goes on with six reserved bytes and its data reference, then its version, revision and vendor and then the channel count, which version 2 leaves at a fixed 3
+                    if (handler == "soun" && stsd.PayloadStart + 34 <= stsd.End)
+                    {
+                        s.Seek(stsd.PayloadStart + 24, SeekOrigin.Begin);
+                        if (ReadBytes(s, buf, 10) && ((buf[0] << 8) | buf[1]) < 2) channels = (buf[8] << 8) | buf[9];
+                    }
                 }
 
                 s.Seek(tkhd.PayloadStart, SeekOrigin.Begin);
@@ -173,6 +182,7 @@ namespace ReplayKitHelper
                     Version = version,
                     Timescale = timescale,
                     SampleEntry = sampleEntry,
+                    Channels = channels,
                 });
             }
             return tracks;

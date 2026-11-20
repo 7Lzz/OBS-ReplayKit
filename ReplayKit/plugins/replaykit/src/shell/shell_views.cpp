@@ -375,6 +375,18 @@ void ShellClipSaving(const std::string &args)
 		ShellRunJs(g_shellHost->browser, "window.RKShell && RKShell.clipSaving && RKShell.clipSaving.apply(null, " + args + ");");
 }
 
+void ShellEditor(const std::string &args)
+{
+	if (g_shellHost && g_shellHost->browser)
+		ShellRunJs(g_shellHost->browser, "window.RKShell && RKShell.editor && RKShell.editor.apply(null, " + args + ");");
+}
+
+void ShellClipsSections(const std::string &args)
+{
+	if (g_shellHost && g_shellHost->browser)
+		ShellRunJs(g_shellHost->browser, "window.RKShell && RKShell.sections && RKShell.sections.apply(null, " + args + ");");
+}
+
 void ShellUpdateTitle()
 {
 	if (!g_shellOn || !g_shellTitle)

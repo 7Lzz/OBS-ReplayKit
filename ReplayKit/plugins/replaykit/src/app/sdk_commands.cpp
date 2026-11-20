@@ -105,6 +105,7 @@ QJsonObject UiState(const QJsonObject &)
 	out["pageHostReady"] = g_hostReady;
 	out["setupPending"] = g_setupPending;
 	out["setupLocked"] = ShellSetupLocked();
+	out["editorOpen"] = QJsonObject{{"clips", ShellEditorOpen(ShellView::Clips)}, {"home", ShellEditorOpen(ShellView::Home)}};
 	out["pagePings"] = QJsonObject{{"sent", g_hostPingSent}, {"answered", g_hostPingAcked}, {"proven", g_hostPingProven}, {"misses", g_hostPingMisses}};
 	return out;
 }
@@ -129,6 +130,37 @@ QJsonObject UiView(const QJsonObject &args)
 		return Fail(QStringLiteral("args.view is home, projector, clips, settings, setup or obs-settings."));
 	ShellOpenView(view, false);
 	return UiState(QJsonObject());
+}
+
+// the answer only says the clips view was asked, since the page opens the editor on its own time; ui.state reports editorOpen once it is open
+QJsonObject UiEditor(const QJsonObject &args)
+{
+	const QString name = args.value("name").toString();
+	if (name.size() > 260)
+		return Fail(QStringLiteral("args.name is the file name of a clip the clips view lists."));
+	if (!g_shellHost || g_shellView != ShellView::Clips)
+		return Fail(QStringLiteral("The clips view has to show first (ui.view clips)."));
+	ShellEditor(QJsonDocument(QJsonArray{name}).toJson(QJsonDocument::Compact).toStdString());
+	return QJsonObject{{"ok", true}, {"asked", true}};
+}
+
+QJsonObject UiClipsSections(const QJsonObject &args)
+{
+	QJsonArray open;
+	for (const QJsonValue &value : args.value("open").toArray()) {
+		const QString key = value.toString();
+		if (!QRegularExpression(QStringLiteral("\\A[a-z]{1,20}\\z")).match(key).hasMatch())
+			return Fail(QStringLiteral("args.open is a list of section names such as favorites and clips."));
+		open.append(key);
+	}
+	// the clips page stays loaded behind the other views, so its sections can be put back from any of them
+	if (!g_shellHost)
+		return Fail(QStringLiteral("The shell is not available."));
+	// appended rather than braced, since a brace list holding one array copies that array instead of wrapping it
+	QJsonArray call;
+	call.append(open);
+	ShellClipsSections(QJsonDocument(call).toJson(QJsonDocument::Compact).toStdString());
+	return QJsonObject{{"ok", true}, {"open", open}};
 }
 
 QJsonObject UiPopup(const QJsonObject &args)
@@ -481,6 +513,8 @@ void RegisterBuiltins()
 	SdkRegister("ui.state", "the view, the window, the preview and its lock, the storage card and how many menus are open", UiState);
 	SdkRegister("memory.state", "committed and resident memory before and after the last hidden-window cleanup", [](const QJsonObject &) { return IdleMemory::Probe(); });
 	SdkRegister("ui.view", "shows a view: args.view is home, projector, clips, settings, setup or obs-settings", UiView);
+	SdkRegister("ui.clips-sections", "shows the sections args.open of the clips view (favorites, clips, screenshots and so on) open whatever was saved for them, without saving anything, while its page stays loaded; an empty list shows them as saved again", UiClipsSections);
+	SdkRegister("ui.editor", "opens the editor on the clip args.name the way the menu of its card does, while the clips view shows and lists that clip; without args.name it closes the editor", UiEditor);
 	SdkRegister("ui.popup", "opens a shell popup using args.name: account, notifications, clip, record, storage, reader (args.id) or close; reports the shared surface", UiPopup);
 	SdkRegister("ui.window", "shows the window of obs or sends it to the tray: args.mode is show or hide", UiWindow);
 	SdkRegister("ui.bring-forward", "restores and raises the obs window, and reports whether it became visible", UiBringForward);

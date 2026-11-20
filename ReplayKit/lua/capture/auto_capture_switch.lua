@@ -16,6 +16,7 @@ local cfg = {
 local MAX_SETTINGS_BYTES = 65536
 -- the card the plugin puts into every scene with a capture, shown in place of the captures while a game of the auto game list is open but not in front
 local FOCUS_CARD_SOURCE = replaykit_shared.focus_card_source
+local AUTO_GAME_DEFAULTS = replaykit_shared.auto_game_defaults
 local DEFAULT_CAPTURE_MODE = "hybrid_auto"
 local MIN_DESKTOP_SWITCH_GRACE_MS = 50
 local MAX_DESKTOP_SWITCH_GRACE_MS = 5000
@@ -204,7 +205,7 @@ local function valid_exe_name(exe)
 end
 
 local function read_capture_policy()
-    local policy = { mode = DEFAULT_CAPTURE_MODE, auto_games = {}, keep_focused = false, focus_card = true, switch_grace_ms = DEFAULT_DESKTOP_SWITCH_GRACE_MS }
+    local policy = { mode = DEFAULT_CAPTURE_MODE, auto_games = {}, keep_focused = AUTO_GAME_DEFAULTS.keep_focused, focus_card = AUTO_GAME_DEFAULTS.out_of_focus, switch_grace_ms = DEFAULT_DESKTOP_SWITCH_GRACE_MS }
     local text = read_text(runtime_settings_path())
     if not text or text == "" then return policy end
 
@@ -214,8 +215,10 @@ local function read_capture_policy()
     if valid_capture_mode(mode) then
         policy.mode = mode
     end
-    policy.keep_focused = obs.obs_data_get_bool(data, "screenshareAutoGameKeepFocused")
-    -- on unless the settings say otherwise, the default of the helper
+    -- a settings file without these keys yet means the defaults of the helper, which shared_values carries
+    if obs.obs_data_has_user_value(data, "screenshareAutoGameKeepFocused") then
+        policy.keep_focused = obs.obs_data_get_bool(data, "screenshareAutoGameKeepFocused")
+    end
     if obs.obs_data_has_user_value(data, "screenshareAutoGameOutOfFocus") then
         policy.focus_card = obs.obs_data_get_bool(data, "screenshareAutoGameOutOfFocus")
     end

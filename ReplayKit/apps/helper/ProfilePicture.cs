@@ -5,6 +5,7 @@ using System.Drawing.Imaging;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using Newtonsoft.Json.Linq;
 using ReplayKitShared;
 
 namespace ReplayKitHelper
@@ -19,11 +20,22 @@ namespace ReplayKitHelper
 
         internal static string FilePath => StateLayout.PathFor(AppConfig.GetReplayKitRoot(), StateLayout.ProfilePictureFile);
 
-        // the write time of the saved picture, which the account menu and the plugin compare to notice a new one; empty when there is none
+        // the sdk hides the picture while screenshots for the readme are taken, without touching the file; it is not saved, so a restart of the helper shows it again
+        internal static volatile bool Hidden;
+
+        // the write time of the saved picture, which the account menu and the plugin compare to notice a new one; empty when there is none or it is hidden
         internal static string Version()
         {
+            if (Hidden) return "";
             var file = new FileInfo(FilePath);
             return file.Exists ? file.LastWriteTimeUtc.Ticks.ToString(CultureInfo.InvariantCulture) : "";
+        }
+
+        internal static JObject SetHidden(bool hidden)
+        {
+            Hidden = hidden;
+            PipeClient.SendAccountChanged();
+            return new JObject { ["ok"] = true, ["hidden"] = hidden, ["picture"] = Version() };
         }
 
         internal static void Save(string source)

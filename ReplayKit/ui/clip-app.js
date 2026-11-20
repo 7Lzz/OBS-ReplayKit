@@ -1328,8 +1328,10 @@ const CLIP_HOVER_PROFILES = {
     return game === "all" ? null : filteredCollapse;
   }
 
+  // sections the sdk shows open for a while, for the readme screenshots, without touching what was saved for them
+  const sdkOpenSections = new Set();
   function sectionCollapsed(key) {
-    return activeFilter === "all" && (gameCollapseState()?.sections ?? collapsedSections).has(key);
+    return activeFilter === "all" && !sdkOpenSections.has(key) && (gameCollapseState()?.sections ?? collapsedSections).has(key);
   }
 
   function syncClipView() {
@@ -1719,7 +1721,7 @@ const CLIP_HOVER_PROFILES = {
     img.src = src;
     const card = img.closest && img.closest(".card");
     if (card) {
-      card.classList.remove("is-processing");
+      setCardProcessing(card, false);
       fillDurationBadge(card);
     }
     return true;
@@ -1734,9 +1736,14 @@ const CLIP_HOVER_PROFILES = {
   function isProcessingClip(clip) {
     return !!clip && clip.indexed !== true && isFreshClip(clip.mtime);
   }
+  // the file of a processing clip is not finished yet, so its buttons, its menu and its name stay out of reach and greyed out until it is
+  function setCardProcessing(card, on) {
+    card.classList.toggle("is-processing", on);
+    for (const part of card.querySelectorAll(":scope > .body, :scope > .actions, .select-clip-btn, .favorite-btn")) part.inert = on;
+  }
   function syncProcessing(card, clip) {
     const thumb = card.querySelector(".thumb");
-    card.classList.toggle("is-processing", isProcessingClip(clip) && !(thumb && thumb.dataset.loaded === "1"));
+    setCardProcessing(card, isProcessingClip(clip) && !(thumb && thumb.dataset.loaded === "1"));
   }
   function thumbNotReady(img, src) {
     const card = img.closest && img.closest(".card");
@@ -1744,10 +1751,10 @@ const CLIP_HOVER_PROFILES = {
     const tries = (Number(img.dataset.thumbTries) || 0) + 1;
     img.dataset.thumbTries = String(tries);
     if (tries > THUMB_RETRY_MAX) {
-      card.classList.remove("is-processing");
+      setCardProcessing(card, false);
       return;
     }
-    card.classList.add("is-processing");
+    setCardProcessing(card, true);
     setTimeout(() => {
       if (img.dataset && img.dataset.src === src && img.dataset.loaded !== "1") loadThumb(img);
     }, Math.min(1000 + tries * 500, 5000));
@@ -1830,7 +1837,7 @@ const CLIP_HOVER_PROFILES = {
       // piggyback on the same near-viewport trigger to lazy-fill the duration badge, kept out of the scroll renderer so CEF is not decoding thumbnails and probing video metadata during every scroll frame.
       const card = img.closest && img.closest(".card");
       if (card) {
-        card.classList.remove("is-processing");
+        setCardProcessing(card, false);
         fillDurationBadge(card);
       }
     }).catch(() => {
@@ -2016,7 +2023,7 @@ const CLIP_HOVER_PROFILES = {
     if (menu) closeCardMenu(menu);
     else card.classList.remove("menu-open");
     resetDeleteButton(card.querySelector(".delete-menu-item"));
-    card.classList.remove("is-processing");
+    setCardProcessing(card, false);
     const preview = card.querySelector(".preview");
     if (preview) preview.classList.remove("is-playing", "is-video-ready", "is-idle");
     const progress = card.querySelector(".progress-fill");
@@ -3796,6 +3803,7 @@ const CLIP_HOVER_PROFILES = {
 
     // the same menu is available from the visible 3-dot button or a right-click anywhere on the clip
     function openCardMenuAtPointer(e) {
+      if (card.classList.contains("is-processing")) return;
       openCardMenuAt(card, menuDropdown, e);
     }
     menuBtn.addEventListener("click", (e) => {
@@ -6771,6 +6779,20 @@ const CLIP_HOVER_PROFILES = {
     quickSent = body;
     fetch(HELPER + "/quick-actions/state?view=" + QUICK_VIEW, { method:"POST", cache:"no-store", headers:{ "Content-Type":"application/json" }, body }).catch(() => { quickSent = ""; });
   }
+  // the sdk opens the editor on a clip the list holds, the way the menu of its card does, and closes it again with an empty name
+  window.__rkEditor = function (name) {
+    if (!name) { closeEditor(); return; }
+    const clip = loadedClips.find((c) => c.name === name);
+    if (clip) requestOpenEditor(clip);
+  };
+  window.__rkOpenSections = function (keys) {
+    sdkOpenSections.clear();
+    for (const key of Array.isArray(keys) ? keys : []) if (SECTION_KEYS.has(key)) sdkOpenSections.add(key);
+    stopActivePreviewForScroll();
+    mediaGalleries.forEach(gallery => gallery.paint());
+    renderLoadedClips(loadedClips);
+    queueVirtualRender(true);
+  };
   window.__rkPublishQuickActions = publishQuickActions;
   window.__rkQuickAction = function (id) {
     const api = editorApi();
@@ -6808,11 +6830,13 @@ const CLIP_HOVER_PROFILES = {
     trimProcessingVeil.classList.toggle("has-bones", RKSkeleton.draw(trimProcessingBonesEl, map));
   }
   let editorShapeTimer = 0;
+  // the editor always opens with its side panels shut, so a shape taken while one of them shows is not the editor a later load draws
+  const EDITOR_SIDE_PANELS = ".ed-tools:not([hidden]), .editor-side > .editor-card:not([hidden])";
   function rememberEditorShape() {
     clearTimeout(editorShapeTimer);
     if (!window.RKSkeleton || !trimVeil.classList.contains("is-open")) return;
     editorShapeTimer = setTimeout(() => {
-      if (!trimVeil.classList.contains("is-open") || trimVeil.querySelector(".modal-veil.is-open") || saveVeil.classList.contains("is-open") || document.fullscreenElement) return;
+      if (!trimVeil.classList.contains("is-open") || trimVeil.querySelector(".modal-veil.is-open") || trimVeil.querySelector(EDITOR_SIDE_PANELS) || saveVeil.classList.contains("is-open") || document.fullscreenElement) return;
       RKSkeleton.save("editor", RKSkeleton.measure(trimVeil));
     }, 1500);
   }

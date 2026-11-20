@@ -2482,8 +2482,8 @@
     "text": "保存容量の上限"
   },
   "common.storesRecentGameplayUntilYouSave": {
-    "source": "d74039e73d8aaae0",
-    "text": "クリップを保存するまで、直近のゲームプレイを保持します。ディスク は RAM をほとんど使わず、クリップ作成中はドライブに書き込みます。メモリ は最も速くクリップを保存しますが、RAM をより多く使います。ディスク で問題が起きる場合に役立つことがあります。"
+    "source": "4b669f702db501a2",
+    "text": "クリップを保存するまで、直近のゲームプレイを保持します。ディスク は RAM をほとんど使いません。メモリ は最も速く保存しますが、RAM をより多く使います。"
   },
   "common.streamableAccount": {
     "source": "92e37626d0f39b5f",
@@ -7064,8 +7064,8 @@
     "text": "既定"
   },
   "settings.deletesTheOldLogsEachTime": {
-    "source": "1ededadd8819ee7b",
-    "text": "OBS の起動のたびに古いログを削除し、たまらないようにします。以前のセッションのログを残したい場合を除き、オンのままにしてください。"
+    "source": "7e3aadb4faf6b5e0",
+    "text": "OBS の起動のたびに古いログを削除し、たまらないようにします。"
   },
   "settings.desktopAudioIsNotTheReplaykit": {
     "source": "dc224b7bdacd7452",
@@ -7140,8 +7140,8 @@
     "text": "Discord リッチプレゼンス"
   },
   "settings.discordRichPresenceNote": {
-    "source": "4e760cbd412f470a",
-    "text": "プレイ中のゲームを Discord のプロフィールに表示し、ReplayKit の入手リンクを添えます。「詳細」の「クリップ内のゲームを認識」をオンにする必要があります。"
+    "source": "082ab1fc1205233b",
+    "text": "プレイ中のゲームを Discord のプロフィールに表示します。「詳細」の「クリップ内のゲームを認識」をオンにする必要があります。"
   },
   "settings.discordScreenshare": {
     "source": "0084858b433582ee",
@@ -7328,8 +7328,8 @@
     "text": "最も鮮明、36 サンプル。既定。"
   },
   "settings.findsTheGameYouWerePlaying": {
-    "source": "78bff2aead6f9227",
-    "text": "プレイ中のゲームを見つけ、新しいクリップとスクリーンショットにゲーム名、アイコン、フォルダーを付けます。オフにするとゲームアイコンとゲームのフィルタが非表示になり、ReplayKit はゲームの検索を停止します。"
+    "source": "19231e050c5b6ec4",
+    "text": "新しいクリップに、プレイ中だったゲームを付けます。"
   },
   "settings.fixHevcPlaybackCompatibility": {
     "source": "a426c818b132fc16",
@@ -7480,12 +7480,12 @@
     "text": "OBS ウィンドウが最小化されるかトレイに入ってから、メモリを解放するために ReplayKit のページを閉じるまでの時間。ウィンドウを開くと再び読み込まれます。未保存の変更や実行中の処理があるページは開いたままになります。"
   },
   "settings.howManySecondsReplaykitWaitsAfter": {
-    "source": "d5c4e0c7c18ddaac",
-    "text": "ゲームを離れてから、画面全体に戻るまで ReplayKit が待つ時間。短いと素早く戻ります。長くすると、ウィンドウを一時的に切り替えたときのちらつきを防げます。"
+    "source": "6bf6fd633f60c58b",
+    "text": "ゲームを離れてから画面に戻るまでの待ち時間。"
   },
   "settings.howSmoothExportedGifsPlayHigher": {
-    "source": "bb90af927071a1f9",
-    "text": "書き出した GIF の滑らかさ。高いほど滑らかになりますが、ファイルが大きくなり書き出しに時間がかかります。どの設定でも再生速度は一定です。"
+    "source": "1823cd06547b3fdb",
+    "text": "書き出した GIF の滑らかさ。高いほど滑らかになりますが、ファイルが大きくなります。"
   },
   "settings.hue": {
     "source": "aaea6806ac42d03b",
@@ -7588,12 +7588,12 @@
     "text": "OBS のトレイアイコンを時計の横に固定したままにする"
   },
   "settings.keepsReplaykitSPopUpMessages": {
-    "source": "f02096f08fb89245",
-    "text": "「クリップを保存しました」などの ReplayKit のポップアップを、スクリーンショットと録画から除外します。クリップや配信には表示されません。"
+    "source": "9dec75ecb5ce0dca",
+    "text": "ReplayKit のポップアップをクリップ、スクリーンショット、配信に映さないようにします。"
   },
   "settings.keepsTheLastMomentsOfYour": {
-    "source": "a8eb11ed982e3f9a",
-    "text": "画面の直近の数秒を保持しておき、クリップのホットキーまたはクリップボタンで保存できるようにします。オフにすると、クリップ用に何も保持されません。"
+    "source": "cd549c721918e9aa",
+    "text": "直近の場面を保持し、クリップとして保存できるようにします。"
   },
   "settings.keepsYourScreenAndPcAwake": {
     "source": "0b5068e28908a131",
@@ -7688,8 +7688,8 @@
     "text": "単色ではなく、領域を色の間でフェードさせます。"
   },
   "settings.letsYouZoomIntoTheVideo": {
-    "source": "7557e4ec68dc0847",
-    "text": "エディターで映像の上をスクロールすると、最大 4 倍まで拡大して細部を確認できます。オフにすると、そこでのスクロールは何もしません。"
+    "source": "d1d6647834e4ad64",
+    "text": "エディターで映像の上をスクロールすると、最大 4 倍まで拡大できます。"
   },
   "settings.like3DaysAgo": {
     "source": "70c998f96efacc23",
@@ -8264,8 +8264,8 @@
     "text": "Windows にサインインしたときに OBS と ReplayKit を開きます。"
   },
   "settings.opensObsWithAdministratorRightsThe": {
-    "source": "4527a5108c023e38",
-    "text": "次に起動するときに、管理者権限で OBS を開きます。Windows は毎回確認を求めます。ほとんどの人には不要です。"
+    "source": "119c25d7a4d8e8c8",
+    "text": "OBS を管理者として実行します。Windows は毎回確認を求めます。ほとんどの人には不要です。"
   },
   "settings.output": {
     "source": "0cd3518a3335a3aa",
@@ -8664,8 +8664,8 @@
     "text": "ReplayKit のインストールを修復しています。"
   },
   "settings.repairsTheVideoTagOnHevc": {
-    "source": "b87233373493fa85",
-    "text": "HEVC のクリップと録画の動画タグを修復し、iPhone などの機器で再生できるようにします。元の画質は維持されます。"
+    "source": "a492c946308a23e4",
+    "text": "HEVC のクリップを iPhone などの機器で再生できるようにします。"
   },
   "settings.repark": {
     "source": "40c2985c92ed985e",
@@ -8910,8 +8910,8 @@
     "text": "その保存済みテーマはもう存在しません。"
   },
   "settings.savesPcAudioDiscordAndYour": {
-    "source": "7176992f35453e0d",
-    "text": "PC の音声、Discord、マイクを、通常のミックス済みトラックとは別のトラックとして保存します。それぞれ、クリップエディターで変更できます。OBS の再起動が必要です。"
+    "source": "8b05f7bfb4343442",
+    "text": "PC の音声、Discord、マイクを別々のトラックとして保存します。OBS の再起動が必要です。"
   },
   "settings.scaleDownscale": {
     "source": "c96fd816bcb1bdda",
@@ -9086,8 +9086,8 @@
     "text": "ウィンドウ上部のアカウントの円に表示されます。どの画像でも使え、正方形に切り抜かれます。"
   },
   "settings.showsAGreyBadgeAtThe": {
-    "source": "9f1e8223ee728f49",
-    "text": "新しい OBS が公開されると、上部にグレーのバッジを表示します。ReplayKit のインストール中は OBS が自動更新されないため、このバッジは通知のみを行います。"
+    "source": "9cb5f9c2683c7692",
+    "text": "新しい OBS が公開されると、上部にバッジを表示します。"
   },
   "settings.showsAWindowsNotificationWhenA": {
     "source": "1b1ab7b39307d283",
@@ -9498,8 +9498,8 @@
     "text": "ゲーム音声の音量を使用"
   },
   "settings.usesYourGraphicsCardToSave": {
-    "source": "7d5edb8a14fc2b5b",
-    "text": "正確なカット、黒い区間、速度の変更などを含む編集済みの動画を、グラフィックスカードを使ってずっと速く保存します。ゲームも滑らかに動き続けます。PC でこれができない場合は、ReplayKit がプロセッサーを代わりに使います。"
+    "source": "16049819fb3a5dab",
+    "text": "グラフィックスカードを使って、編集をより速く保存します。"
   },
   "settings.valueDb": {
     "source": "43245c4acbec741e",
@@ -9530,8 +9530,8 @@
     "text": "何を削除しますか?"
   },
   "settings.whenThisIsOnAndA": {
-    "source": "a3c8828f681ccf6c",
-    "text": "これがオンで、一覧にあるゲームが検出されている間は、Discord などほかのウィンドウに切り替えても、ReplayKit はそのゲームだけを共有します。ゲームが検出されなくなるまで続きます。"
+    "source": "c11a7181e023a485",
+    "text": "ほかのウィンドウに切り替えても、ゲームを映し続けます。"
   },
   "settings.whichSurfaceToGiveAGradient": {
     "source": "400897802e4a1bd2",
@@ -11516,8 +11516,20 @@
     "text": "ゲームがフォーカスされていません"
   },
   "settings.autoGameListOutOfFocusNote": {
-    "source": "f3a2c07856ad8e2d",
-    "text": "このリストのゲームが開いていても操作していないあいだは、デスクトップの代わりに「ゲームがフォーカスされていません」のカードが配信とクリップに表示されます。これがオンのあいだは「ゲームのフォーカスを維持」は効きません。"
+    "source": "52d1f268bc9b1e5f",
+    "text": "ほかのウィンドウに切り替えると、デスクトップの代わりにぼかしたゲームの画面を表示します。"
+  },
+  "settings.autoGameListNote": {
+    "source": "190ca5cc285e21db",
+    "text": "ここにゲームを追加すると、ゲームが見つかっているあいだは、ほかのウィンドウに切り替えてもクリップと画面共有がゲームを映し続けます。"
+  },
+  "settings.autoGameListNoteCard": {
+    "source": "92c7ddc61885a788",
+    "text": "ここにゲームを追加すると、プレイ中はクリップと画面共有にゲームが映り、ほかのウィンドウに切り替えるとぼかしたゲームの画面が映ります。"
+  },
+  "settings.autoGameListNoteSwitch": {
+    "source": "6c65782093296da7",
+    "text": "ここにゲームを追加すると、ウィンドウモードでも、プレイ中はクリップと画面共有がそのゲームに切り替わります。"
   },
   "capture.videoUnavailable": {
     "source": "1371e9f5bfce72a0",

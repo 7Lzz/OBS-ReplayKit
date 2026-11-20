@@ -980,7 +980,7 @@
           <div class="field-wrap"><div class="combo" id="screenshareGameWindow" tabindex="0" role="combobox" aria-expanded="false"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button><div class="combo-menu" role="listbox"></div></div></div>
         </div>
         <div class="form-row" id="screenshareGameOverridesRow">
-          <div class="label" data-i18n="settings.autoGameList"></div>
+          <div class="label"><span data-i18n="settings.autoGameList"></span> <span class="control-note" id="screenshareAutoGameListNote"></span></div>
           <div class="field-wrap is-stacked">
             <div class="game-rule-actions">
               <div class="combo" id="screenshareGameOverridePicker" tabindex="0" role="combobox" aria-expanded="false"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button><div class="combo-menu" role="listbox"></div></div>
@@ -2224,6 +2224,7 @@
     screenshareGameWindowRow: document.getElementById("screenshareGameWindowRow"),
     screenshareGameOverridesRow: document.getElementById("screenshareGameOverridesRow"),
     screenshareGameOverridePicker: document.getElementById("screenshareGameOverridePicker"),
+    screenshareAutoGameListNote: document.getElementById("screenshareAutoGameListNote"),
     addScreenshareGameOverride: document.getElementById("addScreenshareGameOverride"),
     screenshareGameOverrideList: document.getElementById("screenshareGameOverrideList"),
     screenshareAutoGameKeepFocused: document.getElementById("screenshareAutoGameKeepFocused"),
@@ -3345,6 +3346,8 @@
     els.screenshareAutoGameKeepFocused.disabled = !keepFocusUsed;
     els.screenshareAutoGameOutOfFocusRow.classList.toggle("is-disabled", !usesAutoList);
     els.screenshareAutoGameOutOfFocus.disabled = !usesAutoList;
+    // what the list does when you tab out depends on the two switches under it, so its note follows them
+    els.screenshareAutoGameListNote.textContent = els.screenshareAutoGameOutOfFocus.checked ? RK_M("settings.autoGameListNoteCard") : els.screenshareAutoGameKeepFocused.checked ? RK_M("settings.autoGameListNote") : RK_M("settings.autoGameListNoteSwitch");
     els.screenshareSwitchDelayRow.classList.toggle("is-disabled", !usesAutoList);
     els.screenshareSwitchDelay.disabled = !usesAutoList;
     els.screenshareSwitchDelayValue.disabled = !usesAutoList;
@@ -4054,6 +4057,7 @@
   if (window.RKShareCardEditor) RKShareCardEditor.init({ get:(k) => k === "share_cover_text" ? state[k] : settingOr(k), set:(k, v) => { state[k] = v; }, onChange:() => markDirty() });
   els.screenshareGameOverridePicker.addEventListener("combochange", syncScreenshareCaptureFields);
   els.screenshareAutoGameOutOfFocus.addEventListener("change", syncScreenshareCaptureFields);
+  els.screenshareAutoGameKeepFocused.addEventListener("change", syncScreenshareCaptureFields);
   els.addScreenshareGameOverride.addEventListener("click", addScreenshareGameOverride);
   {
     // capture Source dropdown reset -- setComboValue(..., true) fires combochange, which readUi()s the new value into state and re-syncs the dependent rows.
@@ -4422,7 +4426,7 @@
       fillCombo(els.downscaleFilter, data.options.downscaleFilters || []);
       fillCombo(els.screenshareCaptureMode, data.options.screenshareCaptureModes || []);
       fillCombo(els.screenshareGameWindow, data.options.screenshareGameWindows || []);
-      fillCombo(els.screenshareGameOverridePicker, data.options.screenshareGameWindows || []);
+      fillCombo(els.screenshareGameOverridePicker, (data.options.screenshareGameWindows || []).filter((w) => !w.saved));
       fillCombo(els.shareCoverBackground, [
         { value:"theme", label:RK_M("settings.shareCardBackgroundTheme") },
         { value:"media", label:RK_M("settings.shareCardBackgroundMedia") },
@@ -4627,7 +4631,7 @@
       if (externalRefreshBusy() || epoch !== saveEpoch) return;
       const next = data.settings || {};
       fillCombo(els.screenshareGameWindow, data.options.screenshareGameWindows || []);
-      fillCombo(els.screenshareGameOverridePicker, data.options.screenshareGameWindows || []);
+      fillCombo(els.screenshareGameOverridePicker, (data.options.screenshareGameWindows || []).filter((w) => !w.saved));
       // a display plugged in or out while the page is open shows up in the list
       fillCombo(els.captureDisplay, data.options.captureDisplays || [{ value:"primary", label:RK_M("common.primaryDisplay") }]);
       if (!sameSetting(next, lastServerSettings)) {
@@ -5565,12 +5569,12 @@
     if (document.getElementById("page-" + name)) activatePage(name);
   };
 
-  // the first load holds the pages under the shape kept from an earlier load of this page at this size, or under the plain ground when there is none yet, so no control shows a value before the real one is in
+  // the first load holds the sidebar and the pages under the shape kept from an earlier load of this page at this size, or under the plain ground when there is none yet, so no control shows a value before the real one is in and the sidebar does not come in ahead of the settings
   const requestedSettingsPage = new URLSearchParams(location.search).get("page");
   if (requestedSettingsPage) window.__rkGoToPage(requestedSettingsPage);
-  const settingsMain = document.querySelector("main.main");
-  if (window.RKSkeleton) RKSkeleton.cover(settingsMain, { view: "settings", variant: document.body.dataset.skelPage, blankFirst: true });
-  loadSettings().finally(() => { if (window.RKSkeleton) RKSkeleton.uncover(settingsMain); });
+  const settingsShell = document.querySelector(".shell");
+  if (window.RKSkeleton) RKSkeleton.cover(settingsShell, { view: "settings", variant: document.body.dataset.skelPage, blankFirst: true });
+  loadSettings().finally(() => { if (window.RKSkeleton) RKSkeleton.uncover(settingsShell); });
   setInterval(refreshExternalSettings, 2000);
 
   // hidden-not-destroyed window: a reopen just re-shows this page, so the waiting save goes out, settings are fetched again and what still waits for Restart OBS is dropped, to behave like a fresh open. mirrors clips.htmls re-show reset (visibilitychange, plus a focus fallback for CEF hosts that dont deliver visibilitychange on their own hide()/show()).

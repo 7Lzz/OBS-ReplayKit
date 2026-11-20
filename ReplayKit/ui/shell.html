@@ -546,7 +546,23 @@
     } catch (e) { rkReportError(e); }
   }
 
-  window.RKShell = { quickAction: quickAction, clipSaving: clipSaving, show: show, park: park, confirmLeave: confirmLeave, leave: leave, enter: enter, reselect: reselect, ping: ping, windowShown: windowShown, busy: busy, leaveFullscreen: leaveFullscreen, focus: focusActive, sleep: sleep, timing: function () { return JSON.stringify(marks); } };
+  // the sdk opens the editor of the clips view on a clip by its file name, or closes it with an empty name
+  function editor(name) {
+    var f = frames.clips;
+    try {
+      if (f && f.loaded && typeof f.el.contentWindow.__rkEditor === "function") f.el.contentWindow.__rkEditor(String(name || ""));
+    } catch (e) { rkReportError(e); }
+  }
+
+  // the sdk shows sections of the clips view open for a while without touching what was saved for them
+  function sections(keys) {
+    var f = frames.clips;
+    try {
+      if (f && f.loaded && typeof f.el.contentWindow.__rkOpenSections === "function") f.el.contentWindow.__rkOpenSections(keys);
+    } catch (e) { rkReportError(e); }
+  }
+
+  window.RKShell = { quickAction: quickAction, clipSaving: clipSaving, editor: editor, sections: sections, show: show, park: park, confirmLeave: confirmLeave, leave: leave, enter: enter, reselect: reselect, ping: ping, windowShown: windowShown, busy: busy, leaveFullscreen: leaveFullscreen, focus: focusActive, sleep: sleep, timing: function () { return JSON.stringify(marks); } };
 
   // the plugin names the view to start on in the address (at the start, after sleep, after a reload), so the first thing painted is the placeholder of that view; home without one
   var bootView = new URLSearchParams(location.search).get("view");
