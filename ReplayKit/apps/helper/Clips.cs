@@ -290,7 +290,8 @@ namespace ReplayKitHelper
                     InvalidateCache();
                     warning = Locales.Message("common.libraryMetadataNotSaved");
                 }
-                EditDrafts.Forget(selected.Full);
+                // a clip kept in the deleted history can come back at the same path, size and time, where its draft matches it again; deleted history drops the draft once the clip is gone for good
+                if (!kept) EditDrafts.Forget(selected.Full);
                 return new DeleteResult { Status = 200, Name = selected.Name, Kept = kept, Warning = warning };
             }
         }
@@ -1184,11 +1185,10 @@ namespace ReplayKitHelper
             foreach (var raw in names ?? Enumerable.Empty<string>())
             {
                 if (wanted.Count >= 500) break;
-                string decoded;
-                try { decoded = Uri.UnescapeDataString(raw ?? ""); }
-                catch (Exception ex) when (ex is FormatException || ex is ArgumentException) { continue; }
-                if (string.IsNullOrWhiteSpace(decoded) || decoded.IndexOfAny(new[] { '\\', '/' }) >= 0) continue;
-                string name = GetSafeFilename(decoded);
+                // the names come raw in the json body, so a name with % in it is taken as it is and never decoded a second time
+                string given = raw ?? "";
+                if (string.IsNullOrWhiteSpace(given) || given.IndexOfAny(new[] { '\\', '/' }) >= 0) continue;
+                string name = GetSafeFilename(given);
                 if (!string.IsNullOrEmpty(name)) wanted.Add(name);
             }
             var items = new List<JObject>();

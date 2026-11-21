@@ -16,31 +16,56 @@ namespace ReplayKitSetup
     {
         // targeted regex over configparser becuase obss basic.ini has formatting we want byte-identical (no spaces around =, blank lines, base64 blobs in geometry=).
 
-        // set [section] key=value, preserving formatting. value is treated literally.
+        // set [section] key=value, preserving formatting. value is treated literally. it works line by line since a hotkey value is json with [ in it, which a regex over the whole text took for the next section header
         public static string SetIniValue(string text, string section, string key, string value)
         {
-            string keyRe = Regex.Escape(key);
-
-            // both section and key present -> replace value in place.
-            var updateRe = new Regex(@"(\[" + Regex.Escape(section) + @"\][^\[]*?\n)" + keyRe + "=[^\r\n]*", RegexOptions.Singleline);
-            var updateMatch = updateRe.Match(text);
-            if (updateMatch.Success)
-            {
-                return updateRe.Replace(text, m => m.Groups[1].Value + key + "=" + value, 1);
-            }
-
-            // section present, key missing -> insert before the next section header.
-            var sectionRe = new Regex(@"(\[" + Regex.Escape(section) + @"\][^\[]*?)(?=\n\[|\z)", RegexOptions.Singleline);
-            var m2 = sectionRe.Match(text);
-            if (m2.Success)
-            {
-                string body = m2.Groups[1].Value.TrimEnd();
-                return text.Substring(0, m2.Index) + body + $"\n{key}={value}\n" + text.Substring(m2.Index + m2.Length);
-            }
+            var lines = new List<string>(text.Split('\n'));
+            string header = "[" + section + "]";
+            int start = lines.FindIndex(l => l.TrimEnd('\r').Trim() == header);
 
             // section missing entirely -> append a fresh one at end of file.
-            string sep = text.EndsWith("\n") ? "" : "\n";
-            return $"{text}{sep}\n[{section}]\n{key}={value}\n";
+            if (start < 0)
+            {
+                string sep = text.EndsWith("\n") ? "" : "\n";
+                return $"{text}{sep}\n[{section}]\n{key}={value}\n";
+            }
+
+            int end = start + 1;
+            while (end < lines.Count && !IsIniHeader(lines[end])) end++;
+
+            // both section and key present -> replace value in place.
+            for (int i = start + 1; i < end; i++)
+            {
+                if (!lines[i].StartsWith(key + "=", StringComparison.Ordinal)) continue;
+                lines[i] = key + "=" + value + (lines[i].EndsWith("\r") ? "\r" : "");
+                return string.Join("\n", lines);
+            }
+
+            // section present, key missing -> insert after its last line, before the blank lines that lead to the next header.
+            int at = end;
+            while (at > start + 1 && lines[at - 1].TrimEnd('\r').Trim() == "") at--;
+            lines.Insert(at, key + "=" + value + (lines[start].EndsWith("\r") ? "\r" : ""));
+            return string.Join("\n", lines);
+        }
+
+        // [section] key value, or null, read by the same line rule as SetIniValue
+        public static string GetIniValue(string text, string section, string key)
+        {
+            var lines = text.Split('\n');
+            string header = "[" + section + "]";
+            int start = Array.FindIndex(lines, l => l.TrimEnd('\r').Trim() == header);
+            if (start < 0) return null;
+            for (int i = start + 1; i < lines.Length && !IsIniHeader(lines[i]); i++)
+            {
+                if (lines[i].StartsWith(key + "=", StringComparison.Ordinal)) return lines[i].TrimEnd('\r').Substring(key.Length + 1);
+            }
+            return null;
+        }
+
+        private static bool IsIniHeader(string line)
+        {
+            string trimmed = line.TrimEnd('\r').Trim();
+            return trimmed.StartsWith("[") && trimmed.EndsWith("]");
         }
 
         // memoised so ApplyBasicIni and ApplyRecordEncoderJson agree on which encoder got picked.
@@ -139,23 +164,32 @@ namespace ReplayKitSetup
             text = SetIniValue(text, "AdvOut", "RecFilePath", recPath);
             text = SetIniValue(text, "AdvOut", "FFFilePath", recPath);
 
-            text = SetIniValue(text, "Hotkeys", "ReplayBuffer", Keybind.ToBasicIniValue(prefs.ClipKeybind));
-            text = SetIniValue(text, "Hotkeys", "OBSBasic.SaveReplayBuffer", Keybind.ToObsHotkeyValue(prefs.ClipKeybind));
+            // the wizard sets the clip and recording keys; the extra bindings, a stop key of its own and the screenshot key come from the settings file, since the helper reads every hotkey back out of obs and would save an empty one over the setting
+            var clipExtra = RuntimeKeybind("clipKeybindExtra");
+            text = SetIniValue(text, "Hotkeys", "ReplayBuffer", Keybind.ToBasicIniValue(prefs.ClipKeybind, clipExtra));
+            text = SetIniValue(text, "Hotkeys", "OBSBasic.SaveReplayBuffer", Keybind.ToObsHotkeyValue(prefs.ClipKeybind, clipExtra));
             if (prefs.RecordingKeybind != null && prefs.RecordingKeybind.Count > 0)
             {
-                string recordingHotkey = Keybind.ToObsHotkeyValue(prefs.RecordingKeybind);
+                string recordingHotkey = Keybind.ToObsHotkeyValue(prefs.RecordingKeybind, RuntimeKeybind("recordingKeybindExtra"));
+                var stop = RuntimeKeybind("recordingStopKeybind");
                 text = SetIniValue(text, "Hotkeys", "OBSBasic.StartRecording", recordingHotkey);
-                text = SetIniValue(text, "Hotkeys", "OBSBasic.StopRecording", recordingHotkey);
+                text = SetIniValue(text, "Hotkeys", "OBSBasic.StopRecording", stop != null ? Keybind.ToObsHotkeyValue(stop, RuntimeKeybind("recordingStopKeybindExtra")) : recordingHotkey);
             }
+            var screenshot = RuntimeKeybind("screenshotKeybind");
+            var screenshotExtra = RuntimeKeybind("screenshotKeybindExtra");
+            if (screenshot != null || screenshotExtra != null)
+                text = SetIniValue(text, "Hotkeys", "OBSBasic.Screenshot", Keybind.ToObsHotkeyValue(screenshot, screenshotExtra));
 
+            return ApplyShareCableMonitoring(text);
+        }
+
+        // obs monitors to the share cable, which is how Share Preview carries desktop audio; a basic.ini is left as it is when the cable is not on the machine
+        public static string ApplyShareCableMonitoring(string text)
+        {
             var monitor = FindObsStreamAudioRenderEndpoint();
-            if (monitor != null)
-            {
-                text = SetIniValue(text, "Audio", "MonitoringDeviceId", monitor.Value.DeviceId);
-                text = SetIniValue(text, "Audio", "MonitoringDeviceName", monitor.Value.Name);
-            }
-
-            return text;
+            if (monitor == null) return text;
+            text = SetIniValue(text, "Audio", "MonitoringDeviceId", monitor.Value.DeviceId);
+            return SetIniValue(text, "Audio", "MonitoringDeviceName", monitor.Value.Name);
         }
 
         private static (string DeviceId, string Name)? FindObsStreamAudioRenderEndpoint()
@@ -299,8 +333,7 @@ namespace ReplayKitSetup
             {
                 return null;
             }
-            var m = Regex.Match(liveText, @"\[" + Regex.Escape(section) + @"\][^\[]*?\n" + Regex.Escape(key) + @"=([^\r\n]*)", RegexOptions.Singleline);
-            return m.Success ? m.Groups[1].Value : null;
+            return GetIniValue(liveText, section, key);
         }
 
         // basicwindow toggles that only ever take the bundled seed on a genuine fresh install (no live user.ini yet) -- a later run of this (an update, a repair, re-running setup) leaves whatever the user has now alone, same idea as ExtraBrowserDocks below; covers the View menu Toolbars + Status Bar checkboxes, off by default for a cleaner first look, and a user who turns either back on keeps that. DockState and geometry belong here too: the bundle carries the dock layout and window position of the machine it was made on, and the plugin folds the scenes, sources and mixer panels away only once per layout (layoutDocksApplied in window_state.ini), so a bundled DockState put back over a live one left those panels showing under the clean shell. -- SysTrayWhenStarted is here too since replaykit mirrors it as the start minimized setting, so an update must not put the bundled value back over the one the user chose set for a clean re-install, which is meant to behave like a first install: the two view toggles then take the bundled off state again, while DockState and geometry still stay with the live window so the plugin layout marker keeps matching
@@ -316,16 +349,13 @@ namespace ReplayKitSetup
                 string theme = ReadLiveUserIniValue("Theme", "Appearance");
                 if (theme != null) text = SetIniValue(text, "Appearance", "Theme", theme);
             }
-            var sectionRe = new Regex(@"(\[BasicWindow\][^\[]*?\n)ExtraBrowserDocks=([^\r\n]*)", RegexOptions.Singleline);
-            var m = sectionRe.Match(text);
-            if (m.Success)
+            string seed = GetIniValue(text, "BasicWindow", "ExtraBrowserDocks");
+            if (seed != null)
             {
                 // fold the live ini into the bundle seed so user-added docks are preserved.
                 string liveValue = ReadLiveUserIniValue("ExtraBrowserDocks") ?? "";
-                string seed = m.Groups[2].Value;
                 if (liveValue.Length > 0 && liveValue != seed) seed = CombineExtraBrowserDocks(seed, liveValue);
-                string merged = MergeExtraBrowserDocksValue(seed);
-                text = sectionRe.Replace(text, mm => m.Groups[1].Value + "ExtraBrowserDocks=" + merged, 1);
+                text = SetIniValue(text, "BasicWindow", "ExtraBrowserDocks", MergeExtraBrowserDocksValue(seed));
             }
             else
             {
@@ -455,7 +485,7 @@ namespace ReplayKitSetup
         private const string ReplaykitScriptRelpath = "obs-replayKit/scripts/replaykit.lua";
 
         // forward-slashed, lowercased ~/videos -- matches Prefs.DefaultRecordingPath, the helper clip-dir fallback, and the lua/ps fallbacks.
-        private static string DefaultClipDirNorm() => System.IO.Path.Combine(Config.USERPROFILE, "Videos").Replace('\\', '/').ToLowerInvariant();
+        private static string DefaultClipDirNorm() => ClipFolder.Default().Replace('\\', '/').TrimEnd('/').ToLowerInvariant();
 
         // inject replaykit runtime settings into the managed obs script entry.
         private static void ApplyReplaykitRuntimeSettings(JObject settings, Preferences prefs)
@@ -541,6 +571,20 @@ namespace ReplayKitSetup
         }
 
         private static bool IsReplaykitEntry(JObject entry) => EntryBasename(entry) == System.IO.Path.GetFileName(ReplaykitScriptRelpath).ToLowerInvariant();
+
+        // the one script entry obs loads replaykit through: added when it is gone, or pointed at this install when it names another place (a renamed user folder), keeping its settings; an entry that is already right is left exactly as it is
+        public static bool EnsureReplaykitScriptEntry(JObject data, Preferences prefs)
+        {
+            if (!(data["modules"] is JObject modules)) { modules = new JObject(); data["modules"] = modules; }
+            if (!(modules["scripts-tool"] is JArray scripts)) { scripts = new JArray(); modules["scripts-tool"] = scripts; }
+            string path = ReplaykitScriptPath();
+            var entries = scripts.OfType<JObject>().Where(IsReplaykitEntry).ToList();
+            if (entries.Count == 1 && string.Equals((entries[0].Value<string>("path") ?? "").Replace('\\', '/'), path, StringComparison.OrdinalIgnoreCase)) return false;
+            var settings = CollectReplaykitSettings(scripts, prefs);
+            foreach (var entry in entries) scripts.Remove(entry);
+            scripts.Add(new JObject { ["path"] = path, ["settings"] = settings });
+            return true;
+        }
 
         // preserve settings from the managed replaykit.lua script entry.
         private static JObject CollectReplaykitSettings(JArray scripts, Preferences prefs)
@@ -822,6 +866,26 @@ namespace ReplayKitSetup
             catch (Exception exc) when (exc is IOException || exc is UnauthorizedAccessException || exc is Newtonsoft.Json.JsonException || exc is InvalidCastException)
             {
                 return fallback;
+            }
+        }
+
+        // one hotkey of the settings file of the helper, or null when it is not there, not a combo or has no key
+        private static Dictionary<string, object> RuntimeKeybind(string key)
+        {
+            try
+            {
+                if (!File.Exists(Prefs.RUNTIME_SETTINGS_FILE)) return null;
+                if (!(JObject.Parse(File.ReadAllText(Prefs.RUNTIME_SETTINGS_FILE))[key] is JObject combo) || combo["key"]?.Type != JTokenType.String || string.IsNullOrWhiteSpace(combo["key"].Value<string>())) return null;
+                var dict = new Dictionary<string, object> { ["key"] = combo["key"].Value<string>() };
+                foreach (var mod in new[] { "control", "alt", "shift", "command" })
+                {
+                    if (combo[mod]?.Type == JTokenType.Boolean && combo[mod].Value<bool>()) dict[mod] = true;
+                }
+                return dict;
+            }
+            catch (Exception exc) when (exc is IOException || exc is UnauthorizedAccessException || exc is Newtonsoft.Json.JsonException)
+            {
+                return null;
             }
         }
 

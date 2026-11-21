@@ -250,6 +250,25 @@ namespace ReplayKitSetup
             return "{\"bindings\":[" + OrderedComboJson(combo) + "]}";
         }
 
+        // the same two values with the extra binding of the settings as a second entry, the way the helper writes them; the same combo twice is written once
+        public static string ToBasicIniValue(Dictionary<string, object> combo, Dictionary<string, object> extra) =>
+            "{\"ReplayBuffer.Save\":[" + BindingsJson(combo, extra) + "]}";
+
+        public static string ToObsHotkeyValue(Dictionary<string, object> combo, Dictionary<string, object> extra) =>
+            "{\"bindings\":[" + BindingsJson(combo, extra) + "]}";
+
+        private static string BindingsJson(Dictionary<string, object> combo, Dictionary<string, object> extra)
+        {
+            var list = new List<string>();
+            if (combo != null && combo.ContainsKey("key")) list.Add(OrderedComboJson(combo));
+            if (extra != null && extra.ContainsKey("key"))
+            {
+                string second = OrderedComboJson(extra);
+                if (!list.Contains(second)) list.Add(second);
+            }
+            return string.Join(",", list);
+        }
+
         // parse the json obs persists under [Hotkeys] ReplayBuffer=. returns the first ReplayBuffer.Save keybind dict, or null if malformed.
         public static Dictionary<string, object> FromBasicIniValue(string text)
         {

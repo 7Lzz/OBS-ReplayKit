@@ -22,6 +22,8 @@ local active_output_device = false
 local have_discord_output_settings = false
 local last_discord_output_signature = ""
 local stop_vcam_if_active
+-- only a virtual camera this script started is ever stopped by it; one the user started for another app stays on
+local vcam_started_here = false
 
 -- discord runs many processes (a main discord.exe plus a seperate discordsystemhelper.exe, plus electron renderer/utility processes). we still patch the exclude list to cover the named variants -- mainly so the discord audio (record only) source can record friend voices properly even though were not streaming them. the streaming path doesnt depend on this exclude list working perfectly anymore.
 local DISCORD_PROCESS_NAMES = {
@@ -175,11 +177,12 @@ local function _set_monitoring(source_name, target, friendly_target_name, log_mi
     end
     if ensure_unmuted then
         local muted = obs.obs_source_muted(src)
-        if muted then
-            print(string.format("[AutoVirtCam] %s unmuted while syncing monitoring", source_name))
-        end
-        -- OBS 32.1 can leave the mixer monitor icon stale without a source state signal.
-        if changed or refresh_when_unchanged or muted then
+        -- only a monitoring change made here clears a mute, since switching monitoring can leave the source muted; a mute from the PC audio switch or the obs mixer stays
+        if muted and changed then
+            print(string.format("[AutoVirtCam] %s unmuted after its monitoring changed", source_name))
+            obs.obs_source_set_muted(src, false)
+        elseif not muted and (changed or refresh_when_unchanged) then
+            -- OBS 32.1 can leave the mixer monitor icon stale without a source state signal.
             obs.obs_source_set_muted(src, false)
         end
     end
@@ -342,12 +345,7 @@ local function start_vcam()
     obs.timer_remove(start_vcam)
     active_discord_output_mode, active_projector_enabled, have_discord_output_settings, active_output_device = read_discord_output_settings()
     if not discord_output_uses_legacy_vcam() then
-        if obs.obs_frontend_virtualcam_active() then
-            obs.obs_frontend_stop_virtualcam()
-            print("[DiscordProjector] stopped OBS Virtual Camera (Discord projector mode)")
-        else
-            print("[DiscordProjector] Skipping OBS Virtual Camera for Discord output")
-        end
+        stop_vcam_if_active("Discord projector mode")
         return
     end
     if obs.obs_frontend_virtualcam_active() then
@@ -355,6 +353,7 @@ local function start_vcam()
         return
     end
     print("[DiscordProjector] WARN: starting OBS Virtual Camera only because virtual_camera_legacy is explicitly selected")
+    vcam_started_here = true
     obs.obs_frontend_start_virtualcam()
     obs.timer_add(verify_vcam_started, 1500)
 end
@@ -362,11 +361,15 @@ end
 stop_vcam_if_active = function(reason)
     obs.timer_remove(start_vcam)
     obs.timer_remove(verify_vcam_started)
-    if obs.obs_frontend_virtualcam_active() then
+    if not obs.obs_frontend_virtualcam_active() then
+        vcam_started_here = false
+        print(string.format("[AutoVirtCam] virtual camera remains off (%s)", reason or "not needed"))
+    elseif vcam_started_here then
+        vcam_started_here = false
         obs.obs_frontend_stop_virtualcam()
         print(string.format("[AutoVirtCam] stopped virtual camera (%s)", reason or "not needed"))
     else
-        print(string.format("[AutoVirtCam] virtual camera remains off (%s)", reason or "not needed"))
+        print(string.format("[AutoVirtCam] virtual camera left on, it was not started by ReplayKit (%s)", reason or "not needed"))
     end
 end
 
@@ -418,7 +421,7 @@ function script_unload()
     obs.timer_remove(start_vcam)
     obs.timer_remove(verify_vcam_started)
     obs.timer_remove(poll_discord_output_settings)
-    if obs.obs_frontend_virtualcam_active() then
+    if vcam_started_here and obs.obs_frontend_virtualcam_active() then
         obs.obs_frontend_stop_virtualcam()
         print("[AutoVirtCam] stopped virtual camera at OBS shutdown")
     end

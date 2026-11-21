@@ -268,12 +268,14 @@
           else onFail(body.message || RK_M("update.theInstallerReportedAFailure"));
           return;
         }
-        percent = Math.min(percent + 0.7, seenHelperDown ? 97 : 90);
-        setStatus(seenHelperDown ? RK_M("update.copyingReplaykitFiles") : RK_M("update.installingUpdate"), "", percent);
+        // the helper answering again with no verdict yet means obs is back and the new helper is starting; before it went down, the installer is closing obs
+        percent = Math.min(percent + 0.7, seenHelperDown ? 98 : 86);
+        setStatus(seenHelperDown ? RK_M("update.startingObsAgain") : RK_M("update.closingObsToApplyFiles"), "", percent);
       } catch (_) {
+        // no helper while obs is closed: the files go in, then obs starts again by itself
         seenHelperDown = true;
-        percent = Math.min(percent + 0.7, 97);
-        setStatus(RK_M("update.closingObsToApplyFiles"), "", percent);
+        percent = Math.min(percent + 0.7, 95);
+        setStatus(RK_M("update.installingWhileObsIsClosed"), RK_M("update.obsStartsAgainByItselfWhen"), percent);
       }
       if (Date.now() - started > 180000) els.closeBtn.hidden = false;
     }, 1500);
@@ -331,9 +333,11 @@
     await wait(900);
     setStatus(RK_M("update.installingUpdate"), "", 82);
     await wait(900);
-    setStatus(RK_M("update.closingObsToApplyFiles"), "", 90);
+    setStatus(RK_M("update.closingObsToApplyFiles"), "", 86);
     await wait(1100);
-    setStatus(RK_M("update.copyingReplaykitFiles"), "", 97);
+    setStatus(RK_M("update.installingWhileObsIsClosed"), RK_M("update.obsStartsAgainByItselfWhen"), 92);
+    await wait(1400);
+    setStatus(RK_M("update.startingObsAgain"), "", 98);
     await wait(900);
     setHero(RK_M("update.updateComplete"), RK_M("update.replaykitVersionIsInstalled", { version: "9.9.9" }), RK_M("update.obsIsBackUp"));
     setStatus(RK_M("common.done"), "", 100, "done");

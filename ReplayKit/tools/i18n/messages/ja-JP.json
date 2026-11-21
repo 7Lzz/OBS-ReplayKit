@@ -135,6 +135,10 @@
     "source": "0f6b2bf6a5a18623",
     "text": "すべての種類"
   },
+  "clips.alreadyAtItsSmallestSize": {
+    "source": "7a9892df214c18c3",
+    "text": "このクリップはこれ以上小さくできません。圧縮すると {compressed} になり、現在の {original} より大きくなります。"
+  },
   "clips.alreadyAtMaximumCompression": {
     "source": "feac245b763d53c2",
     "text": "既に最大圧縮です。"
@@ -366,6 +370,10 @@
   "clips.compressingTempCopyForName": {
     "source": "27d12c5f874c1b12",
     "text": "{name} の一時コピーを圧縮しています。"
+  },
+  "clips.compressionPassFailed": {
+    "source": "c270abc5510adbee",
+    "text": "圧縮パス {pass} に失敗しました（ffmpeg の終了コード {code}）。"
   },
   "clips.compressionStoppedTooManyErrors": {
     "source": "c52fd8191e65c7c4",
@@ -9629,6 +9637,10 @@
     "source": "83edf867edc566c9",
     "text": "モニターと PC のスリープを許可"
   },
+  "setup.anotherReplaykitUpdateIsAlready": {
+    "source": "fcd92a1e168a4f54",
+    "text": "別の ReplayKit の更新がすでに実行中です。"
+  },
   "setup.appliesYourThemeBeforeObsStarts": {
     "source": "9ff460540709c340",
     "text": "OBS の起動前にテーマを適用します。"
@@ -9696,6 +9708,10 @@
   "setup.createsTheConfigFolder": {
     "source": "07a6b0bf4f598bda",
     "text": "設定のフォルダーを作成します。"
+  },
+  "setup.defaultSettingsPart": {
+    "source": "02e4670cfcda9faf",
+    "text": "既定の設定"
   },
   "setup.deletesReplaykitObsPluginsFromThe": {
     "source": "af44749c5be6c36e",
@@ -10065,6 +10081,14 @@
     "source": "4772517e779a3389",
     "text": "OBS ReplayKit を削除しています"
   },
+  "setup.replacesTheReplaykitFilesAndKeeps": {
+    "source": "26559bd2d6df3743",
+    "text": "ReplayKit のファイルを置き換え、OBS と ReplayKit の設定はそのまま残します。"
+  },
+  "setup.replaykitFilesWereInstalledButThe": {
+    "source": "dbc739eb65009b26",
+    "text": "ReplayKit {version} をインストールしましたが、更新は完了していません。修復されていないもの: {parts}。修復を完了するには、インストーラーをもう一度実行してください。"
+  },
   "setup.replaykitSetupCompleted": {
     "source": "6fcfdf35f881ac92",
     "text": "ReplayKit のセットアップが完了しました。"
@@ -10072,6 +10096,16 @@
   "setup.replaykitSetupIsIncompleteRunThe": {
     "source": "830a32f930807686",
     "text": "ReplayKit のセットアップが完了していません。インストーラーをもう一度実行して修復を完了してください。"
+  },
+  "setup.replaykitVersionWasInstalled": {
+    "source": "f2cdf6fc91719664",
+    "text": {
+      "other": "ReplayKit {version} をインストールしました（{count} 個のファイル）。"
+    }
+  },
+  "setup.replaykitWasInstalledButObsCould": {
+    "source": "5927c3abf26ee4e7",
+    "text": "ReplayKit {version} をインストールしましたが、OBS を再起動できませんでした。OBS を手動で起動してください。"
   },
   "setup.restoreObsBrowser": {
     "source": "64096278c3d85acd",
@@ -10104,6 +10138,10 @@
   "setup.savesCurrentReplaykitSettingsForThe": {
     "source": "28a8fb6b6bdc9443",
     "text": "次回のインストールに備えて、現在の ReplayKit の設定を保存します。"
+  },
+  "setup.sceneSourceSettings": {
+    "source": "f0c4e89a22ba77c8",
+    "text": "シーンのソース設定"
   },
   "setup.setUpObsReplaykit": {
     "source": "f04ea9bf44d4976e",
@@ -10209,6 +10247,22 @@
     "source": "d3360f80cf319e32",
     "text": "既定値のマーカーに有効な手順の一覧がありません。"
   },
+  "setup.theDesktopAudioPlugin": {
+    "source": "4352d805a2e7d2f1",
+    "text": "デスクトップ音声のプラグイン"
+  },
+  "setup.theMotionBlurPlugin": {
+    "source": "ec9eee00d7a677ce",
+    "text": "モーションブラーのプラグイン"
+  },
+  "setup.theObsProcessRoles": {
+    "source": "7418924bad768581",
+    "text": "OBS のプロセスロール"
+  },
+  "setup.theObsUpdateLock": {
+    "source": "34824a33ff9d5f00",
+    "text": "OBS の更新ロック"
+  },
   "setup.theOldReplaykitHelperCouldNot": {
     "source": "99cc371f39d82ad5",
     "text": "古い ReplayKit のヘルパーを停止できなかったため、ファイルは変更されませんでした。"
@@ -10221,6 +10275,10 @@
     "source": "6c07b88b1b03685a",
     "text": "プロセスの役割のバックアップが見つかりません。ReplayKit を削除する前に OBS Studio を修復してください。"
   },
+  "setup.theReplaykitPluginPart": {
+    "source": "669093701c7bded5",
+    "text": "ReplayKit のプラグイン"
+  },
   "setup.theRunningReplaykitHelperDoesNot": {
     "source": "8a9fc69bb15fb743",
     "text": "実行中の ReplayKit のヘルパーは、穏やかな終了のみのシャットダウンに対応していません。"
@@ -10229,9 +10287,29 @@
     "source": "e7c9f6e2b0ee0d7b",
     "text": "セットアップウィンドウを開始できませんでした。\n\n{error}"
   },
+  "setup.theSharePreviewWindow": {
+    "source": "b65bf65a5f38add6",
+    "text": "Share Preview ウィンドウ"
+  },
   "setup.theUninstallWindowCouldNotStart": {
     "source": "55ebd1d805547641",
     "text": "アンインストールウィンドウを開始できませんでした。\n\n{error}"
+  },
+  "setup.theUpdateFailedAndCouldNotRollBack": {
+    "source": "4e502eb60596cfe9",
+    "text": "更新に失敗し、元に戻すこともできませんでした: {error} {rollbackError} ReplayKit は復元用のファイルを残しています。"
+  },
+  "setup.theUpdateFailedAndWasRolledBack": {
+    "source": "4780e3b580c6a02e",
+    "text": "更新に失敗したため、元に戻しました: {error}"
+  },
+  "setup.theVideoToolsAndPlugins": {
+    "source": "75984d59092bf67b",
+    "text": "動画ツールとプラグイン"
+  },
+  "setup.theWasdMouseOverlay": {
+    "source": "12e0f958d023048e",
+    "text": "WASD/マウスのオーバーレイ"
   },
   "setup.thisCanTakeAFewMinutes": {
     "source": "909ed2b4f3ec0322",
@@ -10296,6 +10374,10 @@
   "setup.updateNeedsObsVersion": {
     "source": "32d0de8a3dc8e7bf",
     "text": "ReplayKit {version} には OBS {obs} が必要ですが、OBS をこのバージョンに更新できなかったため、何も変更していません。obsproject.com から OBS {obs} をインストールしてから、ReplayKit のインストーラーを実行してください。"
+  },
+  "setup.updateReplaykitFiles": {
+    "source": "f564c2342274280d",
+    "text": "ReplayKit のファイルを更新"
   },
   "setup.verifiesTheBongoCatFilesAnd": {
     "source": "093cb0e01af8c0a7",
@@ -11115,10 +11197,6 @@
     "source": "e5ffe3ccb145941a",
     "text": "ファイルを適用するために OBS を終了しています"
   },
-  "update.copyingReplaykitFiles": {
-    "source": "ddc0e4344ab04b61",
-    "text": "ReplayKit のファイルをコピーしています"
-  },
   "update.couldNotOpenTheUpdateWindow": {
     "source": "2984504fcf23c2ab",
     "text": "更新ウィンドウを開けませんでした: {error}"
@@ -11167,6 +11245,10 @@
     "source": "5143733fa97d6b3f",
     "text": "バージョン {version} をインストール中です。"
   },
+  "update.installingWhileObsIsClosed": {
+    "source": "164703c0dc316808",
+    "text": "OBS を閉じている間に更新をインストール中"
+  },
   "update.invalidSetupExecutablePath": {
     "source": "67bd4834e48322b0",
     "text": "セットアップの実行ファイルのパスが不正です。"
@@ -11210,6 +11292,10 @@
   "update.obsIsBackUp": {
     "source": "ee6279c5c493778a",
     "text": "OBS が再び起動しました。"
+  },
+  "update.obsStartsAgainByItselfWhen": {
+    "source": "625bf1741db0fa9b",
+    "text": "新しいファイルが入ると、OBS は自動で再起動します。"
   },
   "update.obsWasLeftRunningTryAgain": {
     "source": "c5baef3f91d360f6",
@@ -11282,6 +11368,10 @@
   "update.speedSize": {
     "source": "457bc4aecda61a57",
     "text": "{speed} ({size})"
+  },
+  "update.startingObsAgain": {
+    "source": "c991bddb9e5fc92f",
+    "text": "OBS を再起動中"
   },
   "update.startupUpdateCheckAlreadyRan": {
     "source": "b521777f902946bb",

@@ -147,6 +147,83 @@ namespace ReplayKitSetup
             }
         }
 
+        // a cable that was already on the machine belongs to the user (streamers and voicemeeter setups often have one): replaykit borrows it for share preview, gives its endpoints their vb-audio names back on removal and never runs the uninstaller on it, so only a cable replaykit installed carries this mark
+        private const string OwnerKey = @"SOFTWARE\OBS ReplayKit";
+        private const string OwnerValue = "InstalledVbCable";
+
+        private static bool InstalledByReplayKit()
+        {
+            try
+            {
+                using var key = Registry.LocalMachine.OpenSubKey(OwnerKey);
+                return key?.GetValue(OwnerValue) is int marked && marked == 1;
+            }
+            catch (Exception ex) when (ex is System.Security.SecurityException || ex is UnauthorizedAccessException || ex is IOException) { return false; }
+        }
+
+        private static void MarkInstalledByReplayKit(bool installed, Action<string> log)
+        {
+            try
+            {
+                if (installed)
+                {
+                    using var key = Registry.LocalMachine.CreateSubKey(OwnerKey);
+                    key.SetValue(OwnerValue, 1, RegistryValueKind.DWord);
+                }
+                else
+                {
+                    using var key = Registry.LocalMachine.OpenSubKey(OwnerKey, true);
+                    key?.DeleteValue(OwnerValue, false);
+                }
+            }
+            catch (Exception ex) when (ex is System.Security.SecurityException || ex is UnauthorizedAccessException || ex is IOException)
+            {
+                log?.Invoke("warn: could not record who installed OBS Stream Audio: " + ex.Message);
+            }
+        }
+
+        // undoes RenameEndpoints on a cable of the user: the vb-audio names come back and the surround endpoints show again
+        private static void RestoreEndpointNames(Action<string> log = null)
+        {
+            var restoreLookup = EndpointRenames.ToDictionary(r => r.New, r => r.Orig, StringComparer.OrdinalIgnoreCase);
+            int changes = 0;
+            foreach (int dataFlow in new[] { 0, 1 })
+            {
+                string root = dataFlow == 0
+                    ? @"SOFTWARE\Microsoft\Windows\CurrentVersion\MMDevices\Audio\Render"
+                    : @"SOFTWARE\Microsoft\Windows\CurrentVersion\MMDevices\Audio\Capture";
+                using (var rootKey = Registry.LocalMachine.OpenSubKey(root))
+                {
+                    if (rootKey == null) continue;
+                    foreach (string guid in rootKey.GetSubKeyNames())
+                    {
+                        using (var endpointKey = rootKey.OpenSubKey(guid))
+                        using (var propsKey = rootKey.OpenSubKey(guid + @"\Properties"))
+                        {
+                            string cur = propsKey?.GetValue(FriendlyNameValue)?.ToString();
+                            if (string.IsNullOrEmpty(cur)) continue;
+                            string canonical = LeadingIndexPrefix.Replace(cur, "").Trim();
+                            if (!restoreLookup.TryGetValue(canonical, out string original)) continue;
+                            string deviceId = $"{{0.0.{dataFlow}.00000000}}.{guid}";
+                            int rc = -1;
+                            TryAudioCall(() => rc = AudioHelper.RenameEndpoint(deviceId, original), "rename " + cur, log);
+                            if (rc == 0) { changes++; log?.Invoke($"renamed back: {cur} -> {original}"); }
+                            else log?.Invoke($"rename back FAILED for {cur}: rc=0x{rc:x}");
+                            object stateValue = endpointKey?.GetValue("DeviceState");
+                            int state = stateValue != null ? Convert.ToInt32(stateValue) : 0;
+                            if ((state & HiddenStateFlag) != 0)
+                            {
+                                int vrc = -1;
+                                TryAudioCall(() => vrc = AudioHelper.SetEndpointVisible(deviceId, true), "show " + original, log);
+                                if (vrc == 0) { changes++; log?.Invoke($"shown again: {original}"); }
+                            }
+                        }
+                    }
+                }
+            }
+            if (changes > 0) BounceAudioServices(log);
+        }
+
         // native equivalent of the old Stop-Service AudioEndpointBuilder -Force / Start-Service pair -- -Force stops dependent services too, which ServiceController does not do automatically, so DependentServices is walked by hand.
         private static void BounceAudioServices(Action<string> log = null)
         {
@@ -324,6 +401,8 @@ namespace ReplayKitSetup
                 return true;
             }
 
+            // a mark left from a cable that has since been removed by hand must not make a later cable of the user look like ours
+            MarkInstalledByReplayKit(false, log);
             string packDir = ExtractDriverPack(log);
             if (packDir == null) return false;
 
@@ -386,6 +465,7 @@ namespace ReplayKitSetup
                 log?.Invoke("OBS Stream Audio installer ran but the driver was not detected");
                 return false;
             }
+            MarkInstalledByReplayKit(true, log);
 
             // rename before restoring defaults: both bounce audiosrv, so pay the audio-interrupt cost once.
             RenameEndpoints(log);
@@ -498,7 +578,17 @@ namespace ReplayKitSetup
         // uninstall the obs stream audio virtual audio driver.
         public static bool UninstallVbcable(Action<string> log = null)
         {
-            if (!IsVbcableInstalled()) return true;
+            if (!IsVbcableInstalled())
+            {
+                MarkInstalledByReplayKit(false, log);
+                return true;
+            }
+            if (!InstalledByReplayKit())
+            {
+                log?.Invoke("VB-Audio Virtual Cable was not installed by ReplayKit -- leaving the driver in place and giving its endpoints their names back");
+                RestoreEndpointNames(log);
+                return true;
+            }
 
             var (okToUninstall, restartApps) = StopDiscordForDriverUninstall(log);
             if (!okToUninstall)
@@ -557,7 +647,9 @@ namespace ReplayKitSetup
                 return false;
             }
 
-            return !IsVbcableInstalled();
+            if (IsVbcableInstalled()) return false;
+            MarkInstalledByReplayKit(false, log);
+            return true;
         }
     }
 }

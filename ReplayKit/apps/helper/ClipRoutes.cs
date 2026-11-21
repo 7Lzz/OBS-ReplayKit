@@ -148,7 +148,8 @@ namespace ReplayKitHelper
                         ["replayBufferActive"] = rbRes.Ok ? rbRes.Data?["outputActive"]?.Value<bool>() : (bool?)null,
                         ["recordActive"] = recRes.Ok ? recRes.Data?["outputActive"]?.Value<bool>() : (bool?)null,
                         ["recordMs"] = recRes.Ok ? recRes.Data?["outputDuration"]?.Value<long?>() : (long?)null,
-                        ["obsConnected"] = rbRes.Ok || recRes.Ok,
+                        // the disk buffer answers the replay buffer status from the plugin without obs-websocket, so only the requests obs itself answers say whether it can be reached
+                        ["obsConnected"] = recRes.Ok || micMute.Ok || desktopMute.Ok || discordMute.Ok,
                     });
                 }
                 catch (Exception ex) { HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = ex.Message }); }

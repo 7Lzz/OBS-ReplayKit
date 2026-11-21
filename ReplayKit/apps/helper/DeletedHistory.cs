@@ -308,6 +308,18 @@ namespace ReplayKitHelper
             if (string.IsNullOrEmpty(stored) || !File.Exists(stored)) return;
             if ((File.GetAttributes(stored) & FileAttributes.ReparsePoint) != 0) throw new IOException(Locales.Message("storage.aDeletedItemIsALink"));
             File.Delete(stored);
+            ForgetDraft(entry);
+        }
+
+        // the draft of a clip stays while the clip can still be restored; once it is gone for good the draft goes too, unless a clip has taken its path since
+        private static void ForgetDraft(JObject entry)
+        {
+            if (KindOf(entry) != "clip") return;
+            string folder = entry["folder"]?.Value<string>() ?? "";
+            string name = entry["name"]?.Value<string>() ?? "";
+            if (!Path.IsPathRooted(folder) || Clips.GetSafeFilename(name) == null) return;
+            string original = Path.Combine(folder, name);
+            if (!File.Exists(original)) EditDrafts.Forget(original);
         }
 
         private static void Forget(string id) => ClipStore.Update(StorePath(), db => db.Remove(id));

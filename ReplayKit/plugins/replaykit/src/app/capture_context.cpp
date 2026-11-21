@@ -122,9 +122,14 @@ bool Collect(obs_scene_t *, obs_sceneitem_t *item, void *data)
 			calldata_t info = {};
 			if (proc_handler_call(obs_source_get_proc_handler(source), "get_hooked", &info) && calldata_bool(&info, "hooked")) {
 				capture.kind = id == "game_capture" ? "game" : "window";
-				capture.exe = calldata_string(&info, "executable");
-				capture.title = calldata_string(&info, "title");
-				capture.windowClass = calldata_string(&info, "class");
+				// obs hands a null string for a window without a title (or class), and a null pointer cannot become a std::string
+				auto text = [&info](const char *name) {
+					const char *value = calldata_string(&info, name);
+					return std::string(value ? value : "");
+				};
+				capture.exe = text("executable");
+				capture.title = text("title");
+				capture.windowClass = text("class");
 			}
 			calldata_free(&info);
 		}

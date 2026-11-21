@@ -141,7 +141,8 @@ namespace ReplayKitSetup
                 case "start":
                     // discord is only sent when the opt-in checkbox was on screen. absent -> leave the setting as loaded (the live file for an update, the default after a clean re-install wiped it).
                     bool? discord = o["discord"]?.Type == JTokenType.Boolean ? o.Value<bool>("discord") : (bool?)null;
-                    StartInstall(discord, o.Value<string>("mode") == "reinstall");
+                    string mode = o.Value<string>("mode");
+                    StartInstall(discord, mode == "reinstall" ? SetupMode.Reinstall : mode == "update" ? SetupMode.Update : SetupMode.Install);
                     break;
                 case "uninstall":
                     StartUninstall(o["keepSettings"]?.Type != JTokenType.Boolean || o.Value<bool>("keepSettings"),
@@ -153,7 +154,7 @@ namespace ReplayKitSetup
             }
         }
 
-        private void StartInstall(bool? discord, bool cleanInstall)
+        private void StartInstall(bool? discord, SetupMode mode)
         {
             if (_running) return;
             _running = true;
@@ -162,10 +163,10 @@ namespace ReplayKitSetup
             _worker = new Thread(() =>
             {
                 int code = 1;
-                SetupLog.Line("=== install flow start (v" + VersionInfo.Version + (cleanInstall ? ", clean re-install" : "") + ") ===");
+                SetupLog.Line("=== install flow start (v" + VersionInfo.Version + (mode == SetupMode.Reinstall ? ", clean re-install" : mode == SetupMode.Update ? ", update" : "") + ") ===");
                 try
                 {
-                    var issues = Apply.RunInstallFlow(discord, progress, cleanInstall);
+                    var issues = Apply.RunInstallFlow(discord, progress, mode);
                     code = issues.Count == 0 ? 0 : 1;
                     SetupLog.Line("=== install flow complete: " + issues.Count + " issue(s) ===");
                     Enqueue(() => OnFlowSucceeded(issues.Count));

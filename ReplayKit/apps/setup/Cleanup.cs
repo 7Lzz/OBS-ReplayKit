@@ -401,11 +401,16 @@ namespace ReplayKitSetup
         // source/scene names ReplayKits bundled collection ships. the generic ones ("Display Capture" etc.) are only pulled when nothing the user kept still references them -- see the orphan check in ScrubSceneCollections.
         private static readonly HashSet<string> ReplaykitSceneNames = new HashSet<string>(StringComparer.Ordinal) { "All-In-One" };
 
+        // the plugin adds the game out of focus card to the scenes of any collection with a capture source, the ones of the user too, and it has no settings to recognise it by; it goes even where a kept scene lists it, since its source type leaves with the plugin
+        private static bool IsFocusCard(JObject src) =>
+            string.Equals(src.Value<string>("id") ?? "", ReplayKitShared.OverlayScene.FocusCardSourceKind, StringComparison.Ordinal);
+
         private static bool LooksLikeReplaykitSource(JObject src)
         {
             string id = src.Value<string>("id") ?? "";
             string name = src.Value<string>("name") ?? "";
             if (string.Equals(id, "input-overlay", StringComparison.OrdinalIgnoreCase)) return true;
+            if (IsFocusCard(src)) return true;
             if (name == "Desktop Audio (excl. Discord)" || name == "Discord Audio (record only)") return true;
             var settings = src["settings"];
             return settings != null &&
@@ -489,7 +494,7 @@ namespace ReplayKitSetup
                 foreach (var src in sources.OfType<JObject>().Where(s => (s.Value<string>("id") ?? "") != "scene").ToList())
                 {
                     string name = src.Value<string>("name") ?? "";
-                    if (referenced.Contains(name)) continue;
+                    if (referenced.Contains(name) && !IsFocusCard(src)) continue;
                     if (!LooksLikeReplaykitSource(src) && !rkItemNames.Contains(name)) continue;
                     removedSources.Add(name);
                     src.Remove();

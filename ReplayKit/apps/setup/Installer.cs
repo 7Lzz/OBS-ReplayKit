@@ -288,7 +288,8 @@ namespace ReplayKitSetup
                 ["settings.limit_framerate"] = true,
             },
             ["Audio Input Capture"] = new Dictionary<string, object> { ["monitoring_type"] = 0, ["monitoring_enabled"] = false },
-            ["Desktop Audio (excl. Discord)"] = new Dictionary<string, object> { ["monitoring_type"] = 0, ["monitoring_enabled"] = false },
+            // listed for the volume repair only, with no fields: it is monitored while Share Preview is on, and the virtual camera script sets its monitoring for the saved Share Preview state each time obs starts, so turning it off here only made that script switch it back on after every update, which also cleared a mute
+            ["Desktop Audio (excl. Discord)"] = new Dictionary<string, object>(),
             ["Discord Audio (record only)"] = new Dictionary<string, object> { ["monitoring_type"] = 0, ["monitoring_enabled"] = false },
         };
 
@@ -411,7 +412,7 @@ namespace ReplayKitSetup
                 if (source.ToString(Formatting.None) != before)
                 {
                     patched++;
-                    log?.Invoke($"scene patch -> {name}: {string.Join(", ", spec.Keys)}");
+                    log?.Invoke($"scene patch -> {name}: {(spec.Count > 0 ? string.Join(", ", spec.Keys) : "volume")}");
                 }
             }
 
@@ -555,7 +556,7 @@ namespace ReplayKitSetup
         // refresh changed ReplayKit-managed runtime files while preserving user obs config/state, then apply migrations and refresh tools and plugins.
         internal static int InstallReplaykitRuntimeUpdate(RuntimeTransaction transaction, Action<string> log = null, List<string> problems = null)
         {
-            string runtimeSrc = ValidateRuntimeAssets();
+            ValidateRuntimeAssets();
             // obs is brought to the one supported version before any file is copied: the plugins and the process host of this release are made for it, so an obs that cannot get there leaves the old replaykit as it was
             ObsDownloader.EnsureObsVersion(log);
             if (!ObsVersions.IsInstalledSupported())
@@ -564,6 +565,53 @@ namespace ReplayKitSetup
                 throw new IOException(reason.Shown).WithEnglish(reason);
             }
 
+            int count = CopyRuntimeFiles(transaction, log);
+            RepairAfterRuntimeCopy(log, problems);
+
+            // the defaults this build ships, once per install -- see DefaultsMigration
+            try
+            {
+                if (!DefaultsMigration.Run(log)) problems?.Add(SetupLocale.Message("setup.defaultSettingsPart"));
+            }
+            catch (Exception ex)
+            {
+                log?.Invoke($"warn: default settings pass failed: {ex.Message}");
+                problems?.Add(SetupLocale.Message("setup.defaultSettingsPart"));
+            }
+
+            try
+            {
+                var notUpdated = RunUpdateDriverRefresh(log);
+                if (problems != null) problems.AddRange(notUpdated);
+            }
+            catch (Exception ex)
+            {
+                log?.Invoke($"warn: tool refresh pass failed: {ex.Message}");
+                problems?.Add(SetupLocale.Message("setup.theVideoToolsAndPlugins"));
+            }
+
+            return count;
+        }
+
+        // the Update button of the setup window: the same file refresh the in-app updater does, plus the parts only the setup window sets. the obs config stays as obs saved it (profile, hotkeys, scenes, plugin and websocket config), since rebuilding it from the bundle lost whatever the rebuild did not carry back; a file of it that is gone is written from the bundle the way a first install writes it. the setup flow runs the obs version, plugin, tool and default steps around this itself
+        internal static bool UpdateInstalledConfig(RuntimeTransaction transaction, Preferences prefs, bool writeShareChoice, Action<string> log)
+        {
+            MigrateLegacyStreamableState(log);
+            CopyRuntimeFiles(transaction, log);
+            SeedMissingObsConfig(prefs, log);
+            var problems = new List<string>();
+            RepairAfterRuntimeCopy(log, problems);
+            bool ok = problems.Count == 0;
+            if (writeShareChoice && !WriteShareChoice(prefs, log)) ok = false;
+            if (prefs.DiscordScreenshareEnabled && !PointMonitoringAtShareCable(log)) ok = false;
+            foreach (string problem in problems) log?.Invoke("warn: not repaired: " + problem);
+            return ok;
+        }
+
+        // the runtime files of the bundle, staged and verified first and then swapped in as one transaction, so a failure puts the old files back; returns how many changed
+        private static int CopyRuntimeFiles(RuntimeTransaction transaction, Action<string> log)
+        {
+            string runtimeSrc = ValidateRuntimeAssets();
             string transactionId = Guid.NewGuid().ToString("N");
             var files = Directory.EnumerateFiles(runtimeSrc, "*", SearchOption.AllDirectories)
                 .OrderBy(path => path, StringComparer.OrdinalIgnoreCase).ToList();
@@ -608,7 +656,8 @@ namespace ReplayKitSetup
                 }
 
                 count = stagedFiles.Count - 1;
-                log?.Invoke($"skipped {unchanged} unchanged runtime file(s)");
+                // worded without "skipped": the setup window counts a line with that word as a step that went wrong
+                log?.Invoke($"{unchanged} runtime file(s) were already current");
                 transaction.Complete(log);
             }
             catch (Exception installError)
@@ -616,11 +665,17 @@ namespace ReplayKitSetup
                 try { transaction.Recover(log); }
                 catch (Exception rollbackError)
                 {
-                    throw new IOException("Runtime update failed: " + installError.Message + " " + rollbackError.Message + " ReplayKit kept its recovery files.", installError);
+                    throw new IOException(SetupLocale.Message("setup.theUpdateFailedAndCouldNotRollBack", "error", installError.Message, "rollbackError", rollbackError.Message), installError);
                 }
-                throw new IOException("Runtime update failed and was rolled back: " + installError.Message, installError);
+                throw new IOException(SetupLocale.Message("setup.theUpdateFailedAndWasRolledBack", "error", installError.Message), installError);
             }
-            if (!ShareWindowInstall.Install(log)) problems?.Add("the Share Preview window");
+            return count;
+        }
+
+        // what an update fixes up once the new runtime files are in: the share window, the state files, the cached setup exe, retired files, the managed dock row, the scene source patches and the replaykit script entry. each part is best-effort -- the runtime files are already on disk and obs relaunches with them, so a part that fails is named in problems instead of undoing the update
+        private static void RepairAfterRuntimeCopy(Action<string> log, List<string> problems)
+        {
+            if (!ShareWindowInstall.Install(log)) problems?.Add(SetupLocale.Message("setup.theSharePreviewWindow"));
             // after the copy has gone through, never before: a copy that is rolled back puts the old helper and scripts back, and those look for the settings in the old places
             MigrateStateLayout(log);
             CacheSetupExecutable(log);
@@ -628,54 +683,145 @@ namespace ReplayKitSetup
             RestoreReplaykitUserState(log);
             UpdateControlsDockUrl(log);
 
-            // scene patches and tool refreshes are best-effort -- an exception here must not abort the update, since the runtime files are already on disk and obs will relaunch with them.
             try
             {
                 int patched = ApplyScenePatches(log);
                 if (patched > 0) log?.Invoke($"scene patches applied: {patched}");
+                if (EnsureReplaykitScript(log)) log?.Invoke("replaykit script entry repaired");
             }
             catch (Exception ex)
             {
                 log?.Invoke($"warn: scene patch pass failed: {ex.Message}");
-                problems?.Add("scene source settings");
+                problems?.Add(SetupLocale.Message("setup.sceneSourceSettings"));
             }
+        }
 
-            // the defaults this build ships, once per install -- see DefaultsMigration
+        // the scene collection replaykit installs loads replaykit.lua through its script entry; one that lost the entry, or kept the path of a renamed user folder, loads none of replaykit. the full setup used to rebuild the whole scene file to put it back; this touches only that entry
+        private static bool EnsureReplaykitScript(Action<string> log)
+        {
+            string scenePath = Path.Combine(Config.OBS_CONFIG, UserSceneRel);
+            if (!File.Exists(scenePath)) return false;
+            JObject data;
+            try { data = JObject.Parse(File.ReadAllText(scenePath, System.Text.Encoding.UTF8)); }
+            catch (Exception ex) when (ex is IOException || ex is JsonException)
+            {
+                log?.Invoke($"warn: cannot parse scene file for the script entry: {ex.Message}");
+                return false;
+            }
+            if (!Transform.EnsureReplaykitScriptEntry(data, Prefs.LoadPrefs())) return false;
+            WriteWithRetry(() => File.WriteAllText(scenePath, data.ToString(Formatting.Indented) + "\n", new System.Text.UTF8Encoding(false)));
+            return true;
+        }
+
+        // an empty file counts as gone: obs leaves one behind when a write is cut off, and it cannot read it either. a file that cannot be read right now is never counted, so it is never written over
+        private static bool IsMissingOrEmpty(string path)
+        {
+            try { return !File.Exists(path) || string.IsNullOrWhiteSpace(File.ReadAllText(path)); }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { return false; }
+        }
+
+        // the obs config files of the bundle that are gone from the live config, written the way a first install writes them. the files of a profile or scene collection obs does not open are left out, so an update never adds an Untitled profile or collection nobody uses; with no user.ini at all obs has no config to keep and everything that is gone is written
+        private static int SeedMissingObsConfig(Preferences prefs, Action<string> log)
+        {
+            string userIni = Path.Combine(Config.OBS_CONFIG, "user.ini");
+            string userText = IsMissingOrEmpty(userIni) ? null : ReadTextFile(userIni);
+            string activeProfile = userText == null ? null : Transform.GetIniValue(userText, "Basic", "ProfileDir");
+            string activeCollection = userText == null ? null : Transform.GetIniValue(userText, "Basic", "SceneCollectionFile");
+            int seeded = 0;
+            foreach (var src in Directory.EnumerateFiles(Config.OBS_ASSETS_DIR, "*", SearchOption.AllDirectories))
+            {
+                string rel = Path.GetRelativePath(Config.OBS_ASSETS_DIR, src);
+                var parts = rel.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                // the runtime copy owns the replaykit folder
+                if (parts.Length > 1 && string.Equals(parts[0], "obs-replayKit", StringComparison.OrdinalIgnoreCase)) continue;
+                bool profileFile = parts.Length >= 4 && string.Equals(parts[0], "basic", StringComparison.OrdinalIgnoreCase) && string.Equals(parts[1], "profiles", StringComparison.OrdinalIgnoreCase);
+                bool sceneFile = parts.Length == 3 && string.Equals(parts[0], "basic", StringComparison.OrdinalIgnoreCase) && string.Equals(parts[1], "scenes", StringComparison.OrdinalIgnoreCase);
+                if (userText != null && profileFile && !string.Equals(parts[2], activeProfile, StringComparison.OrdinalIgnoreCase)) continue;
+                if (userText != null && sceneFile && !string.Equals(Path.GetFileNameWithoutExtension(parts[2]), Path.GetFileNameWithoutExtension(activeCollection ?? ""), StringComparison.OrdinalIgnoreCase)) continue;
+                string dst = InstallTarget(rel);
+                if (!IsMissingOrEmpty(dst)) continue;
+                // an empty one is moved out of the way first: the scene transform reads a live scene file it finds, and the backup step has kept a copy
+                if (File.Exists(dst)) WriteWithRetry(() => File.Delete(dst));
+                InstallFile(src, rel, dst, prefs);
+                log?.Invoke("-> " + rel.Replace('\\', '/') + " (it was gone, written from the bundle)");
+                seeded++;
+            }
+            return seeded;
+        }
+
+        // the discord screenshare box is the one setting the setup window changes on an update; it goes into the settings file as a merge of its two keys, and every other setting stays as it is. a settings file that cannot be read is never written over
+        private static bool WriteShareChoice(Preferences prefs, Action<string> log)
+        {
+            string path = Prefs.RUNTIME_SETTINGS_FILE;
             try
             {
-                if (!DefaultsMigration.Run(log)) problems?.Add("default settings");
+                var settings = JObject.Parse(ReadTextFile(path));
+                bool changed = false;
+                if (settings["discord_screenshare_enabled"]?.Type != JTokenType.Boolean || settings.Value<bool>("discord_screenshare_enabled") != prefs.DiscordScreenshareEnabled)
+                {
+                    settings["discord_screenshare_enabled"] = prefs.DiscordScreenshareEnabled;
+                    changed = true;
+                }
+                if (settings["discord_projector_enabled"]?.Type != JTokenType.Boolean || settings.Value<bool>("discord_projector_enabled") != prefs.DiscordProjectorEnabled)
+                {
+                    settings["discord_projector_enabled"] = prefs.DiscordProjectorEnabled;
+                    changed = true;
+                }
+                if (!changed) return true;
+                string temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+                try
+                {
+                    File.WriteAllText(temporary, settings.ToString(Formatting.Indented), new System.Text.UTF8Encoding(false));
+                    FlushFile(temporary);
+                    WriteWithRetry(() => File.Move(temporary, path, true));
+                }
+                finally { if (File.Exists(temporary)) File.Delete(temporary); }
+                log?.Invoke($"discord screenshare {(prefs.DiscordScreenshareEnabled ? "on" : "off")}, share preview {(prefs.DiscordProjectorEnabled ? "on" : "off")}");
+                return true;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is JsonException)
             {
-                log?.Invoke($"warn: default settings pass failed: {ex.Message}");
-                problems?.Add("default settings");
+                log?.Invoke("warn: the discord screenshare choice was not saved: " + ex.Message);
+                return false;
             }
+        }
 
+        // with screenshare on, obs monitors to the share cable the cable step just set up, the one edit an update makes to the profile obs opens
+        private static bool PointMonitoringAtShareCable(Action<string> log)
+        {
             try
             {
-                var notUpdated = RunUpdateDriverRefresh(log);
-                if (problems != null) problems.AddRange(notUpdated);
+                string userIni = Path.Combine(Config.OBS_CONFIG, "user.ini");
+                if (IsMissingOrEmpty(userIni)) return true;
+                string profile = Transform.GetIniValue(ReadTextFile(userIni), "Basic", "ProfileDir");
+                if (string.IsNullOrWhiteSpace(profile) || profile == "." || profile == ".." || profile.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0) return true;
+                string basicIni = Path.Combine(Config.OBS_CONFIG, "basic", "profiles", profile, "basic.ini");
+                if (IsMissingOrEmpty(basicIni)) return true;
+                string current = ReadTextFile(basicIni);
+                string updated = Transform.ApplyShareCableMonitoring(current);
+                if (string.Equals(current, updated, StringComparison.Ordinal)) return true;
+                WriteWithRetry(() => File.WriteAllText(basicIni, updated, new System.Text.UTF8Encoding(false)));
+                log?.Invoke("OBS monitoring device set to OBS Stream Audio");
+                return true;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
             {
-                log?.Invoke($"warn: tool refresh pass failed: {ex.Message}");
-                problems?.Add("the video tools and plugins");
+                log?.Invoke("warn: the OBS monitoring device was not set to the share cable: " + ex.Message);
+                return false;
             }
-
-            return count;
         }
 
         // Verify the video tools and refresh managed plugins on update; report any repairs that did not finish.
         public static List<string> RunUpdateDriverRefresh(Action<string> log = null)
         {
             var problems = new List<string>();
-            if (!ObsUpdateLock.Lock(log)) problems.Add("the OBS update lock");
+            if (!ObsUpdateLock.Lock(log)) problems.Add(SetupLocale.Message("setup.theObsUpdateLock"));
             // an install that only ever updated never got the process host, and one whose obs was just updated needs the one built for the new version; obs and the helper are closed here
             try { ProcessHost.Install(log); }
             catch (Exception ex)
             {
                 log?.Invoke($"warn: OBS process roles not installed: {ex.Message}");
-                problems.Add("the OBS process roles");
+                problems.Add(SetupLocale.Message("setup.theObsProcessRoles"));
             }
             try
             {
@@ -689,21 +835,21 @@ namespace ReplayKitSetup
 
             try
             {
-                if (!ShaderFilter.InstallReplaykitMotionBlurPlugin(log)) problems.Add("the motion blur plugin");
+                if (!ShaderFilter.InstallReplaykitMotionBlurPlugin(log)) problems.Add(SetupLocale.Message("setup.theMotionBlurPlugin"));
             }
-            catch (Exception ex) { log?.Invoke($"warn: OBS Shaderfilter refresh failed: {ex.Message}"); problems.Add("the motion blur plugin"); }
+            catch (Exception ex) { log?.Invoke($"warn: OBS Shaderfilter refresh failed: {ex.Message}"); problems.Add(SetupLocale.Message("setup.theMotionBlurPlugin")); }
 
             try
             {
                 if (!InputOverlay.InstallInputOverlayPlugin(log) || !InputOverlay.InstallInputOverlayPresets(log))
-                    problems.Add("the WASD/mouse overlay");
+                    problems.Add(SetupLocale.Message("setup.theWasdMouseOverlay"));
             }
-            catch (Exception ex) { log?.Invoke($"warn: input overlay refresh failed: {ex.Message}"); problems.Add("the WASD/mouse overlay"); }
+            catch (Exception ex) { log?.Invoke($"warn: input overlay refresh failed: {ex.Message}"); problems.Add(SetupLocale.Message("setup.theWasdMouseOverlay")); }
 
             // the native plugin was missing from this refresh entirely, so an updating install kept whatever replaykit.dll it already had and never picked up plugin-side changes -- and never dropped the pre-unification replaykit-tray.dll, which obs then loaded alongside the new one and injected every tray menu item twice. safe to copy here because the update flow has already closed obs.
             try { NativePlugin.InstallReplaykitPlugin(log); }
             catch (Exception ex) { log?.Invoke($"warn: plugin refresh skipped: {ex.Message}"); }
-            if (NativePlugin.IsBundled() && !NativePlugin.IsCurrent()) problems.Add("the ReplayKit plugin");
+            if (NativePlugin.IsBundled() && !NativePlugin.IsCurrent()) problems.Add(SetupLocale.Message("setup.theReplaykitPluginPart"));
 
             try
             {
@@ -718,7 +864,7 @@ namespace ReplayKitSetup
             // the desktop audio plugin was only ever put in by a full setup, so an updating install kept the 2022 build with its known crash and never got a fix to the build replaykit ships. it compares the installed dll with the bundled one and does nothing when they match; obs is closed here
             try { WinCapture.InstallWinCaptureAudio(log); }
             catch (Exception ex) { log?.Invoke($"warn: desktop audio plugin refresh skipped: {ex.Message}"); }
-            if (WinCapture.IsExpected() && !WinCapture.IsCurrent()) problems.Add("the desktop audio plugin");
+            if (WinCapture.IsExpected() && !WinCapture.IsCurrent()) problems.Add(SetupLocale.Message("setup.theDesktopAudioPlugin"));
 
             try { RemoveObsElevationTask(log); }
             catch (Exception ex) { log?.Invoke($"warn: elevation task cleanup skipped: {ex.Message}"); }
@@ -777,10 +923,10 @@ namespace ReplayKitSetup
             }
         }
 
-        // make sure the recording output folder exists. ~/videos is also created as the simple-output fallback obs reverts to if a profile is reset.
+        // make sure the recording output folder exists. the videos known folder is also created as the simple-output fallback obs reverts to if a profile is reset.
         public static void EnsureRecordingDirs(Preferences prefs, Action<string> log = null)
         {
-            var targets = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { prefs.RecordingPath, Path.Combine(Config.USERPROFILE, "Videos") };
+            var targets = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { prefs.RecordingPath, ClipFolder.Default() };
             foreach (var target in targets)
             {
                 try

@@ -208,16 +208,14 @@ namespace ReplayKitHelper
             if (!ensureUnmuted || targetIsOff)
                 return new JObject { ["ok"] = true, ["applied"] = new JArray("desktop audio monitor off"), ["message"] = "" };
 
+            // only a monitor type changed here clears a mute, since that change can leave desktop audio muted; a mute from the PC audio switch or the obs mixer stays. the refresh below mutes desktop audio for a moment, which leaves a gap in the clip buffer, so it is only needed then too
+            if (!monitorChanged)
+                return new JObject { ["ok"] = true, ["applied"] = new JArray("desktop audio monitor on"), ["message"] = "" };
+
             var unmute = SetInputMuteState(inputName, false, 6);
             if (unmute["ok"]?.Value<bool>() != true) return new JObject { ["ok"] = false, ["applied"] = new JArray(applied), ["message"] = Locales.Message("settings.monitorStateChangedButDesktopAudio", "error", unmute["message"]) };
 
             applied.Add("desktop audio unmuted");
-            // the refresh mutes desktop audio for a moment, which leaves a gap in the clip buffer, so it only runs when the monitor type was changed here and the mixer icon is stale
-            if (!monitorChanged)
-            {
-                applied.Add(targetIsOff ? "desktop audio monitor off" : "desktop audio monitor on");
-                return new JObject { ["ok"] = true, ["applied"] = new JArray(applied), ["message"] = "" };
-            }
             var refresh = RefreshDesktopAudioMixerIconState(inputName, monitorType);
             if (refresh["ok"]?.Value<bool>() != true) return new JObject { ["ok"] = false, ["applied"] = new JArray(applied), ["message"] = Locales.Message("settings.monitorStateChangedButTheObs", "error", refresh["message"]) };
             applied.AddRange((refresh["applied"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
@@ -366,8 +364,8 @@ namespace ReplayKitHelper
             return outputDevice ? new ObsWebSocketResult { Ok = true } : RestoreDiscordAudioTracks(settings, wasOutputDevice);
         }
 
-        // keeps the live desktop-audio monitoring/mute change in sync with the on-disk scene file, so a disabled Share Preview cannot silently come back after obs restarts (obs persists audio monitoring in the scene collection, not in a profile setting this file already writes elsewhere).
-        internal static JObject SetShareModeSceneFile(int monitoringType, bool muted)
+        // keeps the live desktop-audio monitoring change in sync with the on-disk scene file, so a disabled Share Preview cannot silently come back after obs restarts (obs persists audio monitoring in the scene collection, not in a profile setting this file already writes elsewhere). the mute is left as it is, so a muted desktop audio stays muted after the restart.
+        internal static JObject SetShareModeSceneFile(int monitoringType)
         {
             try
             {
@@ -385,8 +383,6 @@ namespace ReplayKitHelper
                     if (current != monitoringType) { source["monitoring_type"] = monitoringType; changed = true; }
                     bool monitoringEnabled = monitoringType != 0;
                     if (source["monitoring_enabled"]?.Value<bool>() != monitoringEnabled) { source["monitoring_enabled"] = monitoringEnabled; changed = true; }
-                    bool currentMuted = source["muted"]?.Value<bool>() ?? true;
-                    if (currentMuted != muted) { source["muted"] = muted; changed = true; }
                 }
                 if (changed) AppConfig.WriteUtf8(path, data.ToString(Formatting.Indented));
                 return new JObject { ["ok"] = true, ["changed"] = changed };
@@ -416,7 +412,7 @@ namespace ReplayKitHelper
                 applied.AddRange((mixer["applied"] as JArray)?.Values<string>() ?? Enumerable.Empty<string>());
                 if (!UsesOutputDeviceRecording(settings) && capture["liveApplied"]?.Value<bool>() == true)
                 {
-                    var sceneFile = SetShareModeSceneFile(shareEnabled ? 2 : 0, false);
+                    var sceneFile = SetShareModeSceneFile(shareEnabled ? 2 : 0);
                     if (sceneFile["ok"]?.Value<bool>() != true)
                         warnings.Add(Locales.Message("settings.desktopAudioMonitoringWasAppliedLive", "error", sceneFile["message"]));
                     else if (sceneFile["changed"]?.Value<bool>() == true) applied.Add("desktop audio monitor state saved");

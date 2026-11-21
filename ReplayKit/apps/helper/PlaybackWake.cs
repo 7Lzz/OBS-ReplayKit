@@ -1,14 +1,16 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
 
 namespace ReplayKitHelper
 {
-    // holds a windows display request while a clip plays. the clips page reports playback in leases so a page that dies mid-play cannot pin the display on; the request belongs to this process, so the sleep override set for obs64.exe does not swallow it
+    // holds a windows display request while a clip plays. the clips page reports playback in leases so a page that dies mid-play cannot pin the display on. the request is held by a child process run as OBSReplayKit.exe (the --playback-wake mode), since this helper runs as the obs64.exe of the process host and windows matches the sleep override set for obs64.exe by image name, which swallowed a request made here
     internal static class PlaybackWake
     {
+        internal const string Mode = "--playback-wake";
         private const int LeaseSeconds = 45;
         private const int MaxSources = 16;
         private const int PowerRequestDisplayRequired = 0;
@@ -32,11 +34,11 @@ namespace ReplayKitHelper
 
         private static readonly object Gate = new object();
         private static readonly Dictionary<string, DateTime> Leases = new Dictionary<string, DateTime>();
-        private static IntPtr _request = IntPtr.Zero;
-        // one small string for the life of the process: the request keeps pointing at it while it is held
-        private static IntPtr _reason = IntPtr.Zero;
+        private static Process _holder;
         private static Timer _sweep;
         private static bool _failureLogged;
+        // a holder that ended on its own is not started again until playback stops, so a holder that cannot start does not respawn every sweep
+        private static bool _gaveUp;
 
         // a page says it is playing (which renews its lease) or that it stopped (which drops it); returns whether the display is held afterwards
         public static bool Report(string source, bool playing)
@@ -53,7 +55,7 @@ namespace ReplayKitHelper
                     Leases.Remove(source);
                 }
                 Update();
-                return _request != IntPtr.Zero;
+                return HolderAlive();
             }
         }
 
@@ -63,17 +65,31 @@ namespace ReplayKitHelper
             foreach (string key in Leases.Where(l => l.Value <= now).Select(l => l.Key).ToList()) Leases.Remove(key);
         }
 
+        private static bool HolderAlive()
+        {
+            try { return _holder != null && !_holder.HasExited; }
+            catch (InvalidOperationException) { return false; }
+        }
+
         // runs under the lock: drops lapsed leases, then holds or lets go of the request to match what is left
         private static void Update()
         {
             Prune();
             if (Leases.Count > 0)
             {
-                if (_request == IntPtr.Zero) Hold();
+                if (_holder != null && !HolderAlive())
+                {
+                    LogFailureOnce("the holder ended with code " + SafeExitCode(_holder));
+                    _holder.Dispose();
+                    _holder = null;
+                    _gaveUp = true;
+                }
+                if (_holder == null && !_gaveUp) Hold();
                 if (_sweep == null) _sweep = new Timer(_ => { lock (Gate) Update(); }, null, 5000, 5000);
                 return;
             }
-            if (_request != IntPtr.Zero) Release();
+            Release();
+            _gaveUp = false;
             if (_sweep != null)
             {
                 _sweep.Dispose();
@@ -81,33 +97,47 @@ namespace ReplayKitHelper
             }
         }
 
-        private static void Hold()
+        private static string SafeExitCode(Process process)
         {
-            if (_reason == IntPtr.Zero) _reason = Marshal.StringToHGlobalUni("ReplayKit clip playback");
-            var context = new ReasonContext { Version = ContextVersion, Flags = ContextSimpleString, SimpleReasonString = _reason };
-            IntPtr handle = PowerCreateRequest(ref context);
-            if (handle == IntPtr.Zero || handle == new IntPtr(-1))
-            {
-                LogFailureOnce("PowerCreateRequest failed (" + Marshal.GetLastWin32Error() + ")");
-                return;
-            }
-            bool display = PowerSetRequest(handle, PowerRequestDisplayRequired);
-            bool system = PowerSetRequest(handle, PowerRequestSystemRequired);
-            if (!display && !system)
-            {
-                LogFailureOnce("PowerSetRequest failed (" + Marshal.GetLastWin32Error() + ")");
-                CloseHandle(handle);
-                return;
-            }
-            _request = handle;
+            try { return process.ExitCode.ToString(); }
+            catch (InvalidOperationException) { return "unknown"; }
         }
 
+        private static void Hold()
+        {
+            try
+            {
+                var psi = new ProcessStartInfo(ProcessHost.HelperExecutable, Mode)
+                {
+                    UseShellExecute = false,
+                    RedirectStandardInput = true,
+                    CreateNoWindow = true,
+                };
+                _holder = Process.Start(psi);
+            }
+            catch (Exception ex) when (ex is System.ComponentModel.Win32Exception || ex is InvalidOperationException)
+            {
+                LogFailureOnce("the holder could not start: " + ex.Message);
+                _holder = null;
+                _gaveUp = true;
+            }
+        }
+
+        // closing its input ends the holder, which lets go of the request as it exits
         private static void Release()
         {
-            PowerClearRequest(_request, PowerRequestDisplayRequired);
-            PowerClearRequest(_request, PowerRequestSystemRequired);
-            CloseHandle(_request);
-            _request = IntPtr.Zero;
+            if (_holder == null) return;
+            try
+            {
+                _holder.StandardInput.Close();
+                if (!_holder.WaitForExit(2000)) _holder.Kill();
+            }
+            catch (Exception ex) when (ex is InvalidOperationException || ex is System.ComponentModel.Win32Exception || ex is System.IO.IOException)
+            {
+                Log.Write("PlaybackWake: releasing the holder: " + ex.Message);
+            }
+            _holder.Dispose();
+            _holder = null;
         }
 
         private static void LogFailureOnce(string what)
@@ -115,6 +145,36 @@ namespace ReplayKitHelper
             if (_failureLogged) return;
             _failureLogged = true;
             Log.Write("PlaybackWake: " + what + "; the display may sleep while a clip plays.");
+        }
+
+        // the --playback-wake mode: holds the request until its input closes, which happens when the helper lets go or the helper itself is gone
+        internal static int RunHolder()
+        {
+            IntPtr reason = Marshal.StringToHGlobalUni("ReplayKit clip playback");
+            var context = new ReasonContext { Version = ContextVersion, Flags = ContextSimpleString, SimpleReasonString = reason };
+            IntPtr handle = PowerCreateRequest(ref context);
+            if (handle == IntPtr.Zero || handle == new IntPtr(-1)) return 2;
+            bool display = PowerSetRequest(handle, PowerRequestDisplayRequired);
+            bool system = PowerSetRequest(handle, PowerRequestSystemRequired);
+            if (!display && !system)
+            {
+                CloseHandle(handle);
+                return 3;
+            }
+            try
+            {
+                using (var input = Console.OpenStandardInput())
+                {
+                    var buffer = new byte[64];
+                    while (input.Read(buffer, 0, buffer.Length) > 0) { }
+                }
+            }
+            catch (Exception ex) when (ex is System.IO.IOException || ex is ObjectDisposedException) { }
+            PowerClearRequest(handle, PowerRequestDisplayRequired);
+            PowerClearRequest(handle, PowerRequestSystemRequired);
+            CloseHandle(handle);
+            Marshal.FreeHGlobal(reason);
+            return 0;
         }
     }
 }

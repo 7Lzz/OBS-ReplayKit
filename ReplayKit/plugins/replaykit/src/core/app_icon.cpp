@@ -364,7 +364,7 @@ void RefreshTrayIcon()
 		if (base.isNull())
 			return;
 		// the dot only rides a user-chosen icon -- on "default" obs manages its own recording indicator.
-		const bool recording = obs_frontend_recording_active() || obs_frontend_replay_buffer_active();
+		const bool recording = obs_frontend_recording_active() || ClipBufferActive();
 		const QIcon icon = recording && g_recordingDotEnabled ? ComposeRecordingDot(base) : base;
 		tray->setIcon(icon);
 		g_lastTrayIconKey = icon.cacheKey();
@@ -446,7 +446,7 @@ void RefreshAppIcon()
 	ApplyAuxWindowIcon(g_settingsWindow, &g_ownedIconSettings, &g_taggedSettings, L"ReplayKit.SettingsWindow");
 	ApplyAuxWindowIcon(g_setupWindow, &g_ownedIconSetup, &g_taggedSetup, L"ReplayKit.SetupWindow");
 
-	const bool recording = obs_frontend_recording_active() || obs_frontend_replay_buffer_active();
+	const bool recording = obs_frontend_recording_active() || ClipBufferActive();
 	blog(LOG_INFO, "[replaykit] icon refresh: custom=%d recording=%d", custom ? 1 : 0, recording ? 1 : 0);
 }
 

@@ -68,6 +68,8 @@ local FORCED_GAME_BLOCKED = {
     ["snippingtool.exe"]            = true,
     ["screenclippinghost.exe"]      = true,
 }
+-- the share window shows the output of obs, so capturing it would film obs inside itself
+FORCED_GAME_BLOCKED[string.lower(replaykit_shared.share_window_exe)] = true
 
 local GRAPHICS_APIS = {
     ["d3d9.dll"]     = true,

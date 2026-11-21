@@ -135,6 +135,10 @@
     "context": "Text in the game picker of the clips library. Also used in the toolbar of the clips library.",
     "text": "All types"
   },
+  "clips.alreadyAtItsSmallestSize": {
+    "context": "Error shown on a clip when compressing it would not make it smaller, so it was left as it is. {compressed} and {original} are file sizes such as 12.3 MB.",
+    "text": "This clip is already as small as it gets: compressed, it would be {compressed}, more than the {original} it is now."
+  },
   "clips.alreadyAtMaximumCompression": {
     "context": "Text in a dialog of the clips library.",
     "text": "Already at maximum compression."
@@ -366,6 +370,10 @@
   "clips.compressingTempCopyForName": {
     "context": "Short notice that pops up in the clips library. Keep {name} as written.",
     "text": "Compressing temp copy for {name}."
+  },
+  "clips.compressionPassFailed": {
+    "context": "Error shown on a clip when one of the two ffmpeg passes of compressing it for an upload failed. {pass} is 1 or 2, {code} is the exit code of ffmpeg.",
+    "text": "Compression pass {pass} failed (ffmpeg exit code {code})."
   },
   "clips.compressionStoppedTooManyErrors": {
     "context": "Error in the clips library, sent by the background helper.",
@@ -9633,6 +9641,10 @@
     "context": "Title or description of an installer step in the installer and uninstaller.",
     "text": "Allow monitor and PC sleep"
   },
+  "setup.anotherReplaykitUpdateIsAlready": {
+    "context": "Error message shown when an installer step fails in the installer and uninstaller.",
+    "text": "Another ReplayKit update is already running."
+  },
   "setup.appliesYourThemeBeforeObsStarts": {
     "context": "Title or description of an installer step in the installer and uninstaller.",
     "text": "Applies your theme before OBS starts."
@@ -9700,6 +9712,10 @@
   "setup.createsTheConfigFolder": {
     "context": "Title or description of an installer step in the installer and uninstaller.",
     "text": "Creates the config folder."
+  },
+  "setup.defaultSettingsPart": {
+    "context": "Part of ReplayKit named in the update window when an update could not repair it; it fills {parts} of the message that lists what was not repaired.",
+    "text": "default settings"
   },
   "setup.deletesReplaykitObsPluginsFromThe": {
     "context": "Title or description of an installer step in the installer and uninstaller.",
@@ -10069,6 +10085,14 @@
     "context": "Title in the installer window. Also used in the uninstall window.",
     "text": "Removing OBS ReplayKit"
   },
+  "setup.replacesTheReplaykitFilesAndKeeps": {
+    "context": "Title or description of an installer step in the installer and uninstaller. Describes the step that updates an existing install in place.",
+    "text": "Replaces the ReplayKit files and keeps your OBS and ReplayKit settings as they are."
+  },
+  "setup.replaykitFilesWereInstalledButThe": {
+    "context": "Result of an update, shown in the ReplayKit update window. {version} is the ReplayKit version number. {parts} lists the parts that were not repaired.",
+    "text": "ReplayKit {version} was installed, but the update is incomplete. Not repaired: {parts}. Run the installer again to finish the repair."
+  },
   "setup.replaykitSetupCompleted": {
     "context": "Text in the installer and uninstaller.",
     "text": "ReplayKit setup completed."
@@ -10076,6 +10100,17 @@
   "setup.replaykitSetupIsIncompleteRunThe": {
     "context": "Text in the installer and uninstaller.",
     "text": "ReplayKit setup is incomplete. Run the installer again to finish the repair."
+  },
+  "setup.replaykitVersionWasInstalled": {
+    "context": "Result of an update, shown in the ReplayKit update window. {version} is the ReplayKit version number. {count} is the number of files copied.",
+    "text": {
+      "one": "ReplayKit {version} was installed ({count} file).",
+      "other": "ReplayKit {version} was installed ({count} files)."
+    }
+  },
+  "setup.replaykitWasInstalledButObsCould": {
+    "context": "Result of an update, shown in the ReplayKit update window. {version} is the ReplayKit version number.",
+    "text": "ReplayKit {version} was installed, but OBS could not be restarted. Start OBS yourself."
   },
   "setup.restoreObsBrowser": {
     "context": "Title or description of an installer step in the installer and uninstaller.",
@@ -10108,6 +10143,10 @@
   "setup.savesCurrentReplaykitSettingsForThe": {
     "context": "Title or description of an installer step in the installer and uninstaller.",
     "text": "Saves current ReplayKit settings for the next install."
+  },
+  "setup.sceneSourceSettings": {
+    "context": "Part of ReplayKit named in the update window when an update could not repair it; it fills {parts} of the message that lists what was not repaired.",
+    "text": "scene source settings"
   },
   "setup.setUpObsReplaykit": {
     "context": "Heading in the installer window.",
@@ -10213,6 +10252,22 @@
     "context": "Error message shown when an installer step fails in the installer and uninstaller.",
     "text": "The defaults marker has no valid steps list."
   },
+  "setup.theDesktopAudioPlugin": {
+    "context": "Part of ReplayKit named in the update window when an update could not repair it; it fills {parts} of the message that lists what was not repaired.",
+    "text": "the desktop audio plugin"
+  },
+  "setup.theMotionBlurPlugin": {
+    "context": "Part of ReplayKit named in the update window when an update could not repair it; it fills {parts} of the message that lists what was not repaired.",
+    "text": "the motion blur plugin"
+  },
+  "setup.theObsProcessRoles": {
+    "context": "Part of ReplayKit named in the update window when an update could not repair it; it fills {parts} of the message that lists what was not repaired.",
+    "text": "the OBS process roles"
+  },
+  "setup.theObsUpdateLock": {
+    "context": "Part of ReplayKit named in the update window when an update could not repair it; it fills {parts} of the message that lists what was not repaired.",
+    "text": "the OBS update lock"
+  },
   "setup.theOldReplaykitHelperCouldNot": {
     "context": "Error message shown when an installer step fails in the installer and uninstaller.",
     "text": "The old ReplayKit helper could not be stopped, so no files were changed."
@@ -10225,6 +10280,10 @@
     "context": "Error message shown when an installer step fails in the installer and uninstaller.",
     "text": "The process role backup is missing. Repair OBS Studio before removing ReplayKit."
   },
+  "setup.theReplaykitPluginPart": {
+    "context": "Part of ReplayKit named in the update window when an update could not repair it; it fills {parts} of the message that lists what was not repaired.",
+    "text": "the ReplayKit plugin"
+  },
   "setup.theRunningReplaykitHelperDoesNot": {
     "context": "Error message shown when an installer step fails in the installer and uninstaller.",
     "text": "The running ReplayKit helper does not support graceful-only shutdown."
@@ -10233,9 +10292,29 @@
     "context": "Message the helper shows when an action fails or finishes in the installer and uninstaller. Keep {error} as written.",
     "text": "The setup window could not start.\n\n{error}"
   },
+  "setup.theSharePreviewWindow": {
+    "context": "Part of ReplayKit named in the update window when an update could not repair it; it fills {parts} of the message that lists what was not repaired.",
+    "text": "the Share Preview window"
+  },
   "setup.theUninstallWindowCouldNotStart": {
     "context": "Message the helper shows when an action fails or finishes in the installer and uninstaller. Keep {error} as written.",
     "text": "The uninstall window could not start.\n\n{error}"
+  },
+  "setup.theUpdateFailedAndCouldNotRollBack": {
+    "context": "Error message shown when an installer step fails in the installer and uninstaller. {error} is why the update failed and {rollbackError} why undoing it failed, as the system gives them.",
+    "text": "The update failed and could not be rolled back: {error} {rollbackError} ReplayKit kept its recovery files."
+  },
+  "setup.theUpdateFailedAndWasRolledBack": {
+    "context": "Error message shown when an installer step fails in the installer and uninstaller. {error} is the reason, as the system gives it.",
+    "text": "The update failed and was rolled back: {error}"
+  },
+  "setup.theVideoToolsAndPlugins": {
+    "context": "Part of ReplayKit named in the update window when an update could not repair it; it fills {parts} of the message that lists what was not repaired.",
+    "text": "the video tools and plugins"
+  },
+  "setup.theWasdMouseOverlay": {
+    "context": "Part of ReplayKit named in the update window when an update could not repair it; it fills {parts} of the message that lists what was not repaired.",
+    "text": "the WASD/mouse overlay"
   },
   "setup.thisCanTakeAFewMinutes": {
     "context": "Text in the installer window.",
@@ -10300,6 +10379,10 @@
   "setup.updateNeedsObsVersion": {
     "context": "Reason a step of the installer stopped, shown in the installer window. Keep {version} and {obs} as written; they are version numbers.",
     "text": "ReplayKit {version} needs OBS {obs} and OBS could not be updated to it, so nothing was changed. Install OBS {obs} from obsproject.com, then run the ReplayKit installer."
+  },
+  "setup.updateReplaykitFiles": {
+    "context": "Title or description of an installer step in the installer and uninstaller. Shown for the step that updates an existing install in place.",
+    "text": "Update ReplayKit files"
   },
   "setup.verifiesTheBongoCatFilesAnd": {
     "context": "Title or description of an installer step in the installer and uninstaller.",
@@ -11124,10 +11207,6 @@
     "context": "Status line in the update prompt.",
     "text": "Closing OBS to apply files"
   },
-  "update.copyingReplaykitFiles": {
-    "context": "Status line in the update prompt.",
-    "text": "Copying ReplayKit files"
-  },
   "update.couldNotOpenTheUpdateWindow": {
     "context": "Message the helper shows when an action fails or finishes in a ReplayKit window, sent by the background helper. Keep {error} as written.",
     "text": "Could not open the update window: {error}"
@@ -11176,6 +11255,10 @@
     "context": "Text in the update prompt. Keep {version} as written.",
     "text": "Installing version {version}."
   },
+  "update.installingWhileObsIsClosed": {
+    "context": "Status line in the update prompt, shown while OBS is closed and the installer puts the new files in.",
+    "text": "Installing the update while OBS is closed"
+  },
   "update.invalidSetupExecutablePath": {
     "context": "Error message in a ReplayKit window, sent by the background helper.",
     "text": "Invalid setup executable path."
@@ -11219,6 +11302,10 @@
   "update.obsIsBackUp": {
     "context": "Text in the update prompt.",
     "text": "OBS is back up."
+  },
+  "update.obsStartsAgainByItselfWhen": {
+    "context": "Detail line under the status in the update prompt, shown while OBS is closed for the update.",
+    "text": "OBS starts again by itself when the new files are in."
   },
   "update.obsWasLeftRunningTryAgain": {
     "context": "Text in a ReplayKit window, sent by the background helper.",
@@ -11291,6 +11378,10 @@
   "update.speedSize": {
     "context": "Status line in the update prompt. Keep {size}, {speed} as written.",
     "text": "{speed} ({size})"
+  },
+  "update.startingObsAgain": {
+    "context": "Status line in the update prompt, shown once the update is in and OBS is starting.",
+    "text": "Starting OBS again"
   },
   "update.startupUpdateCheckAlreadyRan": {
     "context": "Message the helper shows when an action fails or finishes in a ReplayKit window, sent by the background helper.",

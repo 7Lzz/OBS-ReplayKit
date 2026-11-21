@@ -159,7 +159,7 @@ namespace ReplayKitSetup
                 catch (AbandonedMutexException) { updateGateHeld = true; }
                 if (!updateGateHeld)
                 {
-                    const string busy = "Another ReplayKit update is already running.";
+                    string busy = SetupLocale.Message("setup.anotherReplaykitUpdateIsAlready");
                     LogBoth(busy);
                     if (attemptId != null) Report(false, "busy", busy);
                     return 1;
@@ -212,16 +212,16 @@ namespace ReplayKitSetup
                     relaunched = LaunchObsPath(relaunchObs, LogBoth);
                     if (!relaunched)
                     {
-                        Report(false, "relaunch", $"ReplayKit {VersionInfo.Version} was installed but OBS could not be restarted. Start OBS manually.");
+                        Report(false, "relaunch", SetupLocale.Message("setup.replaykitWasInstalledButObsCould", "version", VersionInfo.Version));
                         return 1;
                     }
                 }
                 if (problems.Count > 0)
                 {
-                    Report(false, "incomplete", $"ReplayKit {VersionInfo.Version} files were installed, but the update is incomplete. Not repaired: " + string.Join(", ", problems) + ". Run the installer again to finish the repair.");
+                    Report(false, "incomplete", SetupLocale.Message("setup.replaykitFilesWereInstalledButThe", "version", VersionInfo.Version, "parts", string.Join(", ", problems)));
                     return 1;
                 }
-                Report(true, "done", $"ReplayKit {VersionInfo.Version} installed ({count} file(s)).");
+                Report(true, "done", SetupLocale.Message("setup.replaykitVersionWasInstalled", "version", VersionInfo.Version, "count", count));
                 return 0;
             }
             catch (Exception exc)

@@ -580,7 +580,31 @@ namespace ReplayKitHelper
             }
         }
 
-        // opens the update window as its own detached process (OBSReplayKit.exe --update-window, handled in UpdatePromptWindow.cs). it has to outlive this helper: an update closes obs, the helper follows obs down, and the installer only copies files once the helper pid is gone -- a window hosted in-process would vanish mid-install. SpawnDetached breaks it out of the helpers kill-on-close job so that chain never reaches it. same window whether the startup check or the Settings button opened it.
+        // the update window runs from a copy of this helper exe in a folder of its own, the way the watchdog does. run from scripts\helper it counted as obs to the installer, which waits for every process of that exe to end before it replaces it: every update stalled the full 30 second close timeout and then ended the window it was meant to report to. the window loads WebView2Loader.dll from beside its exe and takes its icon from there
+        private static string UpdateWindowExecutable()
+        {
+            string source = ProcessHost.HelperExecutable;
+            string dir = Path.Combine(Constants.REPLAYKIT_TEMP_ROOT, UpdateWindowFolderPrefix + Guid.NewGuid().ToString("N"));
+            string copy = Path.Combine(dir, "OBSReplayKit-update.exe");
+            try
+            {
+                CreateOwnTempFolder(dir);
+                File.Copy(source, copy, true);
+                File.Copy(Path.Combine(Constants.HelperRoot, "WebView2Loader.dll"), Path.Combine(dir, "WebView2Loader.dll"), true);
+                if (File.Exists(Constants.OBS_ICON_PATH)) File.Copy(Constants.OBS_ICON_PATH, Path.Combine(dir, Path.GetFileName(Constants.OBS_ICON_PATH)), true);
+                return copy;
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+            {
+                // the window still opens, from scripts\helper, where an update has to wait for it and then end it
+                WriteUpdateDebug("update window copy failed, opening it from the helper folder: " + ex.Message);
+                return source;
+            }
+        }
+
+        private const string UpdateWindowFolderPrefix = "update-window-";
+
+        // opens the update window as its own detached process (the copy above run with --update-window, handled in UpdatePromptWindow.cs). it has to outlive this helper: an update closes obs, the helper follows obs down, and the installer only copies files once the helper pid is gone -- a window hosted in-process would vanish mid-install. SpawnDetached breaks it out of the helpers kill-on-close job so that chain never reaches it. same window whether the startup check or the Settings button opened it.
         public static JObject OpenUpdatePromptWindow(string version)
         {
             // one window is enough -- bring the existing one forward rather than stacking another.
@@ -595,7 +619,7 @@ namespace ReplayKitHelper
             }
             catch (Exception ex) { WriteUpdateDebug("update window probe failed: " + ex.Message); }
 
-            string exe = ProcessHost.HelperExecutable;
+            string exe = UpdateWindowExecutable();
             var argList = new List<string> { "--update-window" };
             if (!string.IsNullOrWhiteSpace(version)) { argList.Add("-Version"); argList.Add(version); }
             // the window process has no settings loaded -- hand it the active themes window colour so the pre-paint frame (before the page renders) matches the Appearance tab; the border is the dwm system default
@@ -645,10 +669,10 @@ namespace ReplayKitHelper
                 foreach (string dir in Directory.GetDirectories(root))
                 {
                     string name = Path.GetFileName(dir);
-                    if (ownTempFolders.Contains(name) || !Regex.IsMatch(name, "^(" + Regex.Escape(ReplayKitShared.TempLayout.UpdateFolderPrefix) + "|watchdog-)[a-f0-9]{32}$", RegexOptions.IgnoreCase)) continue;
+                    if (ownTempFolders.Contains(name) || !Regex.IsMatch(name, "^(" + Regex.Escape(ReplayKitShared.TempLayout.UpdateFolderPrefix) + "|watchdog-|" + Regex.Escape(UpdateWindowFolderPrefix) + ")[a-f0-9]{32}$", RegexOptions.IgnoreCase)) continue;
                     try
                     {
-                        // windows refuses to delete a program that is running, so the folder of an installer or a watchdog still at work stays whole
+                        // windows refuses to delete a program that is running, so the folder of an installer, a watchdog or an update window still at work stays whole
                         foreach (string exe in Directory.GetFiles(dir, "*.exe")) File.Delete(exe);
                         Directory.Delete(dir, true);
                     }

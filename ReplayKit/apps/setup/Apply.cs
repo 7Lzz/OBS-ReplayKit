@@ -17,6 +17,9 @@ namespace ReplayKitSetup
         void SubProgress(double fraction, string detail);
     }
 
+    // the three buttons of the setup window: Install on a pc without replaykit, Update and Re-Install on one that has it
+    public enum SetupMode { Install, Update, Reinstall }
+
     // headless installer flow: make sure OBS is present, write the ReplayKit setup, launch OBS. the only interactive choice, discord screenshare, comes from the setup window.
     public static class Apply
     {
@@ -61,10 +64,13 @@ namespace ReplayKitSetup
             System.Threading.Thread.Sleep(120);
         }
 
-        // clean setup uses the defaults and clears old settings only after prerequisites and backup succeed.
-        public static List<string> RunInstallFlow(bool? discordScreenshare, IInstallProgress progress, bool cleanInstall = false)
+        // clean setup uses the defaults and clears old settings only after prerequisites and backup succeed. an update keeps the obs config as obs saved it and refreshes the replaykit files the way the in-app updater does; one asked for where there is no settings file to keep becomes a full install, since a first install is what that pc needs
+        public static List<string> RunInstallFlow(bool? discordScreenshare, IInstallProgress progress, SetupMode mode)
         {
             using var transaction = RuntimeTransaction.Open();
+            bool cleanInstall = mode == SetupMode.Reinstall;
+            bool update = mode == SetupMode.Update && File.Exists(Prefs.RUNTIME_SETTINGS_FILE);
+            if (mode == SetupMode.Update && !update) progress.LogLine("no ReplayKit settings to keep, so this update runs as a full install");
             Transform.CleanReinstall = cleanInstall;
             var prefs = Prefs.LoadPrefs(cleanInstall);
             // the setup checkbox turns the whole Share Preview feature on or off: turning it on from off also switches Share Preview on, turning it off switches it off, and an update that leaves it on keeps the Share Preview state saved in the settings. null (headless) leaves whatever was loaded.
@@ -102,7 +108,12 @@ namespace ReplayKitSetup
                 ProcessHost.Validate();
                 return (object)true;
             });
-            Add(SetupLocale.Pair("setup.closeObs"), SetupLocale.Pair("setup.stopsObsToWriteSettings"), () => (object)Obs.CloseObs(progress.LogLine));
+            bool obsClosed = false;
+            Add(SetupLocale.Pair("setup.closeObs"), SetupLocale.Pair("setup.stopsObsToWriteSettings"), () =>
+            {
+                obsClosed = true;
+                return (object)Obs.CloseObs(progress.LogLine);
+            });
             Add(SetupLocale.Pair("setup.lockObsUpdates"), SetupLocale.Pair("setup.keepsObsOnAVersionReplaykit"), () => (object)ObsUpdateLock.Lock(progress.LogLine));
             Add(SetupLocale.Pair("setup.installObsProcessRoles"), SetupLocale.Pair("setup.preparesObsBrowserAndReplaykitHelper"), () => { ProcessHost.Install(progress.LogLine); return (object)true; });
             Add(SetupLocale.Pair("setup.backUpCurrentObsSettings"), SetupLocale.Pair("setup.savesARestoreCopyFirst"), () => { Installer.BackupExistingConfig(progress.LogLine, cleanInstall); return (object)true; });
@@ -129,13 +140,17 @@ namespace ReplayKitSetup
                 Add(SetupLocale.Pair("setup.removeDiscordScreenshare"), SetupLocale.Pair("setup.uninstallsTheAudioCableDriver"), () => (object)VbCable.UninstallVbcable(progress.LogLine));
             else
                 Add(SetupLocale.Pair("setup.skipDiscordScreenshare"), SetupLocale.Pair("setup.sharePreviewStaysOff"), () => (object)true);
-            Add(SetupLocale.Pair("setup.writeReplaykitObsProfile"), SetupLocale.Pair("setup.writesTheReplaykitObsProfile"), () =>
-            {
-                if (cleanInstall) WipePreservedReplaykitState(progress);
-                bool ok = Installer.InstallObsConfig(prefs, progress.LogLine) > 0;
-                if (ok && firstInstall) Installer.MarkSetupWizardPending(progress.LogLine);
-                return (object)ok;
-            });
+            if (update)
+                Add(SetupLocale.Pair("setup.updateReplaykitFiles"), SetupLocale.Pair("setup.replacesTheReplaykitFilesAndKeeps"),
+                    () => (object)Installer.UpdateInstalledConfig(transaction, prefs, discordScreenshare.HasValue, progress.LogLine));
+            else
+                Add(SetupLocale.Pair("setup.writeReplaykitObsProfile"), SetupLocale.Pair("setup.writesTheReplaykitObsProfile"), () =>
+                {
+                    if (cleanInstall) WipePreservedReplaykitState(progress);
+                    bool ok = Installer.InstallObsConfig(prefs, progress.LogLine) > 0;
+                    if (ok && firstInstall) Installer.MarkSetupWizardPending(progress.LogLine);
+                    return (object)ok;
+                });
             Add(SetupLocale.Pair("setup.applyDefaultSettings"), SetupLocale.Pair("setup.turnsOnTheDefaultsThisVersion"), () => (object)DefaultsMigration.Run(progress.LogLine));
             Add(SetupLocale.Pair("setup.enableObsWebsocket"), SetupLocale.Pair("setup.enablesTheLocalObsWebsocket"), () => (object)Installer.ConfigureObsWebsocket(progress.LogLine));
             Add(SetupLocale.Pair("setup.installCustomControlsAndClips"), SetupLocale.Pair("setup.addsTheDockAndClipsFiles"), () => (object)(Installer.InstallObsCustomDock(progress.LogLine) > 0));
@@ -173,9 +188,19 @@ namespace ReplayKitSetup
             Add(SetupLocale.Pair("setup.launchObs"), SetupLocale.Pair("setup.startsObs"), () => (object)Obs.LaunchObs(progress.LogLine));
 
             progress.TotalSteps = steps.Count;
-            for (int i = 0; i < steps.Count; i++)
+            try
             {
-                RunApplyStep(progress, i + 1, steps[i].Title, steps[i].Detail, steps[i].Action);
+                for (int i = 0; i < steps.Count; i++)
+                {
+                    RunApplyStep(progress, i + 1, steps[i].Title, steps[i].Detail, steps[i].Action);
+                }
+            }
+            catch (Exception) when (update && obsClosed && !transaction.Pending)
+            {
+                // a failed update has put the old replaykit files back, so obs starts again with them, the way the in-app updater brings it back; a full install that failed leaves obs closed as before
+                try { Obs.LaunchObs(progress.LogLine); }
+                catch (Exception ex) { progress.LogLine("warn: could not start OBS again: " + ex.Message); }
+                throw;
             }
             bool complete = progress.Issues.Count == 0;
             Update.RecordSetupResult(complete);

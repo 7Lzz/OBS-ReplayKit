@@ -146,10 +146,10 @@ namespace ReplayKitSetup
         public const string DEFAULT_COMPRESSION_MODE = SettingDefaults.CompressionMode;
         public static readonly string[] ALLOWED_COMPRESSION_MODES = SettingLimits.CompressionModes;
 
-        // ~/videos forward-slashed -- windows own Videos known folder, and where obs itself defaults its recording path, so nothing has to fight obs to keep them aligned.
+        // the windows Videos known folder forward-slashed, where obs itself defaults its recording path, so nothing has to fight obs to keep them aligned.
         public static string DefaultRecordingPath()
         {
-            return Path.Combine(Config.USERPROFILE, "Videos").Replace('\\', '/');
+            return ClipFolder.Default().Replace('\\', '/');
         }
 
         // newtonsoft deserializes a nested json object inside a Dictionary<string,object> as a JObject wrapper, not a native dictionary -- normalize before doing anything else so callers only ever see native types.
@@ -366,6 +366,8 @@ namespace ReplayKitSetup
             if (runtime.TryGetValue("clipDir", out var clipDirObj))
             {
                 string clipDir = (clipDirObj?.ToString() ?? "").Trim();
+                // a default folder that already holds the clips of this install stays where it is, now named, since the default moved to the known folder
+                if (clipDir == "") clipDir = (ClipFolder.LegacyWithClips() ?? "").Replace('\\', '/');
                 mapped["recording_path"] = clipDir != "" ? clipDir : DefaultRecordingPath();
             }
             if (runtime.TryGetValue("clipKeybind", out var clipKb) && clipKb is Newtonsoft.Json.Linq.JObject)

@@ -135,6 +135,10 @@
     "source": "0f6b2bf6a5a18623",
     "text": "Alle Typen"
   },
+  "clips.alreadyAtItsSmallestSize": {
+    "source": "7a9892df214c18c3",
+    "text": "Dieser Clip ist schon so klein wie möglich: komprimiert wäre er {compressed} groß, mehr als die {original}, die er jetzt hat."
+  },
   "clips.alreadyAtMaximumCompression": {
     "source": "feac245b763d53c2",
     "text": "Bereits maximal komprimiert."
@@ -366,6 +370,10 @@
   "clips.compressingTempCopyForName": {
     "source": "27d12c5f874c1b12",
     "text": "Temporäre Kopie für {name} wird komprimiert."
+  },
+  "clips.compressionPassFailed": {
+    "source": "c270abc5510adbee",
+    "text": "Komprimierungsdurchgang {pass} ist fehlgeschlagen (ffmpeg-Exitcode {code})."
   },
   "clips.compressionStoppedTooManyErrors": {
     "source": "c52fd8191e65c7c4",
@@ -9632,6 +9640,10 @@
     "source": "83edf867edc566c9",
     "text": "Ruhezustand von Monitor und PC zulassen"
   },
+  "setup.anotherReplaykitUpdateIsAlready": {
+    "source": "fcd92a1e168a4f54",
+    "text": "Es läuft bereits ein anderes ReplayKit-Update."
+  },
   "setup.appliesYourThemeBeforeObsStarts": {
     "source": "9ff460540709c340",
     "text": "Wendet das Design an, bevor OBS startet."
@@ -9699,6 +9711,10 @@
   "setup.createsTheConfigFolder": {
     "source": "07a6b0bf4f598bda",
     "text": "Erstellt den Konfigurationsordner."
+  },
+  "setup.defaultSettingsPart": {
+    "source": "02e4670cfcda9faf",
+    "text": "Standardeinstellungen"
   },
   "setup.deletesReplaykitObsPluginsFromThe": {
     "source": "af44749c5be6c36e",
@@ -10068,6 +10084,14 @@
     "source": "4772517e779a3389",
     "text": "OBS ReplayKit wird entfernt"
   },
+  "setup.replacesTheReplaykitFilesAndKeeps": {
+    "source": "26559bd2d6df3743",
+    "text": "Ersetzt die ReplayKit-Dateien und behält deine OBS- und ReplayKit-Einstellungen bei."
+  },
+  "setup.replaykitFilesWereInstalledButThe": {
+    "source": "dbc739eb65009b26",
+    "text": "ReplayKit {version} wurde installiert, aber das Update ist unvollständig. Nicht repariert: {parts}. Führe das Installationsprogramm erneut aus, um die Reparatur abzuschließen."
+  },
   "setup.replaykitSetupCompleted": {
     "source": "6fcfdf35f881ac92",
     "text": "ReplayKit-Einrichtung abgeschlossen."
@@ -10075,6 +10099,17 @@
   "setup.replaykitSetupIsIncompleteRunThe": {
     "source": "830a32f930807686",
     "text": "Die ReplayKit-Einrichtung ist unvollständig. Das Installationsprogramm erneut ausführen, um die Reparatur abzuschließen."
+  },
+  "setup.replaykitVersionWasInstalled": {
+    "source": "f2cdf6fc91719664",
+    "text": {
+      "one": "ReplayKit {version} wurde installiert ({count} Datei).",
+      "other": "ReplayKit {version} wurde installiert ({count} Dateien)."
+    }
+  },
+  "setup.replaykitWasInstalledButObsCould": {
+    "source": "5927c3abf26ee4e7",
+    "text": "ReplayKit {version} wurde installiert, aber OBS konnte nicht neu gestartet werden. Starte OBS selbst."
   },
   "setup.restoreObsBrowser": {
     "source": "64096278c3d85acd",
@@ -10107,6 +10142,10 @@
   "setup.savesCurrentReplaykitSettingsForThe": {
     "source": "28a8fb6b6bdc9443",
     "text": "Speichert die aktuellen ReplayKit-Einstellungen für die nächste Installation."
+  },
+  "setup.sceneSourceSettings": {
+    "source": "f0c4e89a22ba77c8",
+    "text": "Einstellungen der Szenenquellen"
   },
   "setup.setUpObsReplaykit": {
     "source": "f04ea9bf44d4976e",
@@ -10212,6 +10251,22 @@
     "source": "d3360f80cf319e32",
     "text": "Die Standardmarkierung hat keine gültige Schrittliste."
   },
+  "setup.theDesktopAudioPlugin": {
+    "source": "4352d805a2e7d2f1",
+    "text": "das Desktop-Audio-Plugin"
+  },
+  "setup.theMotionBlurPlugin": {
+    "source": "ec9eee00d7a677ce",
+    "text": "das Bewegungsunschärfe-Plugin"
+  },
+  "setup.theObsProcessRoles": {
+    "source": "7418924bad768581",
+    "text": "die OBS-Prozessrollen"
+  },
+  "setup.theObsUpdateLock": {
+    "source": "34824a33ff9d5f00",
+    "text": "die OBS-Update-Sperre"
+  },
   "setup.theOldReplaykitHelperCouldNot": {
     "source": "99cc371f39d82ad5",
     "text": "Der alte ReplayKit-Helfer konnte nicht gestoppt werden, daher wurden keine Dateien geändert."
@@ -10224,6 +10279,10 @@
     "source": "6c07b88b1b03685a",
     "text": "Die Sicherung der Prozessrollen fehlt. OBS Studio reparieren, bevor ReplayKit entfernt wird."
   },
+  "setup.theReplaykitPluginPart": {
+    "source": "669093701c7bded5",
+    "text": "das ReplayKit-Plugin"
+  },
   "setup.theRunningReplaykitHelperDoesNot": {
     "source": "8a9fc69bb15fb743",
     "text": "Der laufende ReplayKit-Helfer unterstützt kein rein geordnetes Herunterfahren."
@@ -10232,9 +10291,29 @@
     "source": "e7c9f6e2b0ee0d7b",
     "text": "Das Einrichtungsfenster konnte nicht gestartet werden.\n\n{error}"
   },
+  "setup.theSharePreviewWindow": {
+    "source": "b65bf65a5f38add6",
+    "text": "das Share-Preview-Fenster"
+  },
   "setup.theUninstallWindowCouldNotStart": {
     "source": "55ebd1d805547641",
     "text": "Das Deinstallationsfenster konnte nicht gestartet werden.\n\n{error}"
+  },
+  "setup.theUpdateFailedAndCouldNotRollBack": {
+    "source": "4e502eb60596cfe9",
+    "text": "Das Update ist fehlgeschlagen und konnte nicht rückgängig gemacht werden: {error} {rollbackError} ReplayKit hat seine Wiederherstellungsdateien behalten."
+  },
+  "setup.theUpdateFailedAndWasRolledBack": {
+    "source": "4780e3b580c6a02e",
+    "text": "Das Update ist fehlgeschlagen und wurde rückgängig gemacht: {error}"
+  },
+  "setup.theVideoToolsAndPlugins": {
+    "source": "75984d59092bf67b",
+    "text": "die Videowerkzeuge und Plugins"
+  },
+  "setup.theWasdMouseOverlay": {
+    "source": "12e0f958d023048e",
+    "text": "das WASD-/Maus-Overlay"
   },
   "setup.thisCanTakeAFewMinutes": {
     "source": "909ed2b4f3ec0322",
@@ -10299,6 +10378,10 @@
   "setup.updateNeedsObsVersion": {
     "source": "32d0de8a3dc8e7bf",
     "text": "ReplayKit {version} benötigt OBS {obs}, und OBS konnte nicht auf diese Version aktualisiert werden, daher wurde nichts geändert. Installiere OBS {obs} von obsproject.com und führe dann das Installationsprogramm von ReplayKit aus."
+  },
+  "setup.updateReplaykitFiles": {
+    "source": "f564c2342274280d",
+    "text": "ReplayKit-Dateien aktualisieren"
   },
   "setup.verifiesTheBongoCatFilesAnd": {
     "source": "093cb0e01af8c0a7",
@@ -11123,10 +11206,6 @@
     "source": "e5ffe3ccb145941a",
     "text": "OBS wird zum Anwenden der Dateien geschlossen"
   },
-  "update.copyingReplaykitFiles": {
-    "source": "ddc0e4344ab04b61",
-    "text": "ReplayKit-Dateien werden kopiert"
-  },
   "update.couldNotOpenTheUpdateWindow": {
     "source": "2984504fcf23c2ab",
     "text": "Das Update-Fenster konnte nicht geöffnet werden: {error}"
@@ -11175,6 +11254,10 @@
     "source": "5143733fa97d6b3f",
     "text": "Version {version} wird installiert."
   },
+  "update.installingWhileObsIsClosed": {
+    "source": "164703c0dc316808",
+    "text": "Update wird installiert, während OBS geschlossen ist"
+  },
   "update.invalidSetupExecutablePath": {
     "source": "67bd4834e48322b0",
     "text": "Ungültiger Pfad zur Setup-Programmdatei."
@@ -11218,6 +11301,10 @@
   "update.obsIsBackUp": {
     "source": "ee6279c5c493778a",
     "text": "OBS läuft wieder."
+  },
+  "update.obsStartsAgainByItselfWhen": {
+    "source": "625bf1741db0fa9b",
+    "text": "OBS startet von selbst neu, sobald die neuen Dateien installiert sind."
   },
   "update.obsWasLeftRunningTryAgain": {
     "source": "c5baef3f91d360f6",
@@ -11290,6 +11377,10 @@
   "update.speedSize": {
     "source": "457bc4aecda61a57",
     "text": "{speed} ({size})"
+  },
+  "update.startingObsAgain": {
+    "source": "c991bddb9e5fc92f",
+    "text": "OBS wird neu gestartet"
   },
   "update.startupUpdateCheckAlreadyRan": {
     "source": "b521777f902946bb",

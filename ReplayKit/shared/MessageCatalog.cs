@@ -46,7 +46,7 @@ namespace ReplayKitShared
                 if (Convert.ToString(values[i], CultureInfo.InvariantCulture) != "count" || !(values[i + 1] is int || values[i + 1] is long)) continue;
                 long count = Convert.ToInt64(values[i + 1], CultureInfo.InvariantCulture);
                 form = forms[PluralForm(locale, count)]?.Value<string>();
-                values[i + 1] = count.ToString("N0", CultureInfo.GetCultureInfo(locale));
+                values[i + 1] = count.ToString("N0", CultureFor(locale));
             }
             return Format(form ?? forms["other"]?.Value<string>() ?? id, locale, values);
         }
@@ -73,13 +73,29 @@ namespace ReplayKitShared
             }
         }
 
+        private static readonly Dictionary<string, CultureInfo> Cultures = new Dictionary<string, CultureInfo>(StringComparer.OrdinalIgnoreCase);
+
+        // the setup is built with invariant globalization, where creating any named culture throws, which turned every message with a value into an exception there; its values are then written the invariant way
+        private static CultureInfo CultureFor(string locale)
+        {
+            lock (Cultures)
+            {
+                if (Cultures.TryGetValue(locale ?? "", out var known)) return known;
+                CultureInfo culture;
+                try { culture = CultureInfo.GetCultureInfo(locale ?? ""); }
+                catch (CultureNotFoundException) { culture = CultureInfo.InvariantCulture; }
+                Cultures[locale ?? ""] = culture;
+                return culture;
+            }
+        }
+
         internal static string Format(string text, string locale, object[] pairs)
         {
             if (pairs.Length == 0) return text;
             var values = new Dictionary<string, object>(StringComparer.Ordinal);
             for (int i = 0; i + 1 < pairs.Length; i += 2)
                 values[Convert.ToString(pairs[i], CultureInfo.InvariantCulture)] = pairs[i + 1];
-            CultureInfo culture = CultureInfo.GetCultureInfo(locale);
+            CultureInfo culture = CultureFor(locale);
             return Placeholder.Replace(text, match =>
                 values.TryGetValue(match.Groups[1].Value, out object value) && value != null
                     ? Convert.ToString(value, culture)

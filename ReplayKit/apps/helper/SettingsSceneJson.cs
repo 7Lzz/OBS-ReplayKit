@@ -232,14 +232,44 @@ namespace ReplayKitHelper
             var list = ObsWebSocket.InvokeRequest("GetSceneCollectionList", null, 3000);
             if (list.Ok && !string.IsNullOrEmpty(list.Data?["currentSceneCollectionName"]?.Value<string>()))
                 collectionName = list.Data["currentSceneCollectionName"].Value<string>();
-            if (string.IsNullOrWhiteSpace(collectionName) || collectionName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+            if (string.IsNullOrWhiteSpace(collectionName))
                 throw new InvalidOperationException(Locales.Message("settings.obsSceneCollectionNameIsInvalid"));
 
+            // obs names the file apart from the collection (spaces become _, other punctuation is dropped, a taken name gets a number) and keeps it as SceneCollectionFile; when that line is not for this collection yet, the file is found the way obs finds it, by the name inside it or else its file name
+            string fileName = null;
+            if (string.Equals(ObsUserIni.Read("Basic", "SceneCollection"), collectionName, StringComparison.Ordinal))
+            {
+                fileName = ObsUserIni.Read("Basic", "SceneCollectionFile");
+                if (!string.IsNullOrEmpty(fileName) && !fileName.EndsWith(".json", StringComparison.OrdinalIgnoreCase)) fileName += ".json";
+            }
+            if (string.IsNullOrEmpty(fileName) || fileName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 || !File.Exists(Path.Combine(scenesRoot, fileName)))
+                fileName = FindSceneCollectionFile(scenesRoot, collectionName);
+            // a collection obs has not saved yet gets the name obs will give its file, which the callers then find missing
+            if (fileName == null)
+            {
+                string safe = new string(collectionName.Select(c => char.IsWhiteSpace(c) ? '_' : c).Where(c => c == '_' || char.IsLetterOrDigit(c)).ToArray());
+                fileName = (safe.Length > 0 ? safe : "characters_only") + ".json";
+            }
+
             string rootFull = Path.GetFullPath(scenesRoot).TrimEnd('\\');
-            string path = Path.GetFullPath(Path.Combine(scenesRoot, collectionName + ".json"));
-            if (!path.StartsWith(rootFull + "\\", StringComparison.OrdinalIgnoreCase))
+            string path = Path.GetFullPath(Path.Combine(scenesRoot, fileName));
+            if (!string.Equals(Path.GetDirectoryName(path), rootFull, StringComparison.OrdinalIgnoreCase))
                 throw new InvalidOperationException(Locales.Message("settings.obsSceneCollectionPathResolvedOutside"));
             return path;
+        }
+
+        private static string FindSceneCollectionFile(string scenesRoot, string collectionName)
+        {
+            if (!Directory.Exists(scenesRoot)) return null;
+            foreach (string file in Directory.GetFiles(scenesRoot, "*.json"))
+            {
+                string name = null;
+                try { name = JObject.Parse(File.ReadAllText(file))["name"]?.Value<string>(); }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is JsonException || ex is InvalidCastException) { continue; }
+                if (string.IsNullOrEmpty(name)) name = Path.GetFileNameWithoutExtension(file);
+                if (string.Equals(name, collectionName, StringComparison.Ordinal)) return Path.GetFileName(file);
+            }
+            return null;
         }
 
         // -- json-file scene-source/scene-item builders. the fields every source and filter carries come from OverlayScene.SetSourceFields, shared with the installer. unlike Transform.cs (which always mints a fresh BongoCatSourceUuid constant for a brand-new template file), the live-apply functions below preserve whatever uuid an existing source already has and only mint a new one when creating from scratch -- callers pass whichever uuid is appropriate, these functions never generate one themselves.

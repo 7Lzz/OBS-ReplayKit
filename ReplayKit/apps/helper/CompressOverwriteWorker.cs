@@ -174,7 +174,7 @@ namespace ReplayKitHelper
                 double preMb = Math.Round(preBytes / 1024.0 / 1024.0, 1);
                 double outMb = Math.Round(outBytes / 1024.0 / 1024.0, 1);
                 Log.Write(string.Format("abort: would inflate ({0} MB >= {1} MB source); keeping original", outMb, preMb), "compress", requestId);
-                string msg = string.Format("Already at minimum size ({0} MB would be larger than {1} MB)", outMb, preMb);
+                string msg = Locales.Message("clips.alreadyAtItsSmallestSize", "compressed", Storage.FormatBytes(outBytes), "original", Storage.FormatBytes(preBytes));
                 UploadState.SetUploadState(requestId: requestId, state: "error", phase: "error", percent: 0, error: msg);
                 return new CompressOverwriteResult { Ok = false, Message = msg };
             }

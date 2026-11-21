@@ -11,7 +11,7 @@ using ReplayKitShared;
 
 namespace ReplayKitHelper
 {
-    // entry point: a normal launch binds the loopback listener and runs the accept loop, each connection on the thread pool; the hidden --transcode-poll, --update-watchdog, --update-startup-check, --update-window and --relaunch-obs modes run one job and exit
+    // entry point: a normal launch binds the loopback listener and runs the accept loop, each connection on the thread pool; the hidden --transcode-poll, --update-watchdog, --update-startup-check, --update-window, --playback-wake and --relaunch-obs modes run one job and exit
     internal static class Program
     {
         [DllImport("kernel32.dll", SetLastError = true)]
@@ -49,6 +49,8 @@ namespace ReplayKitHelper
                 Server.State.Config = new JObject { ["scriptDir"] = Constants.HelperRoot };
                 return ObsProcess.RunRelauncher(GetNamedArg(args, "-ObsPath"), GetNamedArg(args, "-ObsPid"));
             }
+            if (args.Length == 1 && args[0] == PlaybackWake.Mode)
+                return PlaybackWake.RunHolder();
             if (args.Length > 0 && string.Equals(args[0], "--transcode-poll", StringComparison.OrdinalIgnoreCase))
                 return RunTranscodePoll(args);
             if (args.Length > 0 && string.Equals(args[0], "--update-watchdog", StringComparison.OrdinalIgnoreCase))
@@ -148,6 +150,8 @@ namespace ReplayKitHelper
             // the settings and the saved state moved out of scripts\ into the replaykit folder itself; an install that still has them in the old places gets them moved before anything reads them, and until then the old copies keep being used
             try { StateLayout.Run(AppConfig.GetReplayKitRoot(), message => Log.Write(message)); }
             catch (Exception ex) { Log.Write("StateLayout.Run: " + ex.Message); }
+            try { ReplaykitSettings.KeepLegacyDefaultClipDir(); }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is InvalidOperationException) { Log.Write("KeepLegacyDefaultClipDir: " + ex.Message); }
 
             try { UploadState.ClearStaleCompressedTempFiles(); } catch (Exception ex) { Log.Write("ClearStaleCompressedTempFiles: " + ex.Message); }
             try { Voiceover.RemoveAbandonedTakes(); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { Log.Write("Voiceover startup cleanup: " + ex.GetType().Name); }

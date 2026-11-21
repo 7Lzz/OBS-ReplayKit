@@ -9,7 +9,7 @@ namespace ReplayKitHelper
     // two-pass, bitrate-targeted libx264 encode of a temp copy (the clip itself is never touched) that then goes to UploadWorker -- the size-constrained sibling of CompressOverwriteWorker. progress comes from -progress pipe:1, since a progress file goes through the page cache and can lag
     internal static class CompressedUploadWorker
     {
-        private static void RunFfmpegPass(string ffmpeg, List<string> argv, string phase, int startPercent, int endPercent, double durationSec, string requestId)
+        private static void RunFfmpegPass(string ffmpeg, List<string> argv, string phase, int pass, int startPercent, int endPercent, double durationSec, string requestId)
         {
             var token = JobCoordinator.Token(requestId);
             token.ThrowIfCancellationRequested();
@@ -53,7 +53,7 @@ namespace ReplayKitHelper
                 if (deadline.IsCancellationRequested) throw new TimeoutException(Locales.Message("storage.compressionExceededItsTimeLimit"));
                 if (!string.IsNullOrEmpty(stderr)) Log.Write("compress-upload " + phase + " stderr: " + stderr, "compress", requestId);
                 UploadState.SetUploadState(requestId: requestId, state: "compressing", phase: phase, percent: endPercent);
-                if (proc.ExitCode != 0) throw new InvalidOperationException(phase + " failed (exit=" + proc.ExitCode + ")");
+                if (proc.ExitCode != 0) throw new InvalidOperationException(Locales.Message("clips.compressionPassFailed", "pass", pass, "code", proc.ExitCode));
             }
         }
 
@@ -68,10 +68,10 @@ namespace ReplayKitHelper
                 Log.Write("Compressing temp copy: video=" + videoKbps + "k audio=" + audioKbps + "k", "compress", requestId);
 
                 var pass1 = new List<string> { "-y", "-hide_banner", "-i", inputPath, "-map", "0:v:0", "-c:v", "libx264", "-preset", "veryfast", "-b:v", videoKbps + "k", "-pass", "1", "-passlogfile", passLog, "-an", "-f", "null", "NUL" };
-                RunFfmpegPass(ffmpeg, pass1, "compress pass 1", 2, 49, durationSec, requestId);
+                RunFfmpegPass(ffmpeg, pass1, "compress pass 1", 1, 2, 49, durationSec, requestId);
 
                 var pass2 = new List<string> { "-y", "-hide_banner", "-i", inputPath, "-map", "0:v:0", "-map", "0:a:0?", "-c:v", "libx264", "-preset", "veryfast", "-b:v", videoKbps + "k", "-pass", "2", "-passlogfile", passLog, "-c:a", "aac", "-b:a", audioKbps + "k", "-movflags", "+faststart", tempPath };
-                RunFfmpegPass(ffmpeg, pass2, "compress pass 2", 50, 94, durationSec, requestId);
+                RunFfmpegPass(ffmpeg, pass2, "compress pass 2", 2, 50, 94, durationSec, requestId);
 
                 if (!File.Exists(tempPath)) throw new InvalidOperationException(Locales.Message("clips.ffmpegProducedNoOutput"));
                 var fi = new FileInfo(tempPath);

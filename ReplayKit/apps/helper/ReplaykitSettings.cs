@@ -1101,6 +1101,19 @@ namespace ReplayKitHelper
             catch (InvalidOperationException) { return 0; }
         }
 
+        // the default clip folder follows the videos known folder now; an install with no folder picked whose clips were saved in the profile videos folder before it was moved gets that folder named, so its library and obs keep using it
+        public static void KeepLegacyDefaultClipDir()
+        {
+            if (!File.Exists(GetSettingsPath())) return;
+            var settings = ReadSettings();
+            if (!string.IsNullOrWhiteSpace(settings["clipDir"]?.Value<string>())) return;
+            string legacy = ClipFolder.LegacyWithClips();
+            if (legacy == null) return;
+            settings["clipDir"] = legacy.Replace('\\', '/');
+            WriteSettings(settings);
+            Log.Write("clip folder: kept " + legacy + ", the default before it followed the videos known folder");
+        }
+
         public static void WriteSettings(JObject settings)
         {
             lock (SettingsStore.Gate)
@@ -1152,6 +1165,8 @@ namespace ReplayKitHelper
             "obs.exe", "obs32.exe", "obs64.exe", "searchapp.exe", "searchhost.exe",
             "shellexperiencehost.exe", "startmenuexperiencehost.exe", "systemsettings.exe",
             "textinputhost.exe", "time.exe", "video.ui.exe",
+            // the share window shows the output of obs, so capturing it would film obs inside itself
+            ReplayKitShared.ShareWindowLayout.ExeName.ToLowerInvariant(),
         };
 
         public static bool TestBlockedGameWindowExe(string exeName)

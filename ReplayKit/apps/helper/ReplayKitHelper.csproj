@@ -64,6 +64,7 @@
     <Compile Include="..\..\shared\ShareWindowLayout.cs" Link="ShareWindowLayout.cs" />
     <Compile Include="..\..\shared\DesktopAudioExclusions.cs" Link="DesktopAudioExclusions.cs" />
     <Compile Include="..\..\shared\ShellLaunch.cs" Link="ShellLaunch.cs" />
+    <Compile Include="..\..\shared\ClipFolder.cs" Link="ClipFolder.cs" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />

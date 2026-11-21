@@ -137,7 +137,7 @@ namespace ReplayKitHelper
             return string.IsNullOrEmpty(v) ? @"C:\Users\Default" : v;
         }
 
-        public static string GetDefaultClipDir() => Path.Combine(GetUserProfile(), "Videos");
+        public static string GetDefaultClipDir() => ReplayKitShared.ClipFolder.Default();
 
         // dock html lives under obs replaykits consolidated runtime tree inside obs-studios config root. prefer %appdata% becuase roaming profiles can redirect it to a non-default location; fall back to the userprofile default for shells where the env var isnt set.
         public static string GetDefaultDockDir()
