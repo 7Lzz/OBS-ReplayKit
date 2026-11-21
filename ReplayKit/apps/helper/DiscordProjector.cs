@@ -643,6 +643,13 @@ namespace ReplayKitHelper
             {
                 _parkedCheckAt = now;
                 leftItsPlace = !ProjectorNative.IsProjectorParked(known.Hwnd, known.Title, known.Rect.X, known.Rect.Y, known.Rect.Width, known.Rect.Height, true);
+                // a park of a window already in place skips its topmost step, so a window that dropped below normal windows is raised here
+                if (!leftItsPlace && ProjectorNative.IsProjectorBelowNormalWindow(known.Hwnd))
+                {
+                    Log.Write(ProjectorNative.RaiseProjectorToTopmost(known.Hwnd)
+                        ? "Discord projector had dropped below normal windows; raised it back to topmost"
+                        : "warn: Discord projector dropped below normal windows and could not be raised back");
+                }
             }
             if (!leftItsPlace && (now - _keepAliveAt).TotalSeconds < intervalSeconds) return;
             _earlyParkUsed = leftItsPlace;

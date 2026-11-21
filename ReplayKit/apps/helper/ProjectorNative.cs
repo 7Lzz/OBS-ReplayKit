@@ -301,6 +301,36 @@ namespace ReplayKitHelper
             finally { DeleteObject(region); }
         }
 
+        // windows can leave a topmost window below normal windows with its WS_EX_TOPMOST bit still set, which IsProjectorParked does not see; enumwindows walks the z-order from the top, so every window before this one is above it
+        public static bool IsProjectorBelowNormalWindow(long hwndValue)
+        {
+            IntPtr hWnd = new IntPtr(hwndValue);
+            bool normalAbove = false;
+            bool below = false;
+            EnumWindows((other, _) =>
+            {
+                if (other == hWnd)
+                {
+                    below = normalAbove;
+                    return false;
+                }
+                if (!normalAbove && IsWindowVisible(other) && (GetWindowLongPtr(other, GWL_EXSTYLE).ToInt64() & WS_EX_TOPMOST) == 0) normalAbove = true;
+                return true;
+            }, IntPtr.Zero);
+            return below;
+        }
+
+        // only the z-order step of a park, since the window is still in place with its alpha, chrome and title
+        public static bool RaiseProjectorToTopmost(long hwndValue)
+        {
+            return RunWithTimeout(cancel =>
+            {
+                if (cancel.IsCancellationRequested || !IsProjectorWindow(hwndValue)) return false;
+                if (!SetWindowPos(new IntPtr(hwndValue), HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE)) return false;
+                return !cancel.IsCancellationRequested && !IsProjectorBelowNormalWindow(hwndValue);
+            }, 1500);
+        }
+
         public static bool IsWindowAtRectAndTitle(long hwndValue, string title, int x, int y, int width, int height)
         {
             IntPtr hWnd = new IntPtr(hwndValue);
