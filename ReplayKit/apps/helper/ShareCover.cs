@@ -39,8 +39,11 @@ namespace ReplayKitHelper
         private static string VideoSelectionPath => StateLayout.PathFor(AppConfig.GetReplayKitRoot(), StateLayout.ShareCoverVideoSelectionFile);
         public static string SoundPath => StateLayout.PathFor(AppConfig.GetReplayKitRoot(), StateLayout.ShareCoverSoundFile);
         public static string CardPath => StateLayout.PathFor(AppConfig.GetReplayKitRoot(), StateLayout.ShareCoverCardFile);
-        // the sound the default card plays, shipped from resources/sounds once there is one; without it the default card is silent
-        public static string DefaultSoundPath => Path.GetFullPath(Path.Combine(Constants.HelperRoot, "..", "..", "sounds", "share-card-default.wav"));
+        // the sound the default card plays, shipped from resources/sounds as opus since a wav of it was most of the setup exe, and the wav of it the share window plays; without the shipped file the default card is silent
+        private static string DefaultSoundSource => Path.GetFullPath(Path.Combine(Constants.HelperRoot, "..", "..", "sounds", "share-card-default.opus"));
+        private static string DefaultSoundPath => StateLayout.PathFor(AppConfig.GetReplayKitRoot(), StateLayout.ShareCoverDefaultSoundFile);
+        // the shipped file a conversion failed for, so a file ffmpeg cannot read is not tried again at every park
+        private static string failedDefaultSound;
 
         private const string NoVideo = "none";
 
@@ -104,7 +107,7 @@ namespace ReplayKitHelper
                 ["videoHasSound"] = videoHasSound,
                 ["maxVideoSeconds"] = MaxVideoSeconds,
                 ["hasSound"] = File.Exists(SoundPath),
-                ["hasDefaultSound"] = File.Exists(DefaultSoundPath),
+                ["hasDefaultSound"] = File.Exists(DefaultSoundSource),
                 ["hasCard"] = File.Exists(CardPath),
                 ["width"] = state?["texture"]?[0]?.Value<int>() ?? 0,
                 ["height"] = state?["texture"]?[1]?.Value<int>() ?? 0,
@@ -125,9 +128,25 @@ namespace ReplayKitHelper
             switch (settings["share_cover_sound"]?.Value<string>() ?? SettingDefaults.ShareCoverSound)
             {
                 case "custom": return File.Exists(SoundPath) ? SoundPath : null;
-                case "default": return File.Exists(DefaultSoundPath) ? DefaultSoundPath : null;
+                case "default": return DefaultSoundWav();
                 default: return null;
             }
+        }
+
+        // the wav of the default sound, made again when the shipped file is newer than it, which an update that ships another sound gives; null while ffmpeg is not downloaded yet, which a later park tries again
+        private static string DefaultSoundWav()
+        {
+            string source = DefaultSoundSource;
+            string wav = DefaultSoundPath;
+            if (!File.Exists(source)) return null;
+            if (File.Exists(wav) && File.GetLastWriteTimeUtc(wav) >= File.GetLastWriteTimeUtc(source)) return wav;
+            string stamp = Stamp(source);
+            if (stamp == failedDefaultSound) return null;
+            string ffmpeg = Compression.FindCompressionFfmpeg();
+            if (string.IsNullOrEmpty(ffmpeg) || !File.Exists(ffmpeg)) return null;
+            if (ConvertSound(source, wav)["ok"]?.Value<bool>() == true) return wav;
+            failedDefaultSound = stamp;
+            return null;
         }
 
         // brings the card and sound of the running share window in line with the settings; drawn again only when something it is made of changed, unless forced
@@ -269,22 +288,25 @@ namespace ReplayKitHelper
             }
         }
 
-        // the picked sound converted to a wav the share window plays (48 khz stereo, ten minutes at most), so any format ffmpeg reads works
-        public static JObject ImportSound(string source)
+        // the picked sound converted to a wav the share window plays
+        public static JObject ImportSound(string source) => ConvertSound(source, SoundPath);
+
+        // a sound as the wav the share window plays (48 khz stereo, ten minutes at most), so any format ffmpeg reads works
+        private static JObject ConvertSound(string source, string target)
         {
             string ffmpeg = Compression.FindCompressionFfmpeg();
             if (string.IsNullOrEmpty(ffmpeg) || !File.Exists(ffmpeg)) return new JObject { ["ok"] = false, ["message"] = Locales.Message("screenshare.theSoundNeedsFfmpeg") };
-            Directory.CreateDirectory(Path.GetDirectoryName(SoundPath));
-            string temporary = SoundPath + ".tmp.wav";
+            Directory.CreateDirectory(Path.GetDirectoryName(target));
+            string temporary = target + ".tmp.wav";
             try
             {
                 var result = Compression.InvokeNativeCapture(ffmpeg, new[] { "-hide_banner", "-loglevel", "error", "-y", "-i", source, "-vn", "-t", MaxSoundSeconds.ToString(), "-ac", "2", "-ar", "48000", "-c:a", "pcm_s16le", temporary }, timeoutMs: 120000);
                 if (result.ExitCode != 0 || !File.Exists(temporary) || new FileInfo(temporary).Length < 1024)
                 {
-                    Log.Write("Share card sound import failed: " + string.Join(" ", result.Output));
+                    Log.Write("Share card sound conversion failed: " + string.Join(" ", result.Output));
                     return new JObject { ["ok"] = false, ["message"] = Locales.Message("screenshare.theSoundCouldNotBeUsed") };
                 }
-                Native.MoveFileReplace(temporary, SoundPath);
+                Native.MoveFileReplace(temporary, target);
                 return new JObject { ["ok"] = true };
             }
             finally

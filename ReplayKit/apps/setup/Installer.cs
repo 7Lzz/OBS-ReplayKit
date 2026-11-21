@@ -202,6 +202,8 @@ namespace ReplayKitSetup
             Path.Combine("obs-replayKit", "scripts", "replay_buffer", "clip_saved_notification.lua"),
             Path.Combine("obs-replayKit", "scripts", "obs_elevation", "hidden_relauncher.vbs"),
             Path.Combine("obs-replayKit", "icons", "nav", "tab-general.svg"),
+            // shipped as opus now, and the helper keeps its own wav of it in user-data
+            Path.Combine("obs-replayKit", "sounds", "share-card-default.wav"),
         };
 
         // installs made before the streamable/ -> helper/ rename: source name (in the old directory) -> new relative path.
