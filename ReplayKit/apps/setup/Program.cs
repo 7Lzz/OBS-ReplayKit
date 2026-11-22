@@ -32,9 +32,9 @@ namespace ReplayKitSetup
             return rc; // unreachable -- FastExitNow terminates the process directly
         }
 
-        // the flags Update.TryRunUpdateFromArgv handles -- all spawned detached from a dock button with no user at a console.
+        // the modes that run without a setup window or console
         private static bool IsHeadlessMode(string[] args) =>
-            args.Contains("--update") || args.Contains("--cleanup") ||
+            args.Contains("--update") || args.Contains("--cleanup") || args.Contains(ConfigBackups.ClearFlag) ||
             args.Contains("--install-discord-screenshare") || args.Contains("--uninstall-discord-screenshare");
 
         private static int Run(string[] args)

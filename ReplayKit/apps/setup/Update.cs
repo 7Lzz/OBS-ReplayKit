@@ -39,16 +39,19 @@ namespace ReplayKitSetup
 
         private static string PendingFile() => Path.Combine(Config.REPLAYKIT_CONFIG, StateLayout.UpdatePendingFile);
 
-        internal static void RecordSetupResult(bool complete)
+        internal static bool RecordSetupResult(bool complete)
         {
             if (complete) File.Delete(PendingFile());
-            WriteResult(complete, complete ? "done" : "incomplete",
+            return WriteResult(complete, complete ? "done" : "incomplete",
                 complete ? SetupLocale.Message("setup.replaykitSetupCompleted") : SetupLocale.Message("setup.replaykitSetupIsIncompleteRunThe"));
         }
 
-        private static void MarkUpdatePending()
+        internal static void RecordSetupFailure(Exception error) => WriteResult(false, "install", error.Message);
+
+        internal static void MarkUpdatePending()
         {
             string path = PendingFile();
+            if (File.Exists(path)) return;
             Directory.CreateDirectory(Path.GetDirectoryName(path));
             string temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
             try
@@ -65,7 +68,25 @@ namespace ReplayKitSetup
             finally { if (File.Exists(temporary)) File.Delete(temporary); }
         }
 
-        private static void WriteResult(bool ok, string stage, string message, string releaseUrl = ReleasePage, string attemptId = null)
+        internal static Exception RecoverInstall(RuntimeTransaction transaction, ConfigBackups.Snapshot snapshot,
+            Exception error, Action<string> log, out bool consistent)
+        {
+            Exception runtimeError = null;
+            try { transaction.Recover(log); }
+            catch (Exception ex)
+            {
+                runtimeError = ex;
+                log?.Invoke("ReplayKit runtime rollback failed: " + ex.Message);
+            }
+
+            var failure = ConfigBackups.Rollback(snapshot, error, log, out consistent);
+            if (runtimeError == null) return failure;
+            consistent = false;
+            return new IOException(SetupLocale.Message("setup.theUpdateFailedAndCouldNotRollBack",
+                "error", failure.Message, "rollbackError", runtimeError.Message), error);
+        }
+
+        private static bool WriteResult(bool ok, string stage, string message, string releaseUrl = ReleasePage, string attemptId = null)
         {
             try
             {
@@ -87,9 +108,12 @@ namespace ReplayKitSetup
                     NetCompat.MoveFile(temporary, path, true);
                 }
                 finally { File.Delete(temporary); }
+                return true;
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
             {
+                Log("could not write setup result: " + ex.Message);
+                return false;
             }
         }
 
@@ -144,11 +168,16 @@ namespace ReplayKitSetup
                 Log(message);
                 try { Console.WriteLine(message); } catch (IOException) { }
             }
-            void Report(bool ok, string stage, string message) => WriteResult(ok, stage, message, releaseUrl, attemptId);
+            bool Report(bool ok, string stage, string message) => WriteResult(ok, stage, message, releaseUrl, attemptId);
 
             bool obsClosed = false;
-            bool relaunchAttempted = false;
+            bool launchAttempted = false;
             bool relaunched = false;
+            bool configWriting = false;
+            bool configConsistent = true;
+            bool externalRuntimeWriting = false;
+            ConfigBackups.Snapshot configBackup = null;
+            string failureStage = "startup";
             Mutex updateGate = null;
             bool updateGateHeld = false;
             RuntimeTransaction transaction = null;
@@ -190,54 +219,86 @@ namespace ReplayKitSetup
                 transaction = RuntimeTransaction.Open();
                 Obs.CloseObs(LogBoth);
                 obsClosed = true;
-                MarkUpdatePending();
+                failureStage = "install";
                 // stage markers: a process that is killed leaves no exception behind, so the last line in the log is the only thing that says where it got to.
                 Log("stage: obs closed, waiting for helper pid " + waitPid);
                 if (!WaitForPid(waitPid > 0 ? waitPid : 0, 60, LogBoth))
                     throw new IOException(SetupLocale.Message("setup.theOldReplaykitHelperCouldNot"));
+                try { configBackup = ConfigBackups.Create("app-update", LogBoth); }
+                catch (Exception ex)
+                {
+                    LogBoth("preflight failed while backing up OBS config: " + ex.Message);
+                    Report(false, "preflight", ex.Message);
+                    return 1;
+                }
                 transaction.Recover(LogBoth);
+                MarkUpdatePending();
+                configWriting = true;
                 Log("stage: helper gone, clearing crash flags");
                 Obs.CleanupCrashFlags(LogBoth);
                 Log("stage: copying runtime files");
                 var problems = new List<string>();
+                externalRuntimeWriting = !ObsVersions.IsInstalledSupported();
                 int count = Installer.InstallReplaykitRuntimeUpdate(transaction, LogBoth, problems);
                 LogBoth($"runtime update copied {count} file(s)");
-                if (problems.Count == 0) File.Delete(PendingFile());
-                Startup.RefreshObsStartup(LogBoth);
-
-                if (relaunch)
+                if (problems.Count == 0)
                 {
-                    Installer.PrepareObsTheme(LogBoth);
-                    relaunchAttempted = true;
-                    relaunched = LaunchObsPath(relaunchObs, LogBoth);
-                    if (!relaunched)
+                    Startup.RefreshObsStartup(LogBoth);
+                    if (relaunch) Installer.PrepareObsTheme(LogBoth);
+                    externalRuntimeWriting = true;
+                    if (!ShareWindowInstall.Install(LogBoth)) problems.Add(SetupLocale.Message("setup.theSharePreviewWindow"));
+                    try { problems.AddRange(Installer.RunUpdateDriverRefresh(LogBoth)); }
+                    catch (Exception ex)
                     {
-                        Report(false, "relaunch", SetupLocale.Message("setup.replaykitWasInstalledButObsCould", "version", VersionInfo.Version));
-                        return 1;
+                        LogBoth("tool and plugin refresh failed: " + ex.Message);
+                        problems.Add(SetupLocale.Message("setup.theVideoToolsAndPlugins"));
                     }
                 }
                 if (problems.Count > 0)
                 {
-                    Report(false, "incomplete", SetupLocale.Message("setup.replaykitFilesWereInstalledButThe", "version", VersionInfo.Version, "parts", string.Join(", ", problems)));
-                    return 1;
+                    failureStage = "incomplete";
+                    throw new IOException(SetupLocale.Message("setup.replaykitFilesWereInstalledButThe",
+                        "version", VersionInfo.Version, "parts", string.Join(", ", problems)));
                 }
-                Report(true, "done", SetupLocale.Message("setup.replaykitVersionWasInstalled", "version", VersionInfo.Version, "count", count));
+                transaction.Complete(LogBoth);
+                configWriting = false;
+                externalRuntimeWriting = false;
+                Installer.CleanupReplaykitLegacyFiles(LogBoth);
+
+                if (relaunch)
+                {
+                    failureStage = "relaunch";
+                    launchAttempted = true;
+                    relaunched = LaunchObsPath(relaunchObs, LogBoth);
+                    if (!relaunched)
+                        throw new IOException(SetupLocale.Message("setup.replaykitWasInstalledButObsCould", "version", VersionInfo.Version));
+                }
+                File.Delete(PendingFile());
+                if (Report(true, "done", SetupLocale.Message("setup.replaykitVersionWasInstalled", "version", VersionInfo.Version, "count", count)) && relaunched)
+                    ConfigBackups.StartCleanup();
                 return 0;
             }
             catch (Exception exc)
             {
-                Log("update failed: " + exc.Message);
-                Report(false, obsClosed ? "install" : "startup", exc.Message);
+                var failure = configWriting ? RecoverInstall(transaction, configBackup, exc, LogBoth, out configConsistent) : exc;
+                if (externalRuntimeWriting)
+                {
+                    failureStage = "incomplete";
+                    Log("OBS was left closed because an external runtime change may require repair");
+                }
+                Log("update failed: " + failure.Message);
+                Report(false, failureStage, failure.Message);
                 return 1;
             }
             finally
             {
                 // bring obs back once the runtime is consistent, including after a successful rollback.
-                if (obsClosed && relaunch && !relaunchAttempted)
+                if (obsClosed && relaunch && !launchAttempted && configConsistent && !externalRuntimeWriting)
                 {
                     try { if (!transaction.Pending) LaunchObsPath(relaunchObs, LogBoth); }
                     catch (Exception ex) { Log("OBS recovery launch failed: " + ex.Message); }
                 }
+                configBackup?.Dispose();
                 transaction?.Dispose();
                 if (updateGateHeld) updateGate.ReleaseMutex();
                 updateGate?.Dispose();
@@ -348,9 +409,10 @@ namespace ReplayKitSetup
             }
         }
 
-        // parses the subset of argv this app needs for --update/--cleanup/--uninstall/--install-discord-screenshare/--uninstall-discord-screenshare mode. returns null if none of those flags are present (normal interactive launch).
+        // return null for a normal interactive launch
         public static int? TryRunUpdateFromArgv(string[] argv)
         {
+            if (argv.Contains(ConfigBackups.ClearFlag)) return ConfigBackups.ClearOld();
             // the windowed uninstall -- the twin of the setup window. --cleanup is the old headless path, kept as a fallback.
             if (argv.Contains("--uninstall"))
             {

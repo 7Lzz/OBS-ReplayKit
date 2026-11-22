@@ -36,6 +36,7 @@ namespace ReplayKitSetup
         private const uint DETACHED_PROCESS = 0x00000008;
         private const uint CREATE_BREAKAWAY_FROM_JOB = 0x01000000;
         private const uint CREATE_NEW_PROCESS_GROUP = 0x00000200;
+        private const uint BELOW_NORMAL_PRIORITY_CLASS = 0x00004000;
 
         // the flag the relaunched copy carries so it knows it is already detached and does the work instead of relaunching again.
         public const string DetachedFlag = "--detached";
@@ -72,11 +73,13 @@ namespace ReplayKitSetup
         }
 
         // starts another program the same detached way, with the rights of this process; 0 when it could not be started
-        public static int Start(string exe, string arguments)
+        public static int Start(string exe, string arguments, bool belowNormal = false)
         {
             string commandLine = Win32Args.Build(exe) + (string.IsNullOrEmpty(arguments) ? "" : " " + arguments);
-            int pid = Spawn(commandLine, exe, DETACHED_PROCESS | CREATE_BREAKAWAY_FROM_JOB | CREATE_NEW_PROCESS_GROUP);
-            if (pid == 0) pid = Spawn(commandLine, exe, DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP);
+            uint flags = DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP;
+            if (belowNormal) flags |= BELOW_NORMAL_PRIORITY_CLASS;
+            int pid = Spawn(commandLine, exe, flags | CREATE_BREAKAWAY_FROM_JOB);
+            if (pid == 0) pid = Spawn(commandLine, exe, flags);
             return pid;
         }
 

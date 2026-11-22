@@ -36,39 +36,40 @@ namespace ReplayKitSetup
 
         // bundled assets root. BUNDLE_ROOT is the folder of the exe; ASSETS_DIR is the copy unpacked from the embedded bundle, or a sibling assets\ folder for a build without one.
         public static readonly string BUNDLE_ROOT;
-        public static readonly string ASSETS_DIR;
-        public static readonly string OBS_ASSETS_DIR;
+        private static readonly Lazy<string> Assets = new Lazy<string>(() => ResolveAssetsDir(BUNDLE_ROOT));
+        public static string ASSETS_DIR => Assets.Value;
+        public static string OBS_ASSETS_DIR => Path.Combine(ASSETS_DIR, "obs-studio");
 
         public static readonly string OBS_INSTALL_DIR;
         public static readonly string PROGRAMFILES_OBS_DIR;
 
         // input-overlay ships as its own raw plugin files (dll + data), extracted once and checked into input-overlay-plugin.zip (built from source by plugins/input-overlay so one build loads in every obs line) -- not an embedded, silently-executed third-party installer. an embedded-and-executed installer is exactly the shape av "application bundler" heuristics exist to catch, and BongoCat.cs already proved the raw-files-plus-safe-extract approach works. vc++ is the one real prerequisite still downloaded (from microsoft only when missing, signature-checked before running).
-        public static readonly string INPUT_OVERLAY_PLUGIN_ZIP;
+        public static string INPUT_OVERLAY_PLUGIN_ZIP => Path.Combine(ASSETS_DIR, BundleLayout.InputOverlayZip);
         public const string VCPP_REDIST_DOWNLOAD_URL = "https://aka.ms/vc14/vc_redist.x64.exe";
         public const long VCPP_REDIST_DOWNLOAD_MAX_BYTES = 64 * 1024 * 1024;
 
         // bundled virtual audio driver -- creates the obs stream audio render endpoint and matching loopback capture endpoint used by discord. still shipped via installers.zips VBCABLE_Driver_Pack45.zip and its own setup exe.
-        public static readonly string INPUT_OVERLAY_INSTALLERS_ZIP;
+        public static string INPUT_OVERLAY_INSTALLERS_ZIP => Path.Combine(ASSETS_DIR, BundleLayout.InstallersZip);
         public const string VBCABLE_DRIVER_PACK_NAME = BundleLayout.VbCablePack;
         public const string VBCABLE_SETUP_EXE_NAME = "VBCABLE_Setup_x64.exe";
 
         // input-overlay preset pack -- extracted under replaykit_config so all replaykit-managed assets live under one umbrella.
-        public static readonly string INPUT_OVERLAY_ZIP;
+        public static string INPUT_OVERLAY_ZIP => Path.Combine(ASSETS_DIR, BundleLayout.PresetsZip);
         public static readonly string INPUT_OVERLAY_TARGET;
 
         // win-capture-audio plugin powers the "desktop audio (excl. discord)" source via windows 10+ per-process loopback. the bundled zip is the replaykit build of the maintained fork https://github.com/Ayrton09/win-capture-audio, see plugins/win-capture-audio/PROVENANCE.md
-        public static readonly string WIN_CAPTURE_AUDIO_ZIP;
+        public static string WIN_CAPTURE_AUDIO_ZIP => Path.Combine(ASSETS_DIR, BundleLayout.WinCaptureAudioZip);
         public const string WIN_CAPTURE_AUDIO_DLL_REL = BundleLayout.WinCaptureAudioDllDir + BundleLayout.WinCaptureAudioDll;
 
         // the Bango Cat folder (modes, pictures, live2d models) from the bongobs-cat project, laid out as an obs-root extract, so installer code strips the top-level folder and writes only safe relative paths into programfiles_obs_dir.
-        public static readonly string BONGO_CAT_ZIP;
+        public static string BONGO_CAT_ZIP => Path.Combine(ASSETS_DIR, BundleLayout.BangoCatZip);
 
         // obs shaderfilter plugin -- replaykit uses its bundled motion_blur.shader when the optional motion blur setting is enabled. the archive is the upstream 2.6.1 windows release cut down to the 64-bit plugin, its locale and internal effect and motion_blur.shader, since replaykit uses nothing else of it.
-        public static readonly string SHADERFILTER_ZIP;
+        public static string SHADERFILTER_ZIP => Path.Combine(ASSETS_DIR, BundleLayout.ShaderfilterZip);
         public const string SHADERFILTER_ZIP_SHA256 = "9ef94f7656c4dc1d5fa7f076a2d96b5c25fa1d0d4c172a09837309665ba4858f";
 
         // replaykits own obs plugin (window chrome, tray menu, notifications, hotkeys) -- compiled from source at release time and bundled straight into assets/, installed under %programdata%\obs-studio\plugins\ (obss no-admin plugin search path).
-        public static readonly string REPLAYKIT_PLUGIN_DLL_BUNDLED;
+        public static string REPLAYKIT_PLUGIN_DLL_BUNDLED => Path.Combine(ASSETS_DIR, "obs-plugins", "replaykit", "bin", "64bit", "replaykit.dll");
         public static readonly string REPLAYKIT_PLUGIN_DIR;
 
         // pre-unification plugin locations. obs loads every dll it finds under plugins\<name>\bin\64bit\, so an old replaykit-tray left sitting beside the current replaykit\ is loaded alongside it and injects a second copy of every tray menu item.
@@ -106,21 +107,12 @@ namespace ReplayKitSetup
                     .Concat(DefaultObsCandidates()));
 
             BUNDLE_ROOT = AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\', '/');
-            ASSETS_DIR = ResolveAssetsDir(BUNDLE_ROOT);
-            OBS_ASSETS_DIR = Path.Combine(ASSETS_DIR, "obs-studio");
 
             OBS_INSTALL_DIR = FindObsInstallDir() ?? _DEFAULT_OBS_DIR;
             PROGRAMFILES_OBS_DIR = OBS_INSTALL_DIR;
 
-            INPUT_OVERLAY_INSTALLERS_ZIP = Path.Combine(ASSETS_DIR, BundleLayout.InstallersZip);
-            INPUT_OVERLAY_PLUGIN_ZIP = Path.Combine(ASSETS_DIR, BundleLayout.InputOverlayZip);
-            INPUT_OVERLAY_ZIP = Path.Combine(ASSETS_DIR, BundleLayout.PresetsZip);
             INPUT_OVERLAY_TARGET = Path.Combine(REPLAYKIT_CONFIG, "input-overlay-presets");
-            WIN_CAPTURE_AUDIO_ZIP = Path.Combine(ASSETS_DIR, BundleLayout.WinCaptureAudioZip);
-            BONGO_CAT_ZIP = Path.Combine(ASSETS_DIR, BundleLayout.BangoCatZip);
-            SHADERFILTER_ZIP = Path.Combine(ASSETS_DIR, BundleLayout.ShaderfilterZip);
 
-            REPLAYKIT_PLUGIN_DLL_BUNDLED = Path.Combine(ASSETS_DIR, "obs-plugins", "replaykit", "bin", "64bit", "replaykit.dll");
             REPLAYKIT_PLUGIN_DIR = Path.Combine(PROGRAMDATA, "obs-studio", "plugins", "replaykit");
             REPLAYKIT_TRAY_LEGACY_PLUGIN_DIR = Path.Combine(PROGRAMDATA, "obs-studio", "plugins", "replaykit-tray");
             REPLAYKIT_TRAY_LEGACY_DLL_IN_CURRENT_DIR = Path.Combine(REPLAYKIT_PLUGIN_DIR, "bin", "64bit", "replaykit-tray.dll");

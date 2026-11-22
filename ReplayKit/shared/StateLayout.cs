@@ -95,6 +95,11 @@ namespace ReplayKitShared
 
         public static string FolderPath(string root) => Path.Combine(root, Folder);
 
+        internal static IEnumerable<string> Files()
+        {
+            foreach (var entry in Entries) yield return entry.File;
+        }
+
         // where the file belongs; files that are not part of the move (the update hand-off) stay in the root
         public static string PathFor(string root, string file)
         {

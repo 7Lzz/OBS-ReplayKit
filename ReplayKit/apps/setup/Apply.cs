@@ -39,7 +39,7 @@ namespace ReplayKitSetup
         }
 
         // Exceptions stop the flow; false results are reported as incomplete steps.
-        public static void RunApplyStep(IInstallProgress progress, int index, SetupLocale.Text title, SetupLocale.Text detail, Func<object> action)
+        public static bool RunApplyStep(IInstallProgress progress, int index, SetupLocale.Text title, SetupLocale.Text detail, Func<object> action)
         {
             progress.Render(index - 1, title, detail, "working");
             object result;
@@ -58,10 +58,11 @@ namespace ReplayKitSetup
             {
                 progress.AddIssue(new SetupLocale.Text(SetupLocale.Message("setup.stepDidNotComplete", "step", title.Shown), SetupLocale.Pair("setup.stepDidNotComplete", "step", title.English).English));
                 progress.Render(index, title, detail, "failed");
-                return;
+                return false;
             }
             progress.Render(index, title, detail, "done");
             System.Threading.Thread.Sleep(120);
+            return true;
         }
 
         // clean setup uses the defaults and clears old settings only after prerequisites and backup succeed. an update keeps the obs config as obs saved it and refreshes the replaykit files the way the in-app updater does; one asked for where there is no settings file to keep becomes a full install, since a first install is what that pc needs
@@ -86,6 +87,7 @@ namespace ReplayKitSetup
 
             var steps = new List<(SetupLocale.Text Title, SetupLocale.Text Detail, Func<object> Action)>();
             void Add(SetupLocale.Text title, SetupLocale.Text detail, Func<object> action) => steps.Add((title, detail, action));
+            bool externalRuntimeWriting = false;
 
             // hard prerequisite: every step after this writes into the OBS install. a failed download used to fall through as a soft "issue" and the flow kept going, scattering plugins into a dead folder and still showing "Done".
             Add(SetupLocale.Pair("setup.installObsStudio"), SetupLocale.Pair("setup.installsObsOrUpdatesItTo"), () =>
@@ -93,6 +95,7 @@ namespace ReplayKitSetup
                 Installer.ValidateRuntimeAssets();
                 if (transaction.Pending) Obs.CloseObs(progress.LogLine);
                 transaction.Recover(progress.LogLine);
+                externalRuntimeWriting = Obs.FindObsExe() != null && !ObsVersions.IsInstalledSupported();
                 ObsDownloader.EnsureObsVersion(progress);
                 if (Obs.FindObsExe() == null)
                 {
@@ -109,15 +112,39 @@ namespace ReplayKitSetup
                 return (object)true;
             });
             bool obsClosed = false;
+            bool launchAttempted = false;
+            bool configWriting = false;
+            ConfigBackups.Snapshot configBackup = null;
             Add(SetupLocale.Pair("setup.closeObs"), SetupLocale.Pair("setup.stopsObsToWriteSettings"), () =>
             {
                 obsClosed = true;
                 return (object)Obs.CloseObs(progress.LogLine);
             });
+            Add(SetupLocale.Pair("setup.backUpCurrentObsSettings"), SetupLocale.Pair("setup.savesARestoreCopyFirst"), () =>
+            {
+                string reason = cleanInstall ? "reinstall" : mode == SetupMode.Update ? "update" : "install";
+                configBackup = ConfigBackups.Create(reason, SetupLog.Line);
+                return (object)true;
+            });
             Add(SetupLocale.Pair("setup.lockObsUpdates"), SetupLocale.Pair("setup.keepsObsOnAVersionReplaykit"), () => (object)ObsUpdateLock.Lock(progress.LogLine));
-            Add(SetupLocale.Pair("setup.installObsProcessRoles"), SetupLocale.Pair("setup.preparesObsBrowserAndReplaykitHelper"), () => { ProcessHost.Install(progress.LogLine); return (object)true; });
-            Add(SetupLocale.Pair("setup.backUpCurrentObsSettings"), SetupLocale.Pair("setup.savesARestoreCopyFirst"), () => { Installer.BackupExistingConfig(progress.LogLine, cleanInstall); return (object)true; });
-            Add(SetupLocale.Pair("setup.prepareObsSettingsFolder"), SetupLocale.Pair("setup.createsTheConfigFolder"), () => { Directory.CreateDirectory(Config.OBS_CONFIG); Obs.CleanupCrashFlags(progress.LogLine); return (object)true; });
+            Add(SetupLocale.Pair("setup.installObsProcessRoles"), SetupLocale.Pair("setup.preparesObsBrowserAndReplaykitHelper"), () =>
+            {
+                if (externalRuntimeWriting) Update.MarkUpdatePending();
+                ProcessHost.Install(progress.LogLine, () =>
+                {
+                    Update.MarkUpdatePending();
+                    externalRuntimeWriting = true;
+                });
+                return (object)true;
+            });
+            Add(SetupLocale.Pair("setup.prepareObsSettingsFolder"), SetupLocale.Pair("setup.createsTheConfigFolder"), () =>
+            {
+                Update.MarkUpdatePending();
+                configWriting = true;
+                Directory.CreateDirectory(Config.OBS_CONFIG);
+                Obs.CleanupCrashFlags(progress.LogLine);
+                return (object)true;
+            });
             // no helper means no dock, no clips, no settings ui -- throw so RunApplyStep stops the flow instead of the old behaviour where a false here only added a "needs attention" line while the rest ran anyway.
             Add(SetupLocale.Pair("setup.buildReplaykitHelper"), SetupLocale.Pair("setup.preparesTheLocalHelper"), () =>
             {
@@ -142,7 +169,13 @@ namespace ReplayKitSetup
                 Add(SetupLocale.Pair("setup.skipDiscordScreenshare"), SetupLocale.Pair("setup.sharePreviewStaysOff"), () => (object)true);
             if (update)
                 Add(SetupLocale.Pair("setup.updateReplaykitFiles"), SetupLocale.Pair("setup.replacesTheReplaykitFilesAndKeeps"),
-                    () => (object)Installer.UpdateInstalledConfig(transaction, prefs, discordScreenshare.HasValue, progress.LogLine));
+                    () =>
+                    {
+                        if (!Installer.UpdateInstalledConfig(transaction, prefs, discordScreenshare.HasValue, progress.LogLine))
+                            return (object)false;
+                        externalRuntimeWriting = true;
+                        return (object)ShareWindowInstall.Install(progress.LogLine);
+                    });
             else
                 Add(SetupLocale.Pair("setup.writeReplaykitObsProfile"), SetupLocale.Pair("setup.writesTheReplaykitObsProfile"), () =>
                 {
@@ -185,26 +218,46 @@ namespace ReplayKitSetup
             Add(SetupLocale.Pair("setup.prepareClipFolders"), SetupLocale.Pair("setup.createsTheClipFolders"), () => { Installer.EnsureRecordingDirs(prefs, progress.LogLine); return (object)true; });
             Add(SetupLocale.Pair("setup.setWindowsStartup"), SetupLocale.Pair("setup.addsObsToWindowsStartup"), () => (object)Startup.ConfigureObsStartup(prefs.ObsStartupEnabled, progress.LogLine));
             Add(SetupLocale.Pair("setup.prepareObsTheme"), SetupLocale.Pair("setup.appliesYourThemeBeforeObsStarts"), () => { Installer.PrepareObsTheme(progress.LogLine); return (object)true; });
-            Add(SetupLocale.Pair("setup.launchObs"), SetupLocale.Pair("setup.startsObs"), () => (object)Obs.LaunchObs(progress.LogLine));
+            Add(SetupLocale.Pair("setup.launchObs"), SetupLocale.Pair("setup.startsObs"), () =>
+            {
+                if (update) transaction.Complete(progress.LogLine);
+                configWriting = false;
+                if (update) Installer.CleanupReplaykitLegacyFiles(SetupLog.Line);
+                launchAttempted = true;
+                if (!Obs.LaunchObs(progress.LogLine))
+                    throw new IOException(SetupLocale.Message("setup.replaykitWasInstalledButObsCould", "version", VersionInfo.Version));
+                return (object)true;
+            });
 
             progress.TotalSteps = steps.Count;
             try
             {
                 for (int i = 0; i < steps.Count; i++)
                 {
-                    RunApplyStep(progress, i + 1, steps[i].Title, steps[i].Detail, steps[i].Action);
+                    if (!RunApplyStep(progress, i + 1, steps[i].Title, steps[i].Detail, steps[i].Action) && configWriting)
+                        throw new IOException(SetupLocale.Message("setup.stepDidNotComplete", "step", steps[i].Title.Shown));
                 }
             }
-            catch (Exception) when (update && obsClosed && !transaction.Pending)
+            catch (Exception error)
             {
-                // a failed update has put the old replaykit files back, so obs starts again with them, the way the in-app updater brings it back; a full install that failed leaves obs closed as before
-                try { Obs.LaunchObs(progress.LogLine); }
-                catch (Exception ex) { progress.LogLine("warn: could not start OBS again: " + ex.Message); }
-                throw;
+                bool consistent = true;
+                var failure = configWriting ? Update.RecoverInstall(transaction, configBackup, error, SetupLog.Line, out consistent) : error;
+                Update.RecordSetupFailure(failure);
+                if (update && obsClosed && consistent && !transaction.Pending && !launchAttempted && !externalRuntimeWriting)
+                {
+                    try { Obs.LaunchObs(progress.LogLine); }
+                    catch (Exception ex) { progress.LogLine("warn: could not start OBS again: " + ex.Message); }
+                }
+                if (update && obsClosed && externalRuntimeWriting && !launchAttempted)
+                    SetupLog.Line("OBS was left closed because an external runtime change may require repair");
+                if (failure == error) throw;
+                throw failure;
             }
+            finally { configBackup?.Dispose(); }
             bool complete = progress.Issues.Count == 0;
-            Update.RecordSetupResult(complete);
+            bool recorded = Update.RecordSetupResult(complete);
             progress.Render(progress.TotalSteps, complete ? SetupLocale.Pair("setup.setupComplete") : SetupLocale.Pair("setup.setupIncomplete"), complete ? SetupLocale.Pair("setup.obsReplaykitIsReady") : SetupLocale.Pair("setup.someStepsNeedAttentionSeeThe"), complete ? "done" : "failed");
+            if (complete && recorded) ConfigBackups.StartCleanup();
             return progress.Issues;
         }
 

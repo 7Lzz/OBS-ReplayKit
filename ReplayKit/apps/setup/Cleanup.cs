@@ -370,10 +370,10 @@ namespace ReplayKitSetup
                 }
             }
 
-            // keep-settings uninstall leaves the folder on purpose (state\ + prefs.json feed the next install); a full uninstall takes it too, now if it is already empty otherwise on reboot right after the exe entry
-            if (!keepUserSettings)
+            // remove the cache directory only when empty; the config archives survive uninstall
+            if (!keepUserSettings && !Directory.EnumerateFileSystemEntries(cacheDir).Any(path => !string.Equals(path, exe, StringComparison.OrdinalIgnoreCase)))
             {
-                try { Directory.Delete(cacheDir, true); log?.Invoke("removed " + cacheDir); }
+                try { Directory.Delete(cacheDir); log?.Invoke("removed " + cacheDir); }
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
                 {
                     if (MoveFileEx(cacheDir, null, MOVEFILE_DELAY_UNTIL_REBOOT))
@@ -422,7 +422,6 @@ namespace ReplayKitSetup
             string scenesDir = Path.Combine(Config.OBS_CONFIG, "basic", "scenes");
             if (!Directory.Exists(scenesDir)) return true;
             bool ok = true;
-            string stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
 
             foreach (string path in Directory.GetFiles(scenesDir, "*.json"))
             {
@@ -534,7 +533,6 @@ namespace ReplayKitSetup
 
                 try
                 {
-                    File.Copy(path, path + ".replaykit-uninstall-" + stamp + ".bak", true);
                     File.WriteAllText(path, root.ToString(Formatting.Indented), new UTF8Encoding(false));
                     log?.Invoke("scrubbed " + Path.GetFileName(path)
                         + (removedScenes.Count > 0 ? "; scene(s): " + string.Join(", ", removedScenes) : "")
@@ -569,7 +567,6 @@ namespace ReplayKitSetup
                 // [BasicWindow] DockState -- the native plugin hid OBSs native "Controls" dock and OBS persisted that
                 // into this blob. it is an opaque QMainWindow::saveState() so there is no clean way to flip one dock;
                 // drop the whole line and OBS rebuilds its default layout (Controls dock visible) on next launch. the
-                // .bak beside this file keeps the old layout if the user wants it.
                 text = Regex.Replace(text, @"(\[BasicWindow\][^\[]*?\r?\n)DockState=[^\r\n]*\r?\n",
                     "$1", RegexOptions.Singleline);
 
@@ -582,7 +579,6 @@ namespace ReplayKitSetup
                 if (text == original) continue;
                 try
                 {
-                    File.Copy(path, path + ".replaykit-uninstall.bak", true);
                     File.WriteAllText(path, text, new UTF8Encoding(false));
                     log?.Invoke("scrubbed " + name + " (Controls dock, ReplayKit theme; OBS dock layout resets to default)");
                 }

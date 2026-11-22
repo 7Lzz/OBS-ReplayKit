@@ -9654,6 +9654,10 @@
     "source": "66f2ce2cf31015c7",
     "text": "Сделать резервную копию текущих настроек OBS"
   },
+  "setup.backupObsSettingsFailed": {
+    "source": "ff7d57022049bfb1",
+    "text": "ReplayKit не удалось создать резервную копию настроек OBS. Подробности см. в журнале установки."
+  },
   "setup.bongoCatCouldNotBeInstalled": {
     "source": "542930c8b2e8727f",
     "text": "Не удалось установить или восстановить Bongo Cat. Запустите установщик ReplayKit ещё раз, чтобы завершить настройку оверлея."
@@ -10127,6 +10131,10 @@
     "source": "64096278c3d85acd",
     "text": "Восстановить браузер OBS"
   },
+  "setup.restoreObsSettingsFailed": {
+    "source": "7cfbacf4bd140e0b",
+    "text": "ReplayKit не удалось восстановить настройки OBS. Подробности см. в журнале установки."
+  },
   "setup.restoreObsSleepBlocking": {
     "source": "e085394d20b9f34b",
     "text": "Восстановить блокировку сна OBS"
@@ -10315,9 +10323,9 @@
     "source": "4e502eb60596cfe9",
     "text": "Обновление не удалось, и отменить его тоже не получилось: {error} {rollbackError} ReplayKit сохранил свои файлы восстановления."
   },
-  "setup.theUpdateFailedAndWasRolledBack": {
-    "source": "4780e3b580c6a02e",
-    "text": "Обновление не удалось и было отменено: {error}"
+  "setup.theUpdateFailedAndObsSettingsWereRestored": {
+    "source": "c1e3a580429f1ba8",
+    "text": "Не удалось завершить установку. ReplayKit восстановил настройки OBS. {error}"
   },
   "setup.theVideoToolsAndPlugins": {
     "source": "75984d59092bf67b",

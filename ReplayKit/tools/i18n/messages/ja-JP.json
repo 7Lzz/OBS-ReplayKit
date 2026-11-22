@@ -9645,6 +9645,10 @@
     "source": "66f2ce2cf31015c7",
     "text": "現在の OBS 設定をバックアップ"
   },
+  "setup.backupObsSettingsFailed": {
+    "source": "ff7d57022049bfb1",
+    "text": "ReplayKit は OBS の設定をバックアップできませんでした。詳しくはセットアップログを確認してください。"
+  },
   "setup.bongoCatCouldNotBeInstalled": {
     "source": "542930c8b2e8727f",
     "text": "Bongo Cat をインストールまたは修復できませんでした。ReplayKit のインストーラーをもう一度実行して、オーバーレイのセットアップを完了してください。"
@@ -10115,6 +10119,10 @@
     "source": "64096278c3d85acd",
     "text": "OBS のブラウザを復元"
   },
+  "setup.restoreObsSettingsFailed": {
+    "source": "7cfbacf4bd140e0b",
+    "text": "ReplayKit は OBS の設定を復元できませんでした。詳しくはセットアップログを確認してください。"
+  },
   "setup.restoreObsSleepBlocking": {
     "source": "e085394d20b9f34b",
     "text": "OBS のスリープ防止を復元"
@@ -10303,9 +10311,9 @@
     "source": "4e502eb60596cfe9",
     "text": "更新に失敗し、元に戻すこともできませんでした: {error} {rollbackError} ReplayKit は復元用のファイルを残しています。"
   },
-  "setup.theUpdateFailedAndWasRolledBack": {
-    "source": "4780e3b580c6a02e",
-    "text": "更新に失敗したため、元に戻しました: {error}"
+  "setup.theUpdateFailedAndObsSettingsWereRestored": {
+    "source": "c1e3a580429f1ba8",
+    "text": "セットアップに失敗しました。ReplayKit は OBS の設定を復元しました。 {error}"
   },
   "setup.theVideoToolsAndPlugins": {
     "source": "75984d59092bf67b",

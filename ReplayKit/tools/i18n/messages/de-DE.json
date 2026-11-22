@@ -9648,6 +9648,10 @@
     "source": "66f2ce2cf31015c7",
     "text": "Aktuelle OBS-Einstellungen sichern"
   },
+  "setup.backupObsSettingsFailed": {
+    "source": "ff7d57022049bfb1",
+    "text": "ReplayKit konnte die OBS-Einstellungen nicht sichern. Weitere Informationen findest du im Installationsprotokoll."
+  },
   "setup.bongoCatCouldNotBeInstalled": {
     "source": "542930c8b2e8727f",
     "text": "Bongo Cat konnte nicht installiert oder repariert werden. Führe das ReplayKit-Installationsprogramm erneut aus, um die Einrichtung des Overlays abzuschließen."
@@ -10119,6 +10123,10 @@
     "source": "64096278c3d85acd",
     "text": "OBS-Browser wiederherstellen"
   },
+  "setup.restoreObsSettingsFailed": {
+    "source": "7cfbacf4bd140e0b",
+    "text": "ReplayKit konnte die OBS-Einstellungen nicht wiederherstellen. Weitere Informationen findest du im Installationsprotokoll."
+  },
   "setup.restoreObsSleepBlocking": {
     "source": "e085394d20b9f34b",
     "text": "OBS-Ruhezustandssperre wiederherstellen"
@@ -10307,9 +10315,9 @@
     "source": "4e502eb60596cfe9",
     "text": "Das Update ist fehlgeschlagen und konnte nicht rückgängig gemacht werden: {error} {rollbackError} ReplayKit hat seine Wiederherstellungsdateien behalten."
   },
-  "setup.theUpdateFailedAndWasRolledBack": {
-    "source": "4780e3b580c6a02e",
-    "text": "Das Update ist fehlgeschlagen und wurde rückgängig gemacht: {error}"
+  "setup.theUpdateFailedAndObsSettingsWereRestored": {
+    "source": "c1e3a580429f1ba8",
+    "text": "Die Einrichtung ist fehlgeschlagen. ReplayKit hat die OBS-Einstellungen wiederhergestellt. {error}"
   },
   "setup.theVideoToolsAndPlugins": {
     "source": "75984d59092bf67b",

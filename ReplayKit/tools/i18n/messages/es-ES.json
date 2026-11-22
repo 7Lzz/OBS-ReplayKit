@@ -9651,6 +9651,10 @@
     "source": "66f2ce2cf31015c7",
     "text": "Hacer copia de seguridad de los ajustes actuales de OBS"
   },
+  "setup.backupObsSettingsFailed": {
+    "source": "ff7d57022049bfb1",
+    "text": "ReplayKit no pudo hacer una copia de seguridad de los ajustes de OBS. Consulta el registro de instalación para obtener más información."
+  },
   "setup.bongoCatCouldNotBeInstalled": {
     "source": "542930c8b2e8727f",
     "text": "No se pudo instalar ni reparar Bongo Cat. Ejecuta de nuevo el instalador de ReplayKit para terminar de configurar la superposición."
@@ -10123,6 +10127,10 @@
     "source": "64096278c3d85acd",
     "text": "Restaurar el navegador de OBS"
   },
+  "setup.restoreObsSettingsFailed": {
+    "source": "7cfbacf4bd140e0b",
+    "text": "ReplayKit no pudo restaurar los ajustes de OBS. Consulta el registro de instalación para obtener más información."
+  },
   "setup.restoreObsSleepBlocking": {
     "source": "e085394d20b9f34b",
     "text": "Restaurar el bloqueo de suspensión de OBS"
@@ -10311,9 +10319,9 @@
     "source": "4e502eb60596cfe9",
     "text": "La actualización falló y no se pudo revertir: {error} {rollbackError} ReplayKit conservó sus archivos de recuperación."
   },
-  "setup.theUpdateFailedAndWasRolledBack": {
-    "source": "4780e3b580c6a02e",
-    "text": "La actualización falló y se revirtió: {error}"
+  "setup.theUpdateFailedAndObsSettingsWereRestored": {
+    "source": "c1e3a580429f1ba8",
+    "text": "La instalación falló. ReplayKit restauró los ajustes de OBS. {error}"
   },
   "setup.theVideoToolsAndPlugins": {
     "source": "75984d59092bf67b",

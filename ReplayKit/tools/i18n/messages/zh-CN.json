@@ -9645,6 +9645,10 @@
     "source": "66f2ce2cf31015c7",
     "text": "备份当前 OBS 设置"
   },
+  "setup.backupObsSettingsFailed": {
+    "source": "ff7d57022049bfb1",
+    "text": "ReplayKit 无法备份 OBS 设置。有关详情，请查看安装日志。"
+  },
   "setup.bongoCatCouldNotBeInstalled": {
     "source": "542930c8b2e8727f",
     "text": "无法安装或修复 Bongo Cat。请重新运行 ReplayKit 安装程序以完成叠加层的设置。"
@@ -10115,6 +10119,10 @@
     "source": "64096278c3d85acd",
     "text": "恢复 OBS 浏览器"
   },
+  "setup.restoreObsSettingsFailed": {
+    "source": "7cfbacf4bd140e0b",
+    "text": "ReplayKit 无法恢复 OBS 设置。有关详情，请查看安装日志。"
+  },
   "setup.restoreObsSleepBlocking": {
     "source": "e085394d20b9f34b",
     "text": "恢复 OBS 睡眠阻止"
@@ -10303,9 +10311,9 @@
     "source": "4e502eb60596cfe9",
     "text": "更新失败且无法回滚：{error} {rollbackError} ReplayKit 保留了其恢复文件。"
   },
-  "setup.theUpdateFailedAndWasRolledBack": {
-    "source": "4780e3b580c6a02e",
-    "text": "更新失败，已回滚：{error}"
+  "setup.theUpdateFailedAndObsSettingsWereRestored": {
+    "source": "c1e3a580429f1ba8",
+    "text": "安装失败。ReplayKit 已恢复 OBS 设置。{error}"
   },
   "setup.theVideoToolsAndPlugins": {
     "source": "75984d59092bf67b",

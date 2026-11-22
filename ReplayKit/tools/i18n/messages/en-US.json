@@ -9649,6 +9649,10 @@
     "context": "Title or description of an installer step in the installer and uninstaller.",
     "text": "Back up current OBS settings"
   },
+  "setup.backupObsSettingsFailed": {
+    "context": "Installer preflight error shown when ReplayKit cannot create or verify the automatic OBS settings backup.",
+    "text": "ReplayKit could not back up the OBS settings. See the setup log for details."
+  },
   "setup.bongoCatCouldNotBeInstalled": {
     "context": "Error message shown when an installer step fails in the installer and uninstaller.",
     "text": "Bongo Cat could not be installed or repaired. Run the ReplayKit installer again to finish setting up the overlay."
@@ -10120,6 +10124,10 @@
     "context": "Title or description of an installer step in the installer and uninstaller.",
     "text": "Restore OBS browser"
   },
+  "setup.restoreObsSettingsFailed": {
+    "context": "Installer error detail shown when ReplayKit cannot restore the OBS settings after a failed setup.",
+    "text": "ReplayKit could not restore the OBS settings. See the setup log for details."
+  },
   "setup.restoreObsSleepBlocking": {
     "context": "Title or description of an installer step in the installer and uninstaller.",
     "text": "Restore OBS sleep blocking"
@@ -10308,9 +10316,9 @@
     "context": "Error message shown when an installer step fails in the installer and uninstaller. {error} is why the update failed and {rollbackError} why undoing it failed, as the system gives them.",
     "text": "The update failed and could not be rolled back: {error} {rollbackError} ReplayKit kept its recovery files."
   },
-  "setup.theUpdateFailedAndWasRolledBack": {
-    "context": "Error message shown when an installer step fails in the installer and uninstaller. {error} is the reason, as the system gives it.",
-    "text": "The update failed and was rolled back: {error}"
+  "setup.theUpdateFailedAndObsSettingsWereRestored": {
+    "context": "Installer error after setup fails and automatic rollback restores the OBS settings. {error} is the original failure.",
+    "text": "Setup failed. ReplayKit restored the OBS settings. {error}"
   },
   "setup.theVideoToolsAndPlugins": {
     "context": "Part of ReplayKit named in the update window when an update could not repair it; it fills {parts} of the message that lists what was not repaired.",

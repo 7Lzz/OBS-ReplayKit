@@ -131,7 +131,7 @@ namespace ReplayKitSetup
             finally { if (File.Exists(temporary)) File.Delete(temporary); }
         }
 
-        public static void Install(Action<string> log = null)
+        public static void Install(Action<string> log = null, Action beforeChange = null)
         {
             var bundle = Bundle();
             string version = (string)bundle.Manifest["ObsVersion"];
@@ -179,6 +179,7 @@ namespace ReplayKitSetup
                 log?.Invoke("shared OBS " + version + " process host already current");
                 return;
             }
+            beforeChange?.Invoke();
             if (interrupted == null) Save(pending, bundle.Manifest);
             else if (!JToken.DeepEquals(interrupted, bundle.Manifest))
                 throw new IOException("Finish the interrupted OBS process host update with its original ReplayKit installer first.");

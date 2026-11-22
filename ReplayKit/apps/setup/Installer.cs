@@ -12,9 +12,6 @@ namespace ReplayKitSetup
     // install bundled obs config into %appdata%/obs-studio/. walks assets/obs-studio/ as a 1:1 mirror, pipes text files thru RewriteUserPaths + ApplyPreferences before writing
     public static class Installer
     {
-        // top-level entries backed up before overwriting. obs-replayKit/ covers the whole replaykit-managed tree (lua scripts, dock html, presets); global.ini is merged not overwritten but cheap to back up anyway.
-        private static readonly string[] BackupTargets = { "basic", "obs-replayKit", "plugin_manager", "plugin_config", "user.ini", "global.ini" };
-
         // scene path inside %appdata%\obs-studio\ transformed on fresh installs and patched on runtime updates -- when it already exists, the full installer uses that live file as the transform input so user-added filters and source state survive reinstall/repair installs.
         private static readonly string UserSceneRel = Path.Combine("basic", "scenes", "Untitled.json");
         private const string RuntimeVersionFile = "version.json";
@@ -220,11 +217,14 @@ namespace ReplayKitSetup
             [StateLayout.HelperConfigFile] = Path.Combine("obs-replayKit", StateLayout.HelperConfigFile),
         };
 
+        internal static string LegacyStreamableStatePath(string root, string file) =>
+            LegacyStreamableStateRels.ContainsKey(file) ? Path.Combine(root, LegacyStreamableDirRel, file) : null;
+
         // the starter settings ship at their old place inside the bundle, the path the transform of the settings is keyed on; on the disk they belong in the user-data folder with the rest of the state
         private static string InstallTarget(string rel)
         {
-            if (string.Equals(rel, Path.Combine("obs-replayKit", StateLayout.SettingsFile), StringComparison.OrdinalIgnoreCase))
-                return StateLayout.PathFor(Config.REPLAYKIT_CONFIG, StateLayout.SettingsFile);
+            if (RuntimePreserveRels.Contains(rel))
+                return StateLayout.PathFor(Config.REPLAYKIT_CONFIG, Path.GetFileName(rel));
             return Path.Combine(Config.OBS_CONFIG, rel);
         }
         // the settings and the saved state moved out of scripts\ and scripts\helper\, then out of the replaykit folder root, into its user-data folder; this moves what an older install still has in the old places, and a file that cannot be moved yet stays where it is and keeps being used
@@ -439,21 +439,23 @@ namespace ReplayKitSetup
         }
 
         // runtime updates used to leave the existing user.ini alone. That preserved OBS layout, but also left the managed Controls dock on its legacy file:// URL after the helper moved to a protected loopback API. OBS is closed before this runs, so update only that canonical dock row while Transform preserves every unrelated dock and preference.
-        private static void UpdateControlsDockUrl(Action<string> log)
+        private static bool UpdateControlsDockUrl(Action<string> log)
         {
             string path = Path.Combine(Config.OBS_CONFIG, "user.ini");
-            if (!File.Exists(path)) return;
+            if (!File.Exists(path)) return true;
             try
             {
                 string current = Config.ReadTextFileFlexible(path);
                 string updated = Transform.ApplyUserIni(current, Prefs.LoadPrefs());
-                if (string.Equals(current, updated, StringComparison.Ordinal)) return;
+                if (string.Equals(current, updated, StringComparison.Ordinal)) return true;
                 WriteWithRetry(() => File.WriteAllText(path, updated, new System.Text.UTF8Encoding(false)));
                 log?.Invoke("updated Controls dock URL");
+                return true;
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is JsonException)
             {
                 log?.Invoke("warn: Controls dock URL update skipped: " + ex.Message);
+                return false;
             }
         }
 
@@ -560,7 +562,7 @@ namespace ReplayKitSetup
             return runtimeSrc;
         }
 
-        // refresh changed ReplayKit-managed runtime files while preserving user obs config/state, then apply migrations and refresh tools and plugins.
+        // stage and apply the runtime and config that can be restored together
         internal static int InstallReplaykitRuntimeUpdate(RuntimeTransaction transaction, Action<string> log = null, List<string> problems = null)
         {
             ValidateRuntimeAssets();
@@ -584,17 +586,6 @@ namespace ReplayKitSetup
             {
                 log?.Invoke($"warn: default settings pass failed: {ex.Message}");
                 problems?.Add(SetupLocale.Message("setup.defaultSettingsPart"));
-            }
-
-            try
-            {
-                var notUpdated = RunUpdateDriverRefresh(log);
-                if (problems != null) problems.AddRange(notUpdated);
-            }
-            catch (Exception ex)
-            {
-                log?.Invoke($"warn: tool refresh pass failed: {ex.Message}");
-                problems?.Add(SetupLocale.Message("setup.theVideoToolsAndPlugins"));
             }
 
             return count;
@@ -624,71 +615,56 @@ namespace ReplayKitSetup
                 .OrderBy(path => path, StringComparer.OrdinalIgnoreCase).ToList();
             if (files.Count == 0) throw new InvalidDataException(SetupLocale.Message("setup.theBundledReplaykitRuntimeIsEmpty"));
 
-            int count = 0, unchanged = 0;
+            int unchanged = 0;
             var stagedFiles = new List<string>();
-            try
+            var stagedState = new List<string>();
+            foreach (string src in files)
             {
-                foreach (string src in files)
+                string fileRel = NetCompat.GetRelativePath(runtimeSrc, src);
+                string rel = Path.Combine("obs-replayKit", fileRel);
+                // the share window has its own update path because it can outlive obs
+                if (ShareWindowInstall.IsShareWindowFile(rel) || string.Equals(fileRel, RuntimeVersionFile, StringComparison.OrdinalIgnoreCase)) continue;
+                if (PreservesRuntimeFile(rel))
                 {
-                    string fileRel = NetCompat.GetRelativePath(runtimeSrc, src);
-                    string rel = Path.Combine("obs-replayKit", fileRel);
-                    // the share window can be running thru the update, which only the install of its own handles
-                    if (ShareWindowInstall.IsShareWindowFile(rel) || string.Equals(fileRel, RuntimeVersionFile, StringComparison.OrdinalIgnoreCase)) continue;
-                    if (PreservesRuntimeFile(rel))
-                    {
-                        log?.Invoke("preserve: " + rel.Replace('\\', '/'));
-                        continue;
-                    }
-                    string targetRel = NetCompat.GetRelativePath(Config.REPLAYKIT_CONFIG, InstallTarget(rel));
-                    string staged = transaction.Stage(targetRel);
-                    string target = transaction.Target(targetRel);
-                    if (!StageRuntimeFile(src, staged, target))
-                    {
-                        unchanged++;
-                        continue;
-                    }
-                    if (!PreservesRuntimeFile(rel)) stagedFiles.Add(targetRel);
+                    log?.Invoke("preserve: " + rel.Replace('\\', '/'));
+                    continue;
                 }
-                log?.Invoke($"staged and verified {stagedFiles.Count} runtime file(s)");
-
-                string stagedVersion = transaction.Stage(RuntimeVersionFile);
-                Directory.CreateDirectory(Path.GetDirectoryName(stagedVersion));
-                WriteVersion(stagedVersion);
-                stagedFiles.Add(RuntimeVersionFile);
-                transaction.Prepare(stagedFiles);
-                foreach (string relative in stagedFiles)
+                string targetRel = NetCompat.GetRelativePath(Config.REPLAYKIT_CONFIG, InstallTarget(rel));
+                string staged = transaction.Stage(targetRel);
+                string target = transaction.Target(targetRel);
+                if (!StageRuntimeFile(src, staged, target))
                 {
-                    ReplaceFile(transaction.Stage(relative), transaction.Target(relative), transactionId);
-                    log?.Invoke("-> obs-replayKit/" + relative.Replace('\\', '/'));
+                    unchanged++;
+                    continue;
                 }
-
-                count = stagedFiles.Count - 1;
-                // worded without "skipped": the setup window counts a line with that word as a step that went wrong
-                log?.Invoke($"{unchanged} runtime file(s) were already current");
-                transaction.Complete(log);
+                // setup can edit seeded state before commit, so the config snapshot owns its rollback
+                if (RuntimePreserveRels.Contains(rel)) stagedState.Add(targetRel);
+                else stagedFiles.Add(targetRel);
             }
-            catch (Exception installError)
+            log?.Invoke($"staged and verified {stagedFiles.Count} runtime file(s)");
+
+            string stagedVersion = transaction.Stage(RuntimeVersionFile);
+            Directory.CreateDirectory(Path.GetDirectoryName(stagedVersion));
+            WriteVersion(stagedVersion);
+            stagedFiles.Add(RuntimeVersionFile);
+            transaction.Prepare(stagedFiles);
+            foreach (string relative in stagedFiles.Concat(stagedState))
             {
-                try { transaction.Recover(log); }
-                catch (Exception rollbackError)
-                {
-                    throw new IOException(SetupLocale.Message("setup.theUpdateFailedAndCouldNotRollBack", "error", installError.Message, "rollbackError", rollbackError.Message), installError);
-                }
-                throw new IOException(SetupLocale.Message("setup.theUpdateFailedAndWasRolledBack", "error", installError.Message), installError);
+                ReplaceFile(transaction.Stage(relative), transaction.Target(relative), transactionId);
+                log?.Invoke("-> obs-replayKit/" + relative.Replace('\\', '/'));
             }
-            return count;
+
+            log?.Invoke($"{unchanged} runtime file(s) were already current");
+            return stagedFiles.Count - 1 + stagedState.Count;
         }
 
-        // what an update fixes up once the new runtime files are in: the share window, the state files, the cached setup exe, retired files, the managed dock row, the scene source patches and the replaykit script entry. each part is best-effort -- the runtime files are already on disk and obs relaunches with them, so a part that fails is named in problems instead of undoing the update
+        // repair the config while the runtime journal is still available
         private static void RepairAfterRuntimeCopy(Action<string> log, List<string> problems)
         {
-            if (!ShareWindowInstall.Install(log)) problems?.Add(SetupLocale.Message("setup.theSharePreviewWindow"));
-            // after the copy has gone through, never before: a copy that is rolled back puts the old helper and scripts back, and those look for the settings in the old places
             MigrateStateLayout(log);
             CacheSetupExecutable(log);
-            CleanupReplaykitLegacyFiles(log);
             RestoreReplaykitUserState(log);
-            UpdateControlsDockUrl(log);
+            if (!UpdateControlsDockUrl(log)) problems?.Add(SetupLocale.Message("setup.updateReplaykitFiles"));
 
             try
             {
@@ -891,43 +867,6 @@ namespace ReplayKitSetup
             }
             catch (Exception ex) { log?.Invoke($"warn: tray icon pin refresh skipped: {ex.Message}"); }
             return problems;
-        }
-
-        // copy the users current obs config to obs-studio.bak.<timestamp>. returns the backup path, or null if there was nothing to back up.
-        public static string BackupExistingConfig(Action<string> log = null, bool includeInstallerPrefs = false)
-        {
-            var present = BackupTargets.Select(name => Path.Combine(Config.OBS_CONFIG, name)).Where(p => Directory.Exists(p) || File.Exists(p)).ToList();
-            bool prefs = includeInstallerPrefs && File.Exists(Prefs.PREFS_FILE);
-            bool cachePrefs = includeInstallerPrefs && File.Exists(Prefs.SETUP_CACHE_PREFS_FILE);
-            if (present.Count == 0 && !prefs && !cachePrefs) return null;
-
-            string stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss-fffffff");
-            string backupDir = Path.Combine(Path.GetDirectoryName(Config.OBS_CONFIG), $"obs-studio.bak.{stamp}");
-            Directory.CreateDirectory(backupDir);
-
-            foreach (var src in present)
-            {
-                string dst = Path.Combine(backupDir, Path.GetFileName(src));
-                if (Directory.Exists(src)) CopyDirectory(src, dst);
-                else File.Copy(src, dst);
-            }
-            if (prefs) File.Copy(Prefs.PREFS_FILE, Path.Combine(backupDir, "installer-prefs.json"));
-            if (cachePrefs) File.Copy(Prefs.SETUP_CACHE_PREFS_FILE, Path.Combine(backupDir, "cached-installer-prefs.json"));
-
-            log?.Invoke($"backed up existing config -> {backupDir}");
-            return backupDir;
-        }
-
-        private static void CopyDirectory(string src, string dst)
-        {
-            Directory.CreateDirectory(dst);
-            foreach (var file in Directory.EnumerateFiles(src, "*", SearchOption.AllDirectories))
-            {
-                string rel = file.Substring(src.Length).TrimStart('\\', '/');
-                string target = Path.Combine(dst, rel);
-                Directory.CreateDirectory(Path.GetDirectoryName(target));
-                File.Copy(file, target, true);
-            }
         }
 
         // make sure the recording output folder exists. the videos known folder is also created as the simple-output fallback obs reverts to if a profile is reset.

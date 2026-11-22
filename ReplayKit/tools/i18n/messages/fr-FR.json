@@ -9651,6 +9651,10 @@
     "source": "66f2ce2cf31015c7",
     "text": "Sauvegarder les paramètres actuels d'OBS"
   },
+  "setup.backupObsSettingsFailed": {
+    "source": "ff7d57022049bfb1",
+    "text": "ReplayKit n’a pas pu sauvegarder les paramètres d’OBS. Consultez le journal d’installation pour en savoir plus."
+  },
   "setup.bongoCatCouldNotBeInstalled": {
     "source": "542930c8b2e8727f",
     "text": "Impossible d'installer ou de réparer Bongo Cat. Relancez l'installateur de ReplayKit pour terminer la configuration de la surimpression."
@@ -10123,6 +10127,10 @@
     "source": "64096278c3d85acd",
     "text": "Restaurer le navigateur d'OBS"
   },
+  "setup.restoreObsSettingsFailed": {
+    "source": "7cfbacf4bd140e0b",
+    "text": "ReplayKit n’a pas pu restaurer les paramètres d’OBS. Consultez le journal d’installation pour en savoir plus."
+  },
   "setup.restoreObsSleepBlocking": {
     "source": "e085394d20b9f34b",
     "text": "Rétablir le blocage de veille d'OBS"
@@ -10311,9 +10319,9 @@
     "source": "4e502eb60596cfe9",
     "text": "La mise à jour a échoué et n'a pas pu être annulée : {error} {rollbackError} ReplayKit a conservé ses fichiers de récupération."
   },
-  "setup.theUpdateFailedAndWasRolledBack": {
-    "source": "4780e3b580c6a02e",
-    "text": "La mise à jour a échoué et a été annulée : {error}"
+  "setup.theUpdateFailedAndObsSettingsWereRestored": {
+    "source": "c1e3a580429f1ba8",
+    "text": "L’installation a échoué. ReplayKit a restauré les paramètres d’OBS. {error}"
   },
   "setup.theVideoToolsAndPlugins": {
     "source": "75984d59092bf67b",
