@@ -122,11 +122,17 @@ void PrewarmCefBrowser()
 				QVBoxLayout *layout = new QVBoxLayout(warmWin);
 				layout->setContentsMargins(0, 0, 0, 0);
 				const std::string url = "data:text/html;base64," + QByteArray(kWarmPage).toBase64().toStdString();
+				const QWindowList windowsBefore = QGuiApplication::allWindows();
 				QCefWidget *browser = g_cef->create_widget(warmWin, url, nullptr);
 				if (!browser) {
 					delete warmWin;
 					return;
 				}
+				// cef focuses a browser as it creates it, which activated the window it sits in and took the foreground and the keyboard from the app in front for the life of this window, on a tray start too; windows never focuses a window under a disabled one, and the page takes no input. obs-browser creates the browser in a window of its own that is not under warmWin until the browser exists, so that one is disabled as well
+				for (QWindow *window : QGuiApplication::allWindows())
+					if (!windowsBefore.contains(window) && !window->inherits("QWidgetWindow"))
+						EnableWindow((HWND)window->winId(), FALSE);
+				EnableWindow((HWND)warmWin->winId(), FALSE);
 				layout->addWidget(browser);
 				WatchBrowserTitle(browser, warmWin, kPrewarmTitle, []() { FinishCefPrewarm("content painted"); });
 				g_prewarmWindow = warmWin;
