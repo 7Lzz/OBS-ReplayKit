@@ -5671,10 +5671,6 @@
     "source": "c74363cfd3f86728",
     "text": "Falló el bucle de aceptación del auxiliar."
   },
-  "helper.iconFileIsTruncated": {
-    "source": "98b468cb694d21e9",
-    "text": "El archivo de icono está truncado."
-  },
   "helper.imagesIcoPngJpgBmp": {
     "source": "6cd3d71abc82115b",
     "text": "Imágenes (*.ico;*.png;*.jpg;*.bmp)"
@@ -5706,10 +5702,6 @@
   "helper.noiseSuppressionMustBe0Or": {
     "source": "2ba4dec793b56033",
     "text": "La supresión de ruido debe ser 0 o 1."
-  },
-  "helper.notAnIconFile": {
-    "source": "13ef6ae92d7dc739",
-    "text": "No es un archivo de icono."
   },
   "helper.obsCouldNotCloseSafely": {
     "source": "f24dbc6872a46d7d",
@@ -9922,6 +9914,18 @@
   "setup.noProcessHostForObs": {
     "source": "d21a9a94574f4ff7",
     "text": "No se incluye ningún host de procesos compartido para OBS {version}. Instala primero una versión de OBS compatible."
+  },
+  "setup.netFrameworkInstallPrompt": {
+    "source": "451227b9398ebce4",
+    "text": "OBS ReplayKit necesita Microsoft .NET Framework 4.8, que no está instalado en este PC.\n\nElige Aceptar para descargar el instalador de .NET Framework 4.8 de Microsoft y abrirlo. Cuando termine, este instalador se volverá a iniciar solo."
+  },
+  "setup.netFrameworkNeedsRestart": {
+    "source": "80d3382bc2a44ab9",
+    "text": "Microsoft .NET Framework 4.8 está instalado y el PC necesita reiniciarse para terminar la instalación.\n\nReinicia el PC y vuelve a ejecutar este instalador."
+  },
+  "setup.netFrameworkInstallFailed": {
+    "source": "66627ff5b476d1d5",
+    "text": "No se pudo instalar Microsoft .NET Framework 4.8.\n\nElige Aceptar para abrir la página de descargas de Microsoft. Instala .NET Framework 4.8 desde allí, reinicia el PC si su instalador te lo pide y vuelve a ejecutar este instalador."
   },
   "setup.obsCouldNotBeInstalledAutomatically": {
     "source": "b9ec5649ef71e37c",

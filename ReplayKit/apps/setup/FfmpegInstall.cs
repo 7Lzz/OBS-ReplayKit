@@ -174,7 +174,7 @@ namespace ReplayKitSetup
                         }
 
                         if (name == "ffmpeg.exe") File.Delete(Path.Combine(HelperDir, "OBSReplayKit-Encoder.exe"));
-                        File.Move(tmp, dst, true);
+                        NetCompat.MoveFile(tmp, dst, true);
                         tmpPaths.Remove(tmp);
                         log?.Invoke("installed -> " + dst);
                     }

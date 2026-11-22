@@ -6,7 +6,6 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
-using Microsoft.Web.WebView2.Core;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -107,7 +106,7 @@ namespace ReplayKitSetup
             {
                 string udf = SetupWindow.WebViewDataDir;
                 Directory.CreateDirectory(udf);
-                var env = await CoreWebView2Environment.CreateAsync(null, udf, new CoreWebView2EnvironmentOptions());
+                var env = await CoreWebView2Environment.CreateAsync(udf);
                 _controller = await env.CreateCoreWebView2ControllerAsync(_hwnd);
                 _web = _controller.CoreWebView2;
 
@@ -246,7 +245,7 @@ namespace ReplayKitSetup
                     if (_queue.Count == 0) return;
                     a = _queue.Dequeue();
                 }
-                try { a(); } catch (Exception) { }
+                try { a(); } catch (Exception ex) { SetupLog.Line("a window action failed: " + ex); }
             }
         }
 
@@ -387,7 +386,7 @@ namespace ReplayKitSetup
         {
             try
             {
-                string exe = Environment.ProcessPath ?? "";
+                string exe = NetCompat.ProcessPath ?? "";
                 if (string.IsNullOrEmpty(exe)) return;
                 IntPtr hIcon = Native.ExtractIconW(Native.GetModuleHandleW(null), exe, 0);
                 if (hIcon != IntPtr.Zero && hIcon != (IntPtr)1)

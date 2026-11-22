@@ -9,10 +9,6 @@ namespace ReplayKitShared
     // starts a program thru a shortcut that the running explorer opens, so a program started from an elevated process runs with the normal rights of the signed in user (the installer starts obs this way, the helper the share window when obs runs as admin)
     public static class ShellLaunch
     {
-#if NET5_0_OR_GREATER
-        [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage("Trimming", "IL2072", Justification = "com idispatch dispatch, no trimmable managed members")]
-        [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage("Trimming", "IL2075", Justification = "com idispatch dispatch, no trimmable managed members")]
-#endif
         public static bool Start(string exe, string arguments, string linkPath, Action<string> log)
         {
             object shell = null;
@@ -43,7 +39,7 @@ namespace ReplayKitShared
             try
             {
                 // a path never holds a quote, so quoting the one argument is all explorer needs
-                var psi = new ProcessStartInfo("explorer.exe", "\"" + linkPath + "\"") { UseShellExecute = false, CreateNoWindow = true };
+                var psi = new ProcessStartInfo(SystemPrograms.Explorer, "\"" + linkPath + "\"") { UseShellExecute = false, CreateNoWindow = true };
                 Process.Start(psi)?.Dispose();
                 return true;
             }

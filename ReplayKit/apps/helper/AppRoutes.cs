@@ -69,7 +69,7 @@ namespace ReplayKitHelper
                         HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["focused"] = focused2 });
                         return false;
                     }
-                    Process.Start(new ProcessStartInfo { FileName = "explorer.exe", Arguments = ProcessArgs.Quote(root), UseShellExecute = false })?.Dispose();
+                    Process.Start(new ProcessStartInfo { FileName = ReplayKitShared.SystemPrograms.Explorer, Arguments = ProcessArgs.Quote(root), UseShellExecute = false })?.Dispose();
                     HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["focused"] = false });
                 }
                 catch (Exception ex) { HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = ex.Message }); }

@@ -5671,10 +5671,6 @@
     "source": "c74363cfd3f86728",
     "text": "La boucle d'acceptation de l'assistant a échoué."
   },
-  "helper.iconFileIsTruncated": {
-    "source": "98b468cb694d21e9",
-    "text": "Le fichier d'icône est tronqué."
-  },
   "helper.imagesIcoPngJpgBmp": {
     "source": "6cd3d71abc82115b",
     "text": "Images (*.ico;*.png;*.jpg;*.bmp)"
@@ -5706,10 +5702,6 @@
   "helper.noiseSuppressionMustBe0Or": {
     "source": "2ba4dec793b56033",
     "text": "La suppression du bruit doit valoir 0 ou 1."
-  },
-  "helper.notAnIconFile": {
-    "source": "13ef6ae92d7dc739",
-    "text": "Ce n'est pas un fichier d'icône."
   },
   "helper.obsCouldNotCloseSafely": {
     "source": "f24dbc6872a46d7d",
@@ -9922,6 +9914,18 @@
   "setup.noProcessHostForObs": {
     "source": "d21a9a94574f4ff7",
     "text": "Aucun hôte de processus partagé n’est fourni pour OBS {version}. Installez d’abord une version d’OBS prise en charge."
+  },
+  "setup.netFrameworkInstallPrompt": {
+    "source": "451227b9398ebce4",
+    "text": "OBS ReplayKit a besoin de Microsoft .NET Framework 4.8, qui n’est pas installé sur ce PC.\n\nChoisissez OK pour télécharger le programme d’installation de .NET Framework 4.8 depuis Microsoft et l’ouvrir. Une fois l’installation terminée, ce programme d’installation redémarre de lui-même."
+  },
+  "setup.netFrameworkNeedsRestart": {
+    "source": "80d3382bc2a44ab9",
+    "text": "Microsoft .NET Framework 4.8 est installé, et le PC doit redémarrer pour terminer l’installation.\n\nRedémarrez le PC, puis relancez ce programme d’installation."
+  },
+  "setup.netFrameworkInstallFailed": {
+    "source": "66627ff5b476d1d5",
+    "text": "Microsoft .NET Framework 4.8 n’a pas pu être installé.\n\nChoisissez OK pour ouvrir la page de téléchargement de Microsoft. Installez .NET Framework 4.8 depuis cette page, redémarrez le PC si son programme d’installation le demande, puis relancez ce programme d’installation."
   },
   "setup.obsCouldNotBeInstalledAutomatically": {
     "source": "b9ec5649ef71e37c",

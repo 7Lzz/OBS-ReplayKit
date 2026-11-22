@@ -1,5 +1,4 @@
 using System;
-using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Runtime.InteropServices;
 
@@ -14,9 +13,7 @@ namespace ReplayKitSetup
         // what the task scheduler answers for a task that does not exist
         private const int TaskNotFound = unchecked((int)0x80070002);
 
-        // delete the ReplayKit scheduled task through the task scheduler itself. safe when the task is not present. Schedule.Service is late-bound com, so the trimmer warnings are moot
-        [UnconditionalSuppressMessage("Trimming", "IL2072", Justification = "com idispatch dispatch, no trimmable managed members")]
-        [UnconditionalSuppressMessage("Trimming", "IL2075", Justification = "com idispatch dispatch, no trimmable managed members")]
+        // delete the ReplayKit scheduled task through the task scheduler itself. safe when the task is not present. Schedule.Service is late-bound com
         public static bool DeleteElevationTask(Action<string> log = null)
         {
             object service = null;

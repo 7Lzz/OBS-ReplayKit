@@ -45,7 +45,7 @@ namespace ReplayKitHelper
                 if (existing != IntPtr.Zero) return Native.FocusHwnd(existing);
             }
             // explorer.exe /select,"<path>" opens the containing folder with the file already highlighted. arguments must be one string becuase explorer parses /select,<rest> as a unit.
-            Process.Start(new ProcessStartInfo { FileName = "explorer.exe", Arguments = "/select," + ProcessArgs.Quote(full), UseShellExecute = false })?.Dispose();
+            Process.Start(new ProcessStartInfo { FileName = ReplayKitShared.SystemPrograms.Explorer, Arguments = "/select," + ProcessArgs.Quote(full), UseShellExecute = false })?.Dispose();
             return false;
         }
 

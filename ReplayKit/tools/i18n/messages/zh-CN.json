@@ -5669,10 +5669,6 @@
     "source": "c74363cfd3f86728",
     "text": "辅助程序的连接接收循环失败。"
   },
-  "helper.iconFileIsTruncated": {
-    "source": "98b468cb694d21e9",
-    "text": "图标文件已截断。"
-  },
   "helper.imagesIcoPngJpgBmp": {
     "source": "6cd3d71abc82115b",
     "text": "图片文件 (*.ico;*.png;*.jpg;*.bmp)"
@@ -5704,10 +5700,6 @@
   "helper.noiseSuppressionMustBe0Or": {
     "source": "2ba4dec793b56033",
     "text": "降噪必须为 0 或 1。"
-  },
-  "helper.notAnIconFile": {
-    "source": "13ef6ae92d7dc739",
-    "text": "不是图标文件。"
   },
   "helper.obsCouldNotCloseSafely": {
     "source": "f24dbc6872a46d7d",
@@ -9916,6 +9908,18 @@
   "setup.noProcessHostForObs": {
     "source": "d21a9a94574f4ff7",
     "text": "未附带适用于 OBS {version} 的共享进程宿主。请先安装受支持的 OBS 版本。"
+  },
+  "setup.netFrameworkInstallPrompt": {
+    "source": "451227b9398ebce4",
+    "text": "OBS ReplayKit 需要 Microsoft .NET Framework 4.8，但此电脑尚未安装。\n\n选择“确定”以从 Microsoft 下载并打开 .NET Framework 4.8 安装程序。安装完成后，此安装程序会自动重新启动。"
+  },
+  "setup.netFrameworkNeedsRestart": {
+    "source": "80d3382bc2a44ab9",
+    "text": "Microsoft .NET Framework 4.8 已安装，需要重启电脑才能完成安装。\n\n请重启电脑，然后重新运行此安装程序。"
+  },
+  "setup.netFrameworkInstallFailed": {
+    "source": "66627ff5b476d1d5",
+    "text": "无法安装 Microsoft .NET Framework 4.8。\n\n选择“确定”以打开 Microsoft 下载页面。请从该页面安装 .NET Framework 4.8，如果其安装程序要求重启电脑，请先重启，然后重新运行此安装程序。"
   },
   "setup.obsCouldNotBeInstalledAutomatically": {
     "source": "b9ec5649ef71e37c",

@@ -209,7 +209,7 @@ namespace ReplayKitSetup
             }
         }
 
-        // the running shell starts a shortcut at the level of the signed in user and leaves no console to attach to, so obs does not inherit the administrator token of this exe. wscript.shell is late-bound com, so the trimmer warnings are moot
+        // the running shell starts a shortcut at the level of the signed in user and leaves no console to attach to, so obs does not inherit the administrator token of this exe. wscript.shell is late-bound com
         private static bool LaunchObsViaShell(string obsExe, Action<string> log)
         {
             return ShellLaunch.Start(obsExe, ObsLaunch.Arguments, Path.Combine(TempLayout.Scratch, "obs-launch.lnk"), log);

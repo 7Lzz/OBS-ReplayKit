@@ -5670,10 +5670,6 @@
     "source": "c74363cfd3f86728",
     "text": "Annahmeschleife des Helfers fehlgeschlagen."
   },
-  "helper.iconFileIsTruncated": {
-    "source": "98b468cb694d21e9",
-    "text": "Symboldatei ist abgeschnitten."
-  },
   "helper.imagesIcoPngJpgBmp": {
     "source": "6cd3d71abc82115b",
     "text": "Bilder (*.ico;*.png;*.jpg;*.bmp)"
@@ -5705,10 +5701,6 @@
   "helper.noiseSuppressionMustBe0Or": {
     "source": "2ba4dec793b56033",
     "text": "Rauschunterdrückung muss 0 oder 1 sein."
-  },
-  "helper.notAnIconFile": {
-    "source": "13ef6ae92d7dc739",
-    "text": "Keine Symboldatei."
   },
   "helper.obsCouldNotCloseSafely": {
     "source": "f24dbc6872a46d7d",
@@ -9919,6 +9911,18 @@
   "setup.noProcessHostForObs": {
     "source": "d21a9a94574f4ff7",
     "text": "Für OBS {version} ist kein gemeinsamer Prozess-Host enthalten. Installiere zuerst eine unterstützte OBS-Version."
+  },
+  "setup.netFrameworkInstallPrompt": {
+    "source": "451227b9398ebce4",
+    "text": "OBS ReplayKit benötigt Microsoft .NET Framework 4.8, das auf diesem PC nicht installiert ist.\n\nWähle OK, um das Installationsprogramm von .NET Framework 4.8 bei Microsoft herunterzuladen und zu öffnen. Sobald es fertig ist, startet dieses Installationsprogramm von selbst erneut."
+  },
+  "setup.netFrameworkNeedsRestart": {
+    "source": "80d3382bc2a44ab9",
+    "text": "Microsoft .NET Framework 4.8 ist installiert, und der PC muss neu gestartet werden, um die Installation abzuschließen.\n\nStarte den PC neu und führe dieses Installationsprogramm dann erneut aus."
+  },
+  "setup.netFrameworkInstallFailed": {
+    "source": "66627ff5b476d1d5",
+    "text": "Microsoft .NET Framework 4.8 konnte nicht installiert werden.\n\nWähle OK, um die Downloadseite von Microsoft zu öffnen. Installiere dort .NET Framework 4.8, starte den PC neu, wenn dessen Installationsprogramm danach fragt, und führe dieses Installationsprogramm dann erneut aus."
   },
   "setup.obsCouldNotBeInstalledAutomatically": {
     "source": "b9ec5649ef71e37c",

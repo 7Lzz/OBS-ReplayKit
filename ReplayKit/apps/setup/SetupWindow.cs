@@ -6,13 +6,12 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
-using Microsoft.Web.WebView2.Core;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 namespace ReplayKitSetup
 {
-    // the modern setup window: a raw win32 window (no WinForms/WPF -- trimming forbids them) hosting a CoreWebView2 controller that renders setup_installer.html. the install itself still runs on a worker thread via Apply.RunInstallFlow; progress is pushed to the page as json messages. reuses the Native p/invoke surface from InstallerWindow.cs.
+    // the modern setup window: a raw win32 window (no WinForms/WPF) hosting a CoreWebView2 controller that renders setup_installer.html. the install itself still runs on a worker thread via Apply.RunInstallFlow; progress is pushed to the page as json messages. reuses the Native p/invoke surface from InstallerWindow.cs.
     internal sealed class SetupWindow : IDisposable
     {
         private const string ClassName = "ReplayKitSetupWindow";
@@ -97,7 +96,7 @@ namespace ReplayKitSetup
             {
                 string udf = WebViewDataDir;
                 Directory.CreateDirectory(udf);
-                var env = await CoreWebView2Environment.CreateAsync(null, udf, new CoreWebView2EnvironmentOptions());
+                var env = await CoreWebView2Environment.CreateAsync(udf);
                 _controller = await env.CreateCoreWebView2ControllerAsync(_hwnd);
                 _web = _controller.CoreWebView2;
 
@@ -261,7 +260,6 @@ namespace ReplayKitSetup
 
         // ---- page <-> host ----
 
-        // JObject, not an anonymous type: the app assembly is trimmed and Newtonsofts reflection serializer cannot keep an anon types getters alive, so JsonConvert.SerializeObject(new { ... }) can come back as "{}".
         internal void PostToPage(JObject payload)
         {
             string json = payload.ToString(Formatting.None);
@@ -284,7 +282,7 @@ namespace ReplayKitSetup
                     if (_queue.Count == 0) return;
                     a = _queue.Dequeue();
                 }
-                try { a(); } catch (Exception) { }
+                try { a(); } catch (Exception ex) { SetupLog.Line("a window action failed: " + ex); }
             }
         }
 
@@ -422,7 +420,7 @@ namespace ReplayKitSetup
         {
             try
             {
-                string exe = Environment.ProcessPath ?? "";
+                string exe = NetCompat.ProcessPath ?? "";
                 if (string.IsNullOrEmpty(exe)) return;
                 IntPtr hIcon = Native.ExtractIconW(Native.GetModuleHandleW(null), exe, 0);
                 if (hIcon != IntPtr.Zero && hIcon != (IntPtr)1)

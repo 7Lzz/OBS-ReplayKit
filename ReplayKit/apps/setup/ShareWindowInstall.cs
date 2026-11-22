@@ -24,7 +24,7 @@ namespace ReplayKitSetup
         {
             using (var sha = SHA256.Create())
             using (var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
-                return Convert.ToHexString(sha.ComputeHash(stream));
+                return NetCompat.ToHex(sha.ComputeHash(stream));
         }
 
         // true once the bundled exe is the installed one
@@ -54,7 +54,7 @@ namespace ReplayKitSetup
             {
                 File.Copy(source, incoming, false);
                 if (Sha256(incoming) != hash) throw new IOException("the copied share window does not match the bundle");
-                Installer.WriteWithRetry(() => File.Move(incoming, Target, true));
+                Installer.WriteWithRetry(() => NetCompat.MoveFile(incoming, Target, true));
                 if (Sha256(Target) != hash) throw new IOException("the installed share window does not match the bundle");
                 log?.Invoke("-> " + Path.Combine(FolderRel, ShareWindowLayout.ExeName).Replace('\\', '/'));
                 return true;

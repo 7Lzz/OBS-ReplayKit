@@ -1,7 +1,13 @@
 using System;
+using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
+
+// every dll this exe imports is a windows one, and the setup runs as admin from the folder it was downloaded to, so a dll of the same name dropped next to it must never be the one loaded
+[assembly: DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
 
 namespace ReplayKitSetup
 {
@@ -11,6 +17,12 @@ namespace ReplayKitSetup
         [STAThread]
         private static int Main(string[] args)
         {
+            // the .net 8 build ran with invariant globalization, so formatting, parsing and casing never followed the culture of the machine, and every thread here does the same
+            CultureInfo.DefaultThreadCurrentCulture = CultureInfo.InvariantCulture;
+            CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.InvariantCulture;
+            Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
+            Thread.CurrentThread.CurrentUICulture = CultureInfo.InvariantCulture;
+
             // headless dock-button / auto-updater modes detach from any inherited console so a dying parent cant kill them partway thru an install (see FastExit.DetachFromConsole); the normal run is a windows app with no console at all.
             if (IsHeadlessMode(args)) FastExit.DetachFromConsole();
 
@@ -29,6 +41,12 @@ namespace ReplayKitSetup
         {
             try
             {
+                if (!NetFramework.IsInstalled())
+                {
+                    SetupLog.Line(".NET Framework 4.8 is not installed; setup stopped before doing anything");
+                    if (!IsHeadlessMode(args)) NetFramework.OfferInstall(args);
+                    return 1;
+                }
                 int? updateRc = Update.TryRunUpdateFromArgv(args);
                 if (updateRc.HasValue) return updateRc.Value;
                 return InstallerApp.Run();

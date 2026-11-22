@@ -34,7 +34,7 @@ namespace ReplayKitSetup
 
         public static readonly string[] OBS_EXE_CANDIDATES;
 
-        // bundled assets root. BUNDLE_ROOT is the app base directory, which for the single-file exe is the temp extraction folder and not the folder the exe was started from (Environment.ProcessPath is that); ASSETS_DIR is the copy unpacked from the embedded bundle, or a sibling assets\ folder for a build without one.
+        // bundled assets root. BUNDLE_ROOT is the folder of the exe; ASSETS_DIR is the copy unpacked from the embedded bundle, or a sibling assets\ folder for a build without one.
         public static readonly string BUNDLE_ROOT;
         public static readonly string ASSETS_DIR;
         public static readonly string OBS_ASSETS_DIR;
@@ -180,7 +180,7 @@ namespace ReplayKitSetup
             return result;
         }
 
-        // full exe path of any running obs process. was a Win32_Process wmi query; System.Management is not trim-safe and this project publishes trimmed, so it walks the process list directly now. this setup exe runs elevated (app.manifest), so MainModule is readable even for an elevated obs.
+        // full exe path of any running obs process. was a Win32_Process wmi query; it walks the process list directly so the setup carries no System.Management. this setup exe runs elevated (app.manifest), so MainModule is readable even for an elevated obs.
         private static IEnumerable<string> RunningObsCandidates()
         {
             var result = new List<string>();

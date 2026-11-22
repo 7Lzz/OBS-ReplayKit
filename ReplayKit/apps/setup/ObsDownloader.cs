@@ -102,13 +102,13 @@ namespace ReplayKitSetup
                 string assetName = Path.GetFileName(new Uri(download.Url).AbsolutePath);
                 log("OBS installer: " + assetName);
 
-                workDir = Directory.CreateTempSubdirectory("ReplayKit-obs-setup-").FullName;
+                workDir = NetCompat.CreateTempSubdirectory("ReplayKit-obs-setup-").FullName;
                 installer = Path.Combine(workDir, assetName);
                 if (!DownloadInstaller(download.Url, installer, 0, progress))
                     return false;
 
                 string actual;
-                using (var stream = File.OpenRead(installer)) actual = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(stream)).ToLowerInvariant();
+                using (var stream = File.OpenRead(installer)) actual = NetCompat.ToHex(NetCompat.Sha256(stream)).ToLowerInvariant();
                 if (actual != download.Sha256)
                 {
                     log("The downloaded OBS installer is not the one ReplayKit expects (sha256 " + actual + "). Try again later, or install OBS yourself from obsproject.com.");

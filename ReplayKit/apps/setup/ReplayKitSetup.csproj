@@ -4,9 +4,9 @@
   <!-- the plugin zip names of the bundle, written by scripts/sync_shared.ps1 from shared/BundleLayout.cs -->
   <Import Project="..\..\Bundle.props" Condition="Exists('..\..\Bundle.props')" />
   <PropertyGroup>
-    <!-- WinExe, no windowing framework: the installer window is drawn with raw win32/comctl32 (InstallerWindow.cs) so trimming stays on. UseWindowsForms/UseWPF are hard-blocked with PublishTrimmed (NETSDK1175), and self-contained they would drag the whole ~50 mb WindowsDesktop runtime + loose native dlls into what must be one small file. -->
+    <!-- .net framework 4.8 is part of windows (and the helper already needs it), so no runtime ships with the setup; it stays one exe without ilrepack: newtonsoft is compiled from its pinned source into this assembly and webview2 is called thru WebView2Com.cs, with its loader dll as a resource -->
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net8.0-windows</TargetFramework>
+    <TargetFramework>net48</TargetFramework>
     <LangVersion>latest</LangVersion>
     <ImplicitUsings>disable</ImplicitUsings>
     <RootNamespace>ReplayKitSetup</RootNamespace>
@@ -15,33 +15,15 @@
     <!-- must stay x64, not AnyCPU: VoiceMeeter.cs loads VoicemeeterRemote64.dll, which a 32-bit process cannot load. -->
     <Platforms>x64</Platforms>
     <PlatformTarget>x64</PlatformTarget>
-    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <Prefer32Bit>false</Prefer32Bit>
     <ApplicationIcon>..\..\lua\helper\obs-replaykit.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <!-- Runtime, managed dependencies, and assets are contained in the installer. -->
-    <SelfContained>true</SelfContained>
-    <PublishSingleFile>true</PublishSingleFile>
-    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
-    <!-- pull the native WebView2Loader.dll into the single file (self-extracted at startup) so the release stays exe plus checksums only; the auto-updater fetches nothing else. -->
-    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
-    <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
-    <!-- no xml doc files copied next to the exe (WebView2 ships large ones). -->
+    <!-- nothing may land beside the exe: no binding redirects, so no OBSReplayKit.exe.config, and no xml docs -->
+    <AutoGenerateBindingRedirects>false</AutoGenerateBindingRedirects>
+    <GenerateSupportedRuntime>false</GenerateSupportedRuntime>
     <AllowedReferenceRelatedFileExtensions>none</AllowedReferenceRelatedFileExtensions>
-    <!-- partial trim takes the exe from ~44 mb to ~24 mb. it only trims bcl assemblies that opt in; Newtonsoft.Json, ServiceController and Registry are root-kept below so their reflection/interop paths stay whole. the ~5 wmi sites were already moved off System.Management (registry + Process api), so nothing here needs full trim. -->
-    <PublishTrimmed>true</PublishTrimmed>
-    <TrimMode>partial</TrimMode>
-    <!-- library-origin trim warnings, none of it reachable code here: IL2104 = Newtonsoft.Json produced warnings (partial trim leaves it whole anyway), IL2026 = the System.Data DataSet/DataTable xml paths Newtonsoft drags in plus the built-in COM activator. the WScript.Shell late-bound COM in Startup.cs carries its own suppress. -->
-    <!-- MSB3277: the WebView2 package's WPF wrapper references WindowsBase 5.0.0.0; DropUnusedWebView2Wrappers keeps that wrapper out of the output, but the warning still fires during RAR. expected + harmless here. -->
-    <NoWarn>$(NoWarn);IL2104;IL2026;MSB3277</NoWarn>
-    <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
-    <!-- no icu. this project has zero CultureInfo use and only ever compares/formats invariant ascii (obs config keys, file paths, version strings), so dropping the ~24 mb icu payload is behaviour-neutral here. -->
-    <InvariantGlobalization>true</InvariantGlobalization>
-    <!-- diagnostic infrastructure an installer never uses. shaves a few mb and does not touch exception messages or stack traces, both of which Program.cs writes to OBSReplayKit-error.log for user crash reports. -->
-    <EventSourceSupport>false</EventSourceSupport>
-    <HttpActivityPropagationSupport>false</HttpActivityPropagationSupport>
-    <MetadataUpdaterSupport>false</MetadataUpdaterSupport>
-    <DebuggerSupport>false</DebuggerSupport>
-    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <!-- CS8632, CS1574 and CS3021: the newtonsoft source carries nullable annotations, xml doc references and clscompliant marks meant for its own project settings -->
+    <NoWarn>$(NoWarn);CS8632;CS1574;CS1591;CS3021</NoWarn>
     <!-- line numbers still land in the crash log without a loose .pdb file next to the exe. -->
     <DebugType>embedded</DebugType>
     <PathMap>$(MSBuildProjectDirectory)=/_/ReplayKitSetup</PathMap>
@@ -71,31 +53,28 @@
   </Target>
 
   <ItemGroup>
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-    <!-- windows-only, not in the net8 shared framework; backs VbCable.cs's AudioEndpointBuilder/Audiosrv bounce. -->
-    <PackageReference Include="System.ServiceProcess.ServiceController" Version="8.0.1" />
-    <!-- raw-win32 CoreWebView2 host for the modern setup window (SetupWindow.cs). only Microsoft.Web.WebView2.Core.dll plus the native WebView2Loader.dll are pulled in; the WinForms/WPF wrappers are gated on UseWindowsForms / UseWPF, both off here. the evergreen runtime is downloaded by WebView2Runtime.cs when missing. -->
-    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3537.50" />
+    <!-- framework assemblies past the ones the sdk references by default -->
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.Net.Http" />
+    <Reference Include="System.ServiceProcess" />
+    <Reference Include="Microsoft.CSharp" />
+    <!-- only for WebView2Loader.dll, which becomes a resource; none of the package's assemblies or build files are used -->
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3537.50" ExcludeAssets="all" PrivateAssets="all" GeneratePathProperty="true" />
   </ItemGroup>
-
   <ItemGroup>
-    <!-- keep whole under trimming: the linker cannot see through Newtonsoft's reflection, and ServiceController plus Registry are small advapi32-interop assemblies where a trimmed member would only surface at runtime mid-install. WebView2.Core is com-interop heavy and its trimmed members would only fault at runtime when the window loads. -->
-    <TrimmerRootAssembly Include="Newtonsoft.Json" />
-    <TrimmerRootAssembly Include="System.ServiceProcess.ServiceController" />
-    <TrimmerRootAssembly Include="Microsoft.Win32.Registry" />
-    <TrimmerRootAssembly Include="Microsoft.Web.WebView2.Core" />
+    <EmbeddedResource Include="$(PkgMicrosoft_Web_WebView2)\runtimes\win-x64\native\WebView2Loader.dll" LogicalName="ReplayKitSetup.WebView2Loader.dll" />
   </ItemGroup>
 
-  <!-- SetupWindow.cs hosts the raw CoreWebView2 controller directly; the WinForms + WPF wrapper assemblies from the package are unused and the WPF one drags a conflicting WindowsBase into the trimmed single file. drop both. -->
-  <Target Name="DropUnusedWebView2Wrappers" AfterTargets="ResolveAssemblyReferences">
-    <ItemGroup>
-      <ReferencePathWithRefAssemblies Remove="@(ReferencePathWithRefAssemblies)"
-        Condition="'%(FileName)' == 'Microsoft.Web.WebView2.WinForms' or '%(FileName)' == 'Microsoft.Web.WebView2.Wpf'" />
-      <ReferenceCopyLocalPaths Remove="@(ReferenceCopyLocalPaths)"
-        Condition="'%(FileName)' == 'Microsoft.Web.WebView2.WinForms' or '%(FileName)' == 'Microsoft.Web.WebView2.Wpf'" />
-      <ReferencePath Remove="@(ReferencePath)"
-        Condition="'%(FileName)' == 'Microsoft.Web.WebView2.WinForms' or '%(FileName)' == 'Microsoft.Web.WebView2.Wpf'" />
-    </ItemGroup>
+  <!-- newtonsoft.json 13.0.3 from its source at the pinned commit (scripts/newtonsoft_source.ps1 checks it out), with the defines its own project gives the net45 build, which is the build nuget hands a .net framework 4.8 app -->
+  <PropertyGroup>
+    <NewtonsoftSourceDir>$(LOCALAPPDATA)\ReplayKit\newtonsoft-src-13.0.3\Src\Newtonsoft.Json\</NewtonsoftSourceDir>
+    <DefineConstants>$(DefineConstants);HAVE_ADO_NET;HAVE_APP_DOMAIN;HAVE_ASYNC;HAVE_BIG_INTEGER;HAVE_BINARY_FORMATTER;HAVE_BINARY_SERIALIZATION;HAVE_BINARY_EXCEPTION_SERIALIZATION;HAVE_CAS;HAVE_CHAR_TO_LOWER_WITH_CULTURE;HAVE_CHAR_TO_STRING_WITH_CULTURE;HAVE_COM_ATTRIBUTES;HAVE_COMPONENT_MODEL;HAVE_CONCURRENT_COLLECTIONS;HAVE_COVARIANT_GENERICS;HAVE_DATA_CONTRACTS;HAVE_DATE_TIME_OFFSET;HAVE_DB_NULL_TYPE_CODE;HAVE_DYNAMIC;HAVE_EMPTY_TYPES;HAVE_ENTITY_FRAMEWORK;HAVE_EXPRESSIONS;HAVE_FAST_REVERSE;HAVE_FSHARP_TYPES;HAVE_FULL_REFLECTION;HAVE_GUID_TRY_PARSE;HAVE_HASH_SET;HAVE_ICLONEABLE;HAVE_ICONVERTIBLE;HAVE_IGNORE_DATA_MEMBER_ATTRIBUTE;HAVE_INOTIFY_COLLECTION_CHANGED;HAVE_INOTIFY_PROPERTY_CHANGING;HAVE_ISET;HAVE_LINQ;HAVE_MEMORY_BARRIER;HAVE_METHOD_IMPL_ATTRIBUTE;HAVE_NON_SERIALIZED_ATTRIBUTE;HAVE_READ_ONLY_COLLECTIONS;HAVE_REFLECTION_EMIT;HAVE_REGEX_TIMEOUTS;HAVE_SECURITY_SAFE_CRITICAL_ATTRIBUTE;HAVE_SERIALIZATION_BINDER_BIND_TO_NAME;HAVE_STREAM_READER_WRITER_CLOSE;HAVE_STRING_JOIN_WITH_ENUMERABLE;HAVE_TIME_SPAN_PARSE_WITH_CULTURE;HAVE_TIME_SPAN_TO_STRING_WITH_CULTURE;HAVE_TIME_ZONE_INFO;HAVE_TRACE_WRITER;HAVE_TYPE_DESCRIPTOR;HAVE_UNICODE_SURROGATE_DETECTION;HAVE_VARIANT_TYPE_PARAMETERS;HAVE_VERSION_TRY_PARSE;HAVE_XLINQ;HAVE_XML_DOCUMENT;HAVE_XML_DOCUMENT_TYPE;HAVE_CONCURRENT_DICTIONARY</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="$(NewtonsoftSourceDir)**\*.cs" Exclude="$(NewtonsoftSourceDir)Properties\**;$(NewtonsoftSourceDir)obj\**;$(NewtonsoftSourceDir)bin\**" Link="newtonsoft\%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+  <Target Name="RequireNewtonsoftSource" BeforeTargets="PrepareForBuild">
+    <Error Condition="!Exists('$(NewtonsoftSourceDir)JsonConvert.cs')" Text="The Newtonsoft.Json source is missing; scripts/newtonsoft_source.ps1 checks it out at the pinned commit, and build.bat runs it first." />
   </Target>
 
   <PropertyGroup>
@@ -138,7 +117,8 @@
     <!-- plugin files are kept loose in the repo and zipped here by the names and folders of shared/BundleLayout.cs, the same constants the installer reads them back with -->
     <ItemGroup>
       <BangoCatFile Include="$(RepoDir)plugins\bango-cat\**\*" />
-      <PresetFile Include="$(RepoDir)vendor\input-overlay-presets\**\*" />
+      <!-- the alternative mice are paint.net sources and previews no layout of shared/InputOverlayLayout.cs uses, so they stay in the vendor folder and out of the release -->
+      <PresetFile Include="$(RepoDir)vendor\input-overlay-presets\**\*" Exclude="$(RepoDir)vendor\input-overlay-presets\mouse\alternative\**\*" />
       <WinCaptureDll Include="$(RepoDir)dist\win-capture-audio\$(WinCaptureAudioDll)" />
       <WinCaptureData Include="$(RepoDir)dist\win-capture-audio\**\*" Exclude="$(RepoDir)dist\win-capture-audio\$(WinCaptureAudioDll)" />
       <InputOverlayFile Include="$(RepoDir)dist\input-overlay\**\*" />

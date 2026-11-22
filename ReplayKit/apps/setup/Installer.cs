@@ -94,7 +94,7 @@ namespace ReplayKitSetup
             try
             {
                 WriteVersion(temporary);
-                File.Move(temporary, path, true);
+                NetCompat.MoveFile(temporary, path, true);
             }
             finally { if (File.Exists(temporary)) File.Delete(temporary); }
             log?.Invoke($"ReplayKit version -> {VersionInfo.Version}");
@@ -204,6 +204,11 @@ namespace ReplayKitSetup
             Path.Combine("obs-replayKit", "icons", "nav", "tab-general.svg"),
             // shipped as opus now, and the helper keeps its own wav of it in user-data
             Path.Combine("obs-replayKit", "sounds", "share-card-default.wav"),
+            // copies of preset files the overlay preview reads from input-overlay-presets
+            Path.Combine("obs-replayKit", "obs-custom-dock", "overlay-preview", "wasd", "wasd.png"),
+            Path.Combine("obs-replayKit", "obs-custom-dock", "overlay-preview", "wasd", "wasd-minimal.json"),
+            Path.Combine("obs-replayKit", "obs-custom-dock", "overlay-preview", "mouse", "mouse.png"),
+            Path.Combine("obs-replayKit", "obs-custom-dock", "overlay-preview", "mouse", "mouse-no-movement.json"),
         };
 
         // installs made before the streamable/ -> helper/ rename: source name (in the old directory) -> new relative path.
@@ -462,7 +467,7 @@ namespace ReplayKitSetup
                 text = System.Text.Encoding.UTF8.GetBytes(rewritten);
             }
             long length = text?.LongLength ?? new FileInfo(src).Length;
-            string hash = text == null ? FileSha256(src) : Convert.ToHexString(SHA256.HashData(text));
+            string hash = text == null ? FileSha256(src) : NetCompat.ToHex(NetCompat.Sha256(text));
             if (CanSkipRuntimeFile(target, length, hash)) return false;
 
             Directory.CreateDirectory(Path.GetDirectoryName(staged));
@@ -625,7 +630,7 @@ namespace ReplayKitSetup
             {
                 foreach (string src in files)
                 {
-                    string fileRel = Path.GetRelativePath(runtimeSrc, src);
+                    string fileRel = NetCompat.GetRelativePath(runtimeSrc, src);
                     string rel = Path.Combine("obs-replayKit", fileRel);
                     // the share window can be running thru the update, which only the install of its own handles
                     if (ShareWindowInstall.IsShareWindowFile(rel) || string.Equals(fileRel, RuntimeVersionFile, StringComparison.OrdinalIgnoreCase)) continue;
@@ -634,7 +639,7 @@ namespace ReplayKitSetup
                         log?.Invoke("preserve: " + rel.Replace('\\', '/'));
                         continue;
                     }
-                    string targetRel = Path.GetRelativePath(Config.REPLAYKIT_CONFIG, InstallTarget(rel));
+                    string targetRel = NetCompat.GetRelativePath(Config.REPLAYKIT_CONFIG, InstallTarget(rel));
                     string staged = transaction.Stage(targetRel);
                     string target = transaction.Target(targetRel);
                     if (!StageRuntimeFile(src, staged, target))
@@ -732,7 +737,7 @@ namespace ReplayKitSetup
             int seeded = 0;
             foreach (var src in Directory.EnumerateFiles(Config.OBS_ASSETS_DIR, "*", SearchOption.AllDirectories))
             {
-                string rel = Path.GetRelativePath(Config.OBS_ASSETS_DIR, src);
+                string rel = NetCompat.GetRelativePath(Config.OBS_ASSETS_DIR, src);
                 var parts = rel.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
                 // the runtime copy owns the replaykit folder
                 if (parts.Length > 1 && string.Equals(parts[0], "obs-replayKit", StringComparison.OrdinalIgnoreCase)) continue;
@@ -775,7 +780,7 @@ namespace ReplayKitSetup
                 {
                     File.WriteAllText(temporary, settings.ToString(Formatting.Indented), new System.Text.UTF8Encoding(false));
                     FlushFile(temporary);
-                    WriteWithRetry(() => File.Move(temporary, path, true));
+                    WriteWithRetry(() => NetCompat.MoveFile(temporary, path, true));
                 }
                 finally { if (File.Exists(temporary)) File.Delete(temporary); }
                 log?.Invoke($"discord screenshare {(prefs.DiscordScreenshareEnabled ? "on" : "off")}, share preview {(prefs.DiscordProjectorEnabled ? "on" : "off")}");
@@ -998,7 +1003,7 @@ namespace ReplayKitSetup
         {
             string launcherPath = Path.Combine(Config.OBS_ASSETS_DIR, "obs-replayKit", "scripts", "helper", "OBSReplayKit.exe");
             if (File.Exists(launcherPath)) return true;
-            // "re-run build.bat" used to be here, which only makes sense to a dev with the source checked out -- an end user hitting this has no build.bat. the file was unpacked from the bundle successfully (AssetBundle.ExtractTo would have failed the whole install otherwise); it going missing right after almost always means antivirus quarantined it the moment it landed on disk as a fresh, unsigned exe. used to read Defenders wmi threat log to name Defender specifically -- dropped with System.Management for the trimmed build; the generic pointer covers Defenders Protection History too.
+            // "re-run build.bat" used to be here, which only makes sense to a dev with the source checked out -- an end user hitting this has no build.bat. the file was unpacked from the bundle successfully (AssetBundle.ExtractTo would have failed the whole install otherwise); it going missing right after almost always means antivirus quarantined it the moment it landed on disk as a fresh, unsigned exe. used to read Defenders wmi threat log to name Defender specifically -- dropped with System.Management; the generic pointer covers Defenders Protection History too.
             log?.Invoke($"warn: helper launcher missing at {launcherPath} -- your antivirus likely quarantined it right after install. check its quarantine or history (Windows Security > Protection History for Defender), restore or exclude the ReplayKit temp folder, then reinstall.");
             return false;
         }

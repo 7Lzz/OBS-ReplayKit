@@ -16,6 +16,7 @@ function ClearPublishDirectory {
 Write-Host '[1/4] Syncing version...'
 & (Join-Path $PSScriptRoot 'sync_version.ps1')
 & (Join-Path $PSScriptRoot 'sync_shared.ps1')
+& (Join-Path $PSScriptRoot 'newtonsoft_source.ps1')
 Write-Host '[2/4] Building helper...'
 & powershell -NoProfile -File (Join-Path $PSScriptRoot 'build_helper.ps1')
 if ($LASTEXITCODE -ne 0) { throw 'Helper build failed.' }
@@ -46,7 +47,7 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Installer publish failed.' }
     $exe = Join-Path $publishDir 'OBSReplayKit.exe'
     if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) { throw 'Installer executable is missing.' }
-    if ((Get-Item -LiteralPath $exe).Length -lt 10MB) { throw 'Installer is smaller than the required self-contained payload.' }
+    if ((Get-Item -LiteralPath $exe).Length -lt 10MB) { throw 'Installer is smaller than the required payload.' }
     $unexpected = @(Get-ChildItem -LiteralPath $publishDir -Force | Where-Object { $_.Name -ne 'OBSReplayKit.exe' })
     if ($unexpected.Count -ne 0) { throw 'Publish produced unexpected companion files; refusing an incomplete single-file release.' }
     $bundle = Join-Path $repoRoot 'apps\setup\obj\assets.bundle.zip'

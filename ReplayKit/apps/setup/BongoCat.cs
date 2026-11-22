@@ -44,7 +44,7 @@ namespace ReplayKitSetup
             if (!File.Exists(path) || new FileInfo(path).Length != entry.Length) return false;
             using (var bundled = entry.Open())
             using (var installed = File.OpenRead(path))
-                return SHA256.HashData(bundled).SequenceEqual(SHA256.HashData(installed));
+                return NetCompat.Sha256(bundled).SequenceEqual(NetCompat.Sha256(installed));
         }
 
         public static bool IsBongoCatInstalled()

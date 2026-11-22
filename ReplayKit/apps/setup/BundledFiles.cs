@@ -50,7 +50,7 @@ namespace ReplayKitSetup
                     if (!File.Exists(file.Target)) return false;
                     using var expected = Expected(file.Entry, file.Relative, normalize);
                     using var installed = File.OpenRead(file.Target);
-                    if (!SHA256.HashData(expected).SequenceEqual(SHA256.HashData(installed))) return false;
+                    if (!NetCompat.Sha256(expected).SequenceEqual(NetCompat.Sha256(installed))) return false;
                 }
                 return true;
             }
@@ -73,7 +73,7 @@ namespace ReplayKitSetup
                             input.CopyTo(output);
                             output.Flush(true);
                         }
-                        File.Move(temporary, file.Target, true);
+                        NetCompat.MoveFile(temporary, file.Target, true);
                     }
                     finally { if (File.Exists(temporary)) File.Delete(temporary); }
                 }

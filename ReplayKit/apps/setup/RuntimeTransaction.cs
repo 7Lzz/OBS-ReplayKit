@@ -18,9 +18,9 @@ namespace ReplayKitSetup
         public static RuntimeTransaction Open()
         {
             string programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
-            if (!Path.IsPathFullyQualified(programFiles)) throw new IOException("Windows Program Files was not found.");
+            if (!NetCompat.IsPathFullyQualified(programFiles)) throw new IOException("Windows Program Files was not found.");
             string runtime = Path.GetFullPath(Config.REPLAYKIT_CONFIG);
-            string key = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(runtime.ToUpperInvariant())));
+            string key = NetCompat.ToHex(NetCompat.Sha256(Encoding.UTF8.GetBytes(runtime.ToUpperInvariant())));
             return new RuntimeTransaction(runtime, PathAt(programFiles, Path.Combine("OBS ReplayKit Recovery", key)));
         }
 
@@ -107,9 +107,9 @@ namespace ReplayKitSetup
         private static string PathAt(string root, string relative)
         {
             if (string.IsNullOrWhiteSpace(relative) || relative.Split('\\', '/').Any(part =>
-                part.Length == 0 || part.EndsWith('.') || part.EndsWith(' ') || part.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0))
+                part.Length == 0 || part.EndsWith(".", StringComparison.Ordinal) || part.EndsWith(" ", StringComparison.Ordinal) || part.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0))
                 throw new InvalidDataException("Invalid ReplayKit runtime path.");
-            string prefix = Path.TrimEndingDirectorySeparator(Path.GetFullPath(root)) + Path.DirectorySeparatorChar;
+            string prefix = NetCompat.TrimEndingDirectorySeparator(Path.GetFullPath(root)) + Path.DirectorySeparatorChar;
             string path = Path.GetFullPath(Path.Combine(prefix, relative));
             if (!path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
                 throw new InvalidDataException("A ReplayKit runtime path escaped its directory.");

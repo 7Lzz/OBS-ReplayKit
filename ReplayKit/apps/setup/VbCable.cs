@@ -277,7 +277,7 @@ namespace ReplayKitSetup
         // sound/media device setup class; one NNNN subkey per installed audio driver, DriverDesc is the same string Win32_SoundDevice.Name returned.
         private const string MediaClassKey = @"SYSTEM\CurrentControlSet\Control\Class\{4d36e96c-e325-11ce-bfc1-08002be10318}";
 
-        // true iff the bundled virtual audio driver is registered. was a Win32_SoundDevice wmi query; System.Management is not trim-safe and this project publishes trimmed, so it checks the media-class driver descriptions in the registry.
+        // true iff the bundled virtual audio driver is registered. was a Win32_SoundDevice wmi query; it checks the media-class driver descriptions in the registry so the setup carries no System.Management.
         public static bool IsVbcableInstalled()
         {
             try
@@ -552,26 +552,16 @@ namespace ReplayKitSetup
             return (true, restartPaths);
         }
 
+        // explorer starts each one from a shortcut at the level of the signed in user, so discord does not come back with the administrator token of this setup; one shortcut per app, since explorer reads it after this returns
         private static void RestartDiscordApps(List<string> paths, Action<string> log = null)
         {
+            int index = 0;
             foreach (var exe in paths.Distinct())
             {
                 if (!File.Exists(exe)) continue;
-                try
-                {
-                    var psi = new ProcessStartInfo(exe)
-                    {
-                        UseShellExecute = false,
-                        CreateNoWindow = true,
-                        WorkingDirectory = Path.GetDirectoryName(exe),
-                    };
-                    Process.Start(psi)?.Dispose();
-                    log?.Invoke("restarted Discord -> " + exe);
-                }
-                catch (Exception exc) when (exc is System.ComponentModel.Win32Exception || exc is InvalidOperationException)
-                {
-                    log?.Invoke("warn: could not restart Discord at " + exe + ": " + exc.Message);
-                }
+                string link = Path.Combine(ReplayKitShared.TempLayout.Scratch, "discord-restart-" + index++ + ".lnk");
+                if (ReplayKitShared.ShellLaunch.Start(exe, "", link, log)) log?.Invoke("restarted Discord -> " + exe);
+                else log?.Invoke("warn: could not restart Discord at " + exe);
             }
         }
 

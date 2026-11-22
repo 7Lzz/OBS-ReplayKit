@@ -81,7 +81,7 @@ namespace ReplayKitSetup
             merged["server_enabled"] = true;
             merged["auth_required"] = true;
             if (string.IsNullOrWhiteSpace(merged.Value<string>("server_password")))
-                merged["server_password"] = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
+                merged["server_password"] = Convert.ToBase64String(NetCompat.RandomBytes(32));
 
             int wantedPort = merged.Value<int?>("server_port") ?? 6455;
             if (!PortIsBindable(wantedPort))

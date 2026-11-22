@@ -52,7 +52,7 @@ namespace ReplayKitSetup
                 try
                 {
                     File.WriteAllText(temporary, pid.ToString(), new UTF8Encoding(false));
-                    File.Move(temporary, path, true);
+                    NetCompat.MoveFile(temporary, path, true);
                 }
                 finally { File.Delete(temporary); }
             }

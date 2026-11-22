@@ -5671,10 +5671,6 @@
     "context": "Error message in a ReplayKit window, sent by the background helper.",
     "text": "Helper accept loop failed."
   },
-  "helper.iconFileIsTruncated": {
-    "context": "Error message in a ReplayKit window, sent by the background helper.",
-    "text": "Icon file is truncated."
-  },
   "helper.imagesIcoPngJpgBmp": {
     "context": "Text in a ReplayKit window, sent by the background helper.",
     "text": "Images (*.ico;*.png;*.jpg;*.bmp)"
@@ -5706,10 +5702,6 @@
   "helper.noiseSuppressionMustBe0Or": {
     "context": "Message the helper shows when an action fails or finishes in a ReplayKit window, sent by the background helper.",
     "text": "Noise suppression must be 0 or 1."
-  },
-  "helper.notAnIconFile": {
-    "context": "Error message in a ReplayKit window, sent by the background helper.",
-    "text": "Not an icon file."
   },
   "helper.obsCouldNotCloseSafely": {
     "context": "Title of a notification or popup in a ReplayKit window, sent by the background helper.",
@@ -9920,6 +9912,18 @@
   "setup.noProcessHostForObs": {
     "context": "Reason a step of the installer stopped, shown in the installer window. Keep {version} as written; it is an OBS version.",
     "text": "No shared process host is bundled for OBS {version}. Install a supported OBS version first."
+  },
+  "setup.netFrameworkInstallPrompt": {
+    "context": "Windows dialog the installer shows first, before anything else, when Microsoft .NET Framework 4.8 is missing. OK downloads the .NET Framework 4.8 installer from Microsoft and opens it; use the label Windows gives the OK button in your language. Keep product names as written.",
+    "text": "OBS ReplayKit needs Microsoft .NET Framework 4.8, which is not installed on this PC.\n\nChoose OK to download the .NET Framework 4.8 installer from Microsoft and open it. Once it has finished, this installer starts again by itself."
+  },
+  "setup.netFrameworkNeedsRestart": {
+    "context": "Windows dialog shown after the Microsoft .NET Framework 4.8 installer finished and asked for a restart of the PC. Keep product names as written.",
+    "text": "Microsoft .NET Framework 4.8 is installed, and the PC needs a restart to finish it.\n\nRestart the PC, then run this installer again."
+  },
+  "setup.netFrameworkInstallFailed": {
+    "context": "Windows dialog shown when the Microsoft .NET Framework 4.8 installer could not be downloaded, was not signed by Microsoft or ended with an error. OK opens the Microsoft download page in the browser; use the label Windows gives the OK button in your language. Keep product names as written.",
+    "text": "Microsoft .NET Framework 4.8 could not be installed.\n\nChoose OK to open the Microsoft download page. Install .NET Framework 4.8 from there, restart the PC if its installer asks you to, then run this installer again."
   },
   "setup.obsCouldNotBeInstalledAutomatically": {
     "context": "Reason a step of the installer stopped, shown in the installer window.",

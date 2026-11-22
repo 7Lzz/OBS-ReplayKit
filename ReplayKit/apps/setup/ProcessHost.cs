@@ -38,7 +38,7 @@ namespace ReplayKitSetup
         private static string Hash(string path)
         {
             using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
-            return Convert.ToHexString(SHA256.HashData(stream));
+            return NetCompat.ToHex(NetCompat.Sha256(stream));
         }
 
         private static string CurrentVersion() =>

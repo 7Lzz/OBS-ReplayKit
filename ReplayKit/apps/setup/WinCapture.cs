@@ -31,7 +31,7 @@ namespace ReplayKitSetup
             }
         }
 
-        private static string HashOf(Stream stream) => Convert.ToHexString(SHA256.HashData(stream));
+        private static string HashOf(Stream stream) => NetCompat.ToHex(NetCompat.Sha256(stream));
 
         // the sha256 of the dll inside the bundled zip, null when the zip has none
         private static string BundledDllHash()
@@ -95,7 +95,7 @@ namespace ReplayKitSetup
             try
             {
                 // a virus scanner or the indexer can hold a freshly closed dll for a moment, so the extraction is tried again for a while before it counts as failed
-                Installer.WriteWithRetry(() => ZipFile.ExtractToDirectory(Config.WIN_CAPTURE_AUDIO_ZIP, Config.PROGRAMFILES_OBS_DIR, overwriteFiles: true));
+                Installer.WriteWithRetry(() => NetCompat.ExtractToDirectory(Config.WIN_CAPTURE_AUDIO_ZIP, Config.PROGRAMFILES_OBS_DIR, overwrite: true));
             }
             catch (UnauthorizedAccessException exc)
             {

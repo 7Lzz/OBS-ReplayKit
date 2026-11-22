@@ -237,7 +237,7 @@ namespace ReplayKitSetup
                 var point = AsNativeDict(position);
                 if (point == null || !point.TryGetValue("x", out var rawX) || !point.TryGetValue("y", out var rawY) ||
                     !TryToDouble(rawX, out double x) || !TryToDouble(rawY, out double y) ||
-                    !double.IsFinite(x) || !double.IsFinite(y) || x < -1 || x > 2 || y < -1 || y > 2) continue;
+                    !NetCompat.IsFinite(x) || !NetCompat.IsFinite(y) || x < -1 || x > 2 || y < -1 || y > 2) continue;
                 result[style] = new JObject { ["x"] = x, ["y"] = y };
             }
             return result;

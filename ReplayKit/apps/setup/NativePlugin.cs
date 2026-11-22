@@ -34,7 +34,7 @@ namespace ReplayKitSetup
         private static string HashOf(string path)
         {
             using (var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
-                return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(stream));
+                return NetCompat.ToHex(NetCompat.Sha256(stream));
         }
 
         // copy the bundled replaykit.dll into obss no-admin plugin search path; assumes obs is already closed (the apply flow closes it first), since the dll would otherwise be locked, same as updating any other loaded plugin.

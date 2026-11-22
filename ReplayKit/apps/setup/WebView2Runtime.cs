@@ -3,7 +3,6 @@ using System.Diagnostics;
 using System.IO;
 using System.Net;
 using System.Net.Http;
-using Microsoft.Web.WebView2.Core;
 
 namespace ReplayKitSetup
 {
@@ -32,7 +31,7 @@ namespace ReplayKitSetup
             string workDir = null;
             try
             {
-                workDir = Directory.CreateTempSubdirectory("ReplayKit-webview2-").FullName;
+                workDir = NetCompat.CreateTempSubdirectory("ReplayKit-webview2-").FullName;
                 string bootstrapper = Path.Combine(workDir, "MicrosoftEdgeWebview2Setup.exe");
                 if (!Download(BootstrapperUrl, bootstrapper, Log)) return false;
                 if (!InputOverlay.IsMicrosoftSigned(bootstrapper, Log)) return false;

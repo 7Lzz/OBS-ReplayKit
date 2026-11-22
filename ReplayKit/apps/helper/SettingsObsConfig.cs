@@ -149,7 +149,7 @@ namespace ReplayKitHelper
             {
                 var psi = new ProcessStartInfo
                 {
-                    FileName = "powercfg.exe",
+                    FileName = SystemPrograms.Powercfg,
                     Arguments = string.Join(" ", arguments),
                     UseShellExecute = false,
                     RedirectStandardOutput = true,
@@ -205,7 +205,7 @@ namespace ReplayKitHelper
             if (allowSleep) args.AddRange(new[] { "DISPLAY", "SYSTEM", "AWAYMODE" });
             try
             {
-                var psi = new ProcessStartInfo { FileName = "powercfg.exe", Arguments = string.Join(" ", args), UseShellExecute = true, Verb = "runas", WindowStyle = ProcessWindowStyle.Hidden };
+                var psi = new ProcessStartInfo { FileName = SystemPrograms.Powercfg, Arguments = string.Join(" ", args), UseShellExecute = true, Verb = "runas", WindowStyle = ProcessWindowStyle.Hidden };
                 using var process = Process.Start(psi);
                 if (process == null) return new JObject { ["ok"] = false, ["message"] = Locales.Message("settings.powercfgCouldNotStart") };
                 if (!process.WaitForExit(120000)) return new JObject { ["ok"] = false, ["message"] = Locales.Message("settings.powercfgDidNotFinish") };

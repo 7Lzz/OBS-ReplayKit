@@ -17,7 +17,7 @@ namespace ReplayKitSetup
         {
             try
             {
-                var psi = new ProcessStartInfo("powercfg.exe", arguments)
+                var psi = new ProcessStartInfo(ReplayKitShared.SystemPrograms.Powercfg, arguments)
                 {
                     UseShellExecute = false,
                     RedirectStandardOutput = true,

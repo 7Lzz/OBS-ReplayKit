@@ -9,7 +9,7 @@ namespace ReplayKitShared
     // the setup half of shared/Gpu.cs: where the adapter rows come from in the installer
     public static partial class Gpu
     {
-        // one row per installed display adapter, read from the registry instead of Win32_VideoController -- System.Management is not trim-safe (WmiNetUtilsHelper throws under the linker) and this project publishes trimmed. DriverDesc is the same marketing string wmis Name returns; qwMemorySize (REG_QWORD, newer drivers) or MemorySize (older) is the vram. returns [] on any failure.
+        // one row per installed display adapter, read from the registry instead of Win32_VideoController so the setup carries no System.Management. DriverDesc is the same marketing string wmis Name returns; qwMemorySize (REG_QWORD, newer drivers) or MemorySize (older) is the vram. returns [] on any failure.
         private static List<JObject> QueryVideoControllers()
         {
             var result = new List<JObject>();

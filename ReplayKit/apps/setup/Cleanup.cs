@@ -40,7 +40,7 @@ namespace ReplayKitSetup
         // MoveFileEx with a null target queues the path for deletion by the session manager on the next boot; needs admin, which this setup exe already has
         private const uint MOVEFILE_DELAY_UNTIL_REBOOT = 0x00000004;
 
-        // own parent pid. was a Win32_Process wmi lookup; System.Management is not trim-safe and this project publishes trimmed, so it reads ProcessBasicInformation directly. null on any failure -- caller just skips adding it to the keep-set.
+        // own parent pid. was a Win32_Process wmi lookup; it reads ProcessBasicInformation directly so the setup carries no System.Management. null on any failure -- caller just skips adding it to the keep-set.
         private static int? CurrentParentPid()
         {
             try
@@ -180,7 +180,7 @@ namespace ReplayKitSetup
                 try
                 {
                     var value = (prop.Value as JObject)?["stored"];
-                    if (value?.Type != JTokenType.String || !Path.IsPathFullyQualified((string)value))
+                    if (value?.Type != JTokenType.String || !NetCompat.IsPathFullyQualified((string)value))
                         throw new InvalidDataException("invalid deleted history path");
                     string stored = Path.GetFullPath((string)value);
                     string folder = Path.GetDirectoryName(stored);

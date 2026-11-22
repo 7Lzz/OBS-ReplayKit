@@ -15,8 +15,8 @@ namespace ReplayKitSetup
 
         public static string MetaPath(string exePath) => exePath + ".json";
 
-        // the running exe itself, not BUNDLE_ROOT: with IncludeAllContentForSelfExtract the app base directory is the temp extraction folder, which never holds the exe; ProcessPath also survives a renamed download
-        public static bool Provision(Action<string> log = null) => Provision(Environment.ProcessPath, Config.REPLAYKIT_SETUP_EXE, log);
+        // the running exe itself as ProcessPath names it, which also survives a renamed download
+        public static bool Provision(Action<string> log = null) => Provision(NetCompat.ProcessPath, Config.REPLAYKIT_SETUP_EXE, log);
 
         internal static bool Provision(string source, string target, Action<string> log)
         {

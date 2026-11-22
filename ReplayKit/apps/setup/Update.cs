@@ -60,7 +60,7 @@ namespace ReplayKitSetup
                     file.Write(bytes, 0, bytes.Length);
                     file.Flush(true);
                 }
-                File.Move(temporary, path, true);
+                NetCompat.MoveFile(temporary, path, true);
             }
             finally { if (File.Exists(temporary)) File.Delete(temporary); }
         }
@@ -84,7 +84,7 @@ namespace ReplayKitSetup
                 try
                 {
                     File.WriteAllText(temporary, payload.ToString(Formatting.Indented) + "\n", new UTF8Encoding(false));
-                    File.Move(temporary, path, true);
+                    NetCompat.MoveFile(temporary, path, true);
                 }
                 finally { File.Delete(temporary); }
             }
@@ -164,7 +164,7 @@ namespace ReplayKitSetup
                     if (attemptId != null) Report(false, "busy", busy);
                     return 1;
                 }
-                DetachedSpawn.WritePid(Environment.ProcessId, attemptId);
+                DetachedSpawn.WritePid(NetCompat.ProcessId, attemptId);
                 Log("update starting version=" + VersionInfo.Version);
                 if (startDelayMs > 0) Thread.Sleep(Math.Min(startDelayMs, 5000));
 

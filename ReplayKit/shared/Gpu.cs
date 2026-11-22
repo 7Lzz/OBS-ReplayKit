@@ -6,7 +6,7 @@ using Newtonsoft.Json.Linq;
 
 namespace ReplayKitShared
 {
-    // detect the users gpu(s) and classify them for encoder selection. each app supplies the adapter rows in its own GpuAdapters.cs (the trimmed setup cant use wmi, the helper does) and this parses the adapter name to tag the architecture tier (neither the registry nor wmi exposes the arch as a structured field, but marketing names follow stable patterns). prefers discrete over integrated when both are present.
+    // detect the users gpu(s) and classify them for encoder selection. each app supplies the adapter rows in its own GpuAdapters.cs (the setup reads the registry, the helper asks wmi) and this parses the adapter name to tag the architecture tier (neither the registry nor wmi exposes the arch as a structured field, but marketing names follow stable patterns). prefers discrete over integrated when both are present.
     public enum Vendor { Nvidia, Amd, Intel, Unknown }
 
     // coarse nvenc capability tiers.

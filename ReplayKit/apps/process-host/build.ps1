@@ -12,6 +12,8 @@ if ($Version) {
     $lines = @($lines | Where-Object tested -eq $Version)
     if ($lines.Count -ne 1) { throw 'The requested host version is not in obs-versions.json.' }
 }
+# release like the official obs builds, since obs adds /LTCG /OPT:REF /OPT:ICF only to release while relwithdebinfo links incrementally and keeps every unused function, which made obs-browser.dll three times the official one
+$config = 'Release'
 $inputs = @(Get-ChildItem -LiteralPath $PSScriptRoot -File | Where-Object { $_.Extension -in '.cpp', '.hpp', '.cmake', '.manifest', '.ps1' } | Sort-Object Name)
 $fingerprint = ($inputs | ForEach-Object { $_.Name + ':' + (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash }) -join '|'
 foreach ($line in $lines) {
@@ -20,10 +22,10 @@ foreach ($line in $lines) {
     $manifestPath = Join-Path $output 'manifest.json'
     $browserDirectory = if ($line.pluginLayout -eq 'modern') { 'core/obs-browser' } else { 'obs-plugins/64bit' }
     $files = [ordered]@{
-        'bin/64bit/replaykit-host/obs64.exe' = 'host/RelWithDebInfo/obs64.exe'
+        'bin/64bit/replaykit-host/obs64.exe' = "host/$config/obs64.exe"
     }
-    $files["$browserDirectory/obs-browser.dll"] = 'plugins/obs-browser/RelWithDebInfo/obs-browser.dll'
-    $files["$browserDirectory/obs-browser-role.dll"] = 'plugins/obs-browser/RelWithDebInfo/obs-browser-role.dll'
+    $files["$browserDirectory/obs-browser.dll"] = "plugins/obs-browser/$config/obs-browser.dll"
+    $files["$browserDirectory/obs-browser-role.dll"] = "plugins/obs-browser/$config/obs-browser-role.dll"
     if (Test-Path -LiteralPath $manifestPath) {
         $cached = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
         $valid = $cached.ObsVersion -eq $version -and $cached.Inputs -eq $fingerprint -and @($cached.Files).Count -eq $files.Count
@@ -57,7 +59,7 @@ foreach ($line in $lines) {
         ("-DREPLAYKIT_MODERN_PLUGINS=$modern"), ('-DREPLAYKIT_HOST_DIR=' + $PSScriptRoot.Replace('\','/')))
     & cmake @configure
     if ($LASTEXITCODE -ne 0) { throw "OBS $version host configuration failed." }
-    cmake --build $build --config RelWithDebInfo --target replaykit-host --parallel 8
+    cmake --build $build --config $config --target replaykit-host --parallel 8
     if ($LASTEXITCODE -ne 0) { throw "OBS $version host build failed." }
     $null = Get-ObsBinaries $line
     Add-Type -AssemblyName System.IO.Compression.FileSystem

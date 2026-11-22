@@ -19,7 +19,7 @@ namespace ReplayKitHelper
         {
             var psi = new ProcessStartInfo
             {
-                FileName = System.IO.Path.Combine(Environment.SystemDirectory, "curl.exe"),
+                FileName = ReplayKitShared.SystemPrograms.Curl,
                 Arguments = ProcessArgs.Join(args),
                 UseShellExecute = false,
                 CreateNoWindow = true,

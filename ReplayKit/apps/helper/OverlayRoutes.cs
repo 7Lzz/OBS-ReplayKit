@@ -102,7 +102,7 @@ namespace ReplayKitHelper
                 return false;
             }
 
-            // static assets under obs-custom-dock/overlay-preview/ -- the sprite sheets + layout json of the wasd/mouse preview (wasd/, mouse/) and the baked bongo cat models (bongo-models/). two path segments, no traversal.
+            // static assets under obs-custom-dock/overlay-preview/ -- the baked bongo cat models (bongo-models/) and the key label pictures (bongo-keys/); the wasd and mouse preview reads the presets thru /input-overlay/file. two path segments, no traversal.
             var previewAsset = Regex.Match(path, @"^/overlay-preview/([a-z0-9_-]+/[a-z0-9_-]+\.(png|json))$");
             if (previewAsset.Success)
             {

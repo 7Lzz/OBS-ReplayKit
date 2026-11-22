@@ -55,32 +55,26 @@ namespace ReplayKitHelper
 
         private static readonly object FfmpegAliasLock = new object();
 
-        // a copy of ffmpeg.exe under a replaykit name with the replaykit icon stamped into it, so the encodes read as replaykit in task manager; a hard link would share the blank icon of ffmpeg, so this costs a second copy of it on disk. the copy carries the write time of the ffmpeg it was made from and is always larger than it, which tells it apart from a stale copy and from the hard link older versions made. ffmpeg.exe itself is never touched, and the plain ffmpeg path is used whenever the copy cannot be made
+        // a hard link to ffmpeg.exe under a replaykit name, so the encodes read as replaykit in task manager while the file stays the unmodified, verified download: ffmpeg carries no version resource the name could contradict. writing an icon into a copy, which earlier releases did, is how a patched executable looks to antivirus heuristics. both names are one file when they share its ntfs identity, and the plain ffmpeg path is used whenever the link cannot be made
         public static string EnsureFfmpegAlias(string ffmpegPath)
         {
             if (string.IsNullOrEmpty(ffmpegPath) || !File.Exists(ffmpegPath)) return ffmpegPath;
             string aliasPath = Path.Combine(Path.GetDirectoryName(ffmpegPath), "OBSReplayKit-Encoder.exe");
-            string tempPath = aliasPath + ".tmp";
             lock (FfmpegAliasLock)
             {
                 try
                 {
-                    var source = new FileInfo(ffmpegPath);
-                    var alias = new FileInfo(aliasPath);
-                    if (alias.Exists && alias.LastWriteTimeUtc == source.LastWriteTimeUtc && alias.Length > source.Length) return alias.FullName;
-                    byte[] icon = File.ReadAllBytes(Constants.OBS_ICON_PATH);
-                    File.Copy(ffmpegPath, tempPath, true);
-                    Native.StampIcon(tempPath, icon);
-                    File.SetLastWriteTimeUtc(tempPath, source.LastWriteTimeUtc);
+                    string identity = ClipRenames.Identity(new FileInfo(ffmpegPath));
+                    if (identity == null) return ffmpegPath;
+                    if (File.Exists(aliasPath) && ClipRenames.Identity(new FileInfo(aliasPath)) == identity) return Path.GetFullPath(aliasPath);
                     // a running encode keeps the old alias open, so it cannot be replaced until that encode is done
-                    if (alias.Exists) File.Delete(aliasPath);
-                    File.Move(tempPath, aliasPath);
-                    Log.Write("ffmpeg alias created: " + aliasPath + " (copy of " + ffmpegPath + " with the replaykit icon)");
+                    if (File.Exists(aliasPath)) File.Delete(aliasPath);
+                    Native.CreateHardLink(aliasPath, ffmpegPath);
+                    Log.Write("ffmpeg alias linked: " + aliasPath + " (hard link to " + ffmpegPath + ")");
                     return Path.GetFullPath(aliasPath);
                 }
-                catch (Exception ex) when (ex is IOException || ex is InvalidDataException || ex is UnauthorizedAccessException || ex is System.ComponentModel.Win32Exception)
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is System.ComponentModel.Win32Exception)
                 {
-                    try { File.Delete(tempPath); } catch (Exception cleanup) when (cleanup is IOException || cleanup is UnauthorizedAccessException) { }
                     Log.Write("ffmpeg alias failed: " + ex.Message + " (falling back to ffmpeg.exe)");
                     return ffmpegPath;
                 }

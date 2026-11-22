@@ -5669,10 +5669,6 @@
     "source": "c74363cfd3f86728",
     "text": "ヘルパーの接続待ち受けに失敗しました。"
   },
-  "helper.iconFileIsTruncated": {
-    "source": "98b468cb694d21e9",
-    "text": "アイコンファイルが途中で切れています。"
-  },
   "helper.imagesIcoPngJpgBmp": {
     "source": "6cd3d71abc82115b",
     "text": "画像 (*.ico;*.png;*.jpg;*.bmp)"
@@ -5704,10 +5700,6 @@
   "helper.noiseSuppressionMustBe0Or": {
     "source": "2ba4dec793b56033",
     "text": "ノイズ抑制は 0 か 1 を指定してください。"
-  },
-  "helper.notAnIconFile": {
-    "source": "13ef6ae92d7dc739",
-    "text": "アイコンファイルではありません。"
   },
   "helper.obsCouldNotCloseSafely": {
     "source": "f24dbc6872a46d7d",
@@ -9916,6 +9908,18 @@
   "setup.noProcessHostForObs": {
     "source": "d21a9a94574f4ff7",
     "text": "OBS {version} 用の共有プロセスホストは同梱されていません。先に対応している OBS のバージョンをインストールしてください。"
+  },
+  "setup.netFrameworkInstallPrompt": {
+    "source": "451227b9398ebce4",
+    "text": "OBS ReplayKit には Microsoft .NET Framework 4.8 が必要ですが、この PC にはインストールされていません。\n\n［OK］を選ぶと、Microsoft から .NET Framework 4.8 のインストーラーをダウンロードして開きます。完了すると、このインストーラーが自動的にもう一度起動します。"
+  },
+  "setup.netFrameworkNeedsRestart": {
+    "source": "80d3382bc2a44ab9",
+    "text": "Microsoft .NET Framework 4.8 がインストールされました。完了するには PC の再起動が必要です。\n\nPC を再起動してから、このインストーラーをもう一度実行してください。"
+  },
+  "setup.netFrameworkInstallFailed": {
+    "source": "66627ff5b476d1d5",
+    "text": "Microsoft .NET Framework 4.8 をインストールできませんでした。\n\n［OK］を選ぶと Microsoft のダウンロード ページが開きます。そこから .NET Framework 4.8 をインストールし、そのインストーラーに求められた場合は PC を再起動してから、このインストーラーをもう一度実行してください。"
   },
   "setup.obsCouldNotBeInstalledAutomatically": {
     "source": "b9ec5649ef71e37c",
