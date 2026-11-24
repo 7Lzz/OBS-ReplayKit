@@ -6,7 +6,7 @@ namespace ReplayKitSetup
     // windows entry for the normal (non-headless) run: ensure the evergreen webview2 runtime (WebView2Runtime.Ensure downloads it when missing), then hand off to SetupWindow. Native below is the win32 p/invoke surface SetupWindow builds its raw window on, kept in one file so nothing else has to carry window plumbing.
     internal static class InstallerApp
     {
-        public static int Run()
+        public static int Run(Func<IInstallProgress, int> update = null, bool relaunchObs = true)
         {
             if (!WebView2Runtime.Ensure(null))
             {
@@ -15,7 +15,7 @@ namespace ReplayKitSetup
                     null);
                 return 1;
             }
-            using var win = new SetupWindow();
+            using var win = new SetupWindow(update, relaunchObs);
             return win.RunModal();
         }
 

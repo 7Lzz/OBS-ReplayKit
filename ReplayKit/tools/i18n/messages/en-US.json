@@ -10033,6 +10033,10 @@
     "context": "Title in the installer window.",
     "text": "Re-installing OBS ReplayKit"
   },
+  "setup.refreshVideoToolsAndPlugins": {
+    "context": "Progress step in the setup window while a local update refreshes ReplayKit's video tools and OBS plugins.",
+    "text": "Refresh video tools and plugins"
+  },
   "setup.registerClipNotifications": {
     "context": "Title or description of an installer step in the installer and uninstaller.",
     "text": "Register clip notifications"
@@ -10411,6 +10415,10 @@
   "setup.verifiesTheTrimCompressTools": {
     "context": "Title or description of an installer step in the installer and uninstaller.",
     "text": "Verifies the trim/compress tools."
+  },
+  "setup.verifyUpdateFiles": {
+    "context": "First progress step in the setup window for a local update. Setup checks its bundled files before closing OBS.",
+    "text": "Verify update files"
   },
   "setup.windowTitle": {
     "context": "Windows installer caption.",

@@ -10029,6 +10029,10 @@
     "source": "863496177662434b",
     "text": "正在重新安装 OBS ReplayKit"
   },
+  "setup.refreshVideoToolsAndPlugins": {
+    "source": "d8fc31e7ed1a1768",
+    "text": "更新视频工具和插件"
+  },
   "setup.registerClipNotifications": {
     "source": "459e3790a2302e26",
     "text": "注册剪辑通知"
@@ -10406,6 +10410,10 @@
   "setup.verifiesTheTrimCompressTools": {
     "source": "426cc43dc1c8ea82",
     "text": "校验裁剪和压缩工具。"
+  },
+  "setup.verifyUpdateFiles": {
+    "source": "e5aa889b3d9cef79",
+    "text": "验证更新文件"
   },
   "setup.windowTitle": {
     "source": "2e0e00e71a75260a",

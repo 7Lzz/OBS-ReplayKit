@@ -12,7 +12,7 @@ using ReplayKitShared;
 
 namespace ReplayKitSetup
 {
-    // the headless modes of the release installer: --update (run by the helper), --cleanup, --uninstall and the discord screenshare install/removal
+    // the release installer's update, cleanup, uninstall and discord screenshare modes
     public static class Update
     {
         [DllImport("kernel32.dll", SetLastError = true)]
@@ -160,15 +160,25 @@ namespace ReplayKitSetup
             return started;
         }
 
-        // run a non-interactive repair/update install from a downloaded release exe.
-        public static int RunUpdateMode(string relaunchObs = null, int waitPid = 0, int startDelayMs = 0, bool relaunch = true, string releaseUrl = ReleasePage, string attemptId = null)
+        public static int RunUpdateMode(string relaunchObs = null, int waitPid = 0, int startDelayMs = 0, bool relaunch = true,
+            string releaseUrl = ReleasePage, string attemptId = null, IInstallProgress progress = null)
         {
             void LogBoth(string message)
             {
                 Log(message);
                 try { Console.WriteLine(message); } catch (IOException) { }
             }
-            bool Report(bool ok, string stage, string message) => WriteResult(ok, stage, message, releaseUrl, attemptId);
+            void ShowFailure(string message) => progress?.AddIssue(new SetupLocale.Text(message, SetupLocale.ToEnglish(message)));
+            bool Report(bool ok, string stage, string message)
+            {
+                if (!ok) ShowFailure(message);
+                return WriteResult(ok, stage, message, releaseUrl, attemptId);
+            }
+
+            if (progress != null) progress.TotalSteps = relaunch ? 8 : 6;
+            int completed = 0;
+            void Step(SetupLocale.Text title, SetupLocale.Text detail = default) =>
+                progress.Render(completed++, title, detail, "working");
 
             bool obsClosed = false;
             bool launchAttempted = false;
@@ -191,6 +201,7 @@ namespace ReplayKitSetup
                     string busy = SetupLocale.Message("setup.anotherReplaykitUpdateIsAlready");
                     LogBoth(busy);
                     if (attemptId != null) Report(false, "busy", busy);
+                    else ShowFailure(busy);
                     return 1;
                 }
                 DetachedSpawn.WritePid(NetCompat.ProcessId, attemptId);
@@ -198,6 +209,7 @@ namespace ReplayKitSetup
                 if (startDelayMs > 0) Thread.Sleep(Math.Min(startDelayMs, 5000));
 
                 // the payload is checked before obs is touched. a release exe built without its embedded assets used to get past here, kill obs, then discover it had nothing to install -- leaving no obs, no helper, and an update popup waiting on a restart that never came.
+                if (progress != null) Step(SetupLocale.Pair("setup.verifyUpdateFiles"));
                 try { Installer.ValidateRuntimeAssets(); }
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is InvalidDataException)
                 {
@@ -216,6 +228,7 @@ namespace ReplayKitSetup
                     return 1;
                 }
 
+                if (progress != null) Step(SetupLocale.Pair("setup.closeObs"), SetupLocale.Pair("setup.stopsObsToWriteSettings"));
                 transaction = RuntimeTransaction.Open();
                 Obs.CloseObs(LogBoth);
                 obsClosed = true;
@@ -224,6 +237,7 @@ namespace ReplayKitSetup
                 Log("stage: obs closed, waiting for helper pid " + waitPid);
                 if (!WaitForPid(waitPid > 0 ? waitPid : 0, 60, LogBoth))
                     throw new IOException(SetupLocale.Message("setup.theOldReplaykitHelperCouldNot"));
+                if (progress != null) Step(SetupLocale.Pair("setup.backUpCurrentObsSettings"), SetupLocale.Pair("setup.savesARestoreCopyFirst"));
                 try { configBackup = ConfigBackups.Create("app-update", LogBoth); }
                 catch (Exception ex)
                 {
@@ -231,6 +245,7 @@ namespace ReplayKitSetup
                     Report(false, "preflight", ex.Message);
                     return 1;
                 }
+                if (progress != null) Step(SetupLocale.Pair("setup.updateReplaykitFiles"), SetupLocale.Pair("setup.replacesTheReplaykitFilesAndKeeps"));
                 transaction.Recover(LogBoth);
                 MarkUpdatePending();
                 configWriting = true;
@@ -243,8 +258,14 @@ namespace ReplayKitSetup
                 LogBoth($"runtime update copied {count} file(s)");
                 if (problems.Count == 0)
                 {
+                    if (progress != null) Step(SetupLocale.Pair("setup.setWindowsStartup"));
                     Startup.RefreshObsStartup(LogBoth);
-                    if (relaunch) Installer.PrepareObsTheme(LogBoth);
+                    if (relaunch)
+                    {
+                        if (progress != null) Step(SetupLocale.Pair("setup.prepareObsTheme"), SetupLocale.Pair("setup.appliesYourThemeBeforeObsStarts"));
+                        Installer.PrepareObsTheme(LogBoth);
+                    }
+                    if (progress != null) Step(SetupLocale.Pair("setup.refreshVideoToolsAndPlugins"));
                     externalRuntimeWriting = true;
                     if (!ShareWindowInstall.Install(LogBoth)) problems.Add(SetupLocale.Message("setup.theSharePreviewWindow"));
                     try { problems.AddRange(Installer.RunUpdateDriverRefresh(LogBoth)); }
@@ -267,6 +288,7 @@ namespace ReplayKitSetup
 
                 if (relaunch)
                 {
+                    if (progress != null) Step(SetupLocale.Pair("setup.launchObs"), SetupLocale.Pair("setup.startsObs"));
                     failureStage = "relaunch";
                     launchAttempted = true;
                     relaunched = LaunchObsPath(relaunchObs, LogBoth);
@@ -472,8 +494,14 @@ namespace ReplayKitSetup
             string releaseUrl = StringArg(argv, "--release-url", ReleasePage);
             if (!Uri.TryCreate(releaseUrl, UriKind.Absolute, out Uri releaseUri) || releaseUri.Scheme != Uri.UriSchemeHttps)
                 releaseUrl = ReleasePage;
+            if (ShowsProgress(argv))
+                return InstallerApp.Run(progress => RunUpdateMode(relaunchObs, waitPid, startDelayMs, !noRelaunch, releaseUrl, attemptId, progress), !noRelaunch);
             return RunUpdateMode(relaunchObs, waitPid, startDelayMs, !noRelaunch, releaseUrl, attemptId);
         }
+
+        // helpers that shipped before attempt IDs always supplied a start delay.
+        internal static bool ShowsProgress(string[] args) =>
+            !args.Contains("--attempt-id") && !args.Contains("--start-delay-ms") && !args.Contains("--wait-pid");
 
         private static string StringArg(string[] argv, string name, string @default)
         {

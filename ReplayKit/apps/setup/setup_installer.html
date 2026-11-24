@@ -216,7 +216,8 @@
     function startFlow(mode) {
       if (running) return;
       running = true;
-      els.title.textContent = mode === "reinstall" ? RK_M("setup.reInstallingObsReplaykit") : RK_M("setup.settingUpObsReplaykit");
+      els.title.textContent = SETUP.automaticUpdate ? RK_M("update.updatingReplaykit")
+        : mode === "reinstall" ? RK_M("setup.reInstallingObsReplaykit") : RK_M("setup.settingUpObsReplaykit");
       els.line1.textContent = RK_M("setup.thisCanTakeAFewMinutes");
       els.line2.hidden = true;
       els.opt.hidden = true;
@@ -225,7 +226,9 @@
       els.uninstallBtn.hidden = true;
       els.spinner.hidden = false;
       els.statLine.textContent = RK_M("setup.starting");
-      send({ cmd: "start", mode: mode, discord: els.discord.checked });
+      const start = () => send({ cmd: "start", mode: mode, discord: els.discord.checked });
+      if (SETUP.automaticUpdate) requestAnimationFrame(() => requestAnimationFrame(start));
+      else start();
     }
 
     function showLanding() {
@@ -308,9 +311,13 @@
             els.title.textContent = RK_M("setup.obsReplaykitRemoved");
             els.line1.textContent = d.removeObs ? RK_M("setup.obsStudioWasUninstalledToo") : RK_M("setup.obsIsStartingBackUp");
             els.closeBtn.hidden = !d.removeObs;
+          } else if (SETUP.automaticUpdate) {
+            els.title.textContent = RK_M("update.updateComplete");
+            els.line1.textContent = "";
           }
           // never surface a warning count here -- benign per-step notes (audio default restore, an optional plugin skipped) read as "something is broken" to a user watching the installer finish.
-          els.statLine.textContent = d.mode === "uninstall" && d.removeObs ? RK_M("setup.done") : RK_M("setup.doneObsIsStarting");
+          els.statLine.textContent = (d.mode === "uninstall" && d.removeObs) || d.obsStarting === false
+            ? RK_M("setup.done") : RK_M("setup.doneObsIsStarting");
           els.statDetail.textContent = "";
           els.statPct.textContent = "";
           els.fill.style.width = "100%";
@@ -320,7 +327,9 @@
         case "failed":
           els.spinner.hidden = true;
           els.title.classList.add("is-bad");
-          els.title.textContent = uninstalling ? RK_M("setup.uninstallFailed") : RK_M("setup.setupFailed");
+          els.title.textContent = SETUP.automaticUpdate ? RK_M("update.updateFailed")
+            : uninstalling ? RK_M("setup.uninstallFailed") : RK_M("setup.setupFailed");
+          if (SETUP.automaticUpdate) els.line1.textContent = "";
           els.statLine.classList.add("is-bad");
           // the host translated the message and added the log path
           els.statLine.setAttribute("translate", "no");
@@ -339,6 +348,7 @@
         if (typeof d === "string") { try { d = JSON.parse(d); } catch (_) { return; } }
         onMessage(d);
       });
+      if (SETUP.automaticUpdate) startFlow("update");
     }
   })();
 </script>

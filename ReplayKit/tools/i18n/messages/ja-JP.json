@@ -10029,6 +10029,10 @@
     "source": "863496177662434b",
     "text": "OBS ReplayKit を再インストールしています"
   },
+  "setup.refreshVideoToolsAndPlugins": {
+    "source": "d8fc31e7ed1a1768",
+    "text": "動画ツールとプラグインを更新"
+  },
   "setup.registerClipNotifications": {
     "source": "459e3790a2302e26",
     "text": "クリップの通知を登録"
@@ -10406,6 +10410,10 @@
   "setup.verifiesTheTrimCompressTools": {
     "source": "426cc43dc1c8ea82",
     "text": "トリム/圧縮ツールを検証します。"
+  },
+  "setup.verifyUpdateFiles": {
+    "source": "e5aa889b3d9cef79",
+    "text": "アップデートファイルを確認"
   },
   "setup.windowTitle": {
     "source": "2e0e00e71a75260a",

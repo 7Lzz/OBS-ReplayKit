@@ -10038,6 +10038,10 @@
     "source": "863496177662434b",
     "text": "Переустановка OBS ReplayKit"
   },
+  "setup.refreshVideoToolsAndPlugins": {
+    "source": "d8fc31e7ed1a1768",
+    "text": "Обновить инструменты для видео и плагины"
+  },
   "setup.registerClipNotifications": {
     "source": "459e3790a2302e26",
     "text": "Регистрация уведомлений о клипах"
@@ -10418,6 +10422,10 @@
   "setup.verifiesTheTrimCompressTools": {
     "source": "426cc43dc1c8ea82",
     "text": "Проверяет инструменты обрезки и сжатия."
+  },
+  "setup.verifyUpdateFiles": {
+    "source": "e5aa889b3d9cef79",
+    "text": "Проверить файлы обновления"
   },
   "setup.windowTitle": {
     "source": "2e0e00e71a75260a",

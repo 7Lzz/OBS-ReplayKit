@@ -23,8 +23,8 @@ namespace ReplayKitSetup
             Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
             Thread.CurrentThread.CurrentUICulture = CultureInfo.InvariantCulture;
 
-            // headless dock-button / auto-updater modes detach from any inherited console so a dying parent cant kill them partway thru an install (see FastExit.DetachFromConsole); the normal run is a windows app with no console at all.
-            if (IsHeadlessMode(args)) FastExit.DetachFromConsole();
+            // update workers detach from any inherited console before OBS and its helper can close it.
+            if (args.Contains("--update") || IsHeadlessMode(args)) FastExit.DetachFromConsole();
 
             int rc = Run(args);
             AssetBundle.Cleanup();
@@ -34,7 +34,7 @@ namespace ReplayKitSetup
 
         // the modes that run without a setup window or console
         private static bool IsHeadlessMode(string[] args) =>
-            args.Contains("--update") || args.Contains("--cleanup") || args.Contains(ConfigBackups.ClearFlag) ||
+            (args.Contains("--update") && !Update.ShowsProgress(args)) || args.Contains("--cleanup") || args.Contains(ConfigBackups.ClearFlag) ||
             args.Contains("--install-discord-screenshare") || args.Contains("--uninstall-discord-screenshare");
 
         private static int Run(string[] args)

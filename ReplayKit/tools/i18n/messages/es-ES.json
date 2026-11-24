@@ -10035,6 +10035,10 @@
     "source": "863496177662434b",
     "text": "Reinstalando OBS ReplayKit"
   },
+  "setup.refreshVideoToolsAndPlugins": {
+    "source": "d8fc31e7ed1a1768",
+    "text": "Actualizar las herramientas de vídeo y los complementos"
+  },
   "setup.registerClipNotifications": {
     "source": "459e3790a2302e26",
     "text": "Registrar notificaciones de clips"
@@ -10414,6 +10418,10 @@
   "setup.verifiesTheTrimCompressTools": {
     "source": "426cc43dc1c8ea82",
     "text": "Verifica las herramientas de recorte y compresión."
+  },
+  "setup.verifyUpdateFiles": {
+    "source": "e5aa889b3d9cef79",
+    "text": "Verificar los archivos de actualización"
   },
   "setup.windowTitle": {
     "source": "2e0e00e71a75260a",

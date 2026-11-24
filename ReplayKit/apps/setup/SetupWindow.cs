@@ -34,17 +34,26 @@ namespace ReplayKitSetup
 
         private readonly object _queueLock = new object();
         private readonly Queue<Action> _queue = new Queue<Action>();
+        private readonly Func<IInstallProgress, int> _update;
+        private readonly bool _relaunchObs;
 
         private Thread _worker;
         private volatile bool _running;
         private bool _done;
         public int ExitCode { get; private set; }
 
+        public SetupWindow(Func<IInstallProgress, int> update, bool relaunchObs)
+        {
+            _update = update;
+            _relaunchObs = relaunchObs;
+            if (update != null) ExitCode = 1;
+        }
+
         public int RunModal()
         {
             _scale = SafeDpiScale();
             _theme = WindowTheme.Load();
-            _html = _theme.ApplyTo(SetupLocale.Inject(LoadHtml()));
+            _html = _theme.ApplyTo(SetupLocale.Inject(LoadHtml(_update != null)));
             _brushBg = Native.CreateSolidBrush((uint)WindowTheme.ColorRef(_theme.Window));
 
             _wndProcRef = WndProc;
@@ -144,6 +153,7 @@ namespace ReplayKitSetup
                     StartInstall(discord, mode == "reinstall" ? SetupMode.Reinstall : mode == "update" ? SetupMode.Update : SetupMode.Install);
                     break;
                 case "uninstall":
+                    if (_update != null) return;
                     StartUninstall(o["keepSettings"]?.Type != JTokenType.Boolean || o.Value<bool>("keepSettings"),
                                    o["removeObs"]?.Type == JTokenType.Boolean && o.Value<bool>("removeObs"));
                     break;
@@ -155,16 +165,24 @@ namespace ReplayKitSetup
 
         private void StartInstall(bool? discord, SetupMode mode)
         {
-            if (_running) return;
+            if (_running || _done) return;
             _running = true;
 
             var progress = new PageProgress(PostToPage);
             _worker = new Thread(() =>
             {
                 int code = 1;
-                SetupLog.Line("=== install flow start (v" + VersionInfo.Version + (mode == SetupMode.Reinstall ? ", clean re-install" : mode == SetupMode.Update ? ", update" : "") + ") ===");
                 try
                 {
+                    if (_update != null)
+                    {
+                        code = _update(progress);
+                        ExitCode = code;
+                        if (code == 0) Enqueue(() => OnFlowSucceeded(0));
+                        else Enqueue(() => OnFlowFailed(progress.Issues.Count > 0 ? progress.Issues[0] : null));
+                        return;
+                    }
+                    SetupLog.Line("=== install flow start (v" + VersionInfo.Version + (mode == SetupMode.Reinstall ? ", clean re-install" : mode == SetupMode.Update ? ", update" : "") + ") ===");
                     var issues = Apply.RunInstallFlow(discord, progress, mode);
                     code = issues.Count == 0 ? 0 : 1;
                     SetupLog.Line("=== install flow complete: " + issues.Count + " issue(s) ===");
@@ -247,7 +265,7 @@ namespace ReplayKitSetup
                 return;
             }
             _done = true;
-            PostToPage(new JObject { ["type"] = "done", ["issues"] = issueCount });
+            PostToPage(new JObject { ["type"] = "done", ["issues"] = issueCount, ["obsStarting"] = _relaunchObs });
             Native.SetTimer(_hwnd, (IntPtr)1, 2400, IntPtr.Zero);
         }
 
@@ -331,7 +349,7 @@ namespace ReplayKitSetup
 
         // ---- helpers ----
 
-        private static string LoadHtml()
+        private static string LoadHtml(bool automaticUpdate)
         {
             var asm = Assembly.GetExecutingAssembly();
             string html;
@@ -345,12 +363,13 @@ namespace ReplayKitSetup
             html = html.Replace("{{HERO_ART}}", BundledDataUri("obs-studio/obs-replayKit/obs-custom-dock/update-art.png", "image/png"));
             html = html.Replace("{{BRAND_ICON}}", BundledDataUri("obs-studio/obs-replayKit/scripts/helper/obs-replaykit.ico", "image/x-icon"));
             html = html.Replace("{{SETUP_CHECK}}", BundledDataUri("obs-studio/obs-replayKit/icons/action/check.svg", "image/svg+xml"));
-            html = html.Replace("{{SETUP_STATE}}", DetectSetupState());
+            var state = automaticUpdate ? new JObject { ["automaticUpdate"] = true } : DetectSetupState();
+            html = html.Replace("{{SETUP_STATE}}", state.ToString(Formatting.None));
             return html;
         }
 
         // {installed, cable, screenshare} -- lets the page show Update / Re-Install instead of Install and pre-check the Discord opt-in when the audio cable is already on the machine (or the current settings file has it on).
-        private static string DetectSetupState()
+        private static JObject DetectSetupState()
         {
             bool installed = false, screenshare = false;
             try { installed = Directory.Exists(Config.REPLAYKIT_CONFIG); } catch (Exception) { }
@@ -362,7 +381,7 @@ namespace ReplayKitSetup
                         .Value<bool?>("discord_screenshare_enabled") ?? false;
             }
             catch (Exception) { }
-            return new JObject { ["installed"] = installed, ["cable"] = cable, ["screenshare"] = screenshare }.ToString(Formatting.None);
+            return new JObject { ["installed"] = installed, ["cable"] = cable, ["screenshare"] = screenshare };
         }
 
         private static string BundledDataUri(string entryPath, string mime)

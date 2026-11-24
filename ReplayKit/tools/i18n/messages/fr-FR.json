@@ -10035,6 +10035,10 @@
     "source": "863496177662434b",
     "text": "Réinstallation d'OBS ReplayKit"
   },
+  "setup.refreshVideoToolsAndPlugins": {
+    "source": "d8fc31e7ed1a1768",
+    "text": "Mettre à jour les outils vidéo et les plugins"
+  },
   "setup.registerClipNotifications": {
     "source": "459e3790a2302e26",
     "text": "Enregistrer les notifications de clips"
@@ -10414,6 +10418,10 @@
   "setup.verifiesTheTrimCompressTools": {
     "source": "426cc43dc1c8ea82",
     "text": "Vérifie les outils de rognage et de compression."
+  },
+  "setup.verifyUpdateFiles": {
+    "source": "e5aa889b3d9cef79",
+    "text": "Vérifier les fichiers de mise à jour"
   },
   "setup.windowTitle": {
     "source": "2e0e00e71a75260a",
