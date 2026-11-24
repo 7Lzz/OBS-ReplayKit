@@ -587,6 +587,10 @@
     "source": "2f28f51974465aa4",
     "text": "デスクトップ"
   },
+  "clips.deletingDraft": {
+    "source": "49ea7967003c1156",
+    "text": "下書きを削除しています…"
+  },
   "clips.draftDeleted": {
     "source": "f21ddd4fdd50fc53",
     "text": "下書きを削除しました"
@@ -602,6 +606,10 @@
   "clips.dragToResizeCardsDoubleClick": {
     "source": "96a8558cd8d63741",
     "text": "ドラッグしてカードのサイズを変更、ダブルクリックでリセット"
+  },
+  "clips.duplicatingClip": {
+    "source": "2dcdc220a9a78fab",
+    "text": "クリップを複製しています…"
   },
   "clips.duplicateFailedError": {
     "source": "6f966f2f9135fd1d",
@@ -1128,8 +1136,8 @@
     "text": "{name} (あなたが設定)"
   },
   "clips.namesCanTContainChars": {
-    "source": "779b980113974f3b",
-    "text": "名前には {chars} を使えません"
+    "source": "ab26fb399c3193b9",
+    "text": "Windows のファイル名には {chars} を使用できません。"
   },
   "clips.newest": {
     "source": "8f9a7eb746403b26",
@@ -5418,8 +5426,8 @@
     "text": "トリムの開始"
   },
   "editor.trimTheAudioWithTheVideo": {
-    "source": "1f8fe14f9e694c75",
-    "text": "音声も一緒にトリム"
+    "source": "378c82dbae6c8041",
+    "text": "トラックをグループ化"
   },
   "editor.trimTimeline": {
     "source": "68c7674a298d8fbd",

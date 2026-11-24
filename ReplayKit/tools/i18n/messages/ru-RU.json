@@ -587,6 +587,10 @@
     "source": "2f28f51974465aa4",
     "text": "Рабочий стол"
   },
+  "clips.deletingDraft": {
+    "source": "49ea7967003c1156",
+    "text": "Удаление черновика…"
+  },
   "clips.draftDeleted": {
     "source": "f21ddd4fdd50fc53",
     "text": "Черновик удалён"
@@ -602,6 +606,10 @@
   "clips.dragToResizeCardsDoubleClick": {
     "source": "96a8558cd8d63741",
     "text": "Перетащите, чтобы изменить размер карточек, двойной щелчок сбрасывает размер"
+  },
+  "clips.duplicatingClip": {
+    "source": "2dcdc220a9a78fab",
+    "text": "Создание копии клипа…"
   },
   "clips.duplicateFailedError": {
     "source": "6f966f2f9135fd1d",
@@ -1128,8 +1136,8 @@
     "text": "{name} (задано вами)"
   },
   "clips.namesCanTContainChars": {
-    "source": "779b980113974f3b",
-    "text": "Имена не могут содержать {chars}"
+    "source": "ab26fb399c3193b9",
+    "text": "В Windows нельзя использовать {chars} в именах файлов."
   },
   "clips.newest": {
     "source": "8f9a7eb746403b26",
@@ -5421,8 +5429,8 @@
     "text": "Начало обрезки"
   },
   "editor.trimTheAudioWithTheVideo": {
-    "source": "1f8fe14f9e694c75",
-    "text": "Обрезать звук вместе с видео"
+    "source": "378c82dbae6c8041",
+    "text": "Сгруппировать дорожки"
   },
   "editor.trimTimeline": {
     "source": "68c7674a298d8fbd",

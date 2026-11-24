@@ -17,6 +17,7 @@ namespace ReplayKitHelper
             public bool Clip;
             public bool Gif;
             public double At, End, Src, X, Y, W, Opacity, Rotate;
+            public double Speed = 1;
             // a clip row has a look of its own, laid on at its size before it goes over the picture; height over width of the clip says that size
             public VideoLook Look;
             public double Aspect;
@@ -77,6 +78,7 @@ namespace ReplayKitHelper
                         if (clip == null || !File.Exists(clip.Full)) { error = VideoImports.IsRef(reference) ? Locales.Message("editor.addedVideoMoved") : Locales.Message("editor.addedClipNotInFolder"); return null; }
                         layer.Path = clip.Full;
                         layer.Clip = true;
+                        if (o["speed"] != null) layer.Speed = Num(o, "speed", 0.1, 5);
                     }
                     else if (kind == "media")
                     {
@@ -108,7 +110,7 @@ namespace ReplayKitHelper
                 plan.layers.Add(new Layer
                 {
                     Path = l.Path, Clip = l.Clip, Gif = l.Gif,
-                    At = l.At + skip, End = l.End, Src = l.Clip ? l.Src + skip : l.Src,
+                    At = l.At + skip, End = l.End, Src = l.Clip ? l.Src + skip * l.Speed : l.Src, Speed = l.Speed,
                     X = l.X, Y = l.Y, W = l.W, Opacity = l.Opacity, Rotate = l.Rotate,
                     Look = l.Look, Aspect = l.Aspect,
                 });
@@ -123,7 +125,7 @@ namespace ReplayKitHelper
             foreach (var l in layers)
             {
                 string dur = N(l.End - l.At);
-                if (l.Clip) argv.AddRange(new[] { "-ss", N(l.Src), "-t", dur, "-i", l.Path });
+                if (l.Clip) argv.AddRange(new[] { "-ss", N(l.Src), "-t", N((l.End - l.At) * l.Speed), "-i", l.Path });
                 else if (l.Gif) argv.AddRange(new[] { "-stream_loop", "-1", "-ignore_loop", "1", "-t", N(l.End - l.At + l.Src), "-i", l.Path });
                 else argv.AddRange(new[] { "-loop", "1", "-framerate", "30", "-t", dur, "-i", l.Path });
             }
@@ -142,7 +144,8 @@ namespace ReplayKitHelper
                 // a gif trimmed at its start is read from its own start and the frames before the cut are dropped, since a looping gif cannot be seeked into
                 string cut = l.Gif && l.Src > 0 ? "trim=start=" + N(l.Src) + "," : "";
                 string look = l.Look != null ? "," + l.Look.Filter(pw, Math.Max(2, (int)Math.Round(pw * l.Aspect / 2) * 2)) : "";
-                string chain = "[" + (first + i) + ":v]" + cut + "setpts=PTS-STARTPTS+" + N(l.At) + "/TB,scale=" + pw + ":-2" + look + ",format=rgba";
+                string pts = l.Speed == 1 ? "PTS-STARTPTS" : "(PTS-STARTPTS)/" + N(l.Speed);
+                string chain = "[" + (first + i) + ":v]" + cut + "setpts=" + pts + "+" + N(l.At) + "/TB,scale=" + pw + ":-2" + look + ",format=rgba";
                 if (l.Opacity < 1) chain += ",colorchannelmixer=aa=" + N(l.Opacity);
                 // turned clockwise about its centre like the preview turns it, on a canvas grown to hold it with clear corners, so laying it on by its centre keeps it in place
                 if (l.Rotate != 0)

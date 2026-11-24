@@ -839,6 +839,8 @@
     var subPane = "edit";
     // the saved presets of each kind, the one picked last of each that overwrite writes over, and the one whose name is being typed
     var presets = { subtitle: [], video: [] };
+    var confirmedPresets = null;
+    var presetsReadFailed = false;
     var chosen = { subtitle: "", video: "" };
     var renaming = null;
     var presetsKey = "";
@@ -1295,11 +1297,13 @@
     function setPane(name) {
       if (name !== pane) els.editing = null;
       pane = name;
+      if (name === "presets" && presetsReadFailed) loadPresets();
       paint();
       lanes.refreshProps();
     }
 
     function setSubPane(name) {
+      if (name === "presets" && presetsReadFailed) loadPresets();
       if (name === subPane) return;
       subPane = name;
       paint();
@@ -1418,27 +1422,39 @@
 
     function loadPresets() {
       if (!o.helper) return;
+      presetsReadFailed = false;
       fetch(o.helper + "/editor-presets", { cache: "no-store" }).then(function (r) { return r.json(); }).then(function (j) {
-        if (!j || !j.ok) throw new Error((j && j.message) || RK_M("editor.thePresetsCouldNotBeRead"));
-        presets.subtitle = Array.isArray(j.subtitle) ? j.subtitle : [];
-        presets.video = Array.isArray(j.video) ? j.video : [];
+        if (!j || !j.ok || !Array.isArray(j.subtitle) || !Array.isArray(j.video)) {
+          throw new Error((j && j.message) || RK_M("editor.thePresetsCouldNotBeRead"));
+        }
+        confirmedPresets = { subtitle: j.subtitle, video: j.video };
+        presets = Object.assign({}, confirmedPresets);
         presetsKey = "";
         paint();
-      }).catch(function (err) { if (o.notify) o.notify(err.message || RK_M("editor.thePresetsCouldNotBeRead"), "bad", RK_M("editor.presets")); });
+      }).catch(function (err) {
+        presetsReadFailed = true;
+        presetsKey = "";
+        paint();
+        if (o.notify) o.notify(err.message || RK_M("editor.thePresetsCouldNotBeRead"), "bad", RK_M("editor.presets"));
+      });
     }
 
-    // the list shows the change at once; one the helper refuses is taken back
+    // the list shows changes at once and goes back to the last confirmed list if the latest write fails
     function storePresets(k, list) {
-      var before = presets[k];
+      if (!confirmedPresets) return;
       presets[k] = list;
       presetsKey = "";
       paint();
       presetsSaving = presetsSaving.then(function () {
         return fetch(o.helper + "/editor-presets/save?kind=" + k, { method: "POST", cache: "no-store", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ presets: list }) })
           .then(function (r) { return r.json(); })
-          .then(function (j) { if (!j || !j.ok) throw new Error((j && j.message) || RK_M("editor.thePresetsCouldNotBeSaved")); });
+          .then(function (j) {
+            if (!j || !j.ok || !Array.isArray(j[k])) throw new Error((j && j.message) || RK_M("editor.thePresetsCouldNotBeSaved"));
+            confirmedPresets[k] = j[k];
+            if (presets[k] === list) { presets[k] = j[k]; presetsKey = ""; paint(); }
+          });
       }).catch(function (err) {
-        if (presets[k] === list) { presets[k] = before; presetsKey = ""; paint(); }
+        if (presets[k] === list) { presets[k] = confirmedPresets[k]; presetsKey = ""; paint(); }
         if (o.notify) o.notify(err.message || RK_M("editor.thePresetsCouldNotBeSaved"), "bad", RK_M("editor.presets"));
       });
     }
@@ -1527,6 +1543,7 @@
       };
       input.addEventListener("keydown", function (e) {
         e.stopPropagation();
+        if (e.isComposing) return;
         if (e.key === "Enter") { e.preventDefault(); finish(true); }
         if (e.key === "Escape") { e.preventDefault(); finish(false); }
       });
@@ -1592,17 +1609,21 @@
       els.presetApply.disabled = !target;
       els.presetOverwrite.disabled = !target || !data;
       els.presetOverwrite.dataset.tooltip = target ? RK_M("editor.replaceNameWithKind", { name: target.name, kind: PRESET_KINDS[k] }) : RK_M("editor.pickAPresetToOverwrite");
-      els.presetSave.disabled = !data;
+      els.presetSave.disabled = !confirmedPresets || !data;
       // a name being typed into a row is never drawn over; the list catches up once it is done
       if (renaming && renaming.kind === k && findPreset(k, renaming.id)) return;
       renaming = null;
       var key = canon([k, list.map(function (p) { return [p.id, p.name]; }), inUse, chosen[k]]);
       if (key === presetsKey) return;
       presetsKey = key;
-      els.presetNote.textContent = list.length ? RK_M("editor.pickAPresetThenApplyIt", { kind: PRESET_KINDS[k] }) : RK_M("editor.noPresetsYetNameKindBelow", { kind: PRESET_KINDS[k] });
+      if (!confirmedPresets) els.presetNote.textContent = presetsReadFailed ? RK_M("editor.thePresetsCouldNotBeRead") : "";
+      else els.presetNote.textContent = list.length ? RK_M("editor.pickAPresetThenApplyIt", { kind: PRESET_KINDS[k] }) : RK_M("editor.noPresetsYetNameKindBelow", { kind: PRESET_KINDS[k] });
+      var active = document.activeElement;
+      var focusedPreset = active && active.parentElement === els.presetList ? active.dataset.presetId : "";
       els.presetList.textContent = "";
       list.forEach(function (p) {
         var row = el("div", "ed-preset" + (p.id === chosen[k] ? " is-selected" : ""));
+        row.dataset.presetId = p.id;
         row.tabIndex = 0;
         row.setAttribute("role", "option");
         row.setAttribute("aria-selected", p.id === chosen[k] ? "true" : "false");
@@ -1634,12 +1655,14 @@
         });
         row.appendChild(bin);
         row.addEventListener("click", function () { selectPreset(k, p.id); });
-        row.addEventListener("dblclick", function () { applyPreset(k, p); });
+        row.addEventListener("dblclick", function (e) { if (!e.target.closest("button")) applyPreset(k, p); });
         row.addEventListener("keydown", function (e) {
+          if (e.target !== row) return;
           if (e.key === " ") { e.preventDefault(); selectPreset(k, p.id); }
           if (e.key === "Enter") { e.preventDefault(); applyPreset(k, p); }
         });
         els.presetList.appendChild(row);
+        if (p.id === focusedPreset) row.focus({ preventScroll: true });
       });
       if (window.RKHover) RKHover.apply(els.presetList, { control: ".icon-mini-btn" });
     }

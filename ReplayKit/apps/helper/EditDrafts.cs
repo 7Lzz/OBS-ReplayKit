@@ -90,18 +90,33 @@ namespace ReplayKitHelper
             return new JObject { ["ok"] = true, ["drafts"] = new JArray(rows.OrderByDescending(r => r.Value<long>("savedAt"))) };
         }
 
-        public static JObject Get(string name)
+        public static JObject Get(string name, out int status)
         {
+            status = 200;
             var clip = Clips.GetSafeClipPath(name);
-            if (clip == null) return Fail(Locales.Message("common.badFilename"));
+            if (clip == null)
+            {
+                status = 400;
+                return Fail(Locales.Message("common.badFilename"));
+            }
             JObject entry = null;
             try { ClipStore.Update(StorePath(), db => { entry = Entry(db, clip, out bool migrated); return migrated; }); }
             catch (Exception ex) when (ex is IOException || ex is JsonException || ex is UnauthorizedAccessException)
             {
                 Log.Write("EditDrafts.Get: " + ex.Message);
+                status = 500;
                 return Fail(Locales.Message("editor.theDraftsCouldNotBeRead"));
             }
-            if (entry == null || !(entry["edit"] is JObject)) return Fail(Locales.Message("editor.thereIsNoDraftForThis"));
+            if (entry == null)
+            {
+                status = 404;
+                return Fail(Locales.Message("editor.thereIsNoDraftForThis"));
+            }
+            if (!(entry["edit"] is JObject))
+            {
+                status = 500;
+                return Fail(Locales.Message("editor.theDraftsCouldNotBeRead"));
+            }
             return new JObject
             {
                 ["ok"] = true,

@@ -19,6 +19,16 @@ namespace ReplayKitHelper
     // the routes of the clip editor: presets, drafts, its session, imported media, trims, renders and subtitles
     internal static class EditorRoutes
     {
+        private static bool TryReadFlag(string value, out bool enabled)
+        {
+            if (value == "0" || value == "1")
+            {
+                enabled = value == "1";
+                return true;
+            }
+            return bool.TryParse(value, out enabled);
+        }
+
         // answers the request when its path is one of these routes, with what DispatchRequest returns; null when it is not
         public static bool? Handle(RouteRequest r)
         {
@@ -75,7 +85,12 @@ namespace ReplayKitHelper
                     if (path == "/editor-presets/save" && req.Method == "POST") { var saved = EditorPresets.Save(Q("kind"), req.Body); HttpResponse.SendJson(stream, saved.Value<bool>("ok") ? 200 : 400, saved); return false; }
                     HttpResponse.SendText(stream, 405, "Method Not Allowed", "GET or POST required");
                 }
-                catch (Exception ex) { HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = ex.Message }); }
+                catch (Exception ex)
+                {
+                    Log.Write("Editor presets request failed: " + ex.GetType().Name);
+                    HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = path == "/editor-presets"
+                        ? Locales.Message("editor.thePresetsCouldNotBeRead") : Locales.Message("editor.thePresetsCouldNotBeSaved") });
+                }
                 return false;
             }
 
@@ -87,8 +102,8 @@ namespace ReplayKitHelper
                     if (path == "/drafts" && req.Method == "GET") { HttpResponse.SendJson(stream, 200, EditDrafts.List()); return false; }
                     if (path == "/drafts/get" && req.Method == "GET")
                     {
-                        var got = EditDrafts.Get(Q("file"));
-                        HttpResponse.SendJson(stream, got.Value<bool>("ok") ? 200 : 404, got);
+                        var got = EditDrafts.Get(Q("file"), out int status);
+                        HttpResponse.SendJson(stream, status, got);
                         return false;
                     }
                     if (path == "/drafts/save" && req.Method == "POST")
@@ -108,7 +123,11 @@ namespace ReplayKitHelper
                     }
                     HttpResponse.SendText(stream, 405, "Method Not Allowed", "GET or POST required");
                 }
-                catch (Exception ex) { HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = ex.Message }); }
+                catch (Exception ex)
+                {
+                    Log.Write("Editor draft request failed: " + ex.GetType().Name);
+                    HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = Locales.Message("editor.badRequest") });
+                }
                 return false;
             }
 
@@ -286,12 +305,17 @@ namespace ReplayKitHelper
                 string file = Q("file");
                 string mode = Q("mode", "copy");
                 // precise=1 -> re-encode for frame-accurate cuts. precise=0 (default) -> stream-copy, keyframe-snapped (fast lossless).
-                string preciseStr = Q("precise", "0");
-                bool precise = preciseStr != "0" && preciseStr.ToLowerInvariant() != "false";
-                string removeAudioStr = Q("removeAudio", "0");
-                bool removeAudio = removeAudioStr != "0" && removeAudioStr.ToLowerInvariant() != "false";
-                double.TryParse(Q("start"), NumberStyles.Float, CultureInfo.InvariantCulture, out double startSec);
-                double.TryParse(Q("end"), NumberStyles.Float, CultureInfo.InvariantCulture, out double endSec);
+                if (!TryReadFlag(Q("precise", "0"), out bool precise) || !TryReadFlag(Q("removeAudio", "0"), out bool removeAudio))
+                {
+                    HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("editor.badRequest") });
+                    return false;
+                }
+                if (!double.TryParse(Q("start"), NumberStyles.Float, CultureInfo.InvariantCulture, out double startSec) ||
+                    !double.TryParse(Q("end"), NumberStyles.Float, CultureInfo.InvariantCulture, out double endSec))
+                {
+                    HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("editor.badStartEnd") });
+                    return false;
+                }
                 // the audio edits of the editor come as json in the body; no body means the audio is left as it is
                 JToken audioEdit = null;
                 JToken videoEdit = null;
@@ -314,33 +338,40 @@ namespace ReplayKitHelper
                 }
                 try
                 {
-                    double videoSpeed = 1;
-                    if (!string.IsNullOrEmpty(Q("speed")) && !double.TryParse(Q("speed"), NumberStyles.Float, CultureInfo.InvariantCulture, out videoSpeed))
+                    if (!double.TryParse(Q("speed", "1"), NumberStyles.Float, CultureInfo.InvariantCulture, out double videoSpeed))
                     {
                         HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("editor.badSpeed") });
                         return false;
                     }
                     double frameTime = -1;
-                    if (mode == "screenshot" && !double.TryParse(Q("time"), NumberStyles.Float, CultureInfo.InvariantCulture, out frameTime))
+                    if (string.Equals(mode, "screenshot", StringComparison.OrdinalIgnoreCase) &&
+                        !double.TryParse(Q("time"), NumberStyles.Float, CultureInfo.InvariantCulture, out frameTime))
                     {
                         HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("editor.badScreenshotTime") });
                         return false;
                     }
                     // the render settings of the editor, each left out to keep what the video has
-                    int.TryParse(Q("height", "0"), NumberStyles.None, CultureInfo.InvariantCulture, out int renderHeight);
-                    int.TryParse(Q("fps", "0"), NumberStyles.None, CultureInfo.InvariantCulture, out int renderFps);
-                    int.TryParse(Q("bitrate", "0"), NumberStyles.None, CultureInfo.InvariantCulture, out int renderKbps);
+                    if (!int.TryParse(Q("height", "0"), NumberStyles.None, CultureInfo.InvariantCulture, out int renderHeight) ||
+                        !int.TryParse(Q("fps", "0"), NumberStyles.None, CultureInfo.InvariantCulture, out int renderFps) ||
+                        !int.TryParse(Q("bitrate", "0"), NumberStyles.None, CultureInfo.InvariantCulture, out int renderKbps))
+                    {
+                        HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("editor.badRequest") });
+                        return false;
+                    }
                     var render = new Trim.RenderOptions { Height = renderHeight, Fps = renderFps, BitrateKbps = renderKbps };
                     if (!double.TryParse(Q("pictureScale", "1"), NumberStyles.Float, CultureInfo.InvariantCulture, out double pictureScale) ||
                         !double.TryParse(Q("pictureRotation", "0"), NumberStyles.Float, CultureInfo.InvariantCulture, out double pictureRotation))
-                        throw new ArgumentException(Locales.Message("editor.invalidVideoTransform"));
+                    {
+                        HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("editor.invalidVideoTransform") });
+                        return false;
+                    }
                     var result = Trim.InvokeClipTrim(file, startSec, endSec, mode, precise, removeAudio, audioEdit, videoSpeed, videoEdit, subtitleEdit, lookEdit, layerEdit, Q("aspect", "original"), frameTime, render, pictureScale, pictureRotation);
                     HttpResponse.SendJson(stream, result.Ok ? 200 : 400, TrimResultToJson(result));
                 }
                 catch (Exception ex)
                 {
                     Log.Write("/trim threw: " + ex.Message + "\n" + ex.StackTrace);
-                    HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = ex.Message });
+                    HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = Locales.Message("clips.theClipCouldNotBeSaved") });
                 }
                 return false;
             }
@@ -359,7 +390,7 @@ namespace ReplayKitHelper
                 catch (Exception ex)
                 {
                     Log.Write("/trim/keyframes threw: " + ex.Message + "\n" + ex.StackTrace);
-                    HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = ex.Message, ["keyframes"] = new JArray() });
+                    HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = Locales.Message("editor.fastTrimSnapPointsUnavailable"), ["keyframes"] = new JArray() });
                 }
                 return false;
             }

@@ -587,6 +587,10 @@
     "source": "2f28f51974465aa4",
     "text": "Bureau"
   },
+  "clips.deletingDraft": {
+    "source": "49ea7967003c1156",
+    "text": "Suppression du brouillon…"
+  },
   "clips.draftDeleted": {
     "source": "f21ddd4fdd50fc53",
     "text": "Brouillon supprimé"
@@ -602,6 +606,10 @@
   "clips.dragToResizeCardsDoubleClick": {
     "source": "96a8558cd8d63741",
     "text": "Faites glisser pour redimensionner les cartes, double-cliquez pour réinitialiser"
+  },
+  "clips.duplicatingClip": {
+    "source": "2dcdc220a9a78fab",
+    "text": "Duplication du clip…"
   },
   "clips.duplicateFailedError": {
     "source": "6f966f2f9135fd1d",
@@ -1128,8 +1136,8 @@
     "text": "{name} (défini par vous)"
   },
   "clips.namesCanTContainChars": {
-    "source": "779b980113974f3b",
-    "text": "Les noms ne peuvent pas contenir {chars}"
+    "source": "ab26fb399c3193b9",
+    "text": "Windows n’autorise pas {chars} dans les noms de fichiers."
   },
   "clips.newest": {
     "source": "8f9a7eb746403b26",
@@ -5420,8 +5428,8 @@
     "text": "Début du rognage"
   },
   "editor.trimTheAudioWithTheVideo": {
-    "source": "1f8fe14f9e694c75",
-    "text": "Rogner l'audio avec la vidéo"
+    "source": "378c82dbae6c8041",
+    "text": "Grouper les pistes"
   },
   "editor.trimTimeline": {
     "source": "68c7674a298d8fbd",

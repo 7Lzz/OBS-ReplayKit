@@ -189,17 +189,27 @@ namespace ReplayKitHelper
         {
             var chains = new List<string>();
             var labels = new List<string>();
-            double cursor = Start;
-            Action<double, double> black = (a, b) =>
+            string[] fps = info.Fps.Split('/');
+            double frameRate = double.Parse(fps[0], CultureInfo.InvariantCulture) /
+                (fps.Length == 1 ? 1 : double.Parse(fps[1], CultureInfo.InvariantCulture));
+            // rounding accumulated edges keeps video cuts, audio and overlays on the same clock.
+            long Frame(double time) => (long)Math.Ceiling((time - Start) * frameRate - 1e-6);
+            long cursor = 0;
+            void Black(long frames)
             {
                 string label = "v" + labels.Count;
-                chains.Add("color=c=black:s=" + info.Width + "x" + info.Height + ":r=" + info.Fps + ":d=" + Num(b - a) + ",setsar=1,format=yuv420p[" + label + "]");
+                chains.Add("color=c=black:s=" + info.Width + "x" + info.Height + ":r=" + info.Fps +
+                    ",trim=end_frame=" + frames.ToString(CultureInfo.InvariantCulture) + ",setsar=1,format=yuv420p[" + label + "]");
                 labels.Add(label);
-            };
+            }
             foreach (var part in Parts(speed))
             {
                 var piece = part.Piece;
-                if (part.A > cursor + 0.004) black(cursor, part.A);
+                long first = Frame(part.A);
+                long last = Frame(part.B);
+                long frames = last - Math.Max(first, cursor);
+                if (frames <= 0) continue;
+                if (first > cursor) Black(first - cursor);
                 double rate = piece.Rate(speed);
                 string speedFilter = Math.Abs(rate - 1) > 1e-6 ? ",setpts=(PTS-STARTPTS)/" + Num(rate) : ",setpts=PTS-STARTPTS";
                 string label = "v" + labels.Count;
@@ -207,15 +217,18 @@ namespace ReplayKitHelper
                 string fit = piece.Path == null ? "" : Fit(info);
                 string look = piece.Look != null ? "," + piece.Look.Filter(info.Width, info.Height) : "";
                 decimal shift = piece.Path == null ? readStart : 0;
-                chains.Add("[" + input + ":v:0]trim=start=" + Shifted(part.SrcA, shift) + ":end=" + Shifted(part.SrcB, shift) + speedFilter + fit + look + ",fps=" + info.Fps + ",setsar=1,format=yuv420p[" + label + "]");
+                string count = frames.ToString(CultureInfo.InvariantCulture);
+                chains.Add("[" + input + ":v:0]trim=start=" + Shifted(part.SrcA, shift) + ":end=" + Shifted(part.SrcB, shift) + speedFilter + fit + look +
+                    ",fps=" + info.Fps + ",tpad=stop_mode=clone:stop=" + count + ",trim=end_frame=" + count + ",setsar=1,format=yuv420p[" + label + "]");
                 labels.Add(label);
-                cursor = part.B;
+                cursor = last;
             }
-            if (End > cursor + 0.001) black(cursor, End);
+            long end = Frame(End);
+            if (end > cursor) Black(end - cursor);
             if (labels.Count == 1)
                 chains.Add("[" + labels[0] + "]null[vout]");
             else
-                chains.Add(string.Concat(labels.Select(l => "[" + l + "]")) + "concat=n=" + labels.Count + ":v=1:a=0[vout]");
+                chains.Add(string.Concat(labels.Select(l => "[" + l + "]")) + "concat=n=" + labels.Count + ":v=1:a=0,setpts=N/((" + info.Fps + ")*TB)[vout]");
             return string.Join(";", chains);
         }
     }

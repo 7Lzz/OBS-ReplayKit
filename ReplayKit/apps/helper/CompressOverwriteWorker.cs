@@ -88,11 +88,17 @@ namespace ReplayKitHelper
             // optional resolution reduction folded into the same encode. -2 keeps aspect + even width; min(ih,H) never upscales, so this is a no-op if the source is already at/below the target.
             if (scaleHeight > 0)
                 commonHead.AddRange(new[] { "-vf", "scale=-2:min(ih\\," + scaleHeight + ")" });
-            var commonTail = new List<string> { "-c:a", "aac", "-b:a", "96k", "-metadata", "comment=" + comment, "-movflags", "+faststart", "-progress", "pipe:1", "-nostats", tempPath };
+            bool videoProgress = caps["videoEncodeProgress"]?.Value<bool>() == true;
+            var commonTail = new List<string> { "-c:a", "aac", "-b:a", "96k", "-metadata", "comment=" + comment, "-movflags", "+faststart", "-nostats" };
+            // encoded video timestamps arrive even when an audio track holds up the muxer.
+            commonTail.AddRange(videoProgress
+                ? new[] { "-stats_enc_post:v:0", "pipe:1", "-stats_enc_post_fmt:v:0", "{dt}" }
+                : new[] { "-progress", "pipe:1" });
+            commonTail.Add(tempPath);
             var argv = Combine(commonHead, CompressionProfile.Arguments(pickedEncoder, mode, resources.Workers, resources.FrameThreads), commonTail);
             string resourceLog = CompressionProfile.Software(pickedEncoder)
                 ? " workers=" + resources.Workers + " frameThreads=" + resources.FrameThreads : " hardware";
-            Log.Write("encoder=" + pickedEncoder + " mode=" + mode + resourceLog, "compress", requestId);
+            Log.Write("encoder=" + pickedEncoder + " mode=" + mode + resourceLog + " progress=" + (videoProgress ? "video" : "aggregate"), "compress", requestId);
 
             var psi = new ProcessStartInfo
             {
@@ -114,8 +120,8 @@ namespace ReplayKitHelper
 
             var stderrTask = CompressionOutput.Read(proc.StandardError, proc);
 
-            // pull progress from stdout line-by-line. -progress pipe:1 makes ffmpeg flush each progress block to stdout immediately, so each readline returns within ~1s of the actual encode position -- the alternative (-progress <file>) goes thru the os page cache and can lag arbitrarily on windows. strictly matches out_time_us= (microseconds); out_time_ms= was changed from milliseconds to microseconds in ffmpeg 5.x and is inconsistent across builds, so its never trusted.
-            double durationUs = Math.Max(1.0, durationSec * 1000000.0);
+            const string aggregateTime = "out_time_us=";
+            double progressDuration = videoProgress ? durationSec : durationSec * 1000000.0;
             int lastReportedPct = 1;
             int linesSeen = 0;
             try
@@ -124,19 +130,17 @@ namespace ReplayKitHelper
                 while ((line = proc.StandardOutput.ReadLine()) != null)
                 {
                     linesSeen++;
-                    if (line.StartsWith("out_time_us="))
+                    if (!videoProgress)
                     {
-                        string valStr = line.Substring(12);
-                        if (double.TryParse(valStr, NumberStyles.Float, CultureInfo.InvariantCulture, out double us))
-                        {
-                            int pct = (int)Math.Floor(2 + (94.0 * Math.Min(1.0, us / durationUs)));
-                            if (pct != lastReportedPct)
-                            {
-                                lastReportedPct = pct;
-                                UploadState.SetUploadState(requestId: requestId, state: "compressing", phase: "compressing", percent: pct);
-                            }
-                        }
+                        if (!line.StartsWith(aggregateTime, StringComparison.Ordinal)) continue;
+                        line = line.Substring(aggregateTime.Length);
                     }
+                    if (!double.TryParse(line, NumberStyles.Float, CultureInfo.InvariantCulture, out double position) ||
+                        !(position > 0) || double.IsInfinity(position)) continue;
+                    int pct = (int)Math.Floor(2 + 94.0 * Math.Min(1.0, position / progressDuration));
+                    if (pct <= lastReportedPct) continue;
+                    lastReportedPct = pct;
+                    UploadState.SetUploadState(requestId: requestId, state: "compressing", phase: "compressing", percent: pct);
                 }
             }
             catch (IOException ex)

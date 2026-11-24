@@ -587,6 +587,10 @@
     "source": "2f28f51974465aa4",
     "text": "Área de trabalho"
   },
+  "clips.deletingDraft": {
+    "source": "49ea7967003c1156",
+    "text": "Excluindo rascunho..."
+  },
   "clips.draftDeleted": {
     "source": "f21ddd4fdd50fc53",
     "text": "Rascunho excluído"
@@ -602,6 +606,10 @@
   "clips.dragToResizeCardsDoubleClick": {
     "source": "96a8558cd8d63741",
     "text": "Arraste para redimensionar os cartões, clique duas vezes para redefinir"
+  },
+  "clips.duplicatingClip": {
+    "source": "2dcdc220a9a78fab",
+    "text": "Duplicando clipe..."
   },
   "clips.duplicateFailedError": {
     "source": "6f966f2f9135fd1d",
@@ -1128,8 +1136,8 @@
     "text": "{name} (definido por você)"
   },
   "clips.namesCanTContainChars": {
-    "source": "779b980113974f3b",
-    "text": "Nomes não podem conter {chars}"
+    "source": "ab26fb399c3193b9",
+    "text": "O Windows não permite {chars} em nomes de arquivo."
   },
   "clips.newest": {
     "source": "8f9a7eb746403b26",
@@ -5420,8 +5428,8 @@
     "text": "Início do corte"
   },
   "editor.trimTheAudioWithTheVideo": {
-    "source": "1f8fe14f9e694c75",
-    "text": "Cortar o áudio junto com o vídeo"
+    "source": "378c82dbae6c8041",
+    "text": "Agrupar faixas"
   },
   "editor.trimTimeline": {
     "source": "68c7674a298d8fbd",

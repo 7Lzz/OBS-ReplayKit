@@ -200,6 +200,7 @@ window.RKScreenshots = {
       input.addEventListener("click", event => event.stopPropagation());
       input.addEventListener("keydown", event => {
         event.stopPropagation();
+        if (event.isComposing) return;
         if (event.key === "Enter") { event.preventDefault(); commit(true); }
         if (event.key === "Escape") { event.preventDefault(); if (!saving) { settled = true; back(); } }
       });

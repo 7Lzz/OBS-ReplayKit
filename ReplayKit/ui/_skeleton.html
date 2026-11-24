@@ -2,7 +2,7 @@
 <style>
   /* a wave that runs left to right across every block at once, slow and steady, which reads as a shorter wait than a pulse; each block moves its own highlight on the compositor by where the block sits (--x), so the blocks show one wave between them, and draw() sets its length and its phase from the clock, so the placeholders of the shell and of a page line up as one wave */
   .rk-skel-layer, .rk-skel-wave { --rk-skel-band:360px; }
-  .rk-skel-layer { position:fixed; inset:0; z-index:30; pointer-events:none; animation:rk-skel-in 160ms var(--ease_smooth, ease) backwards; }
+  .rk-skel-layer { position:fixed; inset:0; z-index:30; overflow:clip; pointer-events:none; animation:rk-skel-in 160ms var(--ease_smooth, ease) backwards; }
   /* opacity and not visibility, since a card or a menu that sets its own visibility would show thru a hidden parent */
   .rk-skel-hidden { opacity:0 !important; pointer-events:none !important; }
   /* the blocks are one svg and not boxes: an svg counts as content to the browser and coloured boxes do not, and a page that has painted no content yet is held off the screen for about half a second after it loads (the shell page after a sleep), so a placeholder made of boxes never showed. only the wave over each block is a box */
@@ -215,7 +215,7 @@
   function pageKey(c) { return (c.embedded ? "" : "window:") + viewKey(c.view, c.variant); }
 
   function loadView(name, variant, win) {
-    return loadSized(viewKey(name, variant), win || window);
+    return load(viewKey(name, variant), win);
   }
 
   function loadingMap(name, variant) {
@@ -227,7 +227,7 @@
   // what goes over root: inside the obs window the shape the shell keeps for this view when it was taken at this very size, so the placeholder does not move when the page takes over from the shell; otherwise root measured with the stand-ins of stage, which puts content that is not there yet into the page and returns how to take it out again (measured and gone before anything else on the page runs)
   function drawCover(c) {
     var win = c.root.ownerDocument.defaultView;
-    var kept = c.view ? loadSized(pageKey(c), win) : null;
+    var kept = c.view ? load(pageKey(c), win) : null;
     if (kept) {
       var r = c.root.getBoundingClientRect();
       c.map = kept;
@@ -240,7 +240,7 @@
       c.layer.textContent = "";
       return;
     }
-    var undo = c.stage ? c.stage() : null;
+    var undo = !c.ready && c.stage ? c.stage() : null;
     try { c.map = measure(c.root); draw(c.layer, c.map); }
     finally { if (typeof undo === "function") undo(); }
   }
@@ -269,8 +269,8 @@
   // the page comes back: at once when its placeholder never came up, otherwise after the placeholder has been up for MIN_SHOWN_MS, with the page fading in as the placeholder fades out over it
   function uncover(root) {
     var c = coverOf(root);
-    if (!c) return;
-    covers.splice(covers.indexOf(c), 1);
+    if (!c || c.ready) return;
+    c.ready = true;
     var shownAt = c.at + c.delay;
     var now = performance.now();
     if (now < shownAt || !c.layer.animate) { reveal(c, false); return; }
@@ -278,6 +278,7 @@
   }
 
   function reveal(c, fade) {
+    covers.splice(covers.indexOf(c), 1);
     c.root.classList.remove("rk-skel-hidden");
     c.root.removeAttribute("aria-busy");
     function finish() {
@@ -312,14 +313,11 @@
     try { localStorage.setItem(STORE + key, JSON.stringify({ v:MAP_VERSION, maps:maps.slice(0, KEPT_SIZES) })); } catch (_) {}
   }
   // the shape kept for this very size of the window, or none, since a page laid out at another size has other rows
-  function loadSized(key, win) {
+  function load(key, win) {
+    win = win || window;
     var maps = keptMaps(key);
     for (var i = 0; i < maps.length; i++) if (maps[i].b.length && maps[i].w === win.innerWidth && maps[i].h === win.innerHeight) return maps[i];
     return null;
-  }
-  // the shape kept for this size, else the newest of any size, which draw() stretches to the width
-  function load(key, win) {
-    return loadSized(key, win || window) || keptMaps(key)[0] || null;
   }
 
   // a page is kept only at the top of every list it scrolls and with nothing open over it, the state it loads in

@@ -70,6 +70,8 @@ namespace ReplayKitHelper
         private const int MaxLanes = 8;
         private const int MaxSegments = 200;
         private const int MaxParts = 8;
+        // source cuts in editor plans are rounded to milliseconds
+        private const double MinPartLength = 0.0005;
         private static readonly Regex UnsafeLabel = new Regex(@"[^A-Za-z0-9 _.()&\-]", RegexOptions.Compiled);
 
         public List<Lane> Lanes = new List<Lane>();
@@ -144,7 +146,7 @@ namespace ReplayKitHelper
                         };
                         valid = valid && part.Src >= 0 && (part.Src < audioCount || plan.Imports.Any(i => i.Src == part.Src))
                             && Finite(part.SrcStart) && Finite(part.SrcEnd) && Finite(part.Off) && Finite(part.Gain)
-                            && part.SrcStart >= 0 && part.SrcEnd - part.SrcStart >= 0.01 && part.SrcEnd <= 86400
+                            && part.SrcStart >= 0 && part.Length >= MinPartLength && part.SrcEnd <= 86400
                             && part.Off >= 0 && part.Off <= 86400 && part.Gain >= 0 && part.Gain <= 4;
                         seg.Parts.Add(part);
                     }

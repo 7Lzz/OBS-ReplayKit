@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html><head>
+<!--#include progress-motion-->
 <!--#include editor-fx-->
 <!--#include transform-readout-->
 <!--#include shortcut-key-->
@@ -38,7 +39,7 @@
         </div>
       </header>
       <div class="editor-body">
-        <div class="modal-veil render-veil" id="render-veil">
+        <div class="modal-veil render-veil modal-motion" id="render-veil" data-skel="skip" inert>
           <div class="modal render-modal" id="render-modal" role="dialog" aria-modal="true" aria-labelledby="render-title">
             <h2 id="render-title" data-i18n="editor.renderSettings"></h2>
             <div class="render-label" id="render-res-label" data-i18n="editor.resolution"></div>
@@ -184,12 +185,12 @@
     </div>
   </div>
 
-  <div class="modal-veil" id="save-veil">
+  <div class="modal-veil modal-motion" id="save-veil" inert>
     <div class="modal save-modal" id="save-modal" role="alertdialog" aria-modal="true" aria-labelledby="save-title" aria-describedby="save-note">
       <h2 id="save-title" data-i18n="editor.savingACopy"></h2>
       <div class="clip-name" id="save-clip-name" translate="no"></div>
       <div class="save-track is-waiting" id="save-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="save-fill" id="save-fill"></div></div>
-      <div class="save-line"><span id="save-stage" data-i18n="editor.starting"></span><span class="save-percent" id="save-percent"></span></div>
+      <div class="save-line"><span id="save-stage" role="status" data-i18n="editor.starting"></span><span class="save-percent" id="save-percent"></span></div>
       <div class="body save-note" id="save-note" data-i18n="editor.editingIsLockedUntilThisIs"></div>
       <div class="row"><button class="btn" type="button" id="save-cancel" data-i18n="editor.cancelSave"></button></div>
     </div>
@@ -400,7 +401,7 @@ window.__rkEditorApi = (function () {
       try { trimVideo.pause(); } catch {}
       trimVideo.currentTime = getPlayBounds().start;
     },
-    isOpen: () => trimVeil.classList.contains("is-open"),
+    isOpen: canEditTimeline,
     master: () => (recordingQuiet || VolumeState.muted ? 0 : VolumeState.volume),
     // the presets of subtitles light the one in use, so a change of style is drawn there too
     onSubtitles: () => { if (editorTools) editorTools.refresh(); if (editorFx) editorFx.refresh(); },
@@ -562,10 +563,12 @@ window.__rkEditorApi = (function () {
   // while the user previews the trimmed window, this caps playback at the end handle so the video loops the selection instead of playing out the entire source.
   let trimPreviewActive = false;
   let trimSourceClip = null;
+  let trimSession = null;
   let trimRenaming = false;
   // the save that is running, or null: the editor cannot be closed or changed while there is one
   // the draft of the open editor: armed once the editor is up, and what was last sent, so an edit that did not change is not sent again
   let trimDraftArmed = false;
+  let trimDraftSaved = false;
   let trimDraftTimer = 0;
   let trimDraftSent = "";
   let trimDraftPending = null;
@@ -577,10 +580,7 @@ window.__rkEditorApi = (function () {
   let trimSnapRequestSeq = 0;
   let trimSnapSkipped = false;
   let trimThumbnailRequestSeq = 0;
-  let trimTimelineScrubbing = false;
-  let trimPlayerScrubbing = false;
-  // true if trimVideo was mid-playback when a drag-scrub started, so it can resume on release instead of staying paused
-  let trimScrubResumePlay = false;
+  let trimScrub = null;
   // last time trimVideo actually advanced while it should have been playing -- a range request that fails mid-scrub doesnt reliably fire a JS-visible error on an already-loading video, it just stops advancing and sits on its last decoded frame since <video> never retries a failed range request on its own, so its watched on a timer below rather than off network events.
   let trimLastProgressAt = 0;
   let trimStallRecovering = false;
@@ -718,6 +718,7 @@ window.__rkEditorApi = (function () {
     for (let i = 0; i < film.frames.length; i++) {
       if (requestSeq !== trimThumbnailRequestSeq || !trimSourceClip) return;
       film.frames[i].ok = await captureTrimFrame(film.frames[i].canvas, film.frames[i].t, requestSeq);
+      if (requestSeq !== trimThumbnailRequestSeq) return;
       if (onProgress) onProgress(i + 1, film.frames.length);
       trimLanes.setFilmstrip(film);
     }
@@ -726,7 +727,15 @@ window.__rkEditorApi = (function () {
   }
 
   function trimDuration() {
-    return Math.max(0, Number(trimEnd.value) - Number(trimStart.value));
+    const { start, end } = trimLanes.windowBounds() || getTrimBounds();
+    return Math.max(0, end - start) / trimLanes.videoSpeed();
+  }
+
+  function canEditTimeline() {
+    return trimVeil.classList.contains("is-open") && !trimVeil.inert &&
+      !trimSaving && !trimRenaming && !trimDraftLeaving &&
+      !renderVeil.classList.contains("is-open") && !popupVeil.classList.contains("is-open") &&
+      !document.querySelector(".ed-lib-veil:not([hidden])");
   }
 
   function getTrimBounds() {
@@ -738,7 +747,8 @@ window.__rkEditorApi = (function () {
 
   // what the preview plays between: the cut, or while the timeline plays by itself the saved clip, which may reach past the video on either side
   function getPlayBounds() {
-    return trimLanes.windowBounds() || getTrimBounds();
+    const saved = trimLanes.windowBounds();
+    return saved ? { start: 0, end: saved.end } : getTrimBounds();
   }
 
   function clampTrimPreviewTime(time) {
@@ -746,10 +756,10 @@ window.__rkEditorApi = (function () {
     return Math.max(start, Math.min(end, Number(time) || start));
   }
 
-  // what the player counts: the video, or while the timeline plays by itself the saved clip, which may reach past the video on either side
+  // the player counts from zero through the end of the edited timeline
   function playSpan() {
     const saved = trimLanes.windowBounds();
-    if (saved) return saved;
+    if (saved) return { start: 0, end: saved.end };
     return { start: 0, end: Math.max(0, Number(trimVideo.duration) || Number(trimSeek.max) || 0) };
   }
 
@@ -758,10 +768,11 @@ window.__rkEditorApi = (function () {
     return Math.max(span.start, Math.min(span.end, Number(time) || 0));
   }
 
-  // fastseek() is the right primitive for scrubbing: it returns immediately and the browser decodes the nearest seekable point. plain currenttime= forces a precise decode which lags noticeably while the user is dragging. fall back to currenttime when fastseek isnt availible.
+  // the virtual timeline always seeks through its own clock
   function previewSeek(t, stayInTrimRange) {
     if (!isFinite(t)) return;
     t = stayInTrimRange === false ? clampVideoTime(t) : clampTrimPreviewTime(t);
+    if (t === 0 || trimLanes.windowBounds()) { trimVideo.currentTime = t; return; }
     if (trimVideo.fastSeek) {
       try { trimVideo.fastSeek(t); return; } catch {}
     }
@@ -771,9 +782,8 @@ window.__rkEditorApi = (function () {
   function updateSeekFill() {
     const saved = trimLanes.windowBounds();
     if (saved) {
-      const length = saved.end - saved.start;
-      const at = Math.max(saved.start, Math.min(saved.end, Number(trimVideo.currentTime) || 0));
-      trimSeekFill.style.width = length > 0 ? (((at - saved.start) / length) * 100) + "%" : "0%";
+      const at = clampVideoTime(trimScrub?.target ?? trimVideo.currentTime);
+      trimSeekFill.style.width = saved.end > 0 ? ((at / saved.end) * 100) + "%" : "0%";
       return;
     }
     const min = Number(trimSeek.min) || 0;
@@ -784,22 +794,87 @@ window.__rkEditorApi = (function () {
     trimSeekFill.style.width = (((value - min) / span) * 100) + "%";
   }
 
-  // exact same progress-bar interaction as clip cards, but it moves the editor playhead instead of a hover-preview loop. the hidden input keeps the existing trim playback and keyboard code using one source of truth without putting a permanent native thumb on screen.
-  function scrubTrimPlayer(clientX) {
-    if (!trimProgressBar) return;
+  function trimPlayerTimeAt(clientX) {
     const rect = trimProgressBar.getBoundingClientRect();
     const span = playSpan();
     const duration = span.end - span.start;
-    if (!(duration > 0) || rect.width <= 0) return;
+    if (!(duration > 0) || rect.width <= 0) return null;
     const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-    const time = span.start + ratio * duration;
-    trimPreviewActive = false;
-    // no pause here -- it fires on every pointermove during a drag. the pointerdown handler below pauses once (if it was playing) and the pointerup/cancel handler resumes it, so skipping never leaves playback stuck paused.
-    previewSeek(time, false);
+    return span.start + ratio * duration;
+  }
+
+  function paintTrimScrub(time) {
     trimSeek.value = String(time);
     updateSeekFill();
     updateTrimPlayhead();
     syncTrimTimeDisplay();
+  }
+
+  function drawTrimScrub() {
+    const scrub = trimScrub;
+    if (!scrub) return;
+    scrub.frame = 0;
+    if (scrub.shown !== scrub.target) {
+      scrub.shown = scrub.target;
+      paintTrimScrub(scrub.target);
+    }
+    if (scrub.sent === scrub.target) return;
+    const picture = trimLanes.pictureAt(scrub.target);
+    const decoder = trimVideo.rkPicture || trimVideo;
+    // let a seek finish before starting another on that source, keeping only the latest position
+    if (!picture || picture.ref !== scrub.ref || !decoder.seeking) {
+      scrub.ref = picture?.ref;
+      scrub.sent = scrub.target;
+      previewSeek(scrub.target, false);
+    } else scrub.frame = requestAnimationFrame(drawTrimScrub);
+  }
+
+  function endTrimScrub(commit) {
+    const scrub = trimScrub;
+    if (!scrub) return;
+    trimScrub = null;
+    cancelAnimationFrame(scrub.frame);
+    scrub.surface.classList.remove("is-scrubbing");
+    if (scrub.surface.hasPointerCapture(scrub.pointer)) scrub.surface.releasePointerCapture(scrub.pointer);
+    if (!commit) return;
+    if (scrub.sent !== scrub.target || (trimVideo.fastSeek && !trimLanes.windowBounds())) trimVideo.currentTime = scrub.target;
+    paintTrimScrub(scrub.target);
+    if (scrub.resume && !editorHeldAway && !document.hidden) trimVideo.play().catch(() => {});
+  }
+
+  function bindTrimScrubber(surface, timeAt) {
+    if (!surface) return;
+    function move(clientX) {
+      const target = timeAt(clientX);
+      if (target === null) return;
+      trimScrub.target = target;
+      if (!trimScrub.frame) trimScrub.frame = requestAnimationFrame(drawTrimScrub);
+    }
+    function owns(event) { return trimScrub?.surface === surface && trimScrub.pointer === event.pointerId; }
+    surface.addEventListener("pointerdown", (event) => {
+      if (event.button !== 0 || !trimSourceClip || trimScrub) return;
+      const target = timeAt(event.clientX);
+      if (target === null) return;
+      event.preventDefault();
+      trimPreviewActive = false;
+      const resume = !trimVideo.paused;
+      trimScrub = { surface, pointer:event.pointerId, resume, target, frame:0 };
+      if (resume) trimVideo.pause();
+      if (trimHoverFrame) trimHoverFrame.drop();
+      if (trimProgressHover) trimProgressHover.style.width = "0%";
+      surface.classList.add("is-scrubbing");
+      try { surface.setPointerCapture(event.pointerId); } catch {}
+      trimScrub.frame = requestAnimationFrame(drawTrimScrub);
+    });
+    surface.addEventListener("pointermove", (event) => {
+      if (owns(event)) move(event.clientX);
+    });
+    function finish(event) {
+      if (!owns(event)) return;
+      if (event.type === "pointerup") trimScrub.target = timeAt(event.clientX) ?? trimScrub.target;
+      endTrimScrub(true);
+    }
+    ["pointerup", "pointercancel", "lostpointercapture"].forEach((name) => surface.addEventListener(name, finish));
   }
 
   // the frame preview over the bar, the same one as the big player of a clip; it shows what the player would show at the cursor, through the pieces of the video, which may come from other clips or leave the picture black
@@ -824,35 +899,14 @@ window.__rkEditorApi = (function () {
   }
 
   if (trimProgressBar) {
-    trimProgressBar.addEventListener("pointerdown", (e) => {
-      e.preventDefault();
-      trimPlayerScrubbing = true;
-      // pause for the drag (still frame per position instead of racing playback), resumed in stopTrimPlayerScrub if it was actually playing
-      trimScrubResumePlay = !trimVideo.paused;
-      if (trimScrubResumePlay) { try { trimVideo.pause(); } catch {} }
-      trimProgressBar.classList.add("is-scrubbing");
-      try { trimProgressBar.setPointerCapture(e.pointerId); } catch (_) {}
-      scrubTrimPlayer(e.clientX);
-      updateTrimProgressHover(e.clientX);
-    });
+    bindTrimScrubber(trimProgressBar, trimPlayerTimeAt);
     trimProgressBar.addEventListener("pointermove", (e) => {
-      if (trimPlayerScrubbing) scrubTrimPlayer(e.clientX);
-      updateTrimProgressHover(e.clientX);
+      if (!trimScrub) updateTrimProgressHover(e.clientX);
     });
     trimProgressBar.addEventListener("pointerleave", () => {
-      if (trimPlayerScrubbing) return;
       if (trimProgressHover) trimProgressHover.style.width = "0%";
       if (trimHoverFrame) trimHoverFrame.hide();
     });
-    const stopTrimPlayerScrub = (e) => {
-      trimPlayerScrubbing = false;
-      trimProgressBar.classList.remove("is-scrubbing");
-      try { trimProgressBar.releasePointerCapture(e.pointerId); } catch (_) {}
-      if (trimScrubResumePlay) { trimScrubResumePlay = false; trimVideo.play().catch(() => {}); }
-      if (trimHoverFrame && !trimProgressBar.matches(":hover")) trimHoverFrame.hide();
-    };
-    trimProgressBar.addEventListener("pointerup", stopTrimPlayerScrub);
-    trimProgressBar.addEventListener("pointercancel", stopTrimPlayerScrub);
   }
 
   function updateTrimPlayhead() {
@@ -860,55 +914,27 @@ window.__rkEditorApi = (function () {
     const max = Number(trimSeek.max) || Number(trimVideo.duration) || 0;
     const value = Math.max(0, Math.min(max, Number(trimSeek.value) || 0));
     // while the timeline plays by itself the playhead may be in the room made for the pieces that reach past the video
-    const ratio = max > 0 ? (trimLanes.windowBounds() ? (Number(trimVideo.currentTime) || 0) : value) / max : 0;
+    const time = trimScrub?.target ?? (trimLanes.windowBounds() ? (Number(trimVideo.currentTime) || 0) : value);
+    const ratio = max > 0 ? time / max : 0;
     trimPlayhead.style.left = (ratio * 100) + "%";
     trimPlayhead.dataset.time = fmtTimelineTime(ratio * max / trimLanes.videoSpeed());
     trimPlayhead.classList.toggle("is-at-start", ratio < 0.035);
     trimPlayhead.classList.toggle("is-at-end", ratio > 0.965);
-    trimLanes.setPlayhead(value);
+    trimLanes.setPlayhead(time);
   }
 
   // keep the playhead independent from the cut handles. the timeline is a normal editor scrub surface: click or drag the frames to inspect a moment, then only move a handle when that is the edit you intend.
-  function scrubTrimTimeline(clientX) {
-    if (!trimFilmstrip) return;
+  function trimTimelineTimeAt(clientX) {
+    if (!trimFilmstrip) return null;
     const rect = trimFilmstrip.getBoundingClientRect();
     const max = Number(trimSeek.max) || Number(trimVideo.duration) || 0;
-    if (!(max > 0) || rect.width <= 0) return;
-    const saved = trimLanes.windowBounds();
+    if (!(max > 0) || rect.width <= 0) return null;
     const ratio = (clientX - rect.left) / rect.width;
-    const time = saved ? Math.max(saved.start, Math.min(saved.end, ratio * max)) : Math.max(0, Math.min(1, ratio)) * max;
-    trimPreviewActive = false;
-    // no pause here -- same reasoning as scrubTrimPlayer above, this also runs on every pointermove during the drag.
-    previewSeek(time, false);
-    trimSeek.value = String(time);
-    updateSeekFill();
-    updateTrimPlayhead();
+    return clampVideoTime(ratio * max);
   }
 
   // the ruler and the strip of room between the ruler and the first track both scrub the timeline
-  [trimScrubber, trimScrubberGap].forEach((scrubber) => {
-    if (!scrubber) return;
-    scrubber.addEventListener("pointerdown", (e) => {
-      if (!trimSourceClip) return;
-      e.preventDefault();
-      trimTimelineScrubbing = true;
-      // pause for the drag (still frame per position instead of racing playback), resumed in stopTimelineScrub if it was actually playing
-      trimScrubResumePlay = !trimVideo.paused;
-      if (trimScrubResumePlay) { try { trimVideo.pause(); } catch {} }
-      try { scrubber.setPointerCapture(e.pointerId); } catch (_) {}
-      scrubTrimTimeline(e.clientX);
-    });
-    scrubber.addEventListener("pointermove", (e) => {
-      if (trimTimelineScrubbing) scrubTrimTimeline(e.clientX);
-    });
-    const stopTimelineScrub = (e) => {
-      trimTimelineScrubbing = false;
-      try { scrubber.releasePointerCapture(e.pointerId); } catch (_) {}
-      if (trimScrubResumePlay) { trimScrubResumePlay = false; trimVideo.play().catch(() => {}); }
-    };
-    scrubber.addEventListener("pointerup", stopTimelineScrub);
-    scrubber.addEventListener("pointercancel", stopTimelineScrub);
-  });
+  [trimScrubber, trimScrubberGap].forEach((scrubber) => bindTrimScrubber(scrubber, trimTimelineTimeAt));
 
   function resetTrimSnapPoints() {
     trimSnapPoints = [];
@@ -1181,7 +1207,7 @@ window.__rkEditorApi = (function () {
       if (trimOutsideStart) trimOutsideStart.style.width = "0%";
       if (trimOutsideEnd) trimOutsideEnd.style.width = "0%";
     }
-    const valid = (e - s) >= TRIM_MIN_SECONDS;
+    const valid = trimDuration() >= TRIM_MIN_SECONDS;
     const importing = trimLanes.busy();
     const free = !trimSaving && !trimRenaming && !importing;
     trimRender.disabled = !valid || !free;
@@ -1200,9 +1226,8 @@ window.__rkEditorApi = (function () {
   }
 
   function syncTrimTimeDisplay() {
-    const saved = trimLanes.windowBounds();
-    const duration = saved ? saved.end - saved.start : Number(trimVideo.duration) || Number(trimSeek.max) || 0;
-    const current = (trimVideo.currentTime || 0) - (saved ? saved.start : 0);
+    const duration = playSpan().end;
+    const current = trimScrub?.target ?? (trimVideo.currentTime || 0);
     const rate = trimLanes.videoSpeed();
     if (trimTotalTime) trimTotalTime.textContent = formatDuration(duration / rate);
     if (trimCurrentTime) trimCurrentTime.textContent = formatDuration(current / rate) || "0:00";
@@ -1239,9 +1264,12 @@ window.__rkEditorApi = (function () {
 
 
   function openTrimModal(clip) {
-    if (!clip || !clip.name || trimSaving || trimDraftLeaving) return;
-    // the real editor stays closed and this stands in for it until onMeta below fires -- popping the actual trim-veil open early would show stale slider positions and an unloaded video (left over from whatever clip was edited last) for a beat before they snap to the right values.
-    trimProcessingVeil.classList.add("is-open");
+    if (!clip || !clip.name || trimSaving || trimRenaming || trimDraftLeaving) return;
+    trimSession?.abort();
+    trimSession = new AbortController();
+    const signal = trimSession.signal;
+    // the processing veil stays up until the timeline and any saved draft are ready
+    setPopupOpen(trimProcessingVeil, true);
     trimVeil.classList.add("is-measuring");
     // a grid cards hover-preview video is tracked independently of trimVideo and nothing here used to stop it -- if the pointer was still over a card when Edit was clicked, that cards <video> kept streaming right alongside trimVideo, uncoordinated and sometimes hitting the same file; the old single-threaded helper mostly hid this, but the multithreaded one can actually run both requests at once, which was driving the intermittent stuck-preview freeze.
     if (activePreview) {
@@ -1252,8 +1280,9 @@ window.__rkEditorApi = (function () {
     const settingsReady = loadReplayKitSettings();
     trimSourceClip = clip;
     // a draft that was kept for this clip is read while the clip loads
-    const draftPromise = hasDraft(clip.name) ? fetchDraft(clip.name) : Promise.resolve(null);
+    const draftPromise = fetchDraft(clip.name, signal);
     trimDraftArmed = false;
+    trimDraftSaved = false;
     trimDraftSent = "";
     trimDraftPending = null;
     trimLanes.resetZoom();
@@ -1279,13 +1308,19 @@ window.__rkEditorApi = (function () {
     syncTrimTimeDisplay();
     syncTrimFullscreenIcon();
     // wait for metadata so we know the real duration before sizing the sliders. the /file endpoint serves range requests, so preload metadata is cheap (a few kb of moov atom, not the whole clip). v=mtime cache-busts; matches the per-card preview url.
-    trimVideo.src = clipPreviewUrlFor(clip);
-    trimVideo.currentTime = 0;
-    const onMeta = async () => {
+    const failOpen = (message) => {
+      if (signal.aborted) return;
+      closeTrimModal();
+      showToast(escapeHtml(message), "bad", RK_M("common.editor"));
+      scheduleToastHide(TOAST_ERROR_MS);
+    };
+    const onError = () => failOpen(RK_M("editor.theVideoOfTheClipCould"));
+    async function prepare() {
       await settingsReady;
-      if (trimSourceClip !== clip) return;
+      if (signal.aborted) return;
       trimPrecise.checked = true;
-      const dur = isFinite(trimVideo.duration) ? trimVideo.duration : 0;
+      const dur = trimVideo.duration;
+      if (!Number.isFinite(dur) || dur <= 0) { failOpen(RK_M("editor.clipLengthCouldNotBeRead")); return; }
       trimStart.min = trimEnd.min = trimSeek.min = "0";
       trimStart.max = trimEnd.max = trimSeek.max = String(dur);
       trimStart.value = "0";
@@ -1300,7 +1335,7 @@ window.__rkEditorApi = (function () {
         trimProcessingStage.textContent = RK_M("editor.buildingThePreviewDoneTotal", { done: done, total: total });
       });
       const lanesPromise = trimLanes.load(clip.name, {
-        stage: (text) => { if (trimSourceClip === clip) trimProcessingStage.textContent = text; },
+        stage: (text) => { if (!signal.aborted) trimProcessingStage.textContent = text; },
         note: (text) => showToast(escapeHtml(text), "bad", RK_M("editor.theAudioCouldNotBeLoaded")),
       });
       editorTools.prepare();
@@ -1311,7 +1346,7 @@ window.__rkEditorApi = (function () {
       }
       await Promise.all([filmstripPromise.catch(() => {}), lanesPromise.catch(() => false)]);
       // the user couldve cancelled (or opened a different clip) while the parts above were in flight -- dont pop the menu open behind them at that point.
-      if (trimSourceClip !== clip) return;
+      if (signal.aborted) return;
       trimSeek.value = "0";
       updateSeekFill();
       trimLanes.refresh();
@@ -1322,25 +1357,29 @@ window.__rkEditorApi = (function () {
       // an edit that was kept for this clip goes back before the editor shows, as one step that undo can take back
       let restored = false;
       let corrected = false;
-      const draft = await draftPromise;
+      const { draft, error } = await draftPromise;
+      if (signal.aborted) return;
+      if (error) { failOpen(error); return; }
       if (draft) {
         trimProcessingStage.textContent = RK_M("editor.puttingYourEditsBack");
         const snap = draft.edit?.snap;
         const refs = [...(snap?.vsegs || []), ...(snap?.layers || []).filter((v) => v.kind === "clip")].map((v) => v.ref).filter(Boolean);
         try { if (refs.length) await protectEditorSources([...new Set(refs)]); }
-        catch (err) { closeTrimModal(); showToast(escapeHtml(err.message), "bad", RK_M("common.editor")); return; }
-        if (trimSourceClip !== clip) return;
-        const result = await restoreTrimDraft(clip, draft, dur);
+        catch (err) { failOpen(err.message); return; }
+        if (signal.aborted) return;
+        const result = await restoreTrimDraft(clip, draft, dur, signal);
+        if (signal.aborted) return;
         restored = !!result;
         corrected = !!(result && result.corrected);
-        if (trimSourceClip !== clip) return;
       }
-      trimProcessingVeil.classList.remove("is-open");
+      trimVideo.removeEventListener("error", onError);
       trimVeil.classList.remove("is-measuring");
       trimVeil.classList.add("is-open");
+      setPopupOpen(trimProcessingVeil, false);
       // the snap marks were already computed above while the trim bar was still display:none (0 width, so pickVisibleTrimSnapMarks drew nothing even though snapping is active) -- now that the bar actually has real layout, redraw them for real.
       renderTrimSnapMarks();
       trimDraftSent = restored && !corrected ? JSON.stringify(buildTrimDraft()) : "";
+      trimDraftSaved = restored;
       trimDraftArmed = true;
       if (corrected) scheduleTrimDraft();
       if (restored) {
@@ -1348,25 +1387,35 @@ window.__rkEditorApi = (function () {
         scheduleToastHide(3200);
       }
       if (replayKitSettings.editorAutoplay && !editorHeldAway && !document.hidden) togglePlayback();
-    };
-    trimVideo.addEventListener("loadedmetadata", onMeta, { once: true });
+    }
+    trimVideo.addEventListener("loadedmetadata", () => {
+      prepare().catch(() => failOpen(RK_M("clips.theEditorCouldNotBeLoaded")));
+    }, { once: true, signal });
+    trimVideo.addEventListener("error", onError, { once: true, signal });
+    trimVideo.src = clipPreviewUrlFor(clip);
+    trimVideo.currentTime = 0;
   }
 
   function closeTrimModal() {
     // a save in progress keeps the editor up, and the save closes it when the file is written
     if (trimSaving || trimRenaming || trimDraftLeaving) return false;
+    cancelEditorLoading();
+    trimSession?.abort();
+    trimSession = null;
+    endTrimScrub(false);
+    trimLanes.cancelDrag();
     // the edit stays behind as a draft wherever the editor is left from: the cancel button, escape, another view, a closed obs
-    const kept = keepTrimDraft();
+    keepTrimDraft();
+    clearTimeout(trimDraftNoteTimer);
+    trimDraftNoteTimer = 0;
+    trimDraftNote.classList.remove("is-shown");
     editorTools.closed();
     trimLanes.unload();
     if (editorFx) editorFx.reset();
-    trimProcessingVeil.classList.remove("is-open");
+    setPopupOpen(trimProcessingVeil, false);
     trimVeil.classList.remove("is-measuring");
     trimVeil.classList.remove("is-open");
     trimPreviewActive = false;
-    trimTimelineScrubbing = false;
-    trimPlayerScrubbing = false;
-    if (trimProgressBar) trimProgressBar.classList.remove("is-scrubbing");
     if (trimHoverFrame) trimHoverFrame.drop();
     closeExitMenu();
     closeRenderSettings();
@@ -1381,7 +1430,7 @@ window.__rkEditorApi = (function () {
     trimThumbnailRequestSeq++;
     resetTrimSnapPoints();
     clearTrimTimeline();
-    return kept;
+    return true;
   }
 
   function clampHandles(activeWasStart) {
@@ -1401,7 +1450,6 @@ window.__rkEditorApi = (function () {
   // moving a trim handle seeks the preview to that cut point without changing the free video playhead behavior.
   trimStart.addEventListener("input", () => {
     snapTrimSelection("start");
-    trimLanes.trimCutEdge("start");
     trimPreviewActive = false;
     try { trimVideo.pause(); } catch {}
     previewSeek(Number(trimStart.value));
@@ -1411,11 +1459,10 @@ window.__rkEditorApi = (function () {
   });
   trimStart.addEventListener("change", () => {
     trimVideo.currentTime = Number(trimStart.value);
-    trimLanes.checkpoint();
+    trimLanes.finishCut();
   });
   trimEnd.addEventListener("input", () => {
     snapTrimSelection("end");
-    trimLanes.trimCutEdge("end");
     trimPreviewActive = false;
     try { trimVideo.pause(); } catch {}
     previewSeek(Number(trimEnd.value));
@@ -1425,10 +1472,11 @@ window.__rkEditorApi = (function () {
   });
   trimEnd.addEventListener("change", () => {
     trimVideo.currentTime = Number(trimEnd.value);
-    trimLanes.checkpoint();
+    trimLanes.finishCut();
   });
   trimRemoveAudio.addEventListener("change", () => {
     trimLanes.setOff(trimRemoveAudio.checked);
+    syncTrimReencodeLock();
     scheduleTrimDraft();
   });
   trimPrecise.addEventListener("change", () => {
@@ -1459,6 +1507,7 @@ window.__rkEditorApi = (function () {
 
   trimVideo.addEventListener("timeupdate", () => {
     trimLastProgressAt = Date.now();
+    if (trimScrub) return;
     const { start, end } = getPlayBounds();
     if (trimPreviewActive && (trimVideo.currentTime < start || trimVideo.currentTime >= end)) {
       if (replayKitSettings.editorLoopPreview && trimVideo.currentTime >= end) {
@@ -1543,7 +1592,7 @@ window.__rkEditorApi = (function () {
 
   // recovers a preview stuck on a frame because the range request it was waiting on failed and nothing retried it -- reloads at the same position instead of leaving the user stuck until they close and reopen the whole modal. guarded by trimStallRecovering so an error event and the watchdog below cant both fire a recovery for the same stall.
   function recoverStalledTrimPreview() {
-    if (trimStallRecovering || !trimSourceClip) return;
+    if (trimStallRecovering || !trimSourceClip || !trimSession) return;
     trimStallRecovering = true;
     const resumeTime = trimVideo.currentTime;
     const wasPreviewing = trimPreviewActive;
@@ -1555,7 +1604,7 @@ window.__rkEditorApi = (function () {
       trimLastProgressAt = Date.now();
       trimStallRecovering = false;
     };
-    trimVideo.addEventListener("loadedmetadata", onRecovered, { once: true });
+    trimVideo.addEventListener("loadedmetadata", onRecovered, { once: true, signal:trimSession.signal });
     // fresh cache-bust, not clip.mtime -- this is specifically forcing a brand new connection rather than any chance of the browser reusing whatever the failed one left behind.
     trimVideo.src = HELPER + "/file/" + encodeURIComponent(clip.name) + "?v=" + Date.now();
   }
@@ -1570,7 +1619,7 @@ window.__rkEditorApi = (function () {
   }, 1000);
   EDITOR_SIGNAL.addEventListener("abort", () => clearInterval(trimStallTimer));
   document.addEventListener("keydown", (e) => {
-    if (!trimVeil.classList.contains("is-open") ||
+    if (!canEditTimeline() ||
         (e.key !== "ArrowLeft" && e.key !== "ArrowRight") ||
         e.ctrlKey || e.altKey || e.metaKey) return;
     const tag = (document.activeElement && document.activeElement.tagName) || "";
@@ -1613,7 +1662,7 @@ window.__rkEditorApi = (function () {
     if (!keep && trimSourceClip) {
       const name = trimSourceClip.name;
       trimDraftArmed = false;
-      if (hasDraft(name) || trimDraftPending) forgetDraft(name);
+      forgetDraft(name);
     }
     if (keep && trimDraftArmed && trimEdited()) {
       trimDraftLeaving = true;
@@ -1665,7 +1714,9 @@ window.__rkEditorApi = (function () {
     input.type = "text";
     input.className = "name-edit-input";
     input.value = base;
+    input.spellcheck = false;
     input.setAttribute("aria-label", RK_M("common.clipName"));
+    RKNameInput.guard(input);
     const extSpan = document.createElement("span");
     extSpan.className = "name-edit-ext";
     extSpan.setAttribute("translate", "no");
@@ -1714,6 +1765,7 @@ window.__rkEditorApi = (function () {
     }
     input.addEventListener("keydown", (e) => {
       e.stopPropagation();
+      if (e.isComposing) return;
       if (e.key === "Enter") { e.preventDefault(); commit(); }
       if (e.key === "Escape") { e.preventDefault(); settled = true; back(); }
     });
@@ -1785,7 +1837,9 @@ window.__rkEditorApi = (function () {
     const name = clip.name;
     if (!trimEdited()) {
       trimDraftSent = "";
-      if (hasDraft(name) || trimDraftPending) forgetDraft(name);
+      // closing an unedited clip must preserve a draft that failed to restore
+      if (trimDraftSaved || trimDraftPending) forgetDraft(name);
+      trimDraftSaved = false;
       trimDraftPending = null;
       return false;
     }
@@ -1793,6 +1847,7 @@ window.__rkEditorApi = (function () {
     const body = JSON.stringify(edit);
     if (body === trimDraftSent) return trimDraftPending || true;
     trimDraftSent = body;
+    const session = trimSession;
     const pending = queueDraftWrite(() => fetch(HELPER + "/drafts/save?file=" + encodeURIComponent(name) + "&t=" + Date.now(), {
       method: "POST",
       cache: "no-store",
@@ -1802,6 +1857,7 @@ window.__rkEditorApi = (function () {
       headers: { "Content-Type": "application/json" },
       body,
     })).then(async (res) => res.ok && (await res.json()).ok === true).catch(() => false).then((saved) => {
+      if (saved && session && trimSession === session && trimDraftSent) trimDraftSaved = true;
       if (trimDraftPending === pending) {
         trimDraftPending = null;
         if (!saved) trimDraftSent = "";
@@ -1814,12 +1870,10 @@ window.__rkEditorApi = (function () {
     return pending;
   }
 
-  // the editor is being left, whichever way: what was changed goes to the helper now. true when something was kept
+  // the editor is being left, whichever way: what was changed goes to the helper now
   function keepTrimDraft() {
-    const wasArmed = trimDraftArmed;
-    const kept = sendTrimDraft(true);
+    sendTrimDraft(true);
     trimDraftArmed = false;
-    return wasArmed && !!kept;
   }
 
   function tellTrimDraftKept() {
@@ -1828,12 +1882,12 @@ window.__rkEditorApi = (function () {
   }
 
   // puts a kept edit into the editor that is loading. a clip that is not the length it was when the edit was kept (it was replaced behind the editor) cannot take it, since the cuts would fall in the wrong places
-  async function restoreTrimDraft(clip, draft, dur) {
+  async function restoreTrimDraft(clip, draft, dur, signal) {
     const edit = draft && draft.edit;
     if (!edit || edit.v !== 1 || !edit.snap) return false;
     if (Math.abs((Number(edit.duration) || 0) - dur) > 0.35) {
-      forgetDraft(clip.name);
-      showToast(RK_M("editor.theDraftOfThisClipWas"), "bad", RK_M("editor.draftDropped"));
+      const removed = await forgetDraft(clip.name);
+      if (removed && !signal.aborted) showToast(RK_M("editor.theDraftOfThisClipWas"), "bad", RK_M("editor.draftDropped"));
       return false;
     }
     trimRemoveAudio.checked = false;
@@ -1841,7 +1895,7 @@ window.__rkEditorApi = (function () {
     trimPrecise.checked = true;
     trimPrecise.dispatchEvent(new Event("change"));
     const result = await trimLanes.applyDraft({ snap: edit.snap, imports: edit.imports });
-    if (trimSourceClip !== clip) return false;
+    if (signal.aborted) return false;
     syncTrimReencodeLock();
     if (!result.ok) {
       showToast(RK_M("editor.theDraftOfThisClipCould"), "bad", RK_M("editor.draftNotRestored"));
@@ -1858,7 +1912,7 @@ window.__rkEditorApi = (function () {
   }
 
   // the save: the editor is locked and a popup follows the encode until the helper answers, so nothing can change under the copy or the new original that is being written
-  const SAVE_QUIET_MS = 300;
+  const SCREENSHOT_POPUP_DELAY_MS = 300;
   const SAVE_POLL_MS = 200;
   const SAVE_POLL_TIMEOUT_MS = 5000;
   // a helper that has said nothing for this long is given up on, so the editor never stays locked for good behind a save nobody is answering
@@ -1871,36 +1925,22 @@ window.__rkEditorApi = (function () {
   function resetSaveFill() {
     if (saveMotion.raf) cancelAnimationFrame(saveMotion.raf);
     Object.assign(saveMotion, { shown: 0, target: 0, vel: 0, raf: 0, lastT: 0 });
+    saveTrack.classList.remove("is-complete");
     saveFill.style.width = "";
   }
 
   function followSaveFill(percent) {
     const m = saveMotion;
-    // the fill only ever moves forward, toward the newest percent
-    if (percent > m.target) m.target = percent;
-    saveFill.style.width = m.shown.toFixed(3) + "%";
+    // the fill only moves toward new measured values, including when decorative motion is off
+    if (percent <= m.target) return;
+    m.target = percent;
     if (m.raf) return;
+    saveFill.style.width = m.shown.toFixed(3) + "%";
     m.lastT = 0;
     const step = (now) => {
-      const dt = m.lastT ? Math.min(0.05, (now - m.lastT) / 1000) : 0.016;
-      m.lastT = now;
-      const omega = 2 / SAVE_SMOOTH_S;
-      const x = omega * dt;
-      const expf = 1 / (1 + x + 0.48 * x * x + 0.235 * x * x * x);
-      const change = m.shown - m.target;
-      const temp = (m.vel + omega * change) * dt;
-      m.vel = (m.vel - omega * temp) * expf;
-      let out = m.target + (change + temp) * expf;
-      if (out > m.target) { out = m.target; m.vel = 0; }
-      m.shown = out;
+      const moving = RKProgress.step(m, now, SAVE_SMOOTH_S);
       saveFill.style.width = m.shown.toFixed(3) + "%";
-      if (m.target - m.shown > 0.08 || m.vel > 0.4) {
-        m.raf = requestAnimationFrame(step);
-      } else {
-        m.shown = m.target;
-        saveFill.style.width = m.shown.toFixed(3) + "%";
-        m.raf = 0;
-      }
+      m.raf = moving ? requestAnimationFrame(step) : 0;
     };
     m.raf = requestAnimationFrame(step);
   }
@@ -1915,8 +1955,9 @@ window.__rkEditorApi = (function () {
     if (known) saveTrack.setAttribute("aria-valuenow", String(percent));
     else saveTrack.removeAttribute("aria-valuenow");
     savePercent.textContent = known ? Math.round(percent) + "%" : "";
-    saveStage.textContent = save.stopping ? RK_M("editor.stopping") : finishing ? RK_M("editor.finishingUp") : save.mode === "screenshot" ? RK_M("editor.renderingScreenshot")
+    const stage = save.stopping ? RK_M("editor.stopping") : finishing ? RK_M("editor.finishingUp") : save.mode === "screenshot" ? RK_M("editor.renderingScreenshot")
       : save.phase === "preparing" ? RK_M("editor.preparingVideo") : !known ? RK_M("editor.startingRender") : save.precise ? RK_M("editor.renderingVideo") : RK_M("editor.cuttingTheClip");
+    if (saveStage.textContent !== stage) saveStage.textContent = stage;
     // once the file is being put in place there is nothing left to take back
     saveCancel.hidden = finishing;
     saveCancel.disabled = save.stopping;
@@ -1924,7 +1965,7 @@ window.__rkEditorApi = (function () {
   }
 
   function beginTrimSave(clipName, mode, precise) {
-    const save = { clipName, mode, precise, requestId: "", percent: 0, phase: "preparing", stopping: false, quietTimer: 0 };
+    const save = { clipName, mode, precise, requestId: "", percent: 0, phase: "preparing", started: false, stopping: false, quietTimer: 0 };
     trimSaving = save;
     resetSaveFill();
     // nothing keeps playing under the save, and a view in fullscreen would hide the popup
@@ -1936,30 +1977,52 @@ window.__rkEditorApi = (function () {
     }
     if (document.activeElement && document.activeElement !== document.body) { try { document.activeElement.blur(); } catch {} }
     trimVeil.inert = true;
-    saveTitle.textContent = mode === "screenshot" ? RK_M("editor.savingAScreenshot") : mode === "overwrite" ? RK_M("editor.renderingOverTheOriginal") : RK_M("editor.renderingVideo");
+    const screenshot = mode === "screenshot";
+    saveTitle.textContent = screenshot ? RK_M("editor.savingAScreenshot") : mode === "overwrite" ? RK_M("editor.renderingOverTheOriginal") : RK_M("editor.renderingVideo");
     saveClipName.textContent = clipName;
     saveClipName.title = clipName;
     paintTrimSave(save);
-    saveVeil.classList.add("is-open", "is-quiet");
-    // a screenshot is one frame and done in well under a second, so the popup of a save would only flash; the button says it is busy instead, while the editor is still held still under it
-    if (mode === "screenshot") screenshotBtn.classList.add("is-busy");
-    else save.quietTimer = setTimeout(() => {
-      save.quietTimer = 0;
-      if (trimSaving === save) saveVeil.classList.remove("is-quiet");
-    }, SAVE_QUIET_MS);
+    saveVeil.classList.toggle("is-quiet", screenshot);
+    setPopupOpen(saveVeil, true);
+    if (screenshot) {
+      screenshotBtn.classList.add("is-busy");
+      save.quietTimer = setTimeout(() => {
+        if (trimSaving !== save) return;
+        save.quietTimer = 0;
+        saveVeil.classList.remove("is-quiet");
+        if (!saveCancel.hidden && !saveCancel.disabled) saveCancel.focus({ preventScroll: true });
+      }, SCREENSHOT_POPUP_DELAY_MS);
+    } else saveCancel.focus({ preventScroll: true });
     updateTrimUi();
-    pollTrimSave(save);
     return save;
   }
 
-  function endTrimSave(save) {
+  function endTrimSave(save, completed = false) {
     if (!save || trimSaving !== save) return;
     trimSaving = null;
     if (save.quietTimer) clearTimeout(save.quietTimer);
+    if (saveMotion.raf) cancelAnimationFrame(saveMotion.raf);
+    saveMotion.raf = 0;
+    if (completed && !saveVeil.classList.contains("is-quiet")) {
+      saveTrack.classList.remove("is-waiting");
+      saveTrack.classList.add("is-complete");
+      saveTrack.setAttribute("aria-valuenow", "100");
+      saveFill.style.width = "100%";
+      savePercent.textContent = "100%";
+      saveStage.textContent = RK_M("common.done");
+      saveCancel.disabled = true;
+    }
     screenshotBtn.classList.remove("is-busy");
-    saveVeil.classList.remove("is-open", "is-quiet");
+    setPopupOpen(saveVeil, false);
+    saveVeil.classList.remove("is-quiet");
     trimVeil.inert = false;
     updateTrimUi();
+  }
+
+  function cancelTrimSave(save) {
+    endTrimSave(save);
+    showToast(RK_M("editor.saveCancelledNothingWasChanged"), "info");
+    scheduleToastHide(3000);
   }
 
   // the position of the encode comes from the job the helper keeps for the clip; the request itself answers once, when the file is written
@@ -2000,6 +2063,7 @@ window.__rkEditorApi = (function () {
   saveCancel.addEventListener("click", async () => {
     const save = trimSaving;
     if (!save || save.stopping || save.phase === "finishing") return;
+    if (!save.started) { cancelTrimSave(save); return; }
     save.stopping = true;
     paintTrimSave(save);
     let url = HELPER + "/cancel-upload?t=" + Date.now() + "&file=" + encodeURIComponent(save.clipName);
@@ -2056,6 +2120,8 @@ window.__rkEditorApi = (function () {
     let save = null;
     try {
       save = beginTrimSave(sourceName, mode, precise);
+      await afterPopupPaint();
+      if (trimSaving !== save) return;
       const url = HELPER + "/trim?file=" + encodeURIComponent(sourceName) +
                   "&start=" + startSec.toFixed(3) +
                   "&end="   + endSec.toFixed(3) +
@@ -2076,9 +2142,12 @@ window.__rkEditorApi = (function () {
       if (subtitlePlan) edit.subtitles = subtitlePlan;
       if (lookPlan) edit.look = lookPlan;
       if (layerPlan) edit.layers = layerPlan;
-      const res = await fetch(url, Object.keys(edit).length
+      save.started = true;
+      const pending = fetch(url, Object.keys(edit).length
         ? { method: "POST", cache: "no-store", headers: { "Content-Type": "application/json" }, body: JSON.stringify(edit) }
         : { method: "POST", cache: "no-store" });
+      pollTrimSave(save);
+      const res = await pending;
       const data = await res.json().catch(() => ({}));
       if (save.abandoned) {
         scheduleNextPoll(50);
@@ -2086,15 +2155,13 @@ window.__rkEditorApi = (function () {
       }
       if (data.cancelled) {
         // nothing was written, and the editor is as it was left
-        endTrimSave(save);
-        showToast(RK_M("editor.saveCancelledNothingWasChanged"), "info");
-        scheduleToastHide(3000);
+        cancelTrimSave(save);
         return;
       }
       if (!res.ok || !data.ok) {
         throw new Error(data.message || ("HTTP " + res.status));
       }
-      endTrimSave(save);
+      endTrimSave(save, true);
       if (screenshot) {
         showToast(RK_M("common.screenshotSavedInScreenshotsAsName", { name: escapeHtml(data.name) }), "info");
         window.dispatchEvent(new Event("replaykit:screenshot-saved"));
@@ -2125,9 +2192,13 @@ window.__rkEditorApi = (function () {
     }
   }
 
-  // while a save runs every key is turned away, so nothing of the edit can change under the encode; a file dragged onto the page is turned away too, or the window would open it
+  // keep the edit locked during a save while allowing keyboard access to its cancel button
   window.addEventListener("keydown", (e) => {
     if (!trimSaving) return;
+    if (!saveVeil.classList.contains("is-quiet") && !saveCancel.hidden && !saveCancel.disabled) {
+      if (e.target === saveCancel && (e.key === "Enter" || e.key === " ")) return;
+      if (e.key === "Tab") saveCancel.focus({ preventScroll: true });
+    }
     e.preventDefault();
     e.stopImmediatePropagation();
   }, { capture: true, signal: EDITOR_SIGNAL });
@@ -2160,8 +2231,7 @@ window.__rkEditorApi = (function () {
       b.setAttribute("aria-checked", on ? "true" : "false");
     });
     document.getElementById("render-size").textContent = RK_M("editor.resolutionWidthHeight", { width: w, height: h });
-    const plan = trimLanes.videoPlan(true);
-    const seconds = plan ? plan.window.end - plan.window.start : trimDuration() / trimLanes.videoSpeed();
+    const seconds = trimDuration();
     document.getElementById("render-length").textContent = RK_M("editor.durationTime", { time: formatDuration(seconds) || "0:00" });
   }
   function openRenderSettings() {
@@ -2169,13 +2239,13 @@ window.__rkEditorApi = (function () {
     closeExitMenu();
     document.getElementById("render-replace").checked = true;
     paintRenderSettings();
-    renderVeil.classList.add("is-open");
+    setPopupOpen(renderVeil, true);
     document.getElementById("render-go").focus();
   }
   function closeRenderSettings() {
     renderFps.close();
     renderBitrate.close();
-    renderVeil.classList.remove("is-open");
+    setPopupOpen(renderVeil, false);
   }
   renderVeil.querySelectorAll(".render-choice").forEach((b) => b.addEventListener("click", () => { renderHeight = Number(b.dataset.height) || 0; paintRenderSettings(); }));
   renderVeil.addEventListener("mousedown", (e) => { if (e.target === renderVeil) closeRenderSettings(); });
@@ -2213,23 +2283,24 @@ window.__rkEditorApi = (function () {
     close: closeTrimModal,
     // what the quick action menu under the logo offers while the editor is open, and a pick from it, which does what the button of the same name does
     quickActions() {
+      const editable = canEditTimeline();
       return [
-        { id:"exit", label:RK_M("editor.exitEditor"), icon:"quick/exit", disabled:!!trimSaving },
-        { id:"undo", label:RK_M("common.undo"), icon:"quick/undo", disabled:!!trimSaving || !trimLanes.canUndo() },
-        { id:"redo", label:RK_M("common.redo"), icon:"quick/redo", disabled:!!trimSaving || !trimLanes.canRedo() },
-        { id:"screenshot", label:RK_M("editor.screenshotThisFrame"), icon:"quick/screenshot", disabled:screenshotBtn.disabled },
-        { id:"render", label:RK_M("editor.renderVideo"), icon:"quick/render", disabled:trimRender.disabled },
-        { id:"import", label:RK_M("picker.importAudio"), icon:"quick/import-audio", disabled:!!trimSaving || trimLanes.busy() },
+        { id:"exit", label:RK_M("editor.exitEditor"), icon:"quick/exit", disabled:!editable },
+        { id:"undo", label:RK_M("common.undo"), icon:"quick/undo", disabled:!editable || !trimLanes.canUndo() },
+        { id:"redo", label:RK_M("common.redo"), icon:"quick/redo", disabled:!editable || !trimLanes.canRedo() },
+        { id:"screenshot", label:RK_M("editor.screenshotThisFrame"), icon:"quick/screenshot", disabled:!editable || screenshotBtn.disabled },
+        { id:"render", label:RK_M("editor.renderVideo"), icon:"quick/render", disabled:!editable || trimRender.disabled },
+        { id:"import", label:RK_M("picker.importAudio"), icon:"quick/import-audio", disabled:!editable || trimLanes.busy() },
       ];
     },
     quickAction(id) {
-      if (trimDraftLeaving) return;
+      if (!canEditTimeline()) return;
       if (id === "exit") editorExitBtn.click();
       else if (id === "screenshot") screenshotBtn.click();
       else if (id === "render") trimRender.click();
-      else if (id === "import" && !trimSaving) trimLanes.importAudio();
-      else if (id === "undo" && !trimSaving) trimLanes.undo();
-      else if (id === "redo" && !trimSaving) trimLanes.redo();
+      else if (id === "import") trimLanes.importAudio();
+      else if (id === "undo") trimLanes.undo();
+      else if (id === "redo") trimLanes.redo();
     },
     pause() { try { trimVideo.pause(); } catch {} },
     // the sdk picks the video and opens a tab of the bar on the left in the editor open on the clip name; false when that editor is not open or the tab is unknown

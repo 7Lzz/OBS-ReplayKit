@@ -321,15 +321,15 @@ const CLIP_HOVER_PROFILES = {
   };
   const CLIP_STATE_URL = HELPER + "/clips/state";
   const localState = new Map();
-  // name -> Date.now() when a UI action set localState optimistically, before the helper job it starts shows in /status -- the reconcile reap loops honour this so a poll landing in that gap cant flash the card back to "Create Link" before the job appears; covers Create Link, bulk upload and every compress path, and self-heals once the grace window passes
-  const optimisticStateAt = new Map();
+  // keep the card busy until the requested job appears in /status or the grace window expires
+  const optimisticStates = new Map();
   const OPTIMISTIC_STATE_GRACE_MS = 10000;
-  function markLocalState(name, st) {
+  function markLocalState(name, st, requestId = "") {
     localState.set(name, st);
-    optimisticStateAt.set(name, Date.now());
+    optimisticStates.set(name, { startedAt: Date.now(), requestId });
   }
   function optimisticStateFresh(name) {
-    return localState.has(name) && Date.now() - (optimisticStateAt.get(name) || 0) < OPTIMISTIC_STATE_GRACE_MS;
+    return localState.has(name) && Date.now() - (optimisticStates.get(name)?.startedAt || 0) < OPTIMISTIC_STATE_GRACE_MS;
   }
   const selectedClipNames = new Set();
   let favoriteNames = new Set();
@@ -886,25 +886,53 @@ const CLIP_HOVER_PROFILES = {
     return out;
   }
 
-  async function fetchDraft(name) {
+  async function fetchDraft(name, signal) {
+    await draftWrites;
+    if (signal.aborted) return { draft: null };
     try {
-      const res = await fetch(HELPER + "/drafts/get?file=" + encodeURIComponent(name) + "&t=" + Date.now(), { cache: "no-store" });
-      if (!res.ok) return null;
+      const res = await fetch(HELPER + "/drafts/get?file=" + encodeURIComponent(name) + "&t=" + Date.now(), { cache: "no-store", signal });
+      if (res.status === 404) return { draft: null };
       const data = await res.json();
-      return data && data.ok ? data : null;
+      if (res.ok && data?.ok === true) return { draft: data };
+      return { error: data?.message || RK_M("editor.theDraftsCouldNotBeRead") };
     } catch {
-      return null;
+      return signal.aborted ? { draft: null } : { error: RK_M("editor.theDraftsCouldNotBeRead") };
     }
   }
 
-  // a draft is gone: told to the helper, and out of the list of the page. the helper is told even when the page did not know of it, since the list may not have been read yet
+  // keep the draft visible until the helper confirms the deletion
   function forgetDraft(name) {
-    const known = draftsByName.delete(name);
-    queueDraftWrite(() => fetch(HELPER + "/drafts/delete?file=" + encodeURIComponent(name) + "&t=" + Date.now(), { method: "POST", cache: "no-store" })).catch(() => {});
-    if (!known) return;
-    draftsChanged();
-    rerenderCard(name);
+    return queueDraftWrite(async () => {
+      const res = await fetch(HELPER + "/drafts/delete?file=" + encodeURIComponent(name) + "&t=" + Date.now(), { method: "POST", cache: "no-store" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data?.ok !== true) throw new Error(data?.message || RK_M("editor.theDraftCouldNotBeRemoved"));
+      if (draftsByName.delete(name)) {
+        draftsChanged();
+        rerenderCard(name);
+      }
+      return true;
+    }).catch((err) => {
+      showToast(escapeHtml(err.message || RK_M("editor.theDraftCouldNotBeRemoved")), "bad", RK_M("clips.deleteDraft"));
+      return false;
+    });
   }
+
+  const draftDiscards = new Set();
+  async function discardDraft(name) {
+    if (!name || draftDiscards.has(name)) return;
+    draftDiscards.add(name);
+    showToast(RK_M("clips.deletingDraft"), "info");
+    try {
+      if (await forgetDraft(name)) {
+        showToast(RK_M("clips.draftDeleted"), "info");
+        scheduleToastHide(2400);
+      } else scheduleToastHide(TOAST_ERROR_MS);
+    } finally {
+      draftDiscards.delete(name);
+    }
+  }
+
+  const duplicateRequests = new Set();
 
   // the card menu of a clip that has a draft says it continues the edit and offers to let it go
   function syncDraftUi(card, name) {
@@ -1554,6 +1582,27 @@ const CLIP_HOVER_PROFILES = {
 
   let toastTimer = 0;
   const TOAST_ERROR_MS = 4000;
+
+  function setPopupOpen(veil, open) {
+    if (veil.classList.contains("modal-motion")) veil.inert = !open;
+    veil.classList.toggle("is-open", open);
+  }
+
+  // let pending feedback paint before starting work, even if cef throttles frames
+  function afterPopupPaint() {
+    if (document.hidden) return Promise.resolve();
+    return new Promise((resolve) => {
+      let frame = 0;
+      const done = () => {
+        clearTimeout(timer);
+        cancelAnimationFrame(frame);
+        resolve();
+      };
+      const timer = setTimeout(done, 100);
+      frame = requestAnimationFrame(() => { frame = requestAnimationFrame(done); });
+    });
+  }
+
   // in fullscreen only the fullscreen element is drawn, so the toast goes inside it for as long as it lasts (the screenshot button of the fullscreen player says it saved there), and back to the page after
   const toastHome = toastEl ? toastEl.parentNode : null;
   function placeToast() {
@@ -1652,7 +1701,7 @@ const CLIP_HOVER_PROFILES = {
     popupShown = item;
     popupReturnFocus = document.activeElement;
     fillPopup(item);
-    popupVeil.classList.add("is-open");
+    setPopupOpen(popupVeil, true);
     popupOk.focus();
   }
 
@@ -1674,7 +1723,7 @@ const CLIP_HOVER_PROFILES = {
     }
     if (!popupShown) return;
     popupShown = null;
-    popupVeil.classList.remove("is-open");
+    setPopupOpen(popupVeil, false);
     const back = popupReturnFocus;
     popupReturnFocus = null;
     if (back && back.isConnected && typeof back.focus === "function") { try { back.focus({ preventScroll: true }); } catch {} }
@@ -2594,6 +2643,8 @@ const CLIP_HOVER_PROFILES = {
     for (const job of jobs) {
       // a save in the editor has a popup of its own and answers on its own request, so it is no business of the cards and never an upload error
       if (job.kind === "trim") continue;
+      const optimistic = optimisticStates.get(job.clipName);
+      if (optimistic?.requestId && optimistic.requestId === job.requestId) optimisticStates.delete(job.clipName);
       const st = job.state || "";
       // just-cancelled clip: skip its still-active job, and pre-mark its error=Cancelled as seen so poll() doesnt raise an "Upload failed" toast.
       const cancelledAt = cancelledUploads.get(job.clipName);
@@ -2633,7 +2684,7 @@ const CLIP_HOVER_PROFILES = {
       if ((st !== "uploading" && st !== "compressing") || byName.has(name)) continue;
       // a UI action just set this optimistically and the helper job isnt in /status yet -- dont reap it (would flash the card back to "Create Link" for a poll).
       if (optimisticStateFresh(name)) continue;
-      optimisticStateAt.delete(name);
+      optimisticStates.delete(name);
       localState.delete(name);
     }
     return { active, jobs, newErrors, completed };
@@ -2683,6 +2734,7 @@ const CLIP_HOVER_PROFILES = {
         cancelledUploads.set(filename, Date.now());
         progressVisuals.delete(filename);
         localState.delete(filename);
+        optimisticStates.delete(filename);
         pendingLinkCreations.delete(filename);
         bulkUploadQueued.delete(filename);
         lastUploadJobsByName.delete(filename);
@@ -2691,6 +2743,7 @@ const CLIP_HOVER_PROFILES = {
         rerenderCard(filename);
       } else {
         localState.clear();
+        optimisticStates.clear();
         pendingLinkCreations.clear();
         bulkUploadQueued.clear();
         lastUploadJobsByName.clear();
@@ -3858,12 +3911,7 @@ const CLIP_HOVER_PROFILES = {
       }
       // on the drafts tab the trash of the card lets go of the draft and leaves the clip; the red Delete of the menu is still the clip
       if (trigger === deleteClipEl && card.classList.contains("is-draft-card")) {
-        const draftName = card.dataset.name;
-        if (draftName) {
-          forgetDraft(draftName);
-          showToast(RK_M("clips.draftDeleted"), "info");
-          scheduleToastHide(2400);
-        }
+        discardDraft(card.dataset.name);
         return;
       }
       deleteClip(card);
@@ -3911,18 +3959,17 @@ const CLIP_HOVER_PROFILES = {
     card.querySelector(".discard-draft-item").addEventListener("click", (e) => {
       e.stopPropagation();
       closeCardMenu(menuDropdown);
-      const name = card.dataset.name;
-      if (!name) return;
-      forgetDraft(name);
-      showToast(RK_M("clips.draftDeleted"), "info");
-      scheduleToastHide(2400);
+      discardDraft(card.dataset.name);
     });
     card.querySelector(".duplicate-menu-item").addEventListener("click", async (e) => {
       e.stopPropagation();
       closeCardMenu(menuDropdown);
       const name = card.dataset.name;
-      if (!name) return;
+      if (!name || duplicateRequests.has(name)) return;
+      duplicateRequests.add(name);
+      showToast(RK_M("clips.duplicatingClip"), "info");
       try {
+        await afterPopupPaint();
         const res = await fetch(HELPER + "/duplicate-clip?file=" + encodeURIComponent(name) + "&t=" + Date.now(),
                                 { method: "POST", cache: "no-store" });
         const data = await res.json().catch(() => ({}));
@@ -3935,6 +3982,8 @@ const CLIP_HOVER_PROFILES = {
       } catch (err) {
         showToast(RK_M("clips.duplicateFailedError", { error: escapeHtml(err.message || err) }));
         scheduleToastHide(TOAST_ERROR_MS);
+      } finally {
+        duplicateRequests.delete(name);
       }
     });
     card.querySelector(".clipboard-clip-item").addEventListener("click", async (e) => {
@@ -4058,26 +4107,53 @@ const CLIP_HOVER_PROFILES = {
     }
   }
 
-  // what a name box takes: the characters windows cannot have in a file name never get in (typed or pasted), with a shake and, once per rename, a word on why; clicks in the box stay in it instead of reaching the card under it
   const BAD_NAME_CHARS = /[<>:"/\\|?*\u0000-\u001f]/g;
   const RESERVED_NAME = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i;
   function guardNameInput(input) {
-    let told = false;
-    input.addEventListener("input", () => {
-      const clean = input.value.replace(BAD_NAME_CHARS, "");
-      if (clean === input.value) return;
-      const caret = Math.max(0, (input.selectionStart || 0) - (input.value.length - clean.length));
-      input.value = clean;
-      try { input.setSelectionRange(caret, caret); } catch (_) {}
+    function reportRejection(rejected) {
       input.classList.remove("is-rejected");
       void input.offsetWidth;
       input.classList.add("is-rejected");
-      if (!told) {
-        told = true;
-        showToast(escapeHtml(RK_M("clips.namesCanTContainChars", { chars: "\\ / : * ? \" < > |" })), "info");
-        scheduleToastHide(2600);
+      const labels = [...new Set(rejected)].map(char => {
+        const code = char.charCodeAt(0);
+        return code < 32 ? "U+" + code.toString(16).toUpperCase().padStart(4, "0") : "“" + char + "”";
+      });
+      const chars = new Intl.ListFormat(RK_I18N.lang()).format(labels);
+      showToast(escapeHtml(RK_M("clips.namesCanTContainChars", { chars })), "info");
+      scheduleToastHide(2600);
+    }
+    function filterInsertion(event, text) {
+      if (!text || !event.cancelable || event.defaultPrevented || input.readOnly) return;
+      const rejected = text.match(BAD_NAME_CHARS);
+      if (!rejected) return;
+      event.preventDefault();
+      const clean = text.replace(BAD_NAME_CHARS, "");
+      if (clean) {
+        input.setRangeText(clean, input.selectionStart, input.selectionEnd, "end");
+        input.dispatchEvent(new Event("input", { bubbles: true }));
       }
+      reportRejection(rejected);
+    }
+    input.addEventListener("beforeinput", event => {
+      if (event.inputType === "insertText" && !event.isComposing) filterInsertion(event, event.data);
     });
+    input.addEventListener("paste", event => filterInsertion(event, event.clipboardData?.getData("text/plain")));
+    // some changes, including ime composition, can only be filtered once they are committed
+    function filterValue() {
+      const value = input.value;
+      const rejected = value.match(BAD_NAME_CHARS);
+      if (!rejected) return;
+      const start = value.slice(0, input.selectionStart).replace(BAD_NAME_CHARS, "").length;
+      const end = value.slice(0, input.selectionEnd).replace(BAD_NAME_CHARS, "").length;
+      const direction = input.selectionDirection;
+      input.value = value.replace(BAD_NAME_CHARS, "");
+      input.setSelectionRange(start, end, direction);
+      reportRejection(rejected);
+    }
+    input.addEventListener("input", event => {
+      if (!event.isComposing) filterValue();
+    });
+    input.addEventListener("compositionend", filterValue);
     for (const type of ["click", "dblclick", "mousedown", "pointerdown", "contextmenu"]) input.addEventListener(type, (e) => e.stopPropagation());
   }
   // the part of a typed name that is kept (windows drops trailing dots and spaces), and what is wrong with it when something is
@@ -4278,6 +4354,7 @@ const CLIP_HOVER_PROFILES = {
     }
     input.addEventListener("blur", () => commit(false));
     input.addEventListener("keydown", (e) => {
+      if (e.isComposing) return;
       if (e.key === "Enter")  { e.preventDefault(); commit(true); }
       if (e.key === "Escape") { e.preventDefault(); if (!saving) restore(); }
     });
@@ -4632,42 +4709,27 @@ const CLIP_HOVER_PROFILES = {
   document.addEventListener("fullscreenchange", handleHostFullscreenChange);
   document.addEventListener("webkitfullscreenchange", handleHostFullscreenChange);
 
-  function updateDisplayProgress(name, fill, reportedPercent, smoothTime) {
+  function updateDisplayProgress(name, fill, reportedPercent, smoothTime, key) {
     const reported = Math.max(0, Math.min(100, Number(reportedPercent) || 0));
     let v = progressVisuals.get(name);
-    if (!v || v.smoothTime !== smoothTime) {
-      v = { displayed: 0, target: 0, vel: 0, fills: new Set(), smoothTime, raf: 0, lastT: 0 };
+    if (!v || v.smoothTime !== smoothTime || v.key !== key) {
+      v = { shown: 0, target: 0, vel: 0, fills: new Set(), smoothTime, key, raf: 0, lastT: 0 };
       progressVisuals.set(name, v);
     }
     // monotonic: the fill only ever moves toward the newest real percentage, never back
     if (reported > v.target) v.target = reported;
     for (const node of v.fills) if (!node.isConnected) v.fills.delete(node);
     v.fills.add(fill);
-    fill.style.width = v.displayed.toFixed(3) + "%";
+    fill.style.width = v.shown.toFixed(3) + "%";
     if (v.raf) return;
     v.lastT = 0;
-    // critically-damped follow (unity-style SmoothDamp): the fill carries a velocity, so a coarse jump in the reported percent bends its path instead of restarting an ease -- kills the stop-and-go at each reported point. st ~= how long to close most of a gap: 0.6 for the ~1/s upload meter, larger for the transcode bar whose samples land ~5s apart (so it glides the whole gap instead of snapping then sitting).
-    const st = (typeof smoothTime === "number" && smoothTime > 0) ? smoothTime : 0.6;
+    // transcode reports less often than upload or compression
+    const seconds = (typeof smoothTime === "number" && smoothTime > 0) ? smoothTime : 0.6;
     const step = (now) => {
       if (progressVisuals.get(name) !== v) { v.raf = 0; return; }
-      const dt = v.lastT ? Math.min(0.05, (now - v.lastT) / 1000) : 0.016;
-      v.lastT = now;
-      const omega = 2 / st;
-      const x = omega * dt;
-      const expf = 1 / (1 + x + 0.48 * x * x + 0.235 * x * x * x);
-      const change = v.displayed - v.target;
-      const temp = (v.vel + omega * change) * dt;
-      v.vel = (v.vel - omega * temp) * expf;
-      let out = v.target + (change + temp) * expf;
-      if (out > v.target) { out = v.target; v.vel = 0; }
-      v.displayed = out;
-      if (v.target - v.displayed > 0.08 || v.vel > 0.4) {
-        v.raf = requestAnimationFrame(step);
-      } else {
-        v.displayed = v.target;
-        v.raf = 0;
-      }
-      for (const node of v.fills) node.style.width = v.displayed.toFixed(3) + "%";
+      const moving = RKProgress.step(v, now, seconds);
+      v.raf = moving ? requestAnimationFrame(step) : 0;
+      for (const node of v.fills) node.style.width = v.shown.toFixed(3) + "%";
     };
     v.raf = requestAnimationFrame(step);
   }
@@ -4689,14 +4751,18 @@ const CLIP_HOVER_PROFILES = {
       resetDeleteButton(deleteUploadItem);
     }
     if (window.RKClipGames) RKClipGames.badge(meta, clip, { change: true, current: () => currentClipForCard(card) });
-    const status = lastUploadJobsByName.get(clip.name)
+    const latestStatus = lastUploadJobsByName.get(clip.name)
       || (lastUploadStatus && lastUploadStatus.clipName === clip.name ? lastUploadStatus : null);
+    const expectedRequest = optimisticStateFresh(clip.name) ? optimisticStates.get(clip.name).requestId : "";
+    const status = expectedRequest && latestStatus?.requestId !== expectedRequest ? null : latestStatus;
     // within the cancel grace window keep the card idle even if a stale status snapshot still reports the job active.
     const cancelPending = cancelledUploads.has(clip.name);
     const state = !cancelPending && status && status.active && (status.state === "compressing" || status.state === "uploading")
       ? status.state
       : (localState.get(clip.name) || "idle");
-    const uploadPct = status && Number(status.percent) ? Number(status.percent) : 0;
+    const activeJob = !cancelPending && status?.active && status.state === state ? status : null;
+    const uploadPct = Number(activeJob?.percent) || 0;
+    const progressKey = activeJob?.requestId || expectedRequest || state;
     // ready/transcode_percent/transcode_status flow from the background poller that runs after each upload. older entries omit them, in which case the link is always shown as ready.
     const uploadedAt = Number(clip.uploaded_at) || 0;
     const processingAge = uploadedAt > 0
@@ -4708,8 +4774,8 @@ const CLIP_HOVER_PROFILES = {
     const processing = clip.ready === false && !failed && !timedOut;
     const transPct   = Number(clip.transcode_percent) || 0;
     const stillTicking = (state === "compressing" || state === "uploading");
-    const queuedCompression = state === "compressing" && status && status.phase === "queued";
-    const finalizing = stillTicking && uploadPhaseIsFinalizing(status);
+    const queuedCompression = state === "compressing" && activeJob?.phase === "queued";
+    const finalizing = stillTicking && uploadPhaseIsFinalizing(activeJob);
     // amber transcode bar while streamable processes; the link is only offered once it is playable (ready, or our poll timed out and we give it the benefit of the doubt). a failed transcode offers no link.
     const showTranscodeBar = !!clip.streamable_url && processing && !stillTicking;
     const showCopy = !!clip.streamable_url && !processing && !failed;
@@ -4719,6 +4785,7 @@ const CLIP_HOVER_PROFILES = {
     const actionSig = [
       draftOpen ? 1 : 0,
       state,
+      progressKey,
       clip.streamable_url || "",
       clip.uploaded_at || 0,
       clip.retention_days || 0,
@@ -4731,14 +4798,14 @@ const CLIP_HOVER_PROFILES = {
     ].join("|");
     // while an upload/compress is running and its bar already exists, nudge the fill in place -- rebuilding actions.innerHTML every poll (below) tears down the cancel X, dropping its :hover state and re-binding its listener each tick so it flashes under the pointer.
     if (stillTicking) {
-      const bar = actions.querySelector(".btn.is-progress");
+      const bar = actions.querySelector(".btn.is-progress:not(.is-transcode)");
       if (bar) {
         card.dataset.actionSig = actionSig;
         bar.classList.toggle("is-finalizing", finalizing);
         bar.classList.toggle("is-queued", !!queuedCompression);
         const phaseLabel = bar.querySelector(".progress-phase");
         if (phaseLabel) phaseLabel.textContent = queuedCompression ? RK_M("clips.queued") : "";
-        updateDisplayProgress(clip.name, bar.querySelector(".progress-fill"), uploadPct);
+        updateDisplayProgress(clip.name, bar.querySelector(".progress-fill"), uploadPct, undefined, progressKey);
         return;
       }
     }
@@ -4748,7 +4815,7 @@ const CLIP_HOVER_PROFILES = {
       if (tbar) {
         card.dataset.actionSig = actionSig;
         // ~4.5s smoothing -- streamables percent lands roughly every 5s, so the bar glides the whole gap instead of snapping in 0.6s then stalling.
-        updateDisplayProgress(clip.name, tbar.querySelector(".progress-fill"), transPct, 4.5);
+        updateDisplayProgress(clip.name, tbar.querySelector(".progress-fill"), transPct, 4.5, clip.streamable_url);
         return;
       }
     }
@@ -4816,7 +4883,7 @@ const CLIP_HOVER_PROFILES = {
       bar.title = RK_M("clips.processingOnStreamable");
       bar.innerHTML = '<span class="progress-track"><span class="progress-fill"></span></span>';
       actions.appendChild(bar);
-      updateDisplayProgress(clip.name, bar.querySelector(".progress-fill"), transPct, 4.5);
+      updateDisplayProgress(clip.name, bar.querySelector(".progress-fill"), transPct, 4.5, clip.streamable_url);
     } else if (showCopy) {
       const btn = document.createElement("button");
       btn.className = "btn action-link-btn";
@@ -4875,7 +4942,7 @@ const CLIP_HOVER_PROFILES = {
       btn.classList.toggle("is-finalizing", finalizing);
       btn.classList.toggle("is-queued", !!queuedCompression);
       btn.querySelector(".progress-phase").textContent = queuedCompression ? RK_M("clips.queued") : "";
-      updateDisplayProgress(clip.name, btn.querySelector(".progress-fill"), uploadPct);
+      updateDisplayProgress(clip.name, btn.querySelector(".progress-fill"), uploadPct, undefined, progressKey);
     } else {
       const btn = document.createElement("button");
       btn.className = "btn action-link-btn";
@@ -5418,7 +5485,7 @@ const CLIP_HOVER_PROFILES = {
         // a compress/upload the user just kicked off whose job isnt in /status yet -- keep it a poll longer (self-heals via optimisticStateFreshs grace window).
         if (optimisticStateFresh(name)) continue;
         // helper isnt running this clips operation. drop the stale pending flag so finished compress-overwrite jobs return the button to "create link" after /clips sees the new mtime/size.
-        optimisticStateAt.delete(name);
+        optimisticStates.delete(name);
         localState.delete(name);
       }
       anyUploading = jobSync.active;
@@ -5459,9 +5526,11 @@ const CLIP_HOVER_PROFILES = {
       resolveFirstRender();
     } finally {
       pollInFlight = false;
-      const hasActiveStreamableUpload = Array.from(lastUploadJobsByName.values()).some((job) =>
-        job && job.active && job.state === "uploading");
-      scheduleNextPoll(uploadCompleted || hasActiveStreamableUpload ? POLL_UPLOAD_MS : pendingClipSave ? SAVE_GHOST_POLL_MS : (anyUploading ? POLL_FAST_MS : POLL_IDLE_MS));
+      const activeJobs = Array.from(lastUploadJobsByName.values()).filter(job => job && job.active);
+      const hasActiveStreamableUpload = activeJobs.some(job => job.state === "uploading");
+      const hasActiveOverwriteCompression = activeJobs.some(job => job.kind === "compress-overwrite");
+      scheduleNextPoll(uploadCompleted || hasActiveStreamableUpload ? POLL_UPLOAD_MS : pendingClipSave ? SAVE_GHOST_POLL_MS
+        : anyUploading && !hasActiveOverwriteCompression ? POLL_FAST_MS : POLL_IDLE_MS);
     }
   }
 
@@ -5794,10 +5863,10 @@ const CLIP_HOVER_PROFILES = {
     resetAllArmedDeleteButtons();
     if (typeof closeClipSortMenu === "function") closeClipSortMenu();
     document.querySelectorAll(".settings-wrap.is-open").forEach((w) => w.classList.remove("is-open"));
-    closeEditor();
+    const editorClosed = closeEditor();
     document.querySelectorAll(".modal-veil.is-open").forEach((v) => {
-      if (trimSaving && (v === trimVeil || v === saveVeil)) return;
-      v.classList.remove("is-open");
+      if (!editorClosed && (v === trimVeil || v === saveVeil || v === trimProcessingVeil || trimVeil.contains(v))) return;
+      setPopupOpen(v, false);
     });
     resetErrorPopup();
 
@@ -5932,10 +6001,10 @@ const CLIP_HOVER_PROFILES = {
     compressBody.innerHTML =
       "<p>" + RK_MH("clips.fileIsSizeMbWhichIs", { file: '<code translate="no">' + escapeHtml(filename) + "</code>", size: sizeMb, cap: capMb }) + "</p>" +
       "<p data-i18n='clips.createATemporaryCompressedCopyAnd'></p>";
-    compressVeil.classList.add("is-open");
+    setPopupOpen(compressVeil, true);
   }
   function closeCompressModal() {
-    compressVeil.classList.remove("is-open");
+    setPopupOpen(compressVeil, false);
     pendingCompressFile = null;
   }
 
@@ -5952,6 +6021,7 @@ const CLIP_HOVER_PROFILES = {
     const file = pendingCompressFile;
     closeCompressModal();
     try {
+      await afterPopupPaint();
       const res = await fetch(HELPER + "/compress?file=" + encodeURIComponent(file)
                               + "&t=" + Date.now(),
                               { method: "POST", cache: "no-store" });
@@ -6075,7 +6145,7 @@ const CLIP_HOVER_PROFILES = {
     }
     syncCompressDsDetail();
 
-    compressModeVeil.classList.add("is-open");
+    setPopupOpen(compressModeVeil, true);
     // focus the first enabled card so enter commits to a valid option and the user can navigate with arrow keys / tab. if everything is locked, focus cancel.
     if (result === "locked") {
       try { compressModeCancel.focus(); } catch (_) {}
@@ -6086,8 +6156,17 @@ const CLIP_HOVER_PROFILES = {
   }
   function closeCompressModePicker() {
     compressDsSelect.close();
-    compressModeVeil.classList.remove("is-open");
+    setPopupOpen(compressModeVeil, false);
     pendingCompressOverwriteFile = null;
+  }
+
+  function markOverwriteCompressionStarted(name, requestId) {
+    cancelledUploads.delete(name);
+    progressVisuals.delete(name);
+    markLocalState(name, "compressing", requestId);
+    anyUploading = true;
+    scheduleNextPoll(POLL_UPLOAD_MS);
+    rerenderCard(name);
   }
 
   // centralised so we dont drift between the modal cards and any other caller that might want to start an overwrite-compress. the server enforces the same compress-history rules as the modal; alreadycompressed comes back as 409 with a message we surface verbatim so the user sees the same wording either way.
@@ -6109,11 +6188,7 @@ const CLIP_HOVER_PROFILES = {
         }
         throw new Error(data.message || ("HTTP " + res.status));
       }
-      cancelledUploads.delete(file);
-      markLocalState(file, "compressing");
-      anyUploading = true;
-      scheduleNextPoll(POLL_FAST_MS);
-      rerenderCard(file);
+      markOverwriteCompressionStarted(file, data.requestId);
       let label = mode === "fast" ? RK_M("clips.compressingFast") : RK_M("clips.compressingSmaller");
       if (scaleHeight > 0) label = RK_M("clips.labelHeightP", { label, height: scaleHeight });
       showToast(RK_M("clips.labelName", { label, name: '<span translate="no">' + escapeHtml(file) + "</span>" }), "info");
@@ -6125,13 +6200,14 @@ const CLIP_HOVER_PROFILES = {
   }
 
   compressModeCards.forEach((card) => {
-    card.addEventListener("click", () => {
+    card.addEventListener("click", async () => {
       // defensive: css pointer-events:none already blocks the click for .is-disabled cards, but if a future tweak loosens that css we still want the rule enforced here. disabled cards simply do nothing instead of opening a confusing error.
       if (card.classList.contains("is-disabled")) return;
       const file = pendingCompressOverwriteFile;
       const mode = card.dataset.mode || "smaller";
       const scaleHeight = currentCompressScaleHeight();
       closeCompressModePicker();
+      await afterPopupPaint();
       startCompressOverwrite(file, mode, scaleHeight);
     });
   });
@@ -6438,10 +6514,10 @@ const CLIP_HOVER_PROFILES = {
       + "<p>" + RK_M("clips.eachClipSOriginalFileWill") + "</p>";
     compressAllGo.textContent = RK_M("clips.compressAll");
     compressAllGo.disabled = (candidates.length === 0);
-    compressAllVeil.classList.add("is-open");
+    setPopupOpen(compressAllVeil, true);
   }
   function closeCompressAllModal() {
-    compressAllVeil.classList.remove("is-open");
+    setPopupOpen(compressAllVeil, false);
     pendingBulkCompressQueue = null;
     compressAllGo.textContent = RK_M("clips.compressAll");
   }
@@ -6459,7 +6535,7 @@ const CLIP_HOVER_PROFILES = {
       + "<p data-i18n='clips.eachSourceClipIsReplacedWith'></p>";
     compressAllGo.textContent = RK_M("clips.compressSelected");
     compressAllGo.disabled = false;
-    compressAllVeil.classList.add("is-open");
+    setPopupOpen(compressAllVeil, true);
   }
 
   // worker that drains the queue. we fire one request, wait for the response, then immediately fire the next. the servers get-uploadjobstartdecision returns busy=true when at the cap, so we back off briefly and retry the same clip. cpu-low bursts above the steady-state cap happen server-side -- we dont need to mirror the logic here, just keep firing.
@@ -6469,6 +6545,7 @@ const CLIP_HOVER_PROFILES = {
     const total = queue.length;
     let done = 0;
     setCompressAllButton("running", { done, total });
+    await afterPopupPaint();
 
     while (queue.length > 0 && !compressAllAbort) {
       const name = queue[0];
@@ -6482,11 +6559,7 @@ const CLIP_HOVER_PROFILES = {
           const data = await res.json().catch(() => ({}));
           if (res.ok && data.ok) {
             started = true;
-            cancelledUploads.delete(name);
-            markLocalState(name, "compressing");
-            anyUploading = true;
-            scheduleNextPoll(POLL_FAST_MS);
-            rerenderCard(name);
+            markOverwriteCompressionStarted(name, data.requestId);
           } else if (data && data.alreadyCompressed) {
             // race: marker appeared between candidate scan and now. skip silently.
             started = true;
@@ -6566,42 +6639,48 @@ const CLIP_HOVER_PROFILES = {
     bulkDeleteBtn.setAttribute("aria-label", trashOn ? RK_M("clips.moveSelectedClipsToTrash") : RK_M("clips.deleteSelectedClips"));
   }
 
+  let bulkDeleting = false;
   async function deleteSelectedClips() {
     const names = Array.from(selectedClipNames);
-    if (!names.length) return;
+    if (!names.length || bulkDeleting) return;
+    bulkDeleting = true;
     if (bulkDeleteBtn) bulkDeleteBtn.disabled = true;
     if (bulkClearBtn) bulkClearBtn.disabled = true;
     const deleted = [];
     let trashed = 0;
     const failed = [];
     let firstFailure = "";
-    for (let i = 0; i < names.length; i++) {
-      if (bulkDeleteBtn) {
-        bulkDeleteBtn.dataset.tooltip = (trashOn ? RK_M("clips.movingToTrashDoneTotal", { done: i + 1, total: names.length }) : RK_M("clips.deletingDoneTotal", { done: i + 1, total: names.length }));
-        bulkDeleteBtn.setAttribute("aria-label", bulkDeleteBtn.dataset.tooltip);
+    try {
+      for (let i = 0; i < names.length; i++) {
+        const count = { done: i, total: names.length };
+        showToast(trashOn ? RK_M("clips.movingToTrashDoneTotal", count) : RK_M("clips.deletingDoneTotal", count), "info");
+        if (i === 0) await afterPopupPaint();
+        try {
+          const res = await fetch(HELPER + "/delete?file=" + encodeURIComponent(names[i]), {
+            method: "POST", cache: "no-store",
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok || !data.ok) throw new Error(data.message || RK_M("clips.deleteFailed"));
+          deleted.push(names[i]);
+          if (data.kept) trashed++;
+        } catch (err) {
+          failed.push(names[i]);
+          if (!firstFailure) firstFailure = (err && err.message) || "";
+        }
       }
-      try {
-        const res = await fetch(HELPER + "/delete?file=" + encodeURIComponent(names[i]), {
-          method: "POST", cache: "no-store",
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok || !data.ok) throw new Error(data.message || RK_M("clips.deleteFailed"));
-        deleted.push(names[i]);
-        if (data.kept) trashed++;
-      } catch (err) {
-        failed.push(names[i]);
-        if (!firstFailure) firstFailure = (err && err.message) || "";
+      if (deleted.length) {
+        dropDeletedClips(deleted);
+        window.dispatchEvent(new Event("replaykit:deleted-changed"));
+        scheduleNextPoll(50);
       }
+    } finally {
+      bulkDeleting = false;
+      if (bulkDeleteBtn) bulkDeleteBtn.disabled = false;
+      if (bulkClearBtn) bulkClearBtn.disabled = false;
+      resetBulkDeleteButton();
+      refreshBulkSelectionUi();
     }
-    if (deleted.length) {
-      dropDeletedClips(deleted);
-      window.dispatchEvent(new Event("replaykit:deleted-changed"));
-      scheduleNextPoll(50);
-    }
-    if (bulkDeleteBtn) bulkDeleteBtn.disabled = false;
-    if (bulkClearBtn) bulkClearBtn.disabled = false;
-    resetBulkDeleteButton();
-    refreshBulkSelectionUi();
+    if (!deleted.length) hideToast();
     if (deleted.length) {
       const toTrash = trashed === deleted.length;
       showToast(deleted.length === 1
@@ -6831,24 +6910,26 @@ const CLIP_HOVER_PROFILES = {
 
   // the ways out of the editor that this page has, whether it is loaded or still on its way
   function closeEditor() {
-    cancelEditorLoading();
     const api = editorApi();
-    return api ? api.close() : true;
+    if (api) return api.close();
+    cancelEditorLoading();
+    return true;
   }
 
   function cancelEditorLoading() {
     ++editorRequest;
     if (!window.__replaykitEditorReady) {
-      trimProcessingVeil.classList.remove("is-open");
+      setPopupOpen(trimProcessingVeil, false);
       releaseEditorSources();
     }
   }
 
   // the editor loads behind a placeholder in its own shape: the one kept from the last time it showed, or the first time the one measured from its markup while that is laid out out of sight
   const trimProcessingBonesEl = document.getElementById("trim-processing-bones");
-  function drawEditorSkeleton(liveRoot) {
-    if (!window.RKSkeleton) return;
-    const map = RKSkeleton.load("editor") || (liveRoot ? RKSkeleton.measure(liveRoot) : null);
+  function drawEditorSkeleton() {
+    if (!window.RKSkeleton || !trimProcessingVeil.classList.contains("is-open")) return;
+    const map = RKSkeleton.load("editor") ||
+      (trimVeil.classList.contains("is-measuring") ? RKSkeleton.measure(trimVeil) : null);
     trimProcessingVeil.classList.toggle("has-bones", RKSkeleton.draw(trimProcessingBonesEl, map));
   }
   let editorShapeTimer = 0;
@@ -6863,29 +6944,34 @@ const CLIP_HOVER_PROFILES = {
     }, 1500);
   }
   new MutationObserver(rememberEditorShape).observe(trimVeil, { attributes:true, attributeFilter:["class"] });
+  window.addEventListener("resize", rememberEditorShape);
+  // give the hidden editor's resize observer a frame to fit the video before measuring it
+  new ResizeObserver(() => requestAnimationFrame(drawEditorSkeleton)).observe(trimProcessingVeil);
   // with no kept shape yet the editor is measured while it loads, and its parts are made as it goes (the video takes its size from the clip, the tool rail comes in after that), so it is measured again at every step the loading screen names
   new MutationObserver(() => {
-    if (trimProcessingVeil.classList.contains("is-open") && editorApi() && window.RKSkeleton && !RKSkeleton.load("editor")) drawEditorSkeleton(trimVeil);
+    if (trimVeil.classList.contains("is-measuring") && window.RKSkeleton && !RKSkeleton.load("editor")) drawEditorSkeleton();
   }).observe(document.getElementById("trim-processing-stage"), { childList:true, characterData:true, subtree:true });
 
   async function openEditor(clip) {
+    if (editorInUse() && !closeEditor()) return;
     const request = ++editorRequest;
-    trimProcessingVeil.classList.add("is-open");
-    drawEditorSkeleton(null);
+    setPopupOpen(trimProcessingVeil, true);
+    drawEditorSkeleton();
     document.getElementById("trim-processing-stage").textContent = RK_M("clips.preparingTheEditor");
     try {
+      await afterPopupPaint();
+      if (request !== editorRequest) return;
       await protectEditorSources([clip.name]);
       if (request !== editorRequest) return;
       await loadEditor();
       if (request !== editorRequest) return;
       const blocked = clipBusyWith(clip.name);
-      if (blocked) { trimProcessingVeil.classList.remove("is-open"); releaseEditorSources(); showToast(clipBusyMessage(blocked), "bad", RK_M("common.editor")); return; }
+      if (blocked) { closeEditor(); showToast(clipBusyMessage(blocked), "bad", RK_M("common.editor")); return; }
       editorApi().open(clip);
-      if (!trimProcessingVeil.classList.contains("has-bones")) drawEditorSkeleton(trimVeil);
+      if (!trimProcessingVeil.classList.contains("has-bones")) drawEditorSkeleton();
     } catch (err) {
       if (request !== editorRequest) return;
-      trimProcessingVeil.classList.remove("is-open");
-      releaseEditorSources();
+      closeEditor();
       showToast(escapeHtml(err.message || RK_M("clips.theEditorCouldNotBeLoaded")), "bad", RK_M("common.editor"));
     }
   }
@@ -6907,7 +6993,7 @@ const CLIP_HOVER_PROFILES = {
   window.__rkCanUnload = function () {
     if (trimSaving || editorHeldAway || clipStateSaveTimer || favoriteSaving || draftWritesPending) return false;
     if (trimVeil.classList.contains("is-open") || trimProcessingVeil.classList.contains("is-open") || document.querySelector(".modal-veil.is-open")) return false;
-    if (compressAllRunning || bulkUploadRunning || bulkUploadQueued.size > 0) return false;
+    if (compressAllRunning || bulkUploadRunning || bulkUploadQueued.size > 0 || bulkDeleting || duplicateRequests.size) return false;
     if (linkTransitionBusy.size > 0 || inFlightCancels.size > 0) return false;
     return true;
   };

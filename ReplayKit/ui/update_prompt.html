@@ -232,11 +232,24 @@
 
   // download owns 0-70% of the bar, verify 70-80, install 80-100. real byte counts come from /update/progress.
   let progressTimer = 0;
+  let progressRun = 0;
+  async function readProgress(read) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    try { return await read(controller.signal); }
+    finally { clearTimeout(timeout); }
+  }
+
   function startProgressPolling() {
-    clearInterval(progressTimer);
+    stopProgressPolling();
+    const run = progressRun;
+    let checking = false;
     progressTimer = setInterval(async () => {
+      if (checking || run !== progressRun) return;
+      checking = true;
       try {
-        const p = await helperJson("update/progress?t=" + Date.now());
+        const p = await readProgress((signal) => helperJson("update/progress?t=" + Date.now(), { signal }));
+        if (run !== progressRun) return;
         if (p.stage === "download") {
           const pct = p.total > 0 ? (p.done / p.total) * 70 : -1;
           const speed = p.bytesPerSecond > 0 ? RK_I18N.number(p.bytesPerSecond / (1024 * 1024), 1) + " MB/s" : "";
@@ -247,20 +260,29 @@
         } else if (p.stage === "install") {
           setStatus(RK_M("update.installingUpdate"), "", 82);
         }
-      } catch (_) {}
+      } catch (_) {} finally { checking = false; }
     }, 400);
   }
-  function stopProgressPolling() { clearInterval(progressTimer); progressTimer = 0; }
+  function stopProgressPolling() {
+    progressRun++;
+    clearInterval(progressTimer);
+    progressTimer = 0;
+  }
 
   // the installer runs detached and takes obs (and this helper) down with it, so "helper stopped answering" is an expected stage here, not a failure. done when the new helper is back up and reports a verdict.
   function watchInstall(attemptId, onComplete, onFail) {
     const started = Date.now();
     let percent = 82;
     let seenHelperDown = false;
+    let checking = false;
     const timer = setInterval(async () => {
+      if (checking) return;
+      checking = true;
       try {
-        const r = await fetch(HELPER + "/update/install-result?attempt=" + encodeURIComponent(attemptId || "") + "&t=" + Date.now(), { cache:"no-store" });
-        const body = await r.json().catch(() => ({}));
+        const body = await readProgress(async (signal) => {
+          const r = await fetch(HELPER + "/update/install-result?attempt=" + encodeURIComponent(attemptId || "") + "&t=" + Date.now(), { cache:"no-store", signal });
+          return r.json();
+        });
         if (body && body.present) {
           clearInterval(timer);
           helperJson("update/install-result/ack?attempt=" + encodeURIComponent(attemptId || ""), { method:"POST" }).catch(() => {});
@@ -276,7 +298,7 @@
         seenHelperDown = true;
         percent = Math.min(percent + 0.7, 95);
         setStatus(RK_M("update.installingWhileObsIsClosed"), RK_M("update.obsStartsAgainByItselfWhen"), percent);
-      }
+      } finally { checking = false; }
       if (Date.now() - started > 180000) els.closeBtn.hidden = false;
     }, 1500);
   }
@@ -285,7 +307,7 @@
   function failUpdate(message) {
     stopProgressPolling();
     setHero(RK_M("update.updateFailed"), message || RK_M("update.theUpdateCouldNotBeApplied"), RK_M("update.retryOrRunTheReplaykitInstaller"), true);
-    setStatus(RK_M("update.updateFailed"), "", 100, "bad");
+    setStatus(RK_M("update.updateFailed"), "", -1, "bad");
     els.retryBtn.hidden = false;
     els.closeBtn.hidden = false;
   }

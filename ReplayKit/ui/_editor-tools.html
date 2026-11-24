@@ -81,17 +81,18 @@
   .ed-view[hidden] { display: none; }
   .ed-view > .ed-status { margin: 10px 0 0; }
   /* the generate button is its own progress bar while the speech engine works, with a cross to stop it */
+  .ed-gen-row { position: relative; }
   .ed-gen { position: relative; overflow: hidden; }
   .ed-gen-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: var(--primary); opacity: 0; transition: width 400ms linear, opacity 120ms linear; pointer-events: none; }
   .ed-gen-label { position: relative; z-index: 1; font-variant-numeric: tabular-nums; }
   .ed-gen-icon { position: relative; z-index: 1; display: inline-flex; }
   .ed-gen.is-working .ed-gen-icon { display: none; }
-  .ed-gen-cancel { position: absolute; z-index: 2; right: 6px; top: 50%; width: 22px; height: 22px; margin-top: -11px; border-radius: 4px; display: none; place-items: center; color: var(--on-accent); }
+  .ed-gen-cancel { position: absolute; z-index: 2; right: 6px; top: 50%; width: 22px; height: 22px; margin-top: -11px; padding: 0; border: 0; border-radius: 4px; background: none; display: grid; place-items: center; color: var(--on-accent); cursor: pointer; }
+  .ed-gen-cancel[hidden] { display: none; }
   .ed-gen-cancel:hover { background: rgba(0, 0, 0, .25); }
   .ed-gen-cancel svg { width: 12px; height: 12px; fill: currentColor; }
-  .ed-tools .btn.ed-gen.is-working, .ed-tools .btn.ed-gen.is-working:hover { background: rgba(var(--accent-rgb), .28); border-color: transparent; cursor: default; }
+  .ed-tools .btn.ed-gen.is-working, .ed-tools .btn.ed-gen.is-working:hover { background: rgba(var(--accent-rgb), .28); border-color: transparent; opacity: 1; cursor: default; }
   .ed-gen.is-working .ed-gen-fill { opacity: 1; }
-  .ed-gen.is-working .ed-gen-cancel { display: grid; }
 
   .ed-tools .combo-button, .ed-sub-edit .combo-button { font:inherit; font-size:12px; }
 
@@ -538,7 +539,7 @@
     var els = {};
     var built = false;
     var job = { run: 0, id: "", timer: 0, busy: false, waitingForInstall: false, listenAt: 0, listenTau: 0 };
-    var rec = { on: false, starting: false, timer: 0, startT: 0, t0: 0, lag: 0, idle: 0, peaks: [] };
+    var rec = { on: false, starting: false, stopping: false, run: 0, timer: 0, onPlaying: null, startT: 0, lag: 0, idle: 0, peaks: [] };
     var clip = null;
     var refreshQueued = 0;
     var textTimer = 0;
@@ -553,14 +554,16 @@
     function savePrefs() { try { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); } catch (_) {} }
     function helperJson(path, method) {
       return fetch(o.helper + path, { method: method || "GET", cache: "no-store" }).then(function (res) {
-        return res.json().catch(function () { return {}; }).then(function (data) {
-          if (!res.ok || data.ok === false) {
-            var error = new Error(data.message || ("HTTP " + res.status));
+        return res.json().catch(function () { return null; }).then(function (data) {
+          if (!res.ok || data?.ok !== true) {
+            var error = new Error(data?.message || (res.ok ? RK_M("clips.replaykitIsNotResponding") : "HTTP " + res.status));
             error.permanent = res.status < 500 && res.status !== 429;
             throw error;
           }
           return data;
         });
+      }, function () {
+        throw new Error(RK_M("clips.replaykitCouldNotBeReached"));
       });
     }
 
@@ -707,6 +710,7 @@
       var accuracyRow = row(RK_M("editor.accuracy"), els.accuracy, ACCURACY_NOTES[prefs.accuracy]);
       els.accuracyNote = accuracyRow.querySelector(".control-note");
       auto.appendChild(accuracyRow);
+      var generateRow = el("div", "ed-gen-row");
       els.generate = el("button", "btn primary ed-gen");
       els.generate.type = "button";
       els.genFill = el("span", "ed-gen-fill");
@@ -714,20 +718,19 @@
       // the button carries the icon of the choice that led to it, like the add buttons of the other tools
       var genIcon = el("span", "ed-gen-icon");
       genIcon.innerHTML = SPARKLE_ICON;
-      els.genCancel = el("span", "ed-gen-cancel");
-      els.genCancel.setAttribute("role", "button");
+      els.genCancel = el("button", "ed-gen-cancel");
+      els.genCancel.type = "button";
+      els.genCancel.hidden = true;
       els.genCancel.setAttribute("aria-label", RK_M("editor.stopGenerating"));
       els.genCancel.dataset.tooltip = RK_M("common.stop");
       els.genCancel.innerHTML = icon("editor/close");
       els.generate.appendChild(els.genFill);
       els.generate.appendChild(genIcon);
       els.generate.appendChild(els.genLabel);
-      els.generate.appendChild(els.genCancel);
-      els.generate.addEventListener("click", function (e) {
-        if (job.busy) { if (e.target.closest(".ed-gen-cancel")) cancelJob(); return; }
-        generate();
-      });
-      auto.appendChild(els.generate);
+      els.generate.addEventListener("click", generate);
+      els.genCancel.addEventListener("click", cancelJob);
+      generateRow.append(els.generate, els.genCancel);
+      auto.appendChild(generateRow);
       els.autoStatus = el("p", "ed-status", "");
       auto.appendChild(els.autoStatus);
 
@@ -1201,6 +1204,7 @@
       restHead.appendChild(el("span", "", RK_M("common.allClips")));
       var grid = el("div", "ed-lib-grid");
       var empty = el("p", "ed-lib-empty", "");
+      empty.setAttribute("role", "status");
       [favHead, favGrid, restHead, grid, empty].forEach(function (n) { body.appendChild(n); });
       card.appendChild(body);
       veil.appendChild(card);
@@ -1218,7 +1222,7 @@
         if (sort.isOpen()) { sort.close(); return; }
         closeLibrary();
       }, { capture: true, signal: EDITOR_SIGNAL });
-      els.lib = { veil: veil, body: body, grid: grid, favGrid: favGrid, favHead: favHead, restHead: restHead, empty: empty, input: input, sortMenu: sort, sort: "newest", clips: [], cards: [] };
+      els.lib = { veil: veil, body: body, grid: grid, favGrid: favGrid, favHead: favHead, restHead: restHead, empty: empty, input: input, sortMenu: sort, sort: "newest", clips: [], cards: [], run: 0, status: "" };
       // the sort and folder buttons keep the plain hover they have on the clips page, with no grow or shrink
       if (window.RKHover) RKHover.apply(card, { control: ".ed-x", row: ".clip-sort-item" });
     }
@@ -1226,25 +1230,37 @@
     function openLibrary() {
       if (!clip) return;
       var lib = els.lib;
+      var run = ++lib.run;
       lib.veil.hidden = false;
       lib.input.value = "";
       lib.sort = "newest";
       lib.sortMenu.close();
       lib.sortMenu.paint();
-      lib.empty.textContent = RK_M("editor.loadingClips");
+      lib.status = RK_M("editor.loadingClips");
+      lib.clips = [];
+      lib.cards = [];
       lib.grid.textContent = "";
       lib.favGrid.textContent = "";
       lib.body.scrollTop = 0;
-      requestAnimationFrame(function () { lib.input.focus(); });
-      fetch(o.helper + "/clips?t=" + Date.now(), { cache: "no-store" }).then(function (res) { return res.json(); }).then(function (list) {
-        lib.clips = (Array.isArray(list) ? list : []).filter(function (c) { return c && c.name && c.duration > 0; });
+      paintLibrary();
+      requestAnimationFrame(function () { if (lib.run === run) lib.input.focus(); });
+      fetch(o.helper + "/clips?t=" + Date.now(), { cache: "no-store" }).then(async function (res) {
+        var list = await res.json();
+        if (!res.ok || !Array.isArray(list)) throw new Error(RK_M("editor.theClipsCouldNotBeListed"));
+        return list;
+      }).then(function (list) {
+        if (lib.run !== run) return;
+        lib.clips = list.filter(function (c) { return c && typeof c.name === "string" && c.name && Number.isFinite(c.duration) && c.duration > 0; });
         // the favorites of the clips page come first, the way that page splits its grid
         var favs = o.favorites ? o.favorites() : [];
         lib.cards = lib.clips.map(libraryCard);
         lib.cards.forEach(function (c) { c.favorite = favs.indexOf(c.clipName) >= 0; });
+        lib.status = "";
         sortLibrary();
       }).catch(function () {
-        lib.empty.textContent = RK_M("editor.theClipsCouldNotBeListed");
+        if (lib.run !== run) return;
+        lib.status = RK_M("editor.theClipsCouldNotBeListed");
+        paintLibrary();
       });
     }
 
@@ -1263,15 +1279,22 @@
 
     // a video from outside the clip folder, read where it lies; it is laid on like a clip of the library
     function pickVideo() {
-      if (!clip) return;
-      fetch(o.helper + "/import-video/pick", { method: "POST", cache: "no-store" }).then(function (res) { return res.json(); }).then(function (r) {
-        if (!r || r.cancelled || !clip) return;
-        if (!r.ok || typeof r.ref !== "string") throw new Error(r.message || RK_M("editor.theVideoCouldNotBeAdded"));
-        addClipLayer({ name: r.ref, duration: r.duration, width: r.width, height: r.height }, r.name || RK_M("editor.video"));
-      }).catch(function (err) { o.notify((err && err.message) || RK_M("editor.theVideoCouldNotBeAdded"), "bad", RK_M("editor.library")); });
+      var owner = clip;
+      if (!owner) return;
+      fetch(o.helper + "/import-video/pick", { method: "POST", cache: "no-store" }).then(async function (res) {
+        var r = await res.json().catch(function () { return null; });
+        if (clip !== owner || (res.ok && r?.cancelled)) return;
+        if (!res.ok || r?.ok !== true || typeof r.ref !== "string" || !Number.isFinite(r.duration) || r.duration <= 0) {
+          throw new Error(r?.message || RK_M("editor.theVideoCouldNotBeAdded"));
+        }
+        return addClipLayer({ name: r.ref, duration: r.duration, width: r.width, height: r.height }, r.name || RK_M("editor.video"));
+      }).catch(function (err) {
+        if (clip === owner) o.notify((err && err.message) || RK_M("editor.theVideoCouldNotBeAdded"), "bad", RK_M("editor.library"));
+      });
     }
 
     function closeLibrary() {
+      els.lib.run += 1;
       els.lib.sortMenu.close();
       els.lib.veil.hidden = true;
       els.lib.grid.textContent = "";
@@ -1314,22 +1337,30 @@
       var split = lib.favGrid.children.length > 0;
       lib.favHead.hidden = lib.favGrid.hidden = !split || favShown === 0;
       lib.restHead.hidden = !split || shown - favShown === 0;
-      lib.empty.textContent = lib.clips.length === 0 ? RK_M("editor.thereAreNoClipsInThe") : shown === 0 ? RK_M("editor.noClipsMatchThat") : "";
+      lib.empty.textContent = lib.status || (lib.clips.length === 0 ? RK_M("editor.thereAreNoClipsInThe") : shown === 0 ? RK_M("editor.noClipsMatchThat") : "");
     }
 
     async function addClipLayer(c, title) {
       var source = clip;
+      if (!source) return;
       try { await o.protect([c.name]); }
-      catch (err) { o.notify((err && err.message) || RK_M("editor.theClipIsProcessing"), "bad", RK_M("editor.library")); return; }
-      if (!clip || clip !== source) return;
-      var id = lanes.addLayer({ kind: "clip", ref: c.name, name: title, len: c.duration, dur: c.duration, aspect: c.width > 0 && c.height > 0 ? c.height / c.width : 0.5625, w: 1 });
+      catch (err) {
+        if (clip === source) o.notify((err && err.message) || RK_M("editor.theClipIsProcessing"), "bad", RK_M("editor.library"));
+        return;
+      }
+      if (clip !== source) return;
+      var id;
+      try { id = lanes.addLayer({ kind: "clip", ref: c.name, name: title, len: c.duration, dur: c.duration, aspect: c.width > 0 && c.height > 0 ? c.height / c.width : 0.5625, w: 1 }); }
+      catch (err) { o.notify((err && err.message) || RK_M("editor.theVideoCouldNotBeAdded"), "bad", RK_M("editor.library")); return; }
       closeLibrary();
       if (!id) { o.notify(RK_M("editor.thereIsNoRoomForAnother"), "bad", RK_M("editor.library")); return; }
       // the sound of the clip comes in as a row of its own linked to the clip, so it follows it; a clip without sound adds none
-      helperJson("/import-audio/clip?name=" + encodeURIComponent(c.name), "POST").then(function (r) {
-        if (r && r.ok && r.id) return lanes.placeImportAt(r.id, null, id);
-        return null;
-      }).catch(function () {});
+      var audio = helperJson("/import-audio/clip?name=" + encodeURIComponent(c.name), "POST").then(function (r) {
+        if (clip !== source) return null;
+        if (r?.ok !== true || typeof r.id !== "string" || !r.id) throw new Error(RK_M("editor.theAudioCouldNotBeImported"));
+        return r.id;
+      });
+      return lanes.placeImportAt(audio, null, id);
     }
 
     // elements: shapes drawn in a colour, stickers, and gifs or pictures from the computer; each goes over the video at the playhead for five seconds
@@ -1584,19 +1615,25 @@
     }
 
     // a picture the page drew goes to the helper as png and comes back as a layer
-    function uploadPicture(canvas, name, aspect) {
-      return new Promise(function (resolve, reject) { canvas.toBlob(function (b) { if (b) resolve(b); else reject(new Error(RK_M("editor.thePictureCouldNotBeMade"))); }, "image/png"); })
-        .then(function (blob) { return fetch(o.helper + "/import-media/upload?name=" + encodeURIComponent(name), { method: "POST", cache: "no-store", body: blob }); })
-        .then(function (res) { return res.json(); })
-        .then(function (r) {
-          if (!r || !r.ok) throw new Error((r && r.message) || RK_M("editor.theElementCouldNotBeAdded"));
-          if (!lanes.addLayer({ kind: "media", ref: r.id, name: name, aspect: aspect, w: 0.25 })) throw new Error(RK_M("editor.thereIsNoRoomForAnother"));
-        });
+    async function uploadPicture(canvas, name, aspect) {
+      var owner = clip;
+      if (!owner) return;
+      var blob = await new Promise(function (resolve) { canvas.toBlob(resolve, "image/png"); });
+      if (clip !== owner) return;
+      if (!blob) throw new Error(RK_M("editor.thePictureCouldNotBeMade"));
+      var res = await fetch(o.helper + "/import-media/upload?name=" + encodeURIComponent(name), { method: "POST", cache: "no-store", body: blob });
+      var r = await res.json();
+      if (clip !== owner) return;
+      if (!r || !r.ok) throw new Error((r && r.message) || RK_M("editor.theElementCouldNotBeAdded"));
+      if (!lanes.addLayer({ kind: "media", ref: r.id, name: name, aspect: aspect, w: 0.25 })) throw new Error(RK_M("editor.thereIsNoRoomForAnother"));
     }
 
     function busy(tile, promise) {
+      var owner = clip;
       tile.classList.add("is-busy");
-      return promise.catch(function (err) { o.notify((err && err.message) || RK_M("editor.theElementCouldNotBeAdded"), "bad", RK_M("editor.elements")); })
+      return promise.catch(function (err) {
+        if (clip === owner) o.notify((err && err.message) || RK_M("editor.theElementCouldNotBeAdded"), "bad", RK_M("editor.elements"));
+      })
         .then(function () { tile.classList.remove("is-busy"); });
     }
 
@@ -1615,6 +1652,8 @@
 
     // a text sticker goes to the helper as the png it is drawn into, a 3d one as its png and an animated one as its gif, so the saved copy plays it too
     function addSticker(x, tile) {
+      var owner = clip;
+      if (!owner) return;
       var failed = function () { throw new Error(RK_M("editor.theStickerCouldNotBeLoaded")); };
       var made;
       if (x.kind === "text") {
@@ -1627,10 +1666,12 @@
         made = fetch(url, { cache: "force-cache" }).then(function (res) { if (!res.ok) failed(); return res.blob(); }, failed).then(function (b) { return { blob: b, aspect: 1 }; });
       }
       busy(tile, made.then(function (m) {
+        if (clip !== owner) return;
         if (!m.blob) throw new Error(RK_M("editor.theStickerCouldNotBeMade"));
         return fetch(o.helper + "/import-media/upload?name=" + encodeURIComponent(x.name), { method: "POST", cache: "no-store", body: m.blob })
           .then(function (res) { return res.json(); })
           .then(function (r) {
+            if (clip !== owner) return;
             if (!r || !r.ok) throw new Error((r && r.message) || RK_M("editor.theStickerCouldNotBeAdded"));
             if (!lanes.addLayer({ kind: "media", ref: r.id, name: x.name, aspect: m.aspect, w: x.kind === "text" ? 0.28 : 0.2, gif: !!r.gif })) throw new Error(RK_M("editor.thereIsNoRoomForAnother"));
           });
@@ -1639,25 +1680,36 @@
 
     // files from the picker of the helper; the shape of each is read off the picture before it is laid on
     function pickMedia() {
+      var owner = clip;
+      if (!owner) return;
       // closing the picker without a file answers ok false and cancelled, which is not an error
-      fetch(o.helper + "/import-media/pick", { method: "POST", cache: "no-store" }).then(function (res) { return res.json(); }).then(function (r) {
-        if (!r || r.cancelled) return;
-        if (!r.ok || !Array.isArray(r.files)) throw new Error(r.message || RK_M("editor.theFilesCouldNotBeAdded"));
+      fetch(o.helper + "/import-media/pick", { method: "POST", cache: "no-store" }).then(async function (res) {
+        var r = await res.json().catch(function () { return null; });
+        if (clip !== owner || (res.ok && r?.cancelled)) return;
+        if (!res.ok || r?.ok !== true || !Array.isArray(r.files)) throw new Error(r?.message || RK_M("editor.theFilesCouldNotBeAdded"));
         var bad = [];
-        r.files.reduce(function (chain, f) {
+        return r.files.reduce(function (chain, f) {
           return chain.then(function () {
+            if (clip !== owner) return null;
             if (!f.ok) { bad.push(RK_M("editor.nameError", { name: f.name, error: f.message })); return null; }
             return new Promise(function (resolve) {
               var img = new Image();
-              img.onload = function () { resolve(img.naturalWidth > 0 ? img.naturalHeight / img.naturalWidth : 1); };
-              img.onerror = function () { resolve(1); };
+              img.onload = function () { resolve(img.naturalWidth > 0 && img.naturalHeight > 0 ? img.naturalHeight / img.naturalWidth : null); };
+              img.onerror = function () { resolve(null); };
               img.src = o.helper + "/import-media/file?id=" + encodeURIComponent(f.id);
             }).then(function (aspect) {
+              if (clip !== owner) return;
+              if (aspect == null) {
+                bad.push(RK_M("editor.nameError", { name: f.name, error: RK_M("editor.thePictureCouldNotBeMade") }));
+                return;
+              }
               if (!lanes.addLayer({ kind: "media", ref: f.id, name: f.name, aspect: aspect, w: 0.3, gif: !!f.gif })) bad.push(RK_M("editor.nameThereIsNoRoomFor", { name: f.name }));
             });
           });
-        }, Promise.resolve()).then(function () { if (bad.length) o.notify(bad.join("\n"), "bad", RK_M("editor.elements")); });
-      }).catch(function (err) { o.notify((err && err.message) || RK_M("editor.theFilesCouldNotBeAdded"), "bad", RK_M("editor.elements")); });
+        }, Promise.resolve()).then(function () { if (clip === owner && bad.length) o.notify(bad.join("\n"), "bad", RK_M("editor.elements")); });
+      }).catch(function (err) {
+        if (clip === owner) o.notify((err && err.message) || RK_M("editor.theFilesCouldNotBeAdded"), "bad", RK_M("editor.elements"));
+      });
     }
 
     function buildRecord(pane) {
@@ -1753,18 +1805,17 @@
       var state = lanes.importState();
       els.importBtn.disabled = !state.ready || state.picking;
       els.importNote.textContent = !state.ready ? RK_M("editor.audioCannotBeAddedToThis2") : state.importing > 0 ? RK_M("editor.addingAudio") : "";
-      // a running job keeps the button live so its cross can stop it
-      els.generate.disabled = !job.busy && (!clip || !clip.audio);
+      els.generate.disabled = job.busy || !clip || !clip.audio;
       els.autoStatus.textContent = clip && !clip.audio ? RK_M("editor.thisClipHasNoAudioTo") : "";
     }
 
-    // a track of the clip clicked on the timeline while the subtitles tab is open becomes what auto subtitles listen to
+    // the selected source tracks become what auto subtitles listen to
     function followTrack() {
       var track = subs.selectedTrack();
       if (track === lastTrack) return;
+      if (!prefs.open || prefs.tab !== "subtitles" || els.listenRow.hidden) return;
       lastTrack = track;
-      if (track == null || !prefs.open || prefs.tab !== "subtitles" || els.listenRow.hidden) return;
-      els.listen.setValue(String(track));
+      if (track != null) els.listen.setValue(track);
     }
 
     function paintSubEdit(list, rows) {
@@ -1835,11 +1886,16 @@
 
     function setProgress(text, pct) {
       var on = text != null;
+      var focused = document.activeElement;
       els.generate.classList.toggle("is-working", on);
       els.generate.setAttribute("aria-busy", on ? "true" : "false");
+      els.generate.disabled = on || !clip || !clip.audio;
+      els.genCancel.hidden = !on;
       var stopLabel = job.waitingForInstall ? RK_M("editor.stopWaitingForSpeech") : RK_M("editor.stopGenerating");
       els.genCancel.setAttribute("aria-label", stopLabel);
       els.genCancel.dataset.tooltip = job.waitingForInstall ? stopLabel : RK_M("common.stop");
+      if (on && focused === els.generate) els.genCancel.focus({ preventScroll: true });
+      if (!on && focused === els.genCancel && !els.generate.disabled) els.generate.focus({ preventScroll: true });
       if (!on) {
         els.genFill.style.width = "0%";
         els.genLabel.textContent = RK_M("editor.generateSubtitles");
@@ -1969,7 +2025,7 @@
     function paintRecord() {
       els.recBtn.classList.toggle("is-on", rec.on);
       els.recBtn.setAttribute("aria-label", rec.on ? RK_M("common.stopRecording") : RK_M("common.startRecording"));
-      els.recBtn.disabled = rec.starting || !lanes.importState().ready && !rec.on;
+      els.recBtn.disabled = rec.starting || rec.stopping || !lanes.importState().ready && !rec.on;
       els.recLabel.textContent = rec.on ? RK_M("common.stopRecording2") : RK_M("common.startRecording2");
       els.recHint.textContent = rec.on ? RK_M("editor.recordingEllipsis") : RK_M("editor.recordYourVoice");
       var t = els.rail.querySelector('[data-tab="record"]');
@@ -1977,42 +2033,50 @@
     }
 
     function startRecording() {
-      if (rec.on || rec.starting || !clip) return;
+      if (rec.on || rec.starting || rec.stopping || !clip) return;
       if (!lanes.importState().ready) { o.notify(RK_M("editor.audioCannotBeAddedToThis2"), "bad", RK_M("common.record")); return; }
       rec.starting = true;
       paintRecord();
       var owner = clip;
       var device = els.mic.value();
       helperJson("/voiceover/start" + (device ? "?device=" + encodeURIComponent(device) : ""), "POST").then(function () {
+        if (clip !== owner) {
+          return helperJson("/voiceover/stop?keep=0", "POST").then(function () {
+            rec.starting = false;
+            paintRecord();
+          });
+        }
         rec.starting = false;
-        if (clip !== owner) { helperJson("/voiceover/stop?keep=0", "POST").catch(function () {}); paintRecord(); return; }
         rec.on = true;
         rec.idle = 0;
         rec.peaks = [];
-        rec.t0 = performance.now();
         rec.lag = 0;
         rec.startT = subs.now();
         if (!prefs.hear) o.setQuiet(true);
-        var startedAt = performance.now();
-        o.play();
-        // the microphone was already running when playback was asked for, so the time until the picture moves is cut from the front of the take
-        o.video.addEventListener("playing", function once() {
-          o.video.removeEventListener("playing", once);
-          rec.lag = (performance.now() - startedAt) / 1000;
-        });
+        if (!o.isPlaying()) {
+          // cut the wait for playback from the start of a take when the video was paused
+          var startedAt = performance.now();
+          rec.onPlaying = function () {
+            rec.onPlaying = null;
+            rec.lag = (performance.now() - startedAt) / 1000;
+          };
+          o.video.addEventListener("playing", rec.onPlaying, { once: true });
+          o.play();
+        }
         paintRecord();
-        meterLoop();
+        meterLoop(++rec.run);
       }).catch(function (err) {
         rec.starting = false;
         paintRecord();
-        o.notify((err && err.message) || RK_M("editor.theMicrophoneCouldNotBeStarted"), "bad", RK_M("common.record"));
+        if (clip === owner) o.notify((err && err.message) || RK_M("editor.theMicrophoneCouldNotBeStarted"), "bad", RK_M("common.record"));
       });
     }
 
-    function meterLoop() {
-      if (!rec.on) return;
+    function meterLoop(run) {
+      if (!rec.on || run !== rec.run) return;
+      var next = function () { meterLoop(run); };
       helperJson("/voiceover/level").then(function (l) {
-        if (!rec.on) return;
+        if (!rec.on || run !== rec.run) return;
         paintTime(l.seconds || 0);
         rec.peaks.push(l.peak || 0);
         if (rec.peaks.length > WAVE_BARS) rec.peaks.shift();
@@ -2021,14 +2085,19 @@
         // the clip stopping (the end of the cut, a pause) is the end of the take
         rec.idle = o.isPlaying() ? 0 : rec.idle + 1;
         if (rec.idle >= 3) { stopRecording(true); return; }
-        rec.timer = setTimeout(meterLoop, 120);
-      }).catch(function () { if (rec.on) rec.timer = setTimeout(meterLoop, 300); });
+        rec.timer = setTimeout(next, 120);
+      }).catch(function () { if (rec.on && run === rec.run) rec.timer = setTimeout(next, 300); });
     }
 
     function stopRecording(keep) {
       if (!rec.on) return;
       rec.on = false;
+      rec.stopping = true;
       clearTimeout(rec.timer);
+      if (rec.onPlaying) {
+        o.video.removeEventListener("playing", rec.onPlaying);
+        rec.onPlaying = null;
+      }
       if (o.isPlaying()) o.pause();
       o.setQuiet(false);
       rec.peaks = [];
@@ -2038,7 +2107,10 @@
       var owner = clip;
       var at = rec.startT;
       var lead = rec.lag;
-      helperJson("/voiceover/stop?keep=" + (keep && clip ? "1" : "0"), "POST").then(function (r) {
+      helperJson("/voiceover/stop?keep=" + (keep && clip ? "1" : "0"), "POST").finally(function () {
+        rec.stopping = false;
+        paintRecord();
+      }).then(function (r) {
         if (!r.kept || !owner || clip !== owner) return;
         return lanes.placeImportAt(r.import.id, at, null, lead);
       }).catch(function (err) {
@@ -2062,7 +2134,7 @@
           els.mic.setOptions(list, prefs.mic);
         });
       }).catch(function () {
-        els.mic.setOptions([["", RK_M("editor.settingsMicrophone"), "", "Uses noise suppression and input sensitivity from Settings > Audio."]], "");
+        els.mic.setOptions([["", RK_M("editor.settingsMicrophone"), "", RK_M("editor.usesSettingsAudioProcessing")]], "");
       });
     }
 

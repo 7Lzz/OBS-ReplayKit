@@ -1,0 +1,27 @@
+<script>
+(function () {
+  if (window.RKProgress) return;
+
+  // carry velocity between measured samples so an update bends the motion
+  function step(m, now, smoothTime) {
+    const dt = m.lastT ? Math.min(0.05, (now - m.lastT) / 1000) : 0.016;
+    m.lastT = now;
+    const omega = 2 / smoothTime;
+    const x = omega * dt;
+    const decay = 1 / (1 + x + 0.48 * x * x + 0.235 * x * x * x);
+    const change = m.shown - m.target;
+    const temp = (m.vel + omega * change) * dt;
+    m.vel = (m.vel - omega * temp) * decay;
+    m.shown = m.target + (change + temp) * decay;
+    if (m.shown > m.target) {
+      m.shown = m.target;
+      m.vel = 0;
+    }
+    const moving = m.target - m.shown > 0.08 || m.vel > 0.4;
+    if (!moving) m.shown = m.target;
+    return moving;
+  }
+
+  window.RKProgress = { step };
+})();
+</script>

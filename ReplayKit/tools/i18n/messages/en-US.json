@@ -587,6 +587,10 @@
     "context": "Text in a ReplayKit window, sent by the background helper. Also used in the game picker of the clips library.",
     "text": "Desktop"
   },
+  "clips.deletingDraft": {
+    "context": "Status shown while Clips waits for a draft deletion to finish.",
+    "text": "Deleting draft..."
+  },
   "clips.draftDeleted": {
     "context": "Short notice that pops up in the clips library.",
     "text": "Draft deleted"
@@ -602,6 +606,10 @@
   "clips.dragToResizeCardsDoubleClick": {
     "context": "Tooltip in the clips library.",
     "text": "Drag to resize cards, double-click to reset"
+  },
+  "clips.duplicatingClip": {
+    "context": "Status shown while Clips is copying a clip on disk.",
+    "text": "Duplicating clip..."
   },
   "clips.duplicateFailedError": {
     "context": "Short notice that pops up in the clips library. Keep {error} as written.",
@@ -1128,8 +1136,8 @@
     "text": "{name} (set by you)"
   },
   "clips.namesCanTContainChars": {
-    "context": "Short notice that pops up in the clips library. Keep {chars} as written.",
-    "text": "Names can’t contain {chars}"
+    "context": "Toast after typing or pasting characters that cannot be used to rename a clip, screenshot, or GIF. {chars} holds one or more rejected characters.",
+    "text": "Windows doesn’t allow {chars} in file names."
   },
   "clips.newest": {
     "context": "Name of a setting in the toolbar of the clips library. Also used in the clips library, the tools panel of the clip editor (subtitles, elements, audio).",
@@ -5420,8 +5428,8 @@
     "text": "Trim start"
   },
   "editor.trimTheAudioWithTheVideo": {
-    "context": "Text in the timeline of the clip editor.",
-    "text": "Trim the audio with the video"
+    "context": "Tooltip and accessible label of the clip editor timeline switch that groups video and audio tracks for editing.",
+    "text": "Group tracks"
   },
   "editor.trimTimeline": {
     "context": "Screen reader label in the clip editor.",

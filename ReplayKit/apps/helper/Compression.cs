@@ -173,6 +173,7 @@ namespace ReplayKitHelper
                     ["encoders"] = encoders,
                     ["fastEncoder"] = fast,
                     ["smallerEncoder"] = smaller,
+                    ["videoEncodeProgress"] = SupportsVideoEncodeProgress(ffmpeg),
                     ["cpuCount"] = Environment.ProcessorCount,
                 };
                 Log.Write(string.Format("capabilities: fast={0} smaller={1} hevcn={2} h264n={3} hevca={4} h264a={5} hevcq={6} h264q={7} x265={8}",
@@ -184,6 +185,21 @@ namespace ReplayKitHelper
                 Server.State.Capabilities = caps;
                 Server.State.CapabilitiesAt = now;
                 return caps;
+            }
+        }
+
+        private static bool SupportsVideoEncodeProgress(string ffmpeg)
+        {
+            if (string.IsNullOrEmpty(ffmpeg)) return false;
+            try
+            {
+                var help = InvokeNativeCapture(ffmpeg, new[] { "-hide_banner", "-h", "full" }, timeoutMs: 5000, lowPriority: true);
+                return help.ExitCode == 0 && help.Output.Any(line => line.StartsWith("-stats_enc_post_fmt", StringComparison.Ordinal));
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is System.ComponentModel.Win32Exception || ex is TimeoutException)
+            {
+                Log.Write("Compression progress capability check: " + ex.Message);
+                return false;
             }
         }
 

@@ -2183,6 +2183,7 @@
   let historySource = null;
   // set while a save is on its way. a resolution change re-applies OBS video settings live (stop outputs -> obs_reset_video -> restart), and letting a second one start before the first finishes can deadlock OBS -- so one save runs at a time and edits made meanwhile go out with the next one.
   let saveInFlight = false;
+  let restartPending = false;
   const AUTO_SAVE_DELAY_MS = 400;
   let autoSaveTimer = 0;
   // what the footer says besides the restart note: a save that failed or warned, or the restart on its way
@@ -2734,9 +2735,10 @@
   function updateFooter() {
     const restart = needsObsRestart();
     els.restartObsBtn.hidden = !restart;
-    const text = saveNote.text || (restart ? RK_M("settings.someChangesTakeEffectAfterObsRestarts") : "");
+    els.restartObsBtn.disabled = restartPending;
+    const text = restartPending ? RK_M("clips.saving") : saveNote.text || (restart ? RK_M("settings.someChangesTakeEffectAfterObsRestarts") : "");
     if (els.saveNote.textContent !== text) els.saveNote.textContent = text;
-    els.saveNote.classList.toggle("bad", !!saveNote.text && saveNote.bad);
+    els.saveNote.classList.toggle("bad", !restartPending && !!saveNote.text && saveNote.bad);
     updateHistoryButtons();
     reportDirty();
     publishQuickActions();
@@ -2756,7 +2758,7 @@
   }
 
   // the shell drops a view that has been out of sight for a while, and changes not saved yet or a save on its way would go with it
-  window.__rkCanUnload = () => !dirty && !saveInFlight;
+  window.__rkCanUnload = () => !dirty && !saveInFlight && !restartPending;
 
   // record is an edit made here, which saves itself; a refresh of what was saved is not, and neither is a save that failed, which waits for the next edit
   function markDirty(record = true) {
@@ -4556,19 +4558,23 @@
         headers:{ "Content-Type":"application/json" },
         body:JSON.stringify(changes),
       });
+      if (data?.ok !== true || !data.settings || typeof data.settings !== "object" || Array.isArray(data.settings) || !Object.keys(data.settings).length) {
+        throw new Error(RK_M("clips.replaykitIsNotResponding"));
+      }
     } catch (e) {
       saveNote = { text:RK_M("settings.couldNotSaveTheSettingsError", { error: e.message || e }), bad:true };
       return false;
     }
     lastServerSettings = clone(data.settings);
-    adoptSavedSettings(data.settings || {}, body);
+    adoptSavedSettings(data.settings, body);
     // the scene item now sits where the preview drew it, so let the poll follow obs again, unless the overlay moved while this was on its way
     if (window.RKOverlayPreview && sameSetting(state.overlayPosition, body.overlayPosition) && state.overlayStyle === body.overlayStyle) RKOverlayPreview.positionApplied();
     // a "custom" icon gets filed as a saved one server-side -- reflect the new tile + selection
     if (["appIcon", "appIconCustomPath", "theme", "themeCustom"].some((key) => !sameSetting(body[key], before[key]))) RKAppearance.refresh();
-    const warnings = data.warnings || [];
-    if (warnings.length) saveNote = { text:warnings.join(" "), bad:true };
-    else saveNote = { text:restart ? RK_M("settings.settingsSavedObsIsRestarting") : "", bad:false };
+    const notes = Array.isArray(data.warnings) ? data.warnings.slice() : [];
+    const warned = notes.length > 0;
+    if (data.restartRequired === true) notes.unshift(RK_M("settings.settingsSavedObsIsRestarting"));
+    saveNote = { text:notes.join(" "), bad:warned };
     return true;
   }
 
@@ -4626,7 +4632,7 @@
 
   // true while an edit or a save is under way -- the 2s external poll must not overwrite state then.
   function externalRefreshBusy() {
-    return saveInFlight || !!autoSaveTimer || editInProgress() || !!document.querySelector(".combo.is-open");
+    return restartPending || saveInFlight || !!autoSaveTimer || editInProgress() || !!document.querySelector(".combo.is-open");
   }
 
   let _externalRefreshInFlight = false;
@@ -4853,8 +4859,16 @@
 
   // the button stays as it is while other edits save, so a click that lands during one waits for it and then restarts
   els.restartObsBtn.addEventListener("click", async () => {
-    while (saveInFlight) await saveRun.catch(() => false);
-    saveSettings(true);
+    if (restartPending || !needsObsRestart()) return;
+    restartPending = true;
+    updateFooter();
+    try {
+      while (saveInFlight) await saveRun.catch(() => false);
+      if (needsObsRestart()) await saveSettings(true);
+    } finally {
+      restartPending = false;
+      updateFooter();
+    }
   });
   els.openLogFolderBtn.addEventListener("click", async () => {
     els.logFolderStatusLine.textContent = "";

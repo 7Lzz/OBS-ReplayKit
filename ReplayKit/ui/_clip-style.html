@@ -2123,8 +2123,8 @@
 
   /* the save popup: the editor is locked behind it while the copy or the new original is written, and it follows the encode of the helper. it sits over the editor and the toast and under an error popup */
   #save-veil { z-index: 70; }
-  /* a save that is over in a moment never shows the card: the page is locked at once, and the card only comes up when the wait is long enough to notice */
-  #save-veil.is-quiet { background: transparent; animation: none; }
+  /* a fast screenshot shows its busy button while the transparent veil holds the editor */
+  #save-veil.is-quiet { opacity: 0; transition: none; }
   #save-veil.is-quiet .save-modal { visibility: hidden; animation: none; }
   .save-modal { width: 380px; max-width: calc(100vw - 48px); }
   .save-modal [hidden] { display: none; }
@@ -2133,6 +2133,7 @@
   .save-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; border-radius: inherit; background: var(--link_accent); }
   /* until the encode has started the bar slides instead of sitting empty */
   .save-track.is-waiting .save-fill { width: 34%; animation: save-slide 1.15s ease-in-out infinite; }
+  .save-track.is-complete .save-fill { transition: width var(--anim_press) var(--ease_smooth); }
   @keyframes save-slide { from { transform: translateX(-100%); } to { transform: translateX(300%); } }
   .save-line { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-top: 8px; font-size: 12px; color: var(--text); font-variant-numeric: tabular-nums; }
   .save-percent { color: var(--text_muted); }
@@ -2194,6 +2195,7 @@
   #trim-veil .editor-top .btn, .ed-tools .btn:not(.tl-mini), .ed-sub-edit .btn:not(.tl-mini), .ed-fx-card .btn { --hover_grow: 1.01; --press_shrink: .99; }
   /* the layout is there, unseen, while the clip loads, so the timeline is built at the size it will be shown at */
   #trim-veil.is-measuring { display: flex; visibility: hidden; }
+  #trim-veil.is-open { animation: none; }
   #trim-veil.is-open .modal { animation: none; }
   .trim-modal {
     /* every track of the timeline, the video row and the audio rows alike, is this tall */
@@ -2327,9 +2329,9 @@
     .editor-side { max-height: 34vh; }
   }
   /* stands in for the edit menu itself (a separate veil/modal, not an overlay on top of it) until the clips real duration is known and the trim bar/handles are set up from it -- the real editor only ever pops up once, already correct, instead of popping up early showing stale slider positions and an unloaded video. */
-  #trim-processing-veil { background: var(--grey7); }
+  #trim-processing-veil { background: var(--grey7); z-index: 41; }
   /* the shape of the editor while it loads (drawEditorSkeleton in clip-app.js); the wave over its blocks already says it is working, so the spinner goes */
-  .trim-processing-bones { position: absolute; inset: 0; }
+  .trim-processing-bones { position: absolute; inset: 0; overflow: clip; pointer-events: none; }
   #trim-processing-veil.has-bones .trim-processing-spinner { display: none; }
   .trim-processing-modal {
     position: relative;
@@ -2953,6 +2955,37 @@
   .modal-veil.is-open { animation: rk-veil-in 130ms ease both; }
   .modal-veil.is-open .modal { animation: rk-modal-in 190ms var(--ease_pop) both; }
   .toast.is-shown { animation: rk-toast-in 160ms var(--ease_pop) both; }
+  .modal-veil.modal-motion {
+    display: flex;
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+    animation: none;
+    transition: opacity var(--anim_press) ease-out, visibility 0s linear var(--anim_press);
+  }
+  .modal-veil.modal-motion.is-open {
+    visibility: visible;
+    opacity: 1;
+    pointer-events: auto;
+    transition-delay: 0s;
+  }
+  .modal-veil.modal-motion > .modal {
+    animation: none;
+    transform: translateY(5px) scale(.988);
+    transition: transform var(--anim_press) ease-out;
+  }
+  .modal-veil.modal-motion.is-open > .modal {
+    transform: none;
+    transition: transform var(--anim_menu) var(--ease_smooth);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .modal-veil.modal-motion, .modal-veil.modal-motion > .modal,
+    .modal-veil.modal-motion.is-open > .modal, .save-track.is-complete .save-fill { transition: none; }
+    .save-track.is-waiting .save-fill { visibility: hidden; }
+    .save-track.is-waiting .save-fill, .trim-processing-spinner, .editor-screenshot-spinner,
+    .toast.is-shown { animation: none; }
+    #trim-processing-veil .rk-skel-bone::after { display: none; }
+  }
 </style>
 
 <style>
@@ -2966,11 +2999,23 @@
   .export-gif-item[aria-disabled="true"] { opacity:.5; cursor:default; background:transparent; }
   .section-heading .section-drag:active { cursor:grabbing; }
   .section-heading .section-drag { touch-action:none; }
-  /* a name box that is being saved holds still and says so; a character that cannot be in a file name gives it a small shake */
+  /* the red highlight and shake share the same rejection animation */
   .name-edit-input.is-saving { opacity:.6; cursor:progress; }
   .name-edit-input.is-invalid { outline:1px solid var(--red); outline-offset:-1px; }
-  .name-edit-input.is-rejected { animation:rk-name-reject 260ms ease-out; }
-  @keyframes rk-name-reject { 20% { transform:translateX(-3px); } 45% { transform:translateX(3px); } 70% { transform:translateX(-2px); } 100% { transform:none; } }
+  .name-edit-input.is-rejected { --name-shake-distance:3px; animation:rk-name-reject 260ms ease-out; }
+  @media (prefers-reduced-motion: reduce) {
+    .name-edit-input.is-rejected { --name-shake-distance:1px; }
+  }
+  @keyframes rk-name-reject {
+    from, to {
+      border-color:var(--red);
+      background-color:color-mix(in srgb, var(--red) 18%, var(--grey7));
+      transform:none;
+    }
+    20% { transform:translateX(calc(-1 * var(--name-shake-distance))); }
+    45% { transform:translateX(var(--name-shake-distance)); }
+    70% { transform:translateX(calc(-.67 * var(--name-shake-distance))); }
+  }
   /* while a section is carried every section folds to its heading, the carried heading floats over the others and they glide aside, the same motion as a track carried in the editor */
   body.is-section-sorting :is(#favorites-grid,#linked-grid,#drafts-grid,#top-spacer,#grid,#bottom-spacer,#empty,#screenshots-grid,#screenshots-empty,#gifs-grid,#gifs-empty) { display:none !important; }
   body.is-section-sorting, body.is-section-sorting * { cursor:grabbing !important; user-select:none; }
