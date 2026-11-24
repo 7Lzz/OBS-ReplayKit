@@ -14,6 +14,22 @@
   .clip-game-icon { display:inline-flex; position:relative; flex:none; width:16px; height:16px; align-items:center; justify-content:center; }
   .clip-game-icon svg, .clip-game-icon img { width:100%; height:100%; object-fit:contain; fill:currentColor; }
   .clip-game-icon img { position:absolute; inset:0; }
+  .clip-game-mix {
+    width:auto; height:14px; align-items:flex-start; isolation:isolate;
+    --mix-overlap:-3px; --mix-second-offset:4px; --mix-third-offset:4px;
+    --mix-tile-surface:var(--bg_card,var(--grey6));
+  }
+  .clip-game-mix:is([data-count="3"], [data-count="4"]) { --mix-overlap:-4px; }
+  .clip-game-mix[data-count="3"] { --mix-second-offset:2px; }
+  .clip-game-mix[data-count="4"] { --mix-second-offset:1px; --mix-third-offset:3px; }
+  .clip-game-mix > .clip-game-icon {
+    width:10px; height:10px; border-radius:2.2px; overflow:hidden;
+    background:var(--mix-tile-surface); box-shadow:0 0 0 .9px var(--mix-tile-surface);
+  }
+  .clip-game-mix > .clip-game-icon + .clip-game-icon { margin-left:var(--mix-overlap); }
+  .clip-game-mix > :nth-child(2) { top:var(--mix-second-offset); }
+  .clip-game-mix > :nth-child(3) { top:var(--mix-third-offset); }
+  .clip-game-mix > :nth-child(4) { top:4px; }
   .clip-game-icon > img[data-artwork] { visibility:hidden; }
   #clip-type-filter .clip-type-icon[data-type="favorites"], #clip-type-filter .combo-option[data-value="favorites"] .combo-option-icon { color:var(--favorite, #facc15); }
   .clip-game-icon.is-ready > svg { visibility:hidden; }
@@ -27,10 +43,9 @@
   .combo-search:focus { border-color:var(--selected2); }
   .clip-game-badge { position:relative; display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; flex:none; vertical-align:middle; color:var(--muted); outline-offset:2px; }
   .clip-filter.has-filters > .combo-button { border-color:var(--selected2); }
-  .clip-game-badge svg, .clip-game-badge img { width:14px; height:14px; object-fit:contain; fill:currentColor; }
-  .clip-game-badge img { position:absolute; }
+  .clip-game-badge:has(> .clip-game-mix) { width:auto; }
   .clip-game-badge:focus-visible { outline:2px solid var(--selected2); border-radius:3px; }
-  .clip-game-badge > .clip-game-icon { width:14px; height:14px; }
+  .clip-game-badge > .clip-game-icon:not(.clip-game-mix) { width:14px; height:14px; }
   .clip-game-badge.is-changeable { cursor:pointer; border-radius:3px; transition:color 90ms linear, transform var(--anim_press,130ms) var(--ease_pop,ease); }
   .clip-game-badge.is-changeable:hover { color:var(--text); transform:scale(var(--hover_grow,1.08)); }
   .clip-game-badge.is-changeable:active { transform:scale(var(--press_shrink,.94)); }
@@ -48,18 +63,22 @@
   .game-picker-search { box-sizing:border-box; width:calc(100% - 48px); margin:0 24px 10px; padding:8px 10px; border:1px solid var(--grey3); border-radius:4px; background:var(--window); color:var(--text); font:inherit; font-size:13px; outline:none; transition:border-color 90ms linear; }
   .game-picker-search:focus { border-color:var(--primary_light,var(--selected2)); }
   .game-picker-list { flex:1; min-height:0; overflow-y:auto; margin-right:6px; padding:10px 12px 10px 24px; border-top:1px solid var(--grey3); }
-  .game-picker-entry { display:flex; align-items:center; gap:4px; }
-  .game-picker-entry > .game-picker-choice { flex:1; min-width:0; width:auto; }
+  .game-picker-mix { margin-bottom:8px; padding-bottom:8px; border-bottom:1px solid var(--grey3); }
+  .game-picker-member { display:flex; align-items:center; gap:10px; min-height:32px; padding:0 3px 0 10px; font-size:13px; }
+  .game-picker-member > span.game-picker-name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .game-picker-remove { display:grid; place-items:center; flex:none; width:28px; height:28px; padding:6px; border:0; border-radius:4px; background:transparent; color:var(--text_muted,var(--muted)); cursor:pointer; }
   .game-picker-remove:hover, .game-picker-remove:focus-visible { color:var(--danger,var(--text)); background:var(--button_bg_hover,var(--grey3)); }
   .game-picker-remove svg { width:14px; height:14px; fill:currentColor; }
   .game-picker-section { margin:12px 0 4px; color:var(--text_muted,var(--muted)); font-size:12px; font-weight:700; }
   .game-picker-choice { display:flex; width:100%; gap:10px; align-items:center; padding:8px 10px; border:0; border-radius:4px; background:transparent; color:var(--text); font:inherit; font-size:13px; text-align:left; cursor:pointer; transition:background-color 90ms linear; }
   .game-picker-choice:hover, .game-picker-choice:focus-visible { background:var(--button_bg_hover,var(--grey3)); outline:none; }
-  .game-picker-choice > .clip-game-icon { width:16px; height:16px; color:var(--text_muted,var(--muted)); }
+  .game-picker-choice > .clip-game-icon { color:var(--text_muted,var(--muted)); }
   .game-picker-choice > .game-picker-name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .game-picker-choice > .game-picker-check { width:14px; height:14px; flex:none; fill:var(--primary_light,var(--selected2)); }
   .game-picker-choice[aria-current="true"] { font-weight:600; }
+  .game-picker-choice:disabled { cursor:default; }
+  .game-picker-choice:disabled:hover { background:transparent; }
+  .game-picker-mix-add[aria-pressed="true"] { color:var(--primary_light,var(--selected2)); }
   .game-picker-caret { width:14px; height:14px; flex:none; fill:currentColor; transition:transform var(--anim_fast,150ms) var(--ease_smooth,ease); }
   .game-picker-choice[aria-expanded="true"] .game-picker-caret { transform:rotate(180deg); }
   .game-picker-sublist { padding-left:24px; }
@@ -106,6 +125,12 @@ window.RKClipGames = (function () {
     const images = img(under) + img(id);
     const spinner = catalog && images ? '<span class="processing-spinner"></span>' : '';
     return '<span class="clip-game-icon" aria-hidden="true">' + symbol(kind || id) + spinner + images + '</span>';
+  }
+  function mixedPicture(games) {
+    const featured = games.slice(0, 4);
+    if (featured.length < 2) return picture("mixed");
+    return '<span class="clip-game-icon clip-game-mix" aria-hidden="true" data-count="' + featured.length + '">' +
+      featured.map(game => picture(game.icon || game.id, "game")).join("") + '</span>';
   }
   document.addEventListener("load", event => { if (event.target.matches(".clip-game-icon > img")) event.target.parentElement.classList.add("is-ready"); }, true);
   document.addEventListener("error", event => { if (event.target.matches(".clip-game-icon > img")) event.target.remove(); }, true);
@@ -161,7 +186,8 @@ window.RKClipGames = (function () {
     const withPlace = name => experience && experience.name ? RK_M("clips.gamePlace", { game: name, place: experience.name }) : name;
     // only a game has a name of its own; desktop, mixed and unassigned are words of the page
     const shownName = capture.kind === "game" ? (capture.name || RK_M("clips.unassigned")) : capture.kind === "desktop" ? RK_M("clips.desktop") : capture.kind === "mixed" ? RK_M("clips.mixed") : RK_M("clips.unassigned");
-    const label = contained ? RK_M("clips.containsGames", { games: capture.games.map(g => capture.partial && g.id === capture.partial.id ? withPlace(g.name) : g.name).join(" · ") }) : capture.kind === "unknown" ? unassignedLabel(capture, shownName) : capture.kind === "game" ? withPlace(shownName) : shownName;
+    const hasGameList = contained || (capture.kind === "mixed" && capture.games?.length);
+    const label = hasGameList ? RK_M("clips.containsGames", { games: capture.games.map(g => capture.partial && g.id === capture.partial.id ? withPlace(g.name) : g.name).join(" · ") }) : capture.kind === "unknown" ? unassignedLabel(capture, shownName) : capture.kind === "game" ? withPlace(shownName) : shownName;
     const node = document.createElement("span");
     node.className = "clip-game-badge" + (changeable ? " is-changeable" : "");
     node.dataset.capture = key;
@@ -186,12 +212,30 @@ window.RKClipGames = (function () {
     }
     // the icon the game had when this clip was made, when the helper kept one for it
     const gameIcon = capture.icon && (!contained || capture.partial) ? capture.icon : game.id;
-    node.innerHTML = experience ? picture(experience.id, "game", gameIcon) : picture(gameIcon, contained ? "game" : capture.kind);
+    node.innerHTML = capture.kind === "mixed" ? mixedPicture(capture.games || []) :
+      experience ? picture(experience.id, "game", gameIcon) : picture(gameIcon, contained ? "game" : capture.kind);
     parent.prepend(node);
   }
+  function bindDisclosure(button, sublist, expanded, onToggle) {
+    button.insertAdjacentHTML("beforeend", '<svg class="game-picker-caret" viewBox="0 0 24 24" aria-hidden="true">{{glyph:nav/caret-down}}</svg>');
+    function expand(on) {
+      sublist.hidden = !on;
+      button.setAttribute("aria-expanded", String(on));
+      onToggle?.(on);
+    }
+    expand(expanded);
+    button.addEventListener("click", () => expand(sublist.hidden));
+    button.addEventListener("keydown", event => {
+      if (event.key === "ArrowRight") { event.preventDefault(); expand(true); sublist.querySelector("button:not(:disabled)")?.focus(); }
+      if (event.key === "ArrowLeft") { event.preventDefault(); expand(false); }
+    });
+    sublist.addEventListener("keydown", event => { if (event.key === "ArrowLeft") { event.preventDefault(); expand(false); button.focus(); } });
+    return expand;
+  }
+
   // the picker lists desktop, unassigned and the games the library already has clips of; the whole catalog is only searched once something is typed
   async function correct(item, screenshot) {
-    const current = group(item);
+    let capture = item.capture, addingToMix = false, managingMix = capture?.kind === "mixed";
     const dialog = document.createElement("dialog");
     dialog.className = "game-picker";
     dialog.setAttribute("aria-label", RK_M("clips.changeGame"));
@@ -202,13 +246,27 @@ window.RKClipGames = (function () {
     close.addEventListener("click", () => dialog.close()); top.append(title, close, sub);
     const search = document.createElement("input"); search.className = "game-picker-search"; search.placeholder = RK_M("clips.searchGames"); search.setAttribute("aria-label", RK_M("clips.searchGames"));
     const list = document.createElement("div"); list.className = "game-picker-list";
+    const mix = document.createElement("div"); mix.className = "game-picker-mix";
+    const mixToggle = document.createElement("button"); mixToggle.type = "button"; mixToggle.className = "game-picker-choice game-picker-mix-toggle";
+    const mixLabel = document.createElement("span"); mixLabel.className = "game-picker-name";
+    mixToggle.append(mixLabel);
+    const mixMembers = document.createElement("div"); mixMembers.className = "game-picker-sublist game-picker-mix-members";
+    mixMembers.setAttribute("role", "group"); mixMembers.setAttribute("aria-label", RK_M("clips.gameMix"));
+    const memberRows = document.createElement("div");
+    const mixAdd = document.createElement("button"); mixAdd.type = "button"; mixAdd.className = "game-picker-choice game-picker-mix-add";
+    mixMembers.append(memberRows, mixAdd);
+    mix.append(mixToggle, mixMembers);
+    const results = document.createElement("div"); results.className = "game-picker-results";
+    list.append(mix, results);
+    const expandMix = bindDisclosure(mixToggle, mixMembers, managingMix, open => {
+      if (!open && addingToMix) setMixMode(false);
+    });
     const status = document.createElement("p"); status.className = "game-picker-status"; status.setAttribute("role", "status");
     const reset = document.createElement("button"); reset.type = "button"; reset.className = "game-picker-choice game-picker-reset"; reset.textContent = RK_M("common.resetToDefault");
-    reset.disabled = !item.capture?.canReset;
-    reset.title = reset.disabled ? RK_M("clips.noSavedOriginalGameAssignmentTo") : RK_M("clips.restoreTheGameRecordedWithThis");
     reset.addEventListener("click", () => choose("", "", "", true));
     dialog.append(top, search, list, reset, status); document.body.append(dialog);
-    let generation = 0, timer, owned = null, saving = false, selectedId = current.id;
+    let generation = 0, timer, owned = null, saving = false, selectedId;
+    const clipQuery = "?file=" + encodeURIComponent(item.name) + (screenshot ? "&screenshot=1&v=" + encodeURIComponent(item.version) : "");
     let artworkActive = 0;
     const artworkQueue = new Set();
     const artworkObserver = new IntersectionObserver(entries => {
@@ -258,31 +316,92 @@ window.RKClipGames = (function () {
     function busy(on) {
       saving = on;
       search.disabled = on;
-      reset.disabled = on || !item.capture?.canReset;
-      list.querySelectorAll("button").forEach(button => { button.disabled = on; });
+      reset.disabled = on || !capture?.canReset;
+      reset.title = capture?.canReset ? RK_M("clips.restoreTheGameRecordedWithThis") : RK_M("clips.noSavedOriginalGameAssignmentTo");
+      list.querySelectorAll("button").forEach(button => { button.disabled = on || button.hasAttribute("data-mix-member"); });
     }
-    async function removeGame(id) {
+
+    function members() {
+      if (capture?.kind === "mixed") return capture.games || [];
+      if (capture?.kind === "game" && capture.id) return [capture];
+      return capture?.kind === "unknown" && capture.partial?.id ? [capture.partial] : [];
+    }
+    function paintMix() {
+      const games = members();
+      const mixed = capture?.kind === "mixed";
+      mixToggle.querySelector(":scope > .clip-game-icon")?.remove();
+      mixToggle.insertAdjacentHTML("afterbegin", mixed ? mixedPicture(games) : picture("mixed"));
+      mixLabel.textContent = mixed ? RK_M("clips.mixedGames") : RK_M("clips.gameMix");
+      mixAdd.textContent = addingToMix ? RK_M("common.done") : RK_M("clips.addGameToMix");
+      mixAdd.setAttribute("aria-pressed", String(addingToMix));
+      memberRows.replaceChildren();
+      games.forEach((game, index) => {
+        const entry = document.createElement("div"); entry.className = "game-picker-member";
+        entry.innerHTML = picture(game.icon || game.id, "game") + '<span class="game-picker-name" translate="no"></span>';
+        entry.querySelector(".game-picker-name").textContent = game.name;
+        if (managingMix) {
+          const remove = document.createElement("button"); remove.type = "button"; remove.className = "game-picker-remove";
+          const label = RK_M("clips.removeGameFromClip", { name: game.name });
+          remove.setAttribute("aria-label", label); remove.title = label;
+          remove.innerHTML = icon("action/trash");
+          remove.addEventListener("click", () => changeMix("remove", game.id, "", index));
+          entry.append(remove);
+        }
+        memberRows.append(entry);
+      });
+    }
+    function setMixMode(on) {
       if (saving) return;
+      addingToMix = on;
+      managingMix ||= on;
+      if (on) expandMix(true);
+      paintMix();
+      results.replaceChildren();
+      if (on) search.focus();
+      load();
+    }
+    mixAdd.addEventListener("click", () => setMixMode(!addingToMix));
+
+    async function changeMix(action, id, name, index) {
+      if (saving) return;
+      const focused = document.activeElement;
       generation++;
-      busy(true);
-      status.textContent = RK_M("clips.removingGame");
-      try {
-        const response = await fetch(helper + "/games/remove?id=" + encodeURIComponent(id), {method:"POST",cache:"no-store"});
-        const data = await response.json();
-        if (!response.ok || !data.ok) throw Error(data.message || RK_M("clips.gameCouldNotBeRemoved"));
-        owned = null;
-        // the clips of a removed game are counted elsewhere now, so the filter and the clips are read again the way they are after a game is set
-        window.dispatchEvent(new CustomEvent("replaykit:game-tags-changed"));
-        busy(false);
-        await load();
-      } catch (error) { busy(false); status.textContent = error.message; }
-    }
-    async function choose(id, name, universe, restore) {
-      if (saving) return;
       busy(true);
       status.textContent = RK_M("clips.saving");
       try {
-        const response = await fetch(helper + (restore ? "/games/reset" : "/games/set") + "?file=" + encodeURIComponent(item.name) + "&id=" + encodeURIComponent(id || "") + (name ? "&name=" + encodeURIComponent(name) : "") + (universe ? "&universe=" + encodeURIComponent(universe) : "") + (screenshot ? "&screenshot=1&v=" + encodeURIComponent(item.version) : ""), {method:"POST",cache:"no-store"});
+        const response = await fetch(helper + "/games/mix" + clipQuery, {
+          method:"POST", cache:"no-store", headers:{"Content-Type":"application/json"},
+          body:JSON.stringify(id ? { action, id } : { action, name }),
+        });
+        const data = await response.json();
+        if (!response.ok || !data.ok || !data.capture) throw Error(data.message || RK_M("clips.gameCouldNotBeChanged"));
+        window.dispatchEvent(new CustomEvent("replaykit:game-tags-changed"));
+        if (!dialog.open) return;
+        capture = data.capture;
+        if (action === "add") search.value = "";
+        owned = null;
+        results.replaceChildren();
+        paintMix();
+        busy(false);
+        if (action === "remove") {
+          const buttons = memberRows.querySelectorAll("button");
+          (buttons[Math.min(index, buttons.length - 1)] || mixAdd).focus();
+        } else search.focus();
+        await load();
+      } catch (error) {
+        if (!dialog.open) return;
+        busy(false);
+        focused?.focus();
+        status.textContent = error.message;
+      }
+    }
+    async function choose(id, name, universe, restore = false) {
+      if (saving) return;
+      if (addingToMix && !restore) { await changeMix("add", id, name); return; }
+      busy(true);
+      status.textContent = RK_M("clips.saving");
+      try {
+        const response = await fetch(helper + (restore ? "/games/reset" : "/games/set") + clipQuery + "&id=" + encodeURIComponent(id || "") + (name ? "&name=" + encodeURIComponent(name) : "") + (universe ? "&universe=" + encodeURIComponent(universe) : ""), {method:"POST",cache:"no-store"});
         const data = await response.json();
         if (!response.ok || !data.ok) throw Error(data.message || RK_M("clips.gameCouldNotBeChanged"));
         window.dispatchEvent(new CustomEvent("replaykit:game-tags-changed")); dialog.close();
@@ -292,41 +411,29 @@ window.RKClipGames = (function () {
       }
     }
     function section(text) {
-      const head = document.createElement("div"); head.className = "game-picker-section"; head.textContent = text; list.append(head);
+      const head = document.createElement("div"); head.className = "game-picker-section"; head.textContent = text; results.append(head);
     }
-    function row(name, id, kind, custom, target = list, experience = null, children = null) {
+    function row(name, id, kind, custom, target = results, experience = null, children = null) {
       const button = document.createElement("button"); button.type = "button"; button.className = "game-picker-choice";
-      const isCurrent = !custom && id === selectedId && (experience ? item.capture?.experience?.universe === experience.universe : !item.capture?.experience?.universe);
+      const member = addingToMix && members().some(game => game.id === id);
+      const isCurrent = member || (!addingToMix && !custom && id === selectedId && (experience ? capture?.experience?.universe === experience.universe : !capture?.experience?.universe));
+      if (member) { button.disabled = true; button.setAttribute("data-mix-member", ""); }
       if (isCurrent) button.setAttribute("aria-current", "true");
       // desktop and unassigned are words of the page; every other row is the name of a game
       const named = kind === "desktop" || kind === "unknown" ? '<span class="game-picker-name"></span>' : '<span class="game-picker-name" translate="no"></span>';
       button.innerHTML = picture(experience?.id || id, kind, experience ? id : null, true) + named + (isCurrent ? '<svg class="game-picker-check" viewBox="0 0 24 24" aria-hidden="true">{{glyph:action/check}}</svg>' : "");
       button.querySelector(".game-picker-name").textContent = name;
-      if (target === list && owned.some(game => game.id === id)) {
-        const entry = document.createElement("div"); entry.className = "game-picker-entry";
-        const remove = document.createElement("button"); remove.type = "button"; remove.className = "game-picker-remove";
-        remove.setAttribute("aria-label", RK_M("clips.removeNameFromYourGames", { name })); remove.title = RK_M("clips.removeFromYourGamesTooltip");
-        remove.innerHTML = icon("action/trash");
-        remove.addEventListener("click", event => { event.preventDefault(); event.stopPropagation(); removeGame(id); });
-        entry.append(button, remove); target.append(entry);
-      } else target.append(button);
+      target.append(button);
       if (children?.length) {
         const sublist = document.createElement("div"); sublist.className = "game-picker-sublist"; sublist.setAttribute("role", "group"); sublist.setAttribute("aria-label", RK_M("clips.nameExperiences", { name }));
-        sublist.hidden = !search.value.trim(); button.setAttribute("aria-expanded", String(!sublist.hidden));
-        button.insertAdjacentHTML("beforeend", '<svg class="game-picker-caret" viewBox="0 0 24 24" aria-hidden="true">{{glyph:nav/caret-down}}</svg>');
-        const expand = on => { sublist.hidden = !on; button.setAttribute("aria-expanded", String(on)); };
-        button.addEventListener("click", () => expand(sublist.hidden));
-        button.addEventListener("keydown", event => {
-          if (event.key === "ArrowRight") { event.preventDefault(); expand(true); sublist.querySelector("button")?.focus(); }
-          if (event.key === "ArrowLeft") { event.preventDefault(); expand(false); }
-        });
-        sublist.addEventListener("keydown", event => { if (event.key === "ArrowLeft") { event.preventDefault(); expand(false); button.focus(); } });
+        bindDisclosure(button, sublist, Boolean(search.value.trim()));
         target.append(sublist);
         row(RK_M("clips.nameAnyExperience", { name }), id, kind, null, sublist);
         children.forEach(child => row(child.name, id, kind, null, sublist, child));
       } else button.addEventListener("click", () => choose(id, custom, experience?.universe));
     }
     async function load() {
+      if (!dialog.open || saving) return;
       const seq = ++generation;
       const query = search.value.trim();
       const needle = query.toLocaleLowerCase();
@@ -357,28 +464,31 @@ window.RKClipGames = (function () {
         if (seq !== generation || !dialog.open || saving) return;
         artworkObserver.disconnect();
         artworkQueue.clear();
-        list.replaceChildren();
+        results.replaceChildren();
         const choices = uniqueGames([...owned, ...found]);
         const available = new Set(choices.map(game => game.id));
+        const current = group({ capture });
+        selectedId = current.id;
         if (current.id?.startsWith("custom-")) selectedId = choices.find(game => gameName(game) === gameName(current))?.id || current.id;
         const matching = game => !needle || String(game.name).toLocaleLowerCase().includes(needle);
-        const mine = owned.filter(game => available.has(game.id) && (matching(game) || (game.experiences || []).some(matching)));
+        const mine = owned.filter(game => available.has(game.id) && (matching(game) || (!addingToMix && (game.experiences || []).some(matching))));
         const shown = new Set(mine.map(game => game.id));
-        if (!needle || "desktop".includes(needle) || "unassigned".includes(needle)) {
+        if (!addingToMix) {
           if (!needle || "desktop".includes(needle)) row(RK_M("clips.desktop"), "desktop", "desktop");
           if (!needle || "unassigned".includes(needle)) row(RK_M("clips.unassigned"), "unknown", "unknown");
         }
         if (mine.length || !query) section(RK_M("clips.yourGames"));
-        mine.forEach(game => row(game.name, game.id, "game", null, list, null, (game.experiences || []).filter(child => matching(game) || matching(child))));
+        mine.forEach(game => row(game.name, game.id, "game", null, results, null, addingToMix ? null : (game.experiences || []).filter(child => matching(game) || matching(child))));
         const others = choices.filter(game => !shown.has(game.id) && matching(game));
         if (others.length) { section(RK_M("clips.allGames")); others.forEach(game => row(game.name, game.id, "game")); }
         if (query && ![...mine, ...others].some(game => gameName(game) === needle)) { section(RK_M("clips.notListed")); row(RK_M("clips.useName", { name: query }), "", "game", query); }
-        if (!list.children.length) { const empty = document.createElement("div"); empty.className = "game-picker-empty"; empty.textContent = RK_M("clips.noGamesMatch"); list.append(empty); }
-        list.querySelectorAll("img[data-artwork]").forEach(image => artworkObserver.observe(image));
-        status.textContent = RK_M("clips.gamesYouRecordOrPickStay");
+        if (!results.children.length) { const empty = document.createElement("div"); empty.className = "game-picker-empty"; empty.textContent = RK_M("clips.noGamesMatch"); results.append(empty); }
+        results.querySelectorAll("img[data-artwork]").forEach(image => artworkObserver.observe(image));
+        status.textContent = addingToMix ? RK_M("clips.chooseGameForMix") : RK_M("clips.gamesYouRecordOrPickStay");
       } catch (error) { if (seq === generation) status.textContent = error.message; }
     }
     search.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(load, 180); });
+    paintMix(); busy(false);
     dialog.showModal(); search.focus(); load();
   }
   function create(changed) {

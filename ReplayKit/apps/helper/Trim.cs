@@ -519,7 +519,7 @@ namespace ReplayKitHelper
             double rate = double.Parse(ratio[0], CultureInfo.InvariantCulture) / double.Parse(ratio[1], CultureInfo.InvariantCulture);
             double t = frameTime - plan.Start;
             var argv = new List<string> { "-hide_banner", "-loglevel", "error" };
-            var piece = plan.Pieces.FirstOrDefault(p => frameTime >= Math.Max(p.At, plan.Start) - 1e-6 && frameTime < p.At + p.Length(speed));
+            var piece = plan.PieceAt(frameTime, speed);
             string video;
             int inputs = 0;
             if (piece != null)
@@ -1049,7 +1049,7 @@ namespace ReplayKitHelper
             }
 
             // the clip under this name is another file now, so an edit that was kept for the old one fits nothing any more
-            try { ClipGames.Rendered(source.Full, finalPath, videoPlan, startSec, endSec, videoSpeed, screenshot, frameTime, sourceCapture, layerPlan?.HasVideo ?? false); }
+            try { ClipGames.Rendered(source.Full, finalPath, videoPlan, startSec, endSec, videoSpeed, screenshot, frameTime, sourceCapture, layerPlan); }
             catch (Exception ex) { Log.Write("Edited capture metadata unavailable: " + ex.GetType().Name); }
             if (overwrite) EditDrafts.Forget(source.Full);
             if (overwrite && precise) Clips.ClearCompressed(source.Name, source.Full);

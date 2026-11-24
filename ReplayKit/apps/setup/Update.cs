@@ -12,7 +12,7 @@ using ReplayKitShared;
 
 namespace ReplayKitSetup
 {
-    // the release installer's update, cleanup, uninstall and discord screenshare modes
+    // the headless modes of the release installer: --update, --cleanup, --uninstall and the discord screenshare install/removal
     public static class Update
     {
         [DllImport("kernel32.dll", SetLastError = true)]
@@ -36,6 +36,28 @@ namespace ReplayKitSetup
 
         // the helper serves this back over /update/install-result so the update popup can say what actually happened. it lives beside the helper logs, not in the update temp dir, which ScheduleCleanup wipes right after this process exits.
         private static string ResultFile(string attemptId) => Path.Combine(TempLayout.Logs, TempLayout.UpdateFile(TempLayout.UpdateResultFile, attemptId));
+
+        private static void WriteProgress(string path, JObject step)
+        {
+            if (step.Value<string>("type") != "step") return;
+            string temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+            try
+            {
+                using (var file = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write))
+                using (var writer = new StreamWriter(file, new UTF8Encoding(false)))
+                    writer.Write(step.ToString(Formatting.None));
+                NetCompat.MoveFile(temporary, path, true);
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+            {
+                Log("could not publish update progress: " + ex.Message);
+            }
+            finally
+            {
+                try { File.Delete(temporary); }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+            }
+        }
 
         private static string PendingFile() => Path.Combine(Config.REPLAYKIT_CONFIG, StateLayout.UpdatePendingFile);
 
@@ -168,12 +190,7 @@ namespace ReplayKitSetup
                 Log(message);
                 try { Console.WriteLine(message); } catch (IOException) { }
             }
-            void ShowFailure(string message) => progress?.AddIssue(new SetupLocale.Text(message, SetupLocale.ToEnglish(message)));
-            bool Report(bool ok, string stage, string message)
-            {
-                if (!ok) ShowFailure(message);
-                return WriteResult(ok, stage, message, releaseUrl, attemptId);
-            }
+            bool Report(bool ok, string stage, string message) => WriteResult(ok, stage, message, releaseUrl, attemptId);
 
             if (progress != null) progress.TotalSteps = relaunch ? 8 : 6;
             int completed = 0;
@@ -201,7 +218,6 @@ namespace ReplayKitSetup
                     string busy = SetupLocale.Message("setup.anotherReplaykitUpdateIsAlready");
                     LogBoth(busy);
                     if (attemptId != null) Report(false, "busy", busy);
-                    else ShowFailure(busy);
                     return 1;
                 }
                 DetachedSpawn.WritePid(NetCompat.ProcessId, attemptId);
@@ -494,14 +510,14 @@ namespace ReplayKitSetup
             string releaseUrl = StringArg(argv, "--release-url", ReleasePage);
             if (!Uri.TryCreate(releaseUrl, UriKind.Absolute, out Uri releaseUri) || releaseUri.Scheme != Uri.UriSchemeHttps)
                 releaseUrl = ReleasePage;
-            if (ShowsProgress(argv))
-                return InstallerApp.Run(progress => RunUpdateMode(relaunchObs, waitPid, startDelayMs, !noRelaunch, releaseUrl, attemptId, progress), !noRelaunch);
-            return RunUpdateMode(relaunchObs, waitPid, startDelayMs, !noRelaunch, releaseUrl, attemptId);
+            IInstallProgress reporter = null;
+            if (attemptId != null && string.Equals(Path.GetDirectoryName(NetCompat.ProcessPath), TempLayout.UpdateDirectory(attemptId), StringComparison.OrdinalIgnoreCase))
+            {
+                string path = TempLayout.UpdateProgressPath(attemptId);
+                reporter = new PageProgress(step => WriteProgress(path, step));
+            }
+            return RunUpdateMode(relaunchObs, waitPid, startDelayMs, !noRelaunch, releaseUrl, attemptId, reporter);
         }
-
-        // helpers that shipped before attempt IDs always supplied a start delay.
-        internal static bool ShowsProgress(string[] args) =>
-            !args.Contains("--attempt-id") && !args.Contains("--start-delay-ms") && !args.Contains("--wait-pid");
 
         private static string StringArg(string[] argv, string name, string @default)
         {

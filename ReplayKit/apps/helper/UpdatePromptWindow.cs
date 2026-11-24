@@ -6,6 +6,9 @@ using System.Threading;
 using System.Windows.Forms;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using ReplayKitShared;
 
 namespace ReplayKitHelper
 {
@@ -14,6 +17,7 @@ namespace ReplayKitHelper
     {
         // css pixels; scaled by the target monitors dpi below. matches update_prompt.html + Update.OpenUpdatePromptWindow.
         private const int ClientCssW = 560, ClientCssH = 336;
+        private const string WatchProgress = "watch-progress:";
 
         // its own taskbar identity so windows does not group this window under obs64 / the helper and can show its own icon on the button + jump list
         [DllImport("shell32.dll")] private static extern int SetCurrentProcessExplicitAppUserModelID([MarshalAs(UnmanagedType.LPWStr)] string appId);
@@ -60,6 +64,7 @@ namespace ReplayKitHelper
                 using (var web = new WebView2 { Dock = DockStyle.Fill, DefaultBackgroundColor = ParseColor(bgColor, DefaultBg) })
                 using (var revealDeadline = new System.Windows.Forms.Timer { Interval = RevealTimeoutMs })
                 using (var revealFade = new System.Windows.Forms.Timer { Interval = RevealFadeStepMs })
+                using (var progressTimer = new System.Windows.Forms.Timer { Interval = 400 })
                 {
                     form.Controls.Add(web);
                     bool revealed = false;
@@ -97,19 +102,63 @@ namespace ReplayKitHelper
                             core.Settings.AreBrowserAcceleratorKeysEnabled = false;
                             core.Settings.IsStatusBarEnabled = false;
 
+                            string endpoint = "http://" + Constants.HOST_ADDR + ":" + port + "/update-prompt";
+                            bool IsUpdatePage(string url) =>
+                                Uri.TryCreate(url, UriKind.Absolute, out Uri page) && page.GetLeftPart(UriPartial.Path) == endpoint;
+                            string progressAttempt = null, progressPath = null, lastStep = null;
+                            progressTimer.Tick += (s, e) =>
+                            {
+                                if (!IsUpdatePage(core.Source)) return;
+                                string next = ReadProgress(progressPath);
+                                if (next == null || next == lastStep) return;
+                                try
+                                {
+                                    var step = JObject.Parse(next);
+                                    if (step["type"]?.Type != JTokenType.String || (string)step["type"] != "step") return;
+                                    core.PostWebMessageAsJson(new JObject
+                                    {
+                                        ["type"] = "install-progress",
+                                        ["attemptId"] = progressAttempt,
+                                        ["step"] = new JObject
+                                        {
+                                            ["type"] = step["type"],
+                                            ["title"] = step["title"],
+                                            ["detail"] = step["detail"],
+                                            ["percent"] = step["percent"]
+                                        }
+                                    }.ToString(Formatting.None));
+                                    lastStep = next;
+                                }
+                                catch (JsonException) { }
+                                catch (InvalidOperationException ex) { WriteDebug("progress message: " + ex.Message); }
+                            };
+
                             // window.close() from the page (closeWindow() in update_prompt.html) lands here
                             core.WindowCloseRequested += (s, e) => CloseForm(form);
                             // no -webkit-app-region in webview2: the page posts "drag" on mousedown over the shell; "ready" is the page telling us it has real content painted, not the pre-navigation blank frame.
                             core.WebMessageReceived += (s, e) =>
                             {
+                                if (!IsUpdatePage(e.Source)) return;
                                 string message = null;
                                 try { message = e.TryGetWebMessageAsString(); } catch (Exception ex) { WriteDebug("web message: " + ex.Message); }
                                 if (message == "drag") { try { Native.StartWindowDrag(form.Handle); } catch (Exception ex) { WriteDebug("drag: " + ex.Message); } }
                                 else if (message == "close") CloseForm(form);
                                 else if (message == "ready") Reveal();
+                                else if (message != null && message.StartsWith(WatchProgress, StringComparison.Ordinal))
+                                {
+                                    string attemptId = message.Substring(WatchProgress.Length);
+                                    if (attemptId.Length == 0) progressTimer.Stop();
+                                    else if (TempLayout.ValidAttempt(attemptId) && attemptId == Update.ReadInstallAttempt())
+                                    {
+                                        progressAttempt = attemptId;
+                                        progressPath = TempLayout.UpdateProgressPath(attemptId);
+                                        lastStep = null;
+                                        progressTimer.Start();
+                                    }
+                                }
                             };
 
-                            string url = "http://" + Constants.HOST_ADDR + ":" + port + "/update-prompt";
+                            string url = endpoint;
                             if (!string.IsNullOrWhiteSpace(version)) url += "?version=" + Uri.EscapeDataString(version);
                             core.Navigate(url);
                         }
@@ -129,6 +178,19 @@ namespace ReplayKitHelper
                 WriteDebug("update window failed: " + ex.Message);
                 return 1;
             }
+        }
+
+        private static string ReadProgress(string path)
+        {
+            if (!File.Exists(path)) return null;
+            try
+            {
+                using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
+                if (stream.Length > 4096) return null;
+                using var reader = new StreamReader(stream);
+                return reader.ReadToEnd();
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { return null; }
         }
 
         private static Form BuildForm(string bgColor)

@@ -104,6 +104,19 @@ namespace ReplayKitHelper
         internal static bool Number(double n) => !double.IsNaN(n) && !double.IsInfinity(n);
         private static double ReadNumber(JToken token) => token != null && (token.Type == JTokenType.Integer || token.Type == JTokenType.Float) ? token.Value<double>() : double.NaN;
         private static string ReadText(JToken token) => token?.Type == JTokenType.String ? token.Value<string>() : "";
+        private static bool KnownGame(string id, string name) => id.Length > 0 && id.Length <= 80 && name.Length > 0 && name.Length <= 160;
+        private const string VideoGamesKey = "videoGames";
+        private const string VideoGameOrderKey = "manualVideoGameOrder";
+
+        internal static bool HasVideoGames(JObject capture) => capture?[VideoGamesKey] is JArray;
+        internal static void SetVideoGames(JObject capture, JArray rows, bool keepOrder = false)
+        {
+            capture[VideoGamesKey] = rows;
+            if (keepOrder) capture[VideoGameOrderKey] = true;
+        }
+
+        private static bool KeepVideoGameOrder(JObject capture) =>
+            capture?[VideoGameOrderKey]?.Type == JTokenType.Boolean && capture[VideoGameOrderKey].Value<bool>();
 
         internal static void Add(JArray rows, double start, double end, string kind, string id = "", string name = "", string why = "", string app = "")
         {
@@ -134,14 +147,11 @@ namespace ReplayKitHelper
 
         internal static JObject Cut(JObject capture, double start, double end, double rate = 1)
         {
-            var rows = new JArray();
-            if (!Number(start) || !Number(end) || !Number(rate) || start < 0 || end <= start || rate <= 0) return Pack(0, rows);
-            foreach (var row in capture?["intervals"] as JArray ?? new JArray())
-            {
-                double left = Math.Max(start, row["s"]?.Value<double>() ?? 0), right = Math.Min(end, row["e"]?.Value<double>() ?? 0);
-                if (right > left) Add(rows, (left - start) / rate, (right - start) / rate, row);
-            }
+            if (!Number(start) || !Number(end) || !Number(rate) || start < 0 || end <= start || rate <= 0) return Pack(0, new JArray());
+            var rows = CutRows(capture?["intervals"] as JArray, start, end, rate);
             var result = Pack((end - start) / rate, rows, capture?["manual"]?.Value<bool>() ?? false);
+            if (capture?[VideoGamesKey] is JArray games)
+                SetVideoGames(result, CutRows(games, start, end, rate), KeepVideoGameOrder(capture));
             if (capture?["original"] is JObject original)
             {
                 var source = (JObject)original.DeepClone();
@@ -151,6 +161,68 @@ namespace ReplayKitHelper
                     if (source[key] is JObject detail) result["original"][key] = detail.DeepClone();
             }
             return result;
+        }
+
+        private static JArray CutRows(JArray source, double start, double end, double rate)
+        {
+            var rows = new JArray();
+            if (source == null) return rows;
+            foreach (var row in source.OfType<JObject>())
+            {
+                double left = Math.Max(start, ReadNumber(row["s"])), right = Math.Min(end, ReadNumber(row["e"]));
+                if (right > left) Add(rows, (left - start) / rate, (right - start) / rate, row);
+            }
+            return rows;
+        }
+
+        // normal footage contributes the game it goes by; previously edited footage keeps its timed labels
+        internal static void PlaceVideoGames(JArray target, JObject cut, JObject summary, double at)
+        {
+            if (cut[VideoGamesKey] is JArray edited)
+            {
+                foreach (var row in edited.OfType<JObject>())
+                    Add(target, at + ReadNumber(row["s"]), at + ReadNumber(row["e"]), row);
+                return;
+            }
+            string game = ReadText(summary["kind"]) == "game" ? ReadText(summary["id"]) : ReadText(summary["partial"]?["id"]);
+            var ids = new HashSet<string>(StringComparer.Ordinal);
+            if (game.Length > 0) ids.Add(game);
+            else if (ReadText(summary["kind"]) == "mixed")
+                foreach (var row in (JArray)summary["games"]) ids.Add(ReadText(row["id"]));
+            if (ids.Count == 0) return;
+            foreach (var row in ((JArray)cut["intervals"]).OfType<JObject>())
+                if (ReadText(row["kind"]) == "game" && ids.Contains(ReadText(row["id"])))
+                    Add(target, at + ReadNumber(row["s"]), at + ReadNumber(row["e"]), row);
+        }
+
+        private static List<JObject> VideoGameLabels(JObject capture, double duration)
+        {
+            var labels = new List<JObject>();
+            if (!(capture?[VideoGamesKey] is JArray rows) || rows.Count > 8192) return labels;
+            var spans = rows.OfType<JObject>().Where(row => ReadText(row["kind"]) == "game").Select(row => new
+            {
+                Start = ReadNumber(row["s"]), End = ReadNumber(row["e"]),
+                Id = ReadText(row["id"]), Name = ReadText(row["name"]),
+            }).Where(span => span.Start >= 0 && span.End > span.Start && span.End <= duration + .05 && KnownGame(span.Id, span.Name));
+            var groups = spans.GroupBy(span => span.Id, StringComparer.Ordinal);
+            if (!KeepVideoGameOrder(capture))
+                groups = groups.OrderByDescending(group => CoveredDuration(group.Select(span => (span.Start, span.End))))
+                    .ThenBy(group => group.Min(span => span.Start));
+            foreach (var group in groups)
+                labels.Add(new JObject { ["id"] = group.Key, ["name"] = group.First().Name });
+            return labels;
+        }
+
+        private static double CoveredDuration(IEnumerable<(double Start, double End)> spans)
+        {
+            double duration = 0, end = 0;
+            foreach (var span in spans.OrderBy(span => span.Start))
+            {
+                if (span.End <= end) continue;
+                duration += span.End - Math.Max(end, span.Start);
+                end = span.End;
+            }
+            return duration;
         }
 
         // the seconds at the end of a clip that may pass without evidence, the time it takes to switch to obs and press clip, before the game focused last stops being the game the clip ends on
@@ -188,7 +260,7 @@ namespace ReplayKitHelper
                         unknown[reason] = (unknown.TryGetValue(reason, out double held) ? held : 0) + end - start;
                     }
                 }
-                if (kind != "desktop" && (kind != "game" || id.Length == 0 || id.Length > 80 || name.Length == 0 || name.Length > 160)) continue;
+                if (kind != "desktop" && (kind != "game" || !KnownGame(id, name))) continue;
                 string key = kind == "desktop" ? "desktop" : id;
                 totals[key] = (totals.TryGetValue(key, out double amount) ? amount : 0) + end - start;
                 names[key] = kind == "desktop" ? "Desktop" : name;
@@ -197,11 +269,22 @@ namespace ReplayKitHelper
                 endAt = end;
             }
             var games = (JArray)result["games"];
+            JObject GameLabel(string id) => new JObject { ["id"] = id, ["name"] = names[id] };
             foreach (var pair in totals.Where(p => p.Key != "desktop" && p.Value >= Math.Min(2, duration * .1)))
-                games.Add(new JObject { ["id"] = pair.Key, ["name"] = names[pair.Key] });
-            var dominant = totals.OrderByDescending(p => p.Value).FirstOrDefault();
+                games.Add(GameLabel(pair.Key));
+            var ranked = totals.OrderByDescending(p => p.Value).ToList();
+            var dominant = ranked.FirstOrDefault();
+            var edited = VideoGameLabels(capture, duration);
+            if (edited.Count > 0)
+            {
+                games.Clear();
+                foreach (var game in edited) games.Add(game);
+                result["kind"] = edited.Count == 1 ? "game" : "mixed";
+                if (edited.Count == 1) result["id"] = edited[0]["id"].DeepClone();
+                result["name"] = edited.Count == 1 ? ReadText(edited[0]["name"]) : "Mixed: " + string.Join(" · ", edited.Select(game => ReadText(game["name"])));
+            }
             // the game focused last before the clip was saved is what was clipped, however much else the clip holds
-            if (endKind == "game" && endAt >= duration - EndSlack && games.Any(g => g["id"].Value<string>() == endKey))
+            else if (endKind == "game" && endAt >= duration - EndSlack && games.Any(g => g["id"].Value<string>() == endKey))
             {
                 result["kind"] = "game";
                 result["id"] = endKey;
@@ -216,7 +299,11 @@ namespace ReplayKitHelper
             else if (totals.Values.Sum() >= duration * (.7 - 1e-9) && totals.Count > 1)
             {
                 result["kind"] = "mixed";
-                result["name"] = "Mixed: " + string.Join(" · ", totals.OrderByDescending(p => p.Value).Select(p => names[p.Key]));
+                result["name"] = "Mixed: " + string.Join(" · ", ranked.Select(p => names[p.Key]));
+                // the mix lists the same games that contributed to its classification
+                games.Clear();
+                foreach (var pair in ranked)
+                    if (pair.Key != "desktop") games.Add(GameLabel(pair.Key));
             }
             // the one game a clip without a main game holds is the game it goes by (name, folder, section) only when that game fills at least as much of it as the desktop does, so seconds of a game passing by do not take over a desktop clip
             if (result["kind"].Value<string>() == "unknown" && games.Count == 1 && totals[games[0]["id"].Value<string>()] >= (totals.TryGetValue("desktop", out double desktop) ? desktop : 0))

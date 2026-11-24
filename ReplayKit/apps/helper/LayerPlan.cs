@@ -25,7 +25,16 @@ namespace ReplayKitHelper
 
         private readonly List<Layer> layers = new List<Layer>();
         public int Count => layers.Count;
-        public bool HasVideo => layers.Exists(layer => layer.Clip && layer.Opacity > 0);
+        internal IEnumerable<(string Path, double At, double End, double Src, double Speed)> ClipSpans(double start, double end, bool singleFrame)
+        {
+            foreach (var layer in layers)
+            {
+                if (!layer.Clip || layer.Opacity <= 0 || (singleFrame && (start < layer.At || start >= layer.End))) continue;
+                double left = Math.Max(start, layer.At), right = Math.Min(end, layer.End);
+                if (right > left)
+                    yield return (layer.Path, left, right, layer.Src + (left - layer.At) * layer.Speed, layer.Speed);
+            }
+        }
 
         private static string N(double v) => v.ToString("0.######", CultureInfo.InvariantCulture);
 

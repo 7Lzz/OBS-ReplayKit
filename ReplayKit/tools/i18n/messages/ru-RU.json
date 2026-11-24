@@ -127,6 +127,10 @@
     "source": "fd3d9876673a7dd1",
     "text": "Снимок экрана с таким именем уже существует"
   },
+  "clips.addGameToMix": {
+    "source": "38a9a0fcf9ec5f98",
+    "text": "Добавить игру в подборку"
+  },
   "clips.allGames": {
     "source": "92bfbe670278c6ef",
     "text": "Все игры"
@@ -202,6 +206,10 @@
   "clips.changeGame": {
     "source": "82958b036739f6f0",
     "text": "Сменить игру"
+  },
+  "clips.chooseGameForMix": {
+    "source": "d4299942eb1c1cc3",
+    "text": "Выберите игру, которую нужно добавить в этот клип."
   },
   "clips.clickAgainToDeleteEverythingHere": {
     "source": "f53e8f7bdfa1cb66",
@@ -795,13 +803,13 @@
     "source": "931ae19725af8acd",
     "text": "Не удалось изменить игру."
   },
-  "clips.gameCouldNotBeRemoved": {
-    "source": "1aa58a5b5f23ff78",
-    "text": "Не удалось удалить игру."
-  },
   "clips.gameDetailsCouldNotBeRead": {
     "source": "4cfe5163b5a903fc",
     "text": "Не удалось прочитать или обновить сведения об игре."
+  },
+  "clips.gameMix": {
+    "source": "09ba786f9c5214b7",
+    "text": "Подборка игр"
   },
   "clips.gamePlace": {
     "source": "9a8f1d511639adf6",
@@ -1343,21 +1351,13 @@
     "source": "ed21b922093cde53",
     "text": "Убрать из избранного"
   },
-  "clips.removeFromYourGamesTooltip": {
-    "source": "213b51cb8c5b9a5d",
-    "text": "Убрать из «Ваших игр». Клипы сохранят свои теги игр."
+  "clips.removeGameFromClip": {
+    "source": "e5ce9ac3d385d243",
+    "text": "Удалить {name} из этого клипа"
   },
   "clips.removeLink": {
     "source": "20e71d9a741d4984",
     "text": "Удалить ссылку"
-  },
-  "clips.removeNameFromYourGames": {
-    "source": "b9c1951739a001ad",
-    "text": "Удалить {name} из ваших игр"
-  },
-  "clips.removingGame": {
-    "source": "04ef4260b7bfaf9c",
-    "text": "Удаление игры…"
   },
   "clips.reorderName": {
     "source": "cc796a93f6d1b921",

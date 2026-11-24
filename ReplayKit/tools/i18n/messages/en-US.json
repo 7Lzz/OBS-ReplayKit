@@ -127,6 +127,10 @@
     "context": "Error message in a ReplayKit window, sent by the background helper.",
     "text": "A screenshot with that name already exists"
   },
+  "clips.addGameToMix": {
+    "context": "Game picker button that lets users add another game label to this clip.",
+    "text": "Add a game to the mix"
+  },
   "clips.allGames": {
     "context": "Text in the game picker of the clips library. Also used in the toolbar of the clips library.",
     "text": "All games"
@@ -390,6 +394,10 @@
   "clips.confirmStreamableDelete": {
     "text": "Click again to permanently delete from Streamable",
     "context": "Second-click confirmation tooltip and accessibility label on the Streamable delete menu item."
+  },
+  "clips.chooseGameForMix": {
+    "context": "Instruction shown while the game picker is adding an assignment to the current clip's mix.",
+    "text": "Choose a game to add to this clip."
   },
   "clips.containsGames": {
     "context": "Text in the game picker of the clips library. Keep {games} as written.",
@@ -795,9 +803,9 @@
     "context": "Error message in the game picker of the clips library.",
     "text": "Game could not be changed."
   },
-  "clips.gameCouldNotBeRemoved": {
-    "context": "Error message in the game picker of the clips library.",
-    "text": "Game could not be removed."
+  "clips.gameMix": {
+    "context": "Expandable game picker heading where users see or create a clip's mix of game labels.",
+    "text": "Game mix"
   },
   "clips.gameDetailsCouldNotBeRead": {
     "context": "Message the helper shows when an action fails or finishes in a ReplayKit window, sent by the background helper.",
@@ -1343,21 +1351,13 @@
     "context": "Tooltip in the clips library.",
     "text": "Remove favorite"
   },
-  "clips.removeFromYourGamesTooltip": {
-    "context": "Tooltip of the remove button on a game in the game picker of the clips library.",
-    "text": "Remove from Your games. Clips keep their game tags."
+  "clips.removeGameFromClip": {
+    "context": "Tooltip and accessibility label for removing one game label from this clip's mix. Keep {name} as written.",
+    "text": "Remove {name} from this clip"
   },
   "clips.removeLink": {
     "context": "Title in the clips library.",
     "text": "Remove link"
-  },
-  "clips.removeNameFromYourGames": {
-    "context": "Screen reader label in the game picker of the clips library. Keep {name} as written.",
-    "text": "Remove {name} from Your games"
-  },
-  "clips.removingGame": {
-    "context": "Status line in the game picker of the clips library.",
-    "text": "Removing game…"
   },
   "clips.reorderName": {
     "context": "Screen reader label in the clips library. Keep {name} as written.",

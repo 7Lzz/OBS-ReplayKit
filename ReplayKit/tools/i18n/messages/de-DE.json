@@ -127,6 +127,10 @@
     "source": "fd3d9876673a7dd1",
     "text": "Ein Screenshot mit diesem Namen existiert bereits"
   },
+  "clips.addGameToMix": {
+    "source": "38a9a0fcf9ec5f98",
+    "text": "Spiel zum Mix hinzufügen"
+  },
   "clips.allGames": {
     "source": "92bfbe670278c6ef",
     "text": "Alle Spiele"
@@ -202,6 +206,10 @@
   "clips.changeGame": {
     "source": "82958b036739f6f0",
     "text": "Spiel ändern"
+  },
+  "clips.chooseGameForMix": {
+    "source": "d4299942eb1c1cc3",
+    "text": "Wähle ein Spiel aus, das du diesem Clip hinzufügen möchtest."
   },
   "clips.clickAgainToDeleteEverythingHere": {
     "source": "f53e8f7bdfa1cb66",
@@ -795,13 +803,13 @@
     "source": "931ae19725af8acd",
     "text": "Spiel konnte nicht geändert werden."
   },
-  "clips.gameCouldNotBeRemoved": {
-    "source": "1aa58a5b5f23ff78",
-    "text": "Spiel konnte nicht entfernt werden."
-  },
   "clips.gameDetailsCouldNotBeRead": {
     "source": "4cfe5163b5a903fc",
     "text": "Spieldetails konnten nicht gelesen oder aktualisiert werden."
+  },
+  "clips.gameMix": {
+    "source": "09ba786f9c5214b7",
+    "text": "Spielemix"
   },
   "clips.gamePlace": {
     "source": "9a8f1d511639adf6",
@@ -1343,21 +1351,13 @@
     "source": "ed21b922093cde53",
     "text": "Aus Favoriten entfernen"
   },
-  "clips.removeFromYourGamesTooltip": {
-    "source": "213b51cb8c5b9a5d",
-    "text": "Aus Meine Spiele entfernen. Clips behalten ihre Spiel-Tags."
+  "clips.removeGameFromClip": {
+    "source": "e5ce9ac3d385d243",
+    "text": "{name} aus diesem Clip entfernen"
   },
   "clips.removeLink": {
     "source": "20e71d9a741d4984",
     "text": "Link entfernen"
-  },
-  "clips.removeNameFromYourGames": {
-    "source": "b9c1951739a001ad",
-    "text": "{name} aus Meine Spiele entfernen"
-  },
-  "clips.removingGame": {
-    "source": "04ef4260b7bfaf9c",
-    "text": "Spiel wird entfernt…"
   },
   "clips.reorderName": {
     "source": "cc796a93f6d1b921",

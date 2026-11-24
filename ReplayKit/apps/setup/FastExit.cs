@@ -30,7 +30,7 @@ namespace ReplayKitSetup
 
         private static ConsoleCtrlDelegate _ctrlHandlerRef;
 
-        // hide this process's own console window if it has one.
+        // hide this processs own console window if it has one. --update mode should never show a window regardless of how it was launched.
         public static void HideConsoleWindow()
         {
             IntPtr hwnd = GetConsoleWindow();

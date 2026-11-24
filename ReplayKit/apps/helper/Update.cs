@@ -473,7 +473,7 @@ namespace ReplayKitHelper
 
         private static string AttemptPath() => Path.Combine(Constants.LOG_DIR, TempLayout.UpdateAttemptFile);
 
-        private static string ReadInstallAttempt()
+        internal static string ReadInstallAttempt()
         {
             try
             {
@@ -691,10 +691,9 @@ namespace ReplayKitHelper
             }
         }
 
-        internal static string CreateUpdateTemp()
+        internal static string CreateUpdateTemp(string attemptId = null)
         {
-            Directory.CreateDirectory(Constants.REPLAYKIT_TEMP_ROOT);
-            string path = Path.Combine(Constants.REPLAYKIT_TEMP_ROOT, ReplayKitShared.TempLayout.UpdateFolderPrefix + Guid.NewGuid().ToString("N"));
+            string path = TempLayout.UpdateDirectory(attemptId ?? Guid.NewGuid().ToString("N"));
             AssertSafeUpdateTemp(path);
             CreateOwnTempFolder(path);
             return path;
@@ -1000,8 +999,8 @@ namespace ReplayKitHelper
                 }
                 if (string.IsNullOrWhiteSpace(latest.ChecksumsUrl)) throw new InvalidOperationException(Locales.Message("update.latestReleaseIsMissingFile", "file", ChecksumsAsset));
 
-                string tempDir = CreateUpdateTemp();
                 string attemptId = Guid.NewGuid().ToString("N");
+                string tempDir = CreateUpdateTemp(attemptId);
                 string previousAttempt = ReadInstallAttempt();
                 JObject started;
                 string previousResult = null;

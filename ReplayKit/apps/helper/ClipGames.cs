@@ -363,17 +363,107 @@ namespace ReplayKitHelper
             else if (id != "desktop" && id != "unknown") game = GameCatalog.Get(id) ?? throw new ArgumentException(Locales.Message("clips.unknownGame2"));
             if (universe.Length > 0 && game?.Id != RobloxExperiences.RobloxId) throw new ArgumentException(Locales.Message("clips.anExperienceMustBelongToRoblox"));
             var experience = universe.Length > 0 ? RobloxExperiences.Select(universe) : null;
-            if (duration <= 0) duration = Path.GetExtension(file).Equals(".png", StringComparison.OrdinalIgnoreCase) ? .001 : (Trim.ProbeVideo(file)?.Duration ?? 0);
-            if (!CaptureTimeline.Number(duration) || duration <= 0) throw new ArgumentException(Locales.Message("clips.theClipLengthIsUnavailable"));
+            duration = CorrectionDuration(file, duration);
             var rows = new JArray();
             CaptureTimeline.Add(rows, 0, duration, game != null ? "game" : id, game?.Id ?? "", game?.Name ?? "");
-            var previous = Read(file);
-            var corrected = CaptureTimeline.Pack(duration, rows, true);
-            var original = previous?["original"] as JObject ?? (previous?["manual"]?.Value<bool>() != true ? previous : null);
-            if (original != null) corrected["original"] = original.DeepClone();
+            var corrected = Correction(duration, rows, Read(file));
             if (experience != null) corrected["experience"] = experience;
             Write(file, corrected);
             if (game != null) GameCatalog.Played(new[] { game }, restore: true);
+        }
+
+        private static double CorrectionDuration(string file, double duration)
+        {
+            if (duration <= 0) duration = Path.GetExtension(file).Equals(".png", StringComparison.OrdinalIgnoreCase) ? .001 : (Trim.ProbeVideo(file)?.Duration ?? 0);
+            if (!CaptureTimeline.Number(duration) || duration <= 0) throw new ArgumentException(Locales.Message("clips.theClipLengthIsUnavailable"));
+            return duration;
+        }
+
+        private static JObject Correction(double duration, JArray rows, JObject previous)
+        {
+            var result = CaptureTimeline.Pack(duration, rows, true);
+            var original = previous?["original"] as JObject ?? (previous?["manual"]?.Value<bool>() != true ? previous : null);
+            if (original != null) result["original"] = original.DeepClone();
+            return result;
+        }
+
+        internal static JObject EditMix(string file, string version, string action, string id, string name)
+        {
+            bool add = action == "add";
+            if (!add && (action != "remove" || !GameCatalog.ValidId(id))) throw new ArgumentException();
+            using var pin = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.Read);
+            var info = new FileInfo(file);
+            if ((info.Attributes & FileAttributes.ReparsePoint) != 0 ||
+                (!string.IsNullOrEmpty(version) && ClipRenames.Version(info) != version)) throw new FileNotFoundException();
+            var game = add ? (string.IsNullOrEmpty(id) ? GameCatalog.Custom(name) :
+                GameCatalog.Get(id) ?? throw new ArgumentException(Locales.Message("clips.unknownGame2"))) : null;
+            double duration = Read(file)?["duration"]?.Value<double>() ?? 0;
+            if (add) duration = CorrectionDuration(file, duration);
+            JObject result = null;
+            bool changed = Clips.UpdateDb(db =>
+            {
+                string key = Key(file);
+                var entry = db[key] as JObject ?? new JObject();
+                var saved = entry["capture"] as JObject;
+                var previous = Current(saved, info) ? saved : null;
+                result = ChangeMembership(previous, previous?["duration"]?.Value<double>() ?? duration, game, id);
+                if (ReferenceEquals(result, previous)) return false;
+                Stamp(result, file);
+                entry["capture"] = result;
+                db[key] = entry;
+                return true;
+            }, Owner(file));
+            if (changed && add)
+            {
+                try { GameCatalog.Played(new[] { game }, restore: true); }
+                catch (Exception ex) when (ex is IOException || ex is InvalidDataException || ex is UnauthorizedAccessException || ex is Newtonsoft.Json.JsonException)
+                { Log.Write("Played games not updated: " + ex.GetType().Name); }
+            }
+            return Public(result, info);
+        }
+
+        private static JObject ChangeMembership(JObject previous, double duration, GameCatalog.Game added, string removed)
+        {
+            var summary = CaptureTimeline.Describe(previous);
+            string primary = MainGame(summary);
+            var games = (JArray)summary["games"];
+            var members = games.OfType<JObject>().Where(g => summary["kind"].Value<string>() == "mixed" || g["id"].Value<string>() == primary)
+                .Select(g => new GameCatalog.Game { Id = g["id"].Value<string>(), Name = g["name"].Value<string>() }).ToList();
+            if (added != null)
+            {
+                if (members.Any(g => g.Id == added.Id)) return previous;
+                if (members.Count >= 128) throw new ArgumentException();
+                members.Add(added);
+            }
+            else if (members.RemoveAll(g => g.Id == removed) == 0) return previous;
+
+            var rows = new JArray();
+            var single = members.Count == 1 ? members[0] : null;
+            if (members.Count < 2)
+                CaptureTimeline.Add(rows, 0, duration, single != null ? "game" : "unknown", single?.Id ?? "", single?.Name ?? "");
+            var result = Correction(duration, rows, previous);
+            if (members.Count > 1)
+            {
+                var kept = new JArray();
+                if (previous != null)
+                    CaptureTimeline.PlaceVideoGames(kept, CaptureTimeline.Cut(previous, 0, duration), summary, 0);
+                var evidence = new JArray();
+                foreach (var member in members)
+                {
+                    var held = kept.Where(row => row["id"]?.Value<string>() == member.Id);
+                    if (!held.Any()) CaptureTimeline.Add(evidence, 0, duration, "game", member.Id, member.Name);
+                    else foreach (var row in held) CaptureTimeline.Add(evidence, row["s"].Value<double>(), row["e"].Value<double>(), row);
+                }
+                CaptureTimeline.SetVideoGames(result, evidence, keepOrder: true);
+            }
+            else if (single != null)
+            {
+                var earlier = result["original"] as JObject;
+                var details = primary == single.Id ? previous : MainGame(CaptureTimeline.Describe(earlier)) == single.Id ? earlier : null;
+                foreach (string key in new[] { "experience", "gameIcon" })
+                    if (details?[key] is JObject detail) result[key] = detail.DeepClone();
+            }
+            return result;
         }
 
         internal static void Reset(string file)
@@ -383,46 +473,78 @@ namespace ReplayKitHelper
             Write(file, original);
         }
 
-        internal static void Rendered(string source, string target, VideoPlan plan, double start, double end, double speed, bool screenshot, double frame, JObject sourceCapture, bool ambiguous = false)
+        internal static void Rendered(string source, string target, VideoPlan plan, double start, double end, double speed, bool screenshot, double frame, JObject sourceCapture, LayerPlan layers)
         {
-            if (ambiguous) { Write(target, CaptureTimeline.Pack(screenshot ? .001 : plan != null ? plan.End - plan.Start : (end - start) / speed, new JArray())); return; }
             JObject result;
             if (plan == null)
             {
                 result = CaptureTimeline.Cut(sourceCapture, screenshot ? frame * speed : start, screenshot ? frame * speed + .001 : end, screenshot ? 1 : speed);
-                CarryDetails(result, new[] { PieceDetails(result, sourceCapture) });
+                CarryDetails(result, new[] { PieceDetails(CaptureTimeline.Describe(result), sourceCapture) });
             }
             else
             {
                 var rows = new JArray();
                 var originalRows = new JArray();
+                var games = new JArray();
+                var originalGames = new JArray();
                 var renderedDetails = new List<JObject>();
                 var originalDetails = new List<JObject>();
+                var captures = new Dictionary<string, JObject>(StringComparer.OrdinalIgnoreCase) { [source] = sourceCapture };
                 bool corrected = false;
+                bool library = false;
                 double left = screenshot ? frame : plan.Start, right = screenshot ? frame + .001 : plan.End;
-                foreach (var piece in plan.Pieces)
+
+                void AddFootage(string path, double at, double from, double to, double rate, bool mainRow)
                 {
-                    double a = Math.Max(left, piece.At), b = Math.Min(right, piece.At + piece.Length(speed));
-                    if (b <= a) continue;
-                    double rate = piece.Rate(speed);
-                    var original = piece.Path == null || string.Equals(piece.Path, source, StringComparison.OrdinalIgnoreCase) ? sourceCapture : Read(piece.Path);
-                    var cut = CaptureTimeline.Cut(original, piece.SrcStart + (a - piece.At) * rate, piece.SrcStart + (b - piece.At) * rate, rate);
+                    string file = path ?? source;
+                    if (!captures.TryGetValue(file, out var original)) captures[file] = original = Read(file);
+                    var cut = CaptureTimeline.Cut(original, from, to, rate);
                     corrected |= cut["original"] is JObject;
                     var baseline = cut["original"] as JObject ?? cut;
                     var recorded = original?["original"] as JObject ?? original;
-                    renderedDetails.Add(PieceDetails(cut, original));
-                    originalDetails.Add(PieceDetails(baseline, recorded));
-                    foreach (var row in (JArray)cut["intervals"])
-                        CaptureTimeline.Add(rows, a - left + row["s"].Value<double>(), a - left + row["e"].Value<double>(), row);
-                    foreach (var row in (JArray)baseline["intervals"])
-                        CaptureTimeline.Add(originalRows, a - left + row["s"].Value<double>(), a - left + row["e"].Value<double>(), row);
+                    var summary = CaptureTimeline.Describe(cut);
+                    var baselineSummary = baseline == cut ? summary : CaptureTimeline.Describe(baseline);
+                    library |= !mainRow || !string.Equals(file, source, StringComparison.OrdinalIgnoreCase) ||
+                        CaptureTimeline.HasVideoGames(cut) || CaptureTimeline.HasVideoGames(baseline);
+                    CaptureTimeline.PlaceVideoGames(games, cut, summary, at);
+                    CaptureTimeline.PlaceVideoGames(originalGames, baseline, baselineSummary, at);
+                    renderedDetails.Add(PieceDetails(summary, original));
+                    originalDetails.Add(PieceDetails(baselineSummary, recorded));
+                    if (mainRow)
+                    {
+                        foreach (var row in (JArray)cut["intervals"])
+                            CaptureTimeline.Add(rows, at + row["s"].Value<double>(), at + row["e"].Value<double>(), row);
+                        foreach (var row in (JArray)baseline["intervals"])
+                            CaptureTimeline.Add(originalRows, at + row["s"].Value<double>(), at + row["e"].Value<double>(), row);
+                    }
                 }
+
+                if (screenshot)
+                {
+                    var piece = plan.PieceAt(frame, speed);
+                    if (piece != null)
+                    {
+                        double rate = piece.Rate(speed);
+                        double from = piece.SrcStart + Math.Max(0, frame - piece.At) * rate;
+                        AddFootage(piece.Path, 0, from, Math.Min(piece.SrcEnd, from + (right - left) * rate), rate, true);
+                    }
+                }
+                else
+                    foreach (var part in plan.Parts(speed))
+                        AddFootage(part.Piece.Path, part.A - left, part.SrcA, part.SrcB, part.Piece.Rate(speed), true);
+
+                if (layers != null)
+                    foreach (var layer in layers.ClipSpans(left - plan.Start, right - plan.Start, screenshot))
+                        AddFootage(layer.Path, layer.At + plan.Start - left, layer.Src, layer.Src + (layer.End - layer.At) * layer.Speed, layer.Speed, false);
+
                 result = CaptureTimeline.Pack(right - left, rows);
+                if (library) CaptureTimeline.SetVideoGames(result, games);
                 CarryDetails(result, renderedDetails);
                 if (corrected)
                 {
                     result["manual"] = true;
                     var baseline = CaptureTimeline.Pack(right - left, originalRows);
+                    if (library) CaptureTimeline.SetVideoGames(baseline, originalGames);
                     CarryDetails(baseline, originalDetails);
                     result["original"] = baseline;
                 }
@@ -430,9 +552,9 @@ namespace ReplayKitHelper
             Write(target, result);
         }
 
-        private static JObject PieceDetails(JObject cut, JObject source)
+        private static JObject PieceDetails(JObject summary, JObject source)
         {
-            string game = MainGame(CaptureTimeline.Describe(cut));
+            string game = MainGame(summary);
             bool matches = game != null && game == MainGame(CaptureTimeline.Describe(source));
             return new JObject
             {

@@ -127,6 +127,10 @@
     "source": "fd3d9876673a7dd1",
     "text": "その名前のスクリーンショットは既に存在します"
   },
+  "clips.addGameToMix": {
+    "source": "38a9a0fcf9ec5f98",
+    "text": "ミックスにゲームを追加"
+  },
   "clips.allGames": {
     "source": "92bfbe670278c6ef",
     "text": "すべてのゲーム"
@@ -202,6 +206,10 @@
   "clips.changeGame": {
     "source": "82958b036739f6f0",
     "text": "ゲームを変更"
+  },
+  "clips.chooseGameForMix": {
+    "source": "d4299942eb1c1cc3",
+    "text": "このクリップに追加するゲームを選択してください。"
   },
   "clips.clickAgainToDeleteEverythingHere": {
     "source": "f53e8f7bdfa1cb66",
@@ -795,13 +803,13 @@
     "source": "931ae19725af8acd",
     "text": "ゲームを変更できませんでした。"
   },
-  "clips.gameCouldNotBeRemoved": {
-    "source": "1aa58a5b5f23ff78",
-    "text": "ゲームを削除できませんでした。"
-  },
   "clips.gameDetailsCouldNotBeRead": {
     "source": "4cfe5163b5a903fc",
     "text": "ゲームの詳細を読み取りまたは更新できませんでした。"
+  },
+  "clips.gameMix": {
+    "source": "09ba786f9c5214b7",
+    "text": "ゲームミックス"
   },
   "clips.gamePlace": {
     "source": "9a8f1d511639adf6",
@@ -1343,21 +1351,13 @@
     "source": "ed21b922093cde53",
     "text": "お気に入りから削除"
   },
-  "clips.removeFromYourGamesTooltip": {
-    "source": "213b51cb8c5b9a5d",
-    "text": "マイゲームから削除します。クリップのゲームタグはそのまま残ります。"
+  "clips.removeGameFromClip": {
+    "source": "e5ce9ac3d385d243",
+    "text": "このクリップから{name}を外す"
   },
   "clips.removeLink": {
     "source": "20e71d9a741d4984",
     "text": "リンクを削除"
-  },
-  "clips.removeNameFromYourGames": {
-    "source": "b9c1951739a001ad",
-    "text": "マイゲームから {name} を削除"
-  },
-  "clips.removingGame": {
-    "source": "04ef4260b7bfaf9c",
-    "text": "ゲームを削除しています…"
   },
   "clips.reorderName": {
     "source": "cc796a93f6d1b921",

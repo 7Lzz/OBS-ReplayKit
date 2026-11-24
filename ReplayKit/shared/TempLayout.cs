@@ -32,6 +32,14 @@ namespace ReplayKitShared
         // the helper downloads an update into a folder of this prefix and a guid, and the installer deletes only a folder of that shape
         public const string UpdateFolderPrefix = "update-";
 
+        public static string UpdateDirectory(string attemptId)
+        {
+            if (!ValidAttempt(attemptId)) throw new ArgumentException("Invalid update attempt ID.", nameof(attemptId));
+            return Path.Combine(Root, UpdateFolderPrefix + attemptId);
+        }
+
+        public static string UpdateProgressPath(string attemptId) => Path.Combine(UpdateDirectory(attemptId), "progress.json");
+
         public static string Root => Path.Combine(Path.GetTempPath(), Folder);
         public static string Logs => Path.Combine(Root, LogsFolder);
         public static string Scratch => Path.Combine(Root, ScratchFolder);

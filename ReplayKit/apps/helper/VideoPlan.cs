@@ -140,13 +140,13 @@ namespace ReplayKitHelper
         }
 
         // a piece as far as it lies inside the saved clip: from A to B on the timeline, showing SrcA to SrcB of its clip
-        private struct Part
+        internal struct Part
         {
             public Piece Piece;
             public double A, B, SrcA, SrcB;
         }
 
-        private IEnumerable<Part> Parts(double speed)
+        internal IEnumerable<Part> Parts(double speed)
         {
             foreach (var piece in Pieces)
             {
@@ -160,6 +160,9 @@ namespace ReplayKitHelper
                 yield return new Part { Piece = piece, A = a, B = b, SrcA = piece.SrcStart + (a - pieceStart) * rate, SrcB = piece.SrcStart + (b - pieceStart) * rate };
             }
         }
+
+        internal Piece PieceAt(double time, double speed) =>
+            Pieces.FirstOrDefault(piece => time >= Math.Max(piece.At, Start) - 1e-6 && time < piece.At + piece.Length(speed));
 
         // the first and last second of the source that the saved clip shows; false when it shows none of the source
         public bool SourceSpan(double speed, out double first, out double last)

@@ -127,6 +127,10 @@
     "source": "fd3d9876673a7dd1",
     "text": "已存在同名截图"
   },
+  "clips.addGameToMix": {
+    "source": "38a9a0fcf9ec5f98",
+    "text": "向混合列表添加游戏"
+  },
   "clips.allGames": {
     "source": "92bfbe670278c6ef",
     "text": "所有游戏"
@@ -202,6 +206,10 @@
   "clips.changeGame": {
     "source": "82958b036739f6f0",
     "text": "更改游戏"
+  },
+  "clips.chooseGameForMix": {
+    "source": "d4299942eb1c1cc3",
+    "text": "选择要添加到此片段的游戏。"
   },
   "clips.clickAgainToDeleteEverythingHere": {
     "source": "f53e8f7bdfa1cb66",
@@ -795,13 +803,13 @@
     "source": "931ae19725af8acd",
     "text": "无法更改游戏。"
   },
-  "clips.gameCouldNotBeRemoved": {
-    "source": "1aa58a5b5f23ff78",
-    "text": "无法移除游戏。"
-  },
   "clips.gameDetailsCouldNotBeRead": {
     "source": "4cfe5163b5a903fc",
     "text": "无法读取或更新游戏详情。"
+  },
+  "clips.gameMix": {
+    "source": "09ba786f9c5214b7",
+    "text": "游戏混合列表"
   },
   "clips.gamePlace": {
     "source": "9a8f1d511639adf6",
@@ -1343,21 +1351,13 @@
     "source": "ed21b922093cde53",
     "text": "取消收藏"
   },
-  "clips.removeFromYourGamesTooltip": {
-    "source": "213b51cb8c5b9a5d",
-    "text": "从“我的游戏”中移除。剪辑会保留游戏标签。"
+  "clips.removeGameFromClip": {
+    "source": "e5ce9ac3d385d243",
+    "text": "从此片段中移除{name}"
   },
   "clips.removeLink": {
     "source": "20e71d9a741d4984",
     "text": "删除链接"
-  },
-  "clips.removeNameFromYourGames": {
-    "source": "b9c1951739a001ad",
-    "text": "从游戏列表中移除 {name}"
-  },
-  "clips.removingGame": {
-    "source": "04ef4260b7bfaf9c",
-    "text": "正在移除游戏…"
   },
   "clips.reorderName": {
     "source": "cc796a93f6d1b921",
