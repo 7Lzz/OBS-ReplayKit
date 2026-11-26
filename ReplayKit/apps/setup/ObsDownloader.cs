@@ -46,7 +46,7 @@ namespace ReplayKitSetup
         public static bool EnsureObsVersion(Action<string> log) => EnsureObsVersion(new LogProgress(log));
 
         // replaykit supports one obs version, the tested version of the newest line: obs is installed when it is missing, updated when it is older, and put back on that version when it is a newer release of the same major (its settings carry over within a major). a newer major is left alone and reported, since going back across majors can break the settings of obs; steam keeps its own copy, so that one is never touched. callers check ObsVersions.IsInstalledSupported afterwards
-        public static bool EnsureObsVersion(IInstallProgress progress)
+        public static bool EnsureObsVersion(IInstallProgress progress, bool forceClose = false)
         {
             var target = ObsVersions.Install.Tested;
             string exe = Obs.FindObsExe();
@@ -65,7 +65,7 @@ namespace ReplayKitSetup
             if (exe != null)
             {
                 progress.LogLine((installed != null && installed > target ? "moving OBS " : "updating OBS ") + (installed?.ToString() ?? "(unknown version)") + " to " + target + ", the version this ReplayKit supports");
-                Obs.CloseObs(progress.LogLine);
+                Obs.CloseObs(progress.LogLine, forceCloseRemaining: forceClose);
             }
             if (!EnsureObsInstalled(progress)) return false;
             installed = ObsVersions.InstalledVersion();

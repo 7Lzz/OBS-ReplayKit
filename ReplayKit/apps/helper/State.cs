@@ -239,8 +239,6 @@ namespace ReplayKitHelper
         // written from both the accept loop and route handlers; read by the accept loop every iteration.
         public volatile bool Shutdown;
 
-        // written by route handlers and read once by the shutdown path, so it needs no lock of its own null means no restart pending; a non-null value is the obs executable path to relaunch once this process exits (the legacy fallback path used only when the detached relauncher in Routes.cs cant be started).
-        public volatile string RestartAfterCleanObsPath;
 
         // -- AuthLock --
         public readonly object AuthLock = new object();

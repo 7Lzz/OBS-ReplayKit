@@ -2,6 +2,7 @@
 #include "prelude.hpp"
 #include "share/share_link.hpp"
 #include "share/share_audio.hpp"
+#include "core/graphics_device.hpp"
 #include "core/shared_values.hpp"
 
 #include <QJsonObject>
@@ -10,18 +11,38 @@
 #include <dxgi.h>
 
 #include <atomic>
+#include <memory>
 #include <mutex>
+#include <optional>
 #include <string>
 
 namespace rk {
 
 namespace {
 
+struct ShareAttachment {
+	ShareAttachment() = default;
+	ShareAttachment(const ShareAttachment &) = delete;
+	ShareAttachment &operator=(const ShareAttachment &) = delete;
+
+	ShareLinkView view;
+	HANDLE mapping = nullptr;
+	HANDLE process = nullptr;
+	uint32_t pid = 0;
+
+	~ShareAttachment()
+	{
+		UnmapViewOfFile(view.state);
+		CloseHandle(view.frameEvent);
+		CloseHandle(view.audioEvent);
+		CloseHandle(mapping);
+		CloseHandle(process);
+	}
+};
+
 std::mutex g_lock;
-ShareLinkView g_view;
-HANDLE g_mapping = nullptr;
-HANDLE g_windowProcess = nullptr;
-uint32_t g_windowPid = 0;
+std::shared_ptr<ShareAttachment> g_attachment;
+const ShareLinkView EmptyLink;
 uint32_t g_serial = 0;
 std::atomic<bool> g_closing{false};
 QTimer *g_timer = nullptr;
@@ -31,10 +52,9 @@ bool g_refusedLogged = false;
 // only touched on the graphics thread
 gs_texture_t *g_texture = nullptr;
 gs_texrender_t *g_render = nullptr;
-uint32_t g_textureSeq = 0;
+std::optional<uint32_t> g_attemptedTexture;
 uint32_t g_textureSerial = 0;
 uint64_t g_lastFrameTime = 0;
-bool g_openFailedLogged = false;
 
 std::atomic<uint64_t> g_copied{0};
 std::atomic<uint64_t> g_busy{0};
@@ -51,7 +71,6 @@ void DropTexture()
 		gs_texture_destroy(g_texture);
 		g_texture = nullptr;
 	}
-	g_textureSeq = 0;
 }
 
 // the gpu obs renders on, which the window has to render on too for the shared texture to open
@@ -59,7 +78,7 @@ uint64_t ObsAdapterLuid()
 {
 	uint64_t luid = 0;
 	obs_enter_graphics();
-	auto *device = static_cast<ID3D11Device *>(gs_get_device_obj());
+	auto *device = ObsGraphicsDevice();
 	IDXGIDevice *dxgiDevice = nullptr;
 	if (device && SUCCEEDED(device->QueryInterface(__uuidof(IDXGIDevice), reinterpret_cast<void **>(&dxgiDevice)))) {
 		IDXGIAdapter *adapter = nullptr;
@@ -110,34 +129,23 @@ void WriteCanvas(share::SharedState *state)
 // called with g_lock held
 void Detach(const char *why)
 {
-	if (!g_view.state)
+	if (!g_attachment)
 		return;
 	blog(LOG_INFO, "[replaykit] share window let go: %s", why);
+	auto *state = g_attachment->view.state;
 	uint32_t mine = GetCurrentProcessId();
-	if (g_view.state->producerPid.load() == mine) {
-		g_view.state->producerState.store(share::ProducerClosing);
+	if (state->producerPid.load() == mine) {
+		state->producerState.store(share::ProducerClosing);
 		uint32_t expected = mine;
-		g_view.state->producerPid.compare_exchange_strong(expected, 0);
+		state->producerPid.compare_exchange_strong(expected, 0);
 	}
-	UnmapViewOfFile(g_view.state);
-	if (g_view.frameEvent)
-		CloseHandle(g_view.frameEvent);
-	if (g_view.audioEvent)
-		CloseHandle(g_view.audioEvent);
-	if (g_mapping)
-		CloseHandle(g_mapping);
-	if (g_windowProcess)
-		CloseHandle(g_windowProcess);
-	g_view = ShareLinkView{};
-	g_mapping = nullptr;
-	g_windowProcess = nullptr;
-	g_windowPid = 0;
+	g_attachment.reset();
 }
 
-bool WindowAlive()
+bool WindowAlive(const ShareAttachment &attachment)
 {
 	DWORD code = STILL_ACTIVE;
-	return g_windowProcess && GetExitCodeProcess(g_windowProcess, &code) && code == STILL_ACTIVE;
+	return GetExitCodeProcess(attachment.process, &code) && code == STILL_ACTIVE;
 }
 
 // called with g_lock held
@@ -182,18 +190,16 @@ void TryAttach()
 		CloseHandle(mapping);
 		return;
 	}
-	g_mapping = mapping;
-	g_windowProcess = process;
-	g_windowPid = state->windowPid;
-	g_view.state = state;
-	g_view.frameEvent = frameEvent;
-	g_view.audioEvent = audioEvent;
-	g_view.serial = ++g_serial;
+	g_attachment = std::make_shared<ShareAttachment>();
+	g_attachment->view = {state, frameEvent, audioEvent, ++g_serial};
+	g_attachment->mapping = mapping;
+	g_attachment->process = process;
+	g_attachment->pid = state->windowPid;
 	state->producerAdapterLuid.store(g_adapterLuid);
 	WriteCanvas(state);
 	WriteMonitoringDevice(state);
 	state->producerState.store(share::ProducerLive);
-	blog(LOG_INFO, "[replaykit] share window attached (pid %u)", g_windowPid);
+	blog(LOG_INFO, "[replaykit] share window attached (pid %u)", g_attachment->pid);
 }
 
 void Tick()
@@ -202,11 +208,11 @@ void Tick()
 		return;
 	{
 		std::lock_guard<std::mutex> guard(g_lock);
-		if (g_view.state) {
-			share::SharedState *state = g_view.state;
-			if (!WindowAlive())
+		if (g_attachment) {
+			share::SharedState *state = g_attachment->view.state;
+			if (!WindowAlive(*g_attachment))
 				Detach("the window exited");
-			else if (state->magic != share::kMagic || state->windowPid != g_windowPid)
+			else if (state->magic != share::kMagic || state->windowPid != g_attachment->pid)
 				Detach("the window started over");
 			else if (state->producerPid.load() != GetCurrentProcessId())
 				Detach("the window took the claim back");
@@ -215,15 +221,29 @@ void Tick()
 				WriteMonitoringDevice(state);
 			}
 		}
-		if (!g_view.state)
+		if (!g_attachment)
 			TryAttach();
 	}
 	ShareAudioRefresh();
 }
 
+bool CurrentAttachment(const ShareAttachment &attachment)
+{
+	const auto *state = attachment.view.state;
+	return g_attachment.get() == &attachment && state->magic == share::kMagic && state->windowPid == attachment.pid &&
+	       state->producerPid.load() == GetCurrentProcessId();
+}
+
+void RejectTexture(const ShareAttachment &attachment, uint32_t seq)
+{
+	std::lock_guard<std::mutex> guard(g_lock);
+	if (CurrentAttachment(attachment))
+		attachment.view.state->rejectedTextureSeq.store(seq);
+}
+
 void OnRendered(void *)
 {
-	if (g_closing.load())
+	if (g_closing.load() || GraphicsStatus().Lost())
 		return;
 	// obs calls this once per video mix, and the program picture only needs to go out once a frame
 	uint64_t frameTime = obs_get_video_frame_time();
@@ -231,15 +251,23 @@ void OnRendered(void *)
 		return;
 	g_lastFrameTime = frameTime;
 
-	std::lock_guard<std::mutex> guard(g_lock);
-	share::SharedState *state = g_view.state;
-	if (!state) {
+	std::shared_ptr<ShareAttachment> attachment;
+	{
+		std::lock_guard<std::mutex> guard(g_lock);
+		attachment = g_attachment;
+	}
+	// the snapshot keeps the mapping alive without making the ui or audio wait for a graphics call
+	if (!attachment) {
 		DropTexture();
+		g_attemptedTexture.reset();
 		return;
 	}
-	if (g_view.serial != g_textureSerial) {
+	const ShareLinkView &view = attachment->view;
+	share::SharedState *state = view.state;
+	if (view.serial != g_textureSerial) {
 		DropTexture();
-		g_textureSerial = g_view.serial;
+		g_attemptedTexture.reset();
+		g_textureSerial = view.serial;
 	}
 	uint32_t seq = state->textureSeq.load(std::memory_order_acquire);
 	if (seq & 1)
@@ -252,20 +280,20 @@ void OnRendered(void *)
 		return;
 	if (!handle) {
 		DropTexture();
+		g_attemptedTexture.reset();
 		return;
 	}
-	if (!g_texture || g_textureSeq != seq) {
+	if (g_attemptedTexture != seq) {
 		DropTexture();
+		g_attemptedTexture = seq;
 		g_texture = gs_texture_open_shared(handle);
 		if (!g_texture) {
-			if (!g_openFailedLogged)
-				blog(LOG_WARNING, "[replaykit] the share window texture %08x could not be opened", handle);
-			g_openFailedLogged = true;
-			return;
+			blog(LOG_WARNING, "[replaykit] the share window texture %08x could not be opened", handle);
+			RejectTexture(*attachment, seq);
 		}
-		g_openFailedLogged = false;
-		g_textureSeq = seq;
 	}
+	if (!g_texture)
+		return;
 	gs_texture_t *main = obs_get_main_texture();
 	if (!main)
 		return;
@@ -276,6 +304,8 @@ void OnRendered(void *)
 	}
 	if (!g_render)
 		g_render = gs_texrender_create(GS_BGRA, GS_ZS_NONE);
+	if (!g_render)
+		return;
 	gs_texrender_reset(g_render);
 	if (!gs_texrender_begin(g_render, width, height))
 		return;
@@ -293,15 +323,25 @@ void OnRendered(void *)
 	int sync = gs_texture_acquire_sync(g_texture, 0, 0);
 	if (sync != 0) {
 		g_busy.fetch_add(1);
-		// anything but busy means the texture is not usable any more, and it is opened again
-		if (sync != ETIMEDOUT)
+		// a broken mutex needs a new texture from the share window
+		if (sync != ETIMEDOUT) {
 			DropTexture();
+			RejectTexture(*attachment, seq);
+		}
 		return;
 	}
 	gs_copy_texture(g_texture, gs_texrender_get_texture(g_render));
-	gs_texture_release_sync(g_texture, 0);
+	if (gs_texture_release_sync(g_texture, 0) != 0) {
+		DropTexture();
+		RejectTexture(*attachment, seq);
+		return;
+	}
+	std::lock_guard<std::mutex> guard(g_lock);
+	if (!CurrentAttachment(*attachment) || state->textureSeq.load() != seq)
+		return;
+	state->frameTextureSeq.store(seq, std::memory_order_relaxed);
 	state->framesWritten.fetch_add(1, std::memory_order_release);
-	SetEvent(g_view.frameEvent);
+	SetEvent(view.frameEvent);
 	g_copied.fetch_add(1);
 }
 
@@ -319,7 +359,7 @@ ShareLinkLock::~ShareLinkLock()
 
 const ShareLinkView &ShareLinkLock::View() const
 {
-	return g_view;
+	return g_attachment ? g_attachment->view : EmptyLink;
 }
 
 void ShareLinkStart()
@@ -330,6 +370,16 @@ void ShareLinkStart()
 	g_timer->setInterval(1000);
 	QObject::connect(g_timer, &QTimer::timeout, g_timer, Tick);
 	g_timer->start();
+}
+
+void ReleaseShareGraphics()
+{
+	DropTexture();
+	g_attemptedTexture.reset();
+	if (g_render) {
+		gs_texrender_destroy(g_render);
+		g_render = nullptr;
+	}
 }
 
 void ShareLinkStop()
@@ -344,11 +394,7 @@ void ShareLinkStop()
 	obs_remove_main_rendered_callback(OnRendered, nullptr);
 	ShareAudioStop();
 	obs_enter_graphics();
-	DropTexture();
-	if (g_render) {
-		gs_texrender_destroy(g_render);
-		g_render = nullptr;
-	}
+	ReleaseShareGraphics();
 	obs_leave_graphics();
 	std::lock_guard<std::mutex> guard(g_lock);
 	Detach("obs is closing");
@@ -359,18 +405,19 @@ QJsonObject ShareLinkProbe()
 	QJsonObject out;
 	{
 	std::lock_guard<std::mutex> guard(g_lock);
-	out["attached"] = g_view.state != nullptr;
-	out["windowPid"] = qint64(g_windowPid);
+	out["attached"] = bool(g_attachment);
+	out["windowPid"] = qint64(g_attachment ? g_attachment->pid : 0);
 	out["serial"] = qint64(g_serial);
 	out["closing"] = g_closing.load();
 	out["adapterLuid"] = QString::number(qulonglong(g_adapterLuid), 16);
 	out["framesCopied"] = qint64(g_copied.load());
 	out["framesSkippedBusy"] = qint64(g_busy.load());
 	out["framesSkippedSize"] = qint64(g_sizeMismatch.load());
-	if (g_view.state) {
-		out["generation"] = qint64(g_view.state->textureSeq.load() / 2);
-		out["texture"] = QString("%1x%2").arg(g_view.state->textureWidth).arg(g_view.state->textureHeight);
-		out["framesWritten"] = qint64(g_view.state->framesWritten.load());
+	if (g_attachment) {
+		const auto *state = g_attachment->view.state;
+		out["generation"] = qint64(state->textureSeq.load() / 2);
+		out["texture"] = QString("%1x%2").arg(state->textureWidth).arg(state->textureHeight);
+		out["framesWritten"] = qint64(state->framesWritten.load());
 	}
 	}
 	// after the link lock is let go, since the relay takes its own lock first and the link lock second

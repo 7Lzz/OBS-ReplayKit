@@ -24,6 +24,7 @@ constexpr ULONGLONG kRepresentMs = 33;
 // the card fades in over the frame it replaces while its picture rises into place, and fades out over the frame that comes back
 constexpr ULONGLONG kEnterMs = 500;
 constexpr ULONGLONG kLeaveMs = 350;
+constexpr ULONGLONG kRebuildRetryMs = 2000;
 // how far the picture rises during the reveal, in pixels of a 1080 pixel tall card
 constexpr float kRise = 24.0f;
 // a hold never keeps the window past this, so an update that never brings obs back cannot leave it forever
@@ -237,7 +238,7 @@ void ShareApp::Step(bool frameSignal)
 	pipe.Drain([this](const std::string &line) { return Execute(line); });
 	if (quit)
 		return;
-	if (window.TakeResized() && !renderer.Resize())
+	if (!rebuildAt && window.TakeResized() && !renderer.Resize())
 		rebuildAt = NowMs();
 	Tick(frameSignal);
 }
@@ -245,6 +246,8 @@ void ShareApp::Step(bool frameSignal)
 bool ShareApp::RebuildRenderer(uint64_t luid)
 {
 	Log("rebuilding the renderer on luid %016llx", luid);
+	// the producer cannot open the old texture once its renderer is torn down
+	shared.PublishTexture(0, 0, 0, 0, luid);
 	if (!renderer.Init(window.Handle(), luid))
 		return false;
 	if (!card.pixels.empty())
@@ -252,12 +255,10 @@ bool ShareApp::RebuildRenderer(uint64_t luid)
 	renderer.SetVideoFill(videoFill);
 	if (!videoFrame.pixels.empty())
 		renderer.SetVideoFrame(videoFrame.pixels, videoFrame.width, videoFrame.height);
-	// the old texture is gone with the old device, so the plugin is told to open the new one
-	shared.PublishTexture(0, 0, 0, 0, renderer.AdapterLuid());
 	return true;
 }
 
-bool ShareApp::EnsureSharedTexture(bool replace)
+bool ShareApp::EnsureSharedTexture(bool replace, ULONGLONG now)
 {
 	SharedState *state = shared.State();
 	uint32_t width = state->wantWidth.load();
@@ -266,6 +267,9 @@ bool ShareApp::EnsureSharedTexture(bool replace)
 		return false;
 	if (!replace && renderer.SharedHandle() && renderer.SharedWidth() == width && renderer.SharedHeight() == height)
 		return true;
+	if (now < textureRetryAt)
+		return false;
+	textureRetryAt = now + kFrameStaleMs;
 	if (!renderer.CreateSharedTexture(width, height)) {
 		shared.PublishTexture(0, 0, 0, 0, renderer.AdapterLuid());
 		return false;
@@ -279,26 +283,13 @@ void ShareApp::Tick(bool frameSignal)
 {
 	const ULONGLONG now = NowMs();
 	SharedState *state = shared.State();
-	if (rebuildAt && now >= rebuildAt) {
-		rebuildAt = RebuildRenderer(renderer.AdapterLuid()) ? 0 : now + 2000;
-		if (rebuildAt)
-			return;
-	}
-
-	uint32_t producer = shared.LiveProducer();
-	uint32_t producerState = state->producerState.load();
-	bool present = producer && producerState == ProducerLive;
+	const uint32_t producer = shared.LiveProducer();
+	const bool present = producer && state->producerState.load() == ProducerLive;
+	const uint64_t luid = present ? state->producerAdapterLuid.load() : 0;
 	if (present) {
 		firstProducerDeadline = 0;
-		uint64_t luid = state->producerAdapterLuid.load();
-		if (luid && luid != renderer.AdapterLuid() && !RebuildRenderer(luid)) {
-			rebuildAt = now + 2000;
-			return;
-		}
-		if (EnsureSharedTexture(previousProducer != 0 && previousProducer != producer))
-			previousProducer = producer;
 		if (awaySince) {
-			Log("obs (pid %lu) is sending frames", producer);
+			Log("obs (pid %lu) attached", producer);
 			awaySince = 0;
 			holdUntil = 0;
 		}
@@ -306,10 +297,37 @@ void ShareApp::Tick(bool frameSignal)
 		awaySince = now;
 		Log("obs is away%s", holdUntil > now ? ", held for a restart or update" : "");
 	}
+	if (!present && awaySince && firstProducerDeadline <= now && holdUntil <= now && keepSeconds >= 0 && now - awaySince >= ULONGLONG(keepSeconds) * 1000) {
+		Log("obs stayed away for %lld s, the keep time", keepSeconds);
+		quit = true;
+		return;
+	}
+
+	if (rebuildAt) {
+		if (now < rebuildAt)
+			return;
+		if (!RebuildRenderer(luid ? luid : renderer.AdapterLuid())) {
+			rebuildAt = now + kRebuildRetryMs;
+			return;
+		}
+		rebuildAt = 0;
+	}
+
+	if (present) {
+		if (luid && luid != renderer.AdapterLuid() && !RebuildRenderer(luid)) {
+			rebuildAt = now + kRebuildRetryMs;
+			return;
+		}
+		const uint32_t rejected = state->rejectedTextureSeq.load();
+		const bool rejectedCurrent = rejected && rejected == state->textureSeq.load();
+		if (EnsureSharedTexture(rejectedCurrent || (previousProducer != 0 && previousProducer != producer), now))
+			previousProducer = producer;
+	}
 
 	uint64_t written = state->framesWritten.load(std::memory_order_acquire);
 	bool newFrame = false;
-	if ((frameSignal || written != lastFramesWritten) && written != lastFramesWritten && renderer.TakeFrame()) {
+	if ((frameSignal || written != lastFramesWritten) && written != lastFramesWritten &&
+	    state->frameTextureSeq.load() == state->textureSeq.load() && renderer.TakeFrame()) {
 		lastFramesWritten = written;
 		lastFrameAt = now;
 		framesReceived++;
@@ -330,12 +348,6 @@ void ShareApp::Tick(bool frameSignal)
 		}
 	}
 	audio.SetCardShowing(!live);
-
-	if (!present && awaySince && firstProducerDeadline <= now && holdUntil <= now && keepSeconds >= 0 && now - awaySince >= ULONGLONG(keepSeconds) * 1000) {
-		Log("obs stayed away for %lld s, the keep time", keepSeconds);
-		quit = true;
-		return;
-	}
 
 	// live frames are presented as obs sends them, which also carries the card fading out; a card that fades in or moves is presented on its own schedule at the obs rate, and a still one every kRepresentMs
 	const bool leaving = live && now - liveSince < kLeaveMs;

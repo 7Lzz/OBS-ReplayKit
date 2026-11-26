@@ -7,6 +7,7 @@ namespace rk {
 
 // starts the once a second look for the window, from obs_module_load
 void ShareLinkStart();
+void ReleaseShareGraphics();
 // obs is closing: the window is told to show its card and let go, before obs tears its scenes down
 void ShareLinkStop();
 QJsonObject ShareLinkProbe();

@@ -51,6 +51,10 @@
     "source": "879ad747764bbbda",
     "text": "Erneute Anmeldung bei Streamable erzwingen?"
   },
+  "capture.graphicsDeviceLost": {
+    "source": "ee5556a1cd8bbd5a",
+    "text": "OBS hat den Zugriff auf das Grafikgerät verloren. Die Videoaufnahme ist unterbrochen."
+  },
   "capture.recordingStarted": {
     "source": "c9ad24bd74b949ab",
     "text": "Aufnahme gestartet"
@@ -9641,8 +9645,8 @@
     "text": "Ruhezustand von Monitor und PC zulassen"
   },
   "setup.anotherReplaykitUpdateIsAlready": {
-    "source": "fcd92a1e168a4f54",
-    "text": "Es läuft bereits ein anderes ReplayKit-Update."
+    "source": "1009b6c4daadb600",
+    "text": "ReplayKit ändert bereits die OBS-Installation oder startet OBS neu."
   },
   "setup.appliesYourThemeBeforeObsStarts": {
     "source": "9ff460540709c340",
@@ -9939,6 +9943,10 @@
   "setup.obsCouldNotBeInstalledAutomatically": {
     "source": "b9ec5649ef71e37c",
     "text": "OBS Studio konnte nicht automatisch installiert werden. Installiere OBS von obsproject.com und führe dieses Installationsprogramm dann erneut aus."
+  },
+  "setup.obsDidNotExitGracefully": {
+    "source": "d232068992159151",
+    "text": "OBS oder einer seiner Prozesse läuft noch. Das Setup wurde beendet."
   },
   "setup.obsIsStartingBackUp": {
     "source": "13a7f357aa36308e",

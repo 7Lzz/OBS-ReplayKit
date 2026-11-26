@@ -25,7 +25,6 @@ namespace ReplayKitHelper
             Stream stream = r.Stream;
             HttpRequest req = r.Req;
             string path = r.Path;
-            string Q(string key, string def = "") => r.Q(key, def);
 
 
             if (path == "/status")
@@ -90,11 +89,11 @@ namespace ReplayKitHelper
             {
                 // the detached relauncher starts obs only after the original process exits normally
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
-                string obsPath = ObsProcess.GetRunningObsPath();
-                if (obsPath == null) { HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = Locales.Message("common.couldNotLocateObsExecutablePath") }); return false; }
-                ObsProcess.ArmRelaunchAndCloseObs(obsPath, "/restart-obs");
+                using var close = ObsProcess.CloseRequest.Begin(out string error);
+                if (close == null) { HttpResponse.SendJson(stream, 409, new JObject { ["ok"] = false, ["message"] = error }); return false; }
                 HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["message"] = Locales.Message("helper.obsIsRestarting") });
-                ObsProcess.StopObsForRestart("/restart-obs", true);
+                stream.Dispose();
+                close.Run(path, restart: true);
                 return false;
             }
 
@@ -109,9 +108,11 @@ namespace ReplayKitHelper
             {
                 // requests a normal exit; a stalled shutdown is reported without killing obs
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
+                using var close = ObsProcess.CloseRequest.Begin(out string error);
+                if (close == null) { HttpResponse.SendJson(stream, 409, new JObject { ["ok"] = false, ["message"] = error }); return false; }
                 HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["message"] = Locales.Message("helper.obsIsClosing") });
-                // the installer says when the close is for an update
-                ObsProcess.StopObsForRestart("/exit-obs", Q("reason") == "update");
+                stream.Dispose();
+                close.Run(path, restart: false);
                 return false;
             }
 
@@ -119,8 +120,8 @@ namespace ReplayKitHelper
             {
                 // clears the sign-in state and requests a normal restart before the unlocked profile is cleaned
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
-                string obsPath = ObsProcess.GetRunningObsPath();
-                if (obsPath == null) { HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = Locales.Message("common.couldNotLocateObsExecutablePath") }); return false; }
+                using var close = ObsProcess.CloseRequest.Begin(out string error);
+                if (close == null) { HttpResponse.SendJson(stream, 409, new JObject { ["ok"] = false, ["message"] = error }); return false; }
                 // a restart that left the old sign-in behind would bring it straight back, so it does not go ahead
                 bool cleared = AuthCore.ClearAuth();
                 cleared = StreamableSignIn.ClearProfile() && cleared;
@@ -129,12 +130,10 @@ namespace ReplayKitHelper
                     HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = Locales.Message("share.signInCouldNotBeCleared") });
                     return false;
                 }
-                Server.State.RestartAfterCleanObsPath = obsPath;
-                Log.Write("/restart-obs-clean: cleared ReplayKit's Streamable profile and will relaunch from '" + obsPath + "'.");
+                Log.Write("/restart-obs-clean: cleared ReplayKit's Streamable profile.");
                 HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["message"] = Locales.Message("helper.obsWillRestartWithAClean") });
-
-                // allow the response to flush before closing obs
-                ObsProcess.StopObsForRestart("/restart-obs-clean", true);
+                stream.Dispose();
+                close.Run(path, restart: true);
                 return false;
             }
 

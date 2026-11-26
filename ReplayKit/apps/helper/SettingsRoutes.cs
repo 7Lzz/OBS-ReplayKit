@@ -33,7 +33,7 @@ namespace ReplayKitHelper
             if (path == "/settings/native")
             {
                 if (req.Method != "GET") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "GET required"); return false; }
-                if (query.ContainsKey("clip")) ClipBuffer.ReportDiskState(QFlag("clip"));
+                if (query.ContainsKey("clip")) ClipBuffer.ReportDiskState(QFlag("clip"), QFlag("retained"), Q("clipStamp"));
                 try { HttpResponse.SendJson(stream, 200, SettingsHttp.GetNativeSettingsPayload()); }
                 catch (Exception ex) { HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = ex.Message }); }
                 return false;
@@ -55,15 +55,15 @@ namespace ReplayKitHelper
                         var result = SettingsHttp.SaveSettingsFromRequest(req.Body);
                         if (result["restartRequired"]?.Value<bool>() == true)
                         {
-                            string obsPath = ObsProcess.GetRunningObsPath();
-                            if (obsPath == null)
+                            using var close = ObsProcess.CloseRequest.Begin(out string error);
+                            if (close == null)
                             {
-                                HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = Locales.Message("common.couldNotLocateObsExecutablePath") });
+                                HttpResponse.SendJson(stream, 409, new JObject { ["ok"] = false, ["message"] = error });
                                 return false;
                             }
-                            ObsProcess.ArmRelaunchAndCloseObs(obsPath, "/settings");
                             HttpResponse.SendJson(stream, 200, result);
-                            ObsProcess.StopObsForRestart("/settings", true);
+                            stream.Dispose();
+                            close.Run(path, restart: true);
                             return false;
                         }
                         HttpResponse.SendJson(stream, 200, result);

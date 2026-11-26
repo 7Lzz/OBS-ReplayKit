@@ -29,6 +29,7 @@
 #include "layout/controls_dock.hpp"
 #include "layout/ui_layout.hpp"
 #include "overlays/focus_card.hpp"
+#include "core/graphics_device.hpp"
 #include "notify/clip_toast.hpp"
 #include "notify/notify_button.hpp"
 #include "share/share_link.hpp"
@@ -133,6 +134,7 @@ void TellHelperFileSaved(const char *path, bool clip = false)
 void OnFrontendEvent(enum obs_frontend_event event, void *)
 {
 	if (event == OBS_FRONTEND_EVENT_SCRIPTING_SHUTDOWN) {
+		StopGraphicsWatch();
 		ShareLinkStop();
 		FocusCardStop();
 		ClipBufferShutdown();

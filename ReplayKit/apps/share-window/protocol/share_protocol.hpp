@@ -57,6 +57,9 @@ struct SharedState {
 	std::atomic<uint32_t> wantWidth;
 	std::atomic<uint32_t> wantHeight;
 	std::atomic<uint64_t> framesWritten;
+	// the producer tags a published frame and rejects a broken texture by its published sequence
+	std::atomic<uint32_t> frameTextureSeq;
+	std::atomic<uint32_t> rejectedTextureSeq;
 
 	// the device obs monitors to, the same seqlock way as the texture: the endpoint id, or default for the default device the way obs names it; empty until a plugin wrote it
 	std::atomic<uint32_t> deviceSeq;

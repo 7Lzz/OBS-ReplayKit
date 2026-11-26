@@ -51,6 +51,10 @@
     "source": "879ad747764bbbda",
     "text": "Forcer la reconnexion à Streamable ?"
   },
+  "capture.graphicsDeviceLost": {
+    "source": "ee5556a1cd8bbd5a",
+    "text": "OBS a perdu l’accès au périphérique graphique. La capture vidéo est interrompue."
+  },
   "capture.recordingStarted": {
     "source": "c9ad24bd74b949ab",
     "text": "Enregistrement démarré"
@@ -9644,8 +9648,8 @@
     "text": "Autoriser la mise en veille de l'écran et du PC"
   },
   "setup.anotherReplaykitUpdateIsAlready": {
-    "source": "fcd92a1e168a4f54",
-    "text": "Une autre mise à jour de ReplayKit est déjà en cours."
+    "source": "1009b6c4daadb600",
+    "text": "ReplayKit est déjà en train de modifier l’installation d’OBS ou de redémarrer OBS."
   },
   "setup.appliesYourThemeBeforeObsStarts": {
     "source": "9ff460540709c340",
@@ -9942,6 +9946,10 @@
   "setup.obsCouldNotBeInstalledAutomatically": {
     "source": "b9ec5649ef71e37c",
     "text": "OBS Studio n’a pas pu être installé automatiquement. Installez OBS depuis obsproject.com, puis relancez ce programme d’installation."
+  },
+  "setup.obsDidNotExitGracefully": {
+    "source": "d232068992159151",
+    "text": "OBS ou l’un de ses processus est toujours en cours d’exécution. L’installation s’est arrêtée."
   },
   "setup.obsIsStartingBackUp": {
     "source": "13a7f357aa36308e",

@@ -606,7 +606,22 @@ namespace ReplayKitHelper
         // one early park per keep-alive interval, so a window something keeps moving cannot be fought over every second
         private static bool _earlyParkUsed;
 
-        public static void KeepAlive()
+        // keep obs and share-window ipc waits off the http accept loop
+        public static void StartKeepAlive()
+        {
+            var worker = new Thread(() =>
+            {
+                while (!Server.State.Shutdown)
+                {
+                    try { KeepAlive(); }
+                    catch (Exception ex) { Log.Write("warn: Discord projector keep-alive threw: " + ex.Message); }
+                    Thread.Sleep(50);
+                }
+            }) { Name = "share-keep-alive", IsBackground = true };
+            worker.Start();
+        }
+
+        private static void KeepAlive()
         {
             if (Volatile.Read(ref startupState) != 2)
             {

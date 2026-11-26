@@ -46,6 +46,7 @@
     <Compile Include="..\..\shared\StateLayout.cs" Link="StateLayout.cs" />
     <Compile Include="..\..\shared\TempLayout.cs" Link="TempLayout.cs" />
     <Compile Include="..\..\shared\ObsLaunch.cs" Link="ObsLaunch.cs" />
+    <Compile Include="..\..\shared\ObsExit.cs" Link="ObsExit.cs" />
     <Compile Include="..\..\shared\HelperEndpoint.cs" Link="HelperEndpoint.cs" />
     <Compile Include="..\..\shared\SystemPrograms.cs" Link="SystemPrograms.cs" />
     <Compile Include="..\..\shared\LanguageMatch.cs" Link="LanguageMatch.cs" />

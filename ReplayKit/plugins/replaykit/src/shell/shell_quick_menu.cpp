@@ -42,9 +42,8 @@ QJsonObject Action(const QString &id, const QString &label, const QString &icon,
 // what the plugin does itself in every view: keep a clip, start or stop recording, take a screenshot of what obs shows and open the deleted history, which is left out while it is turned off and while an editor is open, since the pick would land in it
 QJsonArray GlobalActions()
 {
-	const bool clipping = ClipBufferActive();
 	QJsonArray out{
-		Action(QStringLiteral("save-clip"), TrMessage("shell.saveClip"), QStringLiteral("quick/save-clip"), !clipping),
+		Action(QStringLiteral("save-clip"), TrMessage("shell.saveClip"), QStringLiteral("quick/save-clip"), !ClipBufferCanSave()),
 		obs_frontend_recording_active() ? Action(QStringLiteral("record"), TrMessage("common.stopRecording"), QStringLiteral("quick/stop"))
 						: Action(QStringLiteral("record"), TrMessage("common.startRecording"), QStringLiteral("quick/record")),
 		Action(QStringLiteral("screenshot"), TrMessage("shell.takeScreenshot"), QStringLiteral("quick/screenshot")),
@@ -235,7 +234,7 @@ void ShellQuickMenu::Run(const QString &view, const QString &id)
 		return;
 	}
 	if (id == QLatin1String("save-clip")) {
-		if (ClipBufferActive())
+		if (ClipBufferCanSave())
 			ClipBufferSave();
 	} else if (id == QLatin1String("record")) {
 		ToggleRecording();

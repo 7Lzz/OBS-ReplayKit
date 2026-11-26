@@ -32,7 +32,7 @@ private:
 	void Step(bool frameSignal);
 	void Tick(bool frameSignal);
 	bool RebuildRenderer(uint64_t luid);
-	bool EnsureSharedTexture(bool replace);
+	bool EnsureSharedTexture(bool replace, ULONGLONG now);
 	std::string Execute(const std::string &line);
 	std::string StateJson();
 	void ShowVideoFrame(ULONGLONG now);
@@ -74,6 +74,7 @@ private:
 	ULONGLONG holdUntil = 0;
 	ULONGLONG showCardUntil = 0;
 	ULONGLONG rebuildAt = 0;
+	ULONGLONG textureRetryAt = 0;
 	uint64_t lastFramesWritten = 0;
 	uint32_t previousProducer = 0;
 	bool live = false;

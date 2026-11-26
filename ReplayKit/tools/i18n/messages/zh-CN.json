@@ -51,6 +51,10 @@
     "source": "879ad747764bbbda",
     "text": "是否强制重新登录 Streamable？"
   },
+  "capture.graphicsDeviceLost": {
+    "source": "ee5556a1cd8bbd5a",
+    "text": "OBS 已失去对图形设备的访问权限。视频捕获已中断。"
+  },
   "capture.recordingStarted": {
     "source": "c9ad24bd74b949ab",
     "text": "已开始录制"
@@ -9638,8 +9642,8 @@
     "text": "允许显示器和电脑休眠"
   },
   "setup.anotherReplaykitUpdateIsAlready": {
-    "source": "fcd92a1e168a4f54",
-    "text": "另一个 ReplayKit 更新已在运行。"
+    "source": "1009b6c4daadb600",
+    "text": "ReplayKit 正在更改 OBS 安装或重启 OBS。"
   },
   "setup.appliesYourThemeBeforeObsStarts": {
     "source": "9ff460540709c340",
@@ -9936,6 +9940,10 @@
   "setup.obsCouldNotBeInstalledAutomatically": {
     "source": "b9ec5649ef71e37c",
     "text": "无法自动安装 OBS Studio。请从 obsproject.com 安装 OBS，然后重新运行此安装程序。"
+  },
+  "setup.obsDidNotExitGracefully": {
+    "source": "d232068992159151",
+    "text": "OBS 或其关联进程仍在运行。安装程序已停止。"
   },
   "setup.obsIsStartingBackUp": {
     "source": "13a7f357aa36308e",

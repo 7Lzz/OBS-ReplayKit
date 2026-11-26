@@ -17,12 +17,15 @@ namespace ReplayKitSetup
     // obs process management: locate obs64.exe, close running instances, clear crash flags, relaunch
     public static class Obs
     {
+        // include the time the helper needs to release its connection and let obs child processes exit
+        private const int SetupCloseWaitMs = 30000;
+
         // best detected obs executable path, or null.
         public static string FindObsExe() => Config.FindObsExeCandidate();
 
         // a real OBS core sits under obsRoot (bin\64bit\obs64.exe). tells a working install apart from a broken/phantom C:\Program Files\obs-studio that only holds our plugins + stale uninstaller stubs.
         public static bool CoreInstalledAt(string obsRoot) =>
-            !string.IsNullOrEmpty(obsRoot) && File.Exists(Path.Combine(obsRoot, "bin", "64bit", "obs64.exe"));
+            !string.IsNullOrEmpty(obsRoot) && File.Exists(Config.ObsExeFromRoot(obsRoot));
 
         private static Process[] ObsProcesses()
         {
@@ -65,10 +68,56 @@ namespace ReplayKitSetup
             return processes.Length > 0;
         }
 
-        // asks for a normal exit; an unavailable helper or a stalled shutdown leaves obs running
-        internal static void RequestGracefulExit(Func<bool> obsRunning, TimeSpan wait, Action<string> log)
+        private static bool IsInstalledCore(string path) => !string.IsNullOrEmpty(path) &&
+            string.Equals(Path.GetFullPath(path), Path.GetFullPath(Config.ObsExeFromRoot(Config.PROGRAMFILES_OBS_DIR)), StringComparison.OrdinalIgnoreCase);
+
+        private static Process CaptureCloseTarget()
         {
-            if (!obsRunning()) return;
+            using var current = Process.GetCurrentProcess();
+            string installed = Config.ObsExeFromRoot(Config.PROGRAMFILES_OBS_DIR);
+            var processes = Process.GetProcessesByName(Path.GetFileNameWithoutExtension(installed));
+            Process target = null;
+            try
+            {
+                foreach (var process in processes)
+                {
+                    try
+                    {
+                        _ = process.Handle;
+                        if (process.HasExited || process.SessionId != current.SessionId || !IsInstalledCore(process.MainModule?.FileName)) continue;
+                        if (target != null)
+                        {
+                            target = null;
+                            return null;
+                        }
+                        target = process;
+                    }
+                    catch (InvalidOperationException) when (process.HasExited) { }
+                    catch (System.ComponentModel.Win32Exception) when (process.HasExited) { }
+                }
+                return target;
+            }
+            catch (Exception ex) when (ex is InvalidOperationException || ex is System.ComponentModel.Win32Exception)
+            {
+                target = null;
+                return null;
+            }
+            finally { foreach (var process in processes) if (process != target) process.Dispose(); }
+        }
+
+        private static bool WaitForObsProcesses(int timeoutMs)
+        {
+            var timer = Stopwatch.StartNew();
+            while (AnyObsRunning())
+            {
+                if (timer.ElapsedMilliseconds >= timeoutMs) return false;
+                Thread.Sleep(250);
+            }
+            return true;
+        }
+
+        private static bool RequestGracefulExit()
+        {
             try
             {
                 using (var http = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(3) })
@@ -85,37 +134,57 @@ namespace ReplayKitSetup
                                 throw new IOException(SetupLocale.Message("setup.theRunningReplaykitHelperDoesNot"));
                         }
                     }
-                    // the reason lets the helper stop obs itself if a normal close stalls, instead of leaving it running with a notice in the bell
-                    using (var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Post, HelperEndpoint.Origin + "/exit-obs?reason=update"))
+                    // the plain close is graceful on older helpers too
+                    using (var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Post, HelperEndpoint.Origin + "/exit-obs"))
                     {
                         // the helper only takes calls that come from its own page
                         request.Headers.Add("Origin", HelperEndpoint.Origin);
                         using (var response = http.SendAsync(request).GetAwaiter().GetResult())
-                            if (!response.IsSuccessStatusCode) return;
+                            return response.IsSuccessStatusCode;
                     }
                 }
             }
             catch (Exception ex) when (ex is System.Net.Http.HttpRequestException || ex is System.Threading.Tasks.TaskCanceledException || ex is InvalidOperationException)
             {
-                return;
+                return false;
             }
-
-            log?.Invoke("asked obs to exit through the helper");
-            DateTime deadline = DateTime.UtcNow + wait;
-            while (DateTime.UtcNow < deadline && obsRunning()) Thread.Sleep(250);
-            log?.Invoke(obsRunning() ? "obs did not exit in time" : "obs exited by itself");
         }
 
-        // installation takes priority after the normal close has had time to drain outputs
-        public static int CloseObs(Action<string> log = null)
+        public static int CloseObs(Action<string> log = null, bool forceCloseRemaining = false)
         {
             if (!AnyObsRunning()) return 0;
-            try { RequestGracefulExit(AnyObsRunning, TimeSpan.FromSeconds(30), log); }
+            using var target = forceCloseRemaining ? null : CaptureCloseTarget();
+            bool closeRequested = false;
+            try { closeRequested = RequestGracefulExit(); }
             catch (Exception ex) when (ex is IOException || ex is JsonException)
             {
                 log?.Invoke("normal OBS shutdown unavailable: " + ex.Message);
             }
+            if (!closeRequested && target != null)
+            {
+                try { closeRequested = !target.HasExited && target.CloseMainWindow(); }
+                catch (Exception ex) when (ex is InvalidOperationException || ex is System.ComponentModel.Win32Exception)
+                {
+                    log?.Invoke("could not request a normal OBS window close: " + ex.Message);
+                }
+            }
+            if (closeRequested && WaitForObsProcesses(SetupCloseWaitMs)) return 0;
             if (!AnyObsRunning()) return 0;
+            if (!forceCloseRemaining)
+            {
+                if (target == null) throw new IOException(SetupLocale.Message("setup.obsDidNotExitGracefully"));
+                using var gate = new EventWaitHandle(false, EventResetMode.ManualReset, ObsExit.GateName(target.Id), out bool created);
+                if (!created) throw new IOException(SetupLocale.Message("setup.obsDidNotExitGracefully"));
+                int forced = 0;
+                if (!target.HasExited)
+                {
+                    log?.Invoke("normal shutdown did not finish; force-closing OBS process pid " + target.Id);
+                    if (!ObsExit.ForceAndWait(target)) throw new IOException(SetupLocale.Message("setup.obsDidNotExitGracefully"));
+                    forced = 1;
+                }
+                if (!WaitForObsProcesses(ObsExit.ForceWaitMs)) throw new IOException(SetupLocale.Message("setup.obsDidNotExitGracefully"));
+                return forced;
+            }
             log?.Invoke("normal shutdown did not finish; force-closing OBS and its remaining processes to continue installation");
             var processes = ObsProcesses();
             int killed = 0;
@@ -138,7 +207,7 @@ namespace ReplayKitSetup
                 {
                     try
                     {
-                        if (!process.HasExited) process.WaitForExit((int)Math.Max(0, 10000 - timer.ElapsedMilliseconds));
+                        if (!process.HasExited) process.WaitForExit((int)Math.Max(0, ObsExit.ForceWaitMs - timer.ElapsedMilliseconds));
                     }
                     catch (InvalidOperationException) { }
                     catch (System.ComponentModel.Win32Exception ex) { log?.Invoke("OBS exit could not be confirmed: " + ex.Message); }

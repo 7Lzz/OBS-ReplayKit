@@ -197,9 +197,9 @@ void PollHelperSettings()
 	const bool full = g_fullSyncDue;
 	g_fullSyncDue = false;
 	g_openClipsHotkeyRequestInFlight = true;
-	RunAsync([full]() {
-		const std::string nativePath = "/settings/native" + ClipBufferPollQuery();
-		std::string settingsBody = HttpRequest("GET", full ? "/settings" : nativePath.c_str(), nullptr, 3000);
+	const std::string path = full ? "/settings" : "/settings/native" + ClipBufferPollQuery();
+	RunAsync([full, path]() {
+		std::string settingsBody = HttpRequest("GET", path.c_str(), nullptr, 3000);
 		QMetaObject::invokeMethod(g_callbacks, [settingsBody, full]() {
 			g_openClipsHotkeyRequestInFlight = false;
 			// a helper that did not answer is asked for the full read again next time

@@ -49,6 +49,12 @@ namespace ReplayKitHelper
                 Server.State.Config = new JObject { ["scriptDir"] = Constants.HelperRoot };
                 return ObsProcess.RunRelauncher(GetNamedArg(args, "-ObsPath"), GetNamedArg(args, "-ObsPid"));
             }
+            if (args.Length > 0 && args[0] == ObsProcess.RestartMode)
+            {
+                Server.State.Config = new JObject { ["scriptDir"] = Constants.HelperRoot };
+                return ObsProcess.RunRestart(GetNamedArg(args, "-ObsPid"), GetNamedArg(args, "-ObsWindow"),
+                    GetNamedArg(args, "-ObsStarted"), GetNamedArg(args, "-CloseTicket"));
+            }
             if (args.Length == 1 && args[0] == PlaybackWake.Mode)
                 return PlaybackWake.RunHolder();
             if (args.Length > 0 && string.Equals(args[0], "--transcode-poll", StringComparison.OrdinalIgnoreCase))
@@ -194,11 +200,12 @@ namespace ReplayKitHelper
             var acceptThread = new Thread(() =>
             {
                 try { RunAcceptLoop(); }
-                catch (Exception ex) { acceptFailure = ex; Server.State.Shutdown = true; }
+                catch (Exception ex) { acceptFailure = ex; }
+                finally { Server.State.Shutdown = true; }
             }) { Name = "accept", IsBackground = true };
             acceptThread.Start();
 
-            try { DiscordProjector.StartAtStartup(); } catch (Exception ex) { Log.Write("warn: Discord projector startup threw: " + ex.Message); }
+            try { DiscordProjector.StartKeepAlive(); } catch (Exception ex) { Log.Write("warn: Discord projector startup threw: " + ex.Message); }
             try { AuthCore.RestoreAuthAtStartup(); } catch (Exception ex) { Log.Write("RestoreAuthAtStartup: " + ex.Message); }
             try { SettingsOverlayLive.RevertAbandonedOverlayPreviewAtStartup(); } catch (Exception ex) { Log.Write("RevertAbandonedOverlayPreviewAtStartup: " + ex.Message); }
             try { SettingsHttp.ApplyAppIconAtStartup(); } catch (Exception ex) { Log.Write("ApplyAppIconAtStartup: " + ex.Message); }
@@ -307,7 +314,6 @@ namespace ReplayKitHelper
                             Log.Write("Parent terminated during idle (GetExitCodeProcess). Exiting.");
                             break;
                         }
-                        try { DiscordProjector.KeepAlive(); } catch (Exception ex) { Log.Write("warn: Discord projector keep-alive threw: " + ex.Message); }
                     }
                     if (accept == null) accept = _listener.BeginAcceptTcpClient(null, null);
                     if (!accept.AsyncWaitHandle.WaitOne(50)) continue;
@@ -430,12 +436,6 @@ namespace ReplayKitHelper
             if (ParentWatchdog.ParentDied && CrashPopupSuppressed())
             {
                 try { ObsProcess.ClearCrashSentinel(); } catch (Exception ex) { Log.Write("ClearObsCrashSentinel: " + ex.Message); }
-            }
-
-            string restartObsPath = Server.State.RestartAfterCleanObsPath;
-            if (!string.IsNullOrEmpty(restartObsPath))
-            {
-                ObsProcess.Relaunch(restartObsPath);
             }
 
             ReleaseSingleton();

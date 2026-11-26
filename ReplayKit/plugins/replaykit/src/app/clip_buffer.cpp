@@ -10,14 +10,14 @@
 #include <QJsonObject>
 #include <QStringList>
 #include <deque>
-#include <functional>
-#include <memory>
+#include <optional>
 #include <util/config-file.h>
 #include <util/platform.h>
 #include <vector>
 
 #include "core/app_icon.hpp"
 #include "core/async.hpp"
+#include "core/graphics_device.hpp"
 #include "core/helper_client.hpp"
 #include "core/json_lite.hpp"
 #include "core/locale.hpp"
@@ -38,6 +38,10 @@ enum class Mode { Memory, Disk };
 constexpr int kPieceSeconds = 10;
 // a split lands on the next keyframe and the next audio packet after it
 constexpr int kSplitWaitMs = 6000;
+constexpr int StopCheckMs = 100;
+constexpr ULONGLONG GraphicsFailureMatchMs = 1000;
+constexpr qint64 CaptureStallMs = 5000;
+constexpr auto NoPacketRevision = UINT64_MAX;
 
 struct Piece {
 	std::string path;
@@ -45,6 +49,7 @@ struct Piece {
 	qint64 endMs = 0;
 	qint64 captureStartMs = 0;
 	qint64 captureEndMs = 0;
+	std::uint64_t group = 0;
 };
 
 Mode g_mode = Mode::Memory;
@@ -53,9 +58,23 @@ obs_encoder_t *g_video = nullptr;
 std::vector<obs_encoder_t *> g_audio;
 std::deque<Piece> g_pieces;
 Piece g_current;
+GraphicsState g_outputGraphics;
+std::atomic<std::uint64_t> g_packetGraphics{NoPacketRevision};
+std::optional<GraphicsState> g_failedGraphics;
+ULONGLONG g_matchGraphicsUntil = 0;
+bool g_diskStopRequested = false;
+std::optional<long long> g_pendingStop;
+QPointer<QTimer> g_stopTimer;
+std::future<void> g_outputRelease;
+std::uint64_t g_pieceGroup = 0;
+std::uint64_t g_startRequest = 0;
+std::optional<std::uint64_t> g_startAfterDisk;
+std::uint64_t g_diskStateStamp = 0;
 std::atomic<qint64> firstFrameAt{0}, lastFrameAt{0}, lastKeyframeAt{0};
 
-void CapturePacket(obs_output_t *, encoder_packet *packet, encoder_packet_time *time, void *)
+void ReportState();
+
+void CapturePacket(obs_output_t *output, encoder_packet *packet, encoder_packet_time *time, void *)
 {
 	if (!packet || packet->type != OBS_ENCODER_VIDEO || !time || time->cts == 0)
 		return;
@@ -68,6 +87,15 @@ void CapturePacket(obs_output_t *, encoder_packet *packet, encoder_packet_time *
 	lastFrameAt.store(qMax(lastFrameAt.load(), at));
 	if (packet->keyframe)
 		lastKeyframeAt.store(at);
+	const auto graphics = GraphicsStatus();
+	if (!graphics.Lost() && time->cts >= GraphicsReadySince() && g_packetGraphics.exchange(graphics.revision) != graphics.revision && g_callbacks) {
+		QMetaObject::invokeMethod(g_callbacks, [output]() {
+			if (g_out == output) {
+				ReportState();
+				RefreshTrayIcon();
+			}
+		}, Qt::QueuedConnection);
+	}
 }
 std::vector<std::string> g_doomed;
 QPointer<QTimer> g_purgeTimer;
@@ -123,9 +151,29 @@ bool DiskActive()
 	return g_out && obs_output_active(g_out);
 }
 
+bool DiskCapturing()
+{
+	const auto graphics = GraphicsStatus();
+	const auto last = lastFrameAt.load();
+	return !g_pendingStop && DiskActive() && !graphics.Lost() && g_packetGraphics.load() == graphics.revision &&
+	       last > 0 && qint64(GetTickCount64()) - last < CaptureStallMs;
+}
+
+bool DiskCanSaveRetained()
+{
+	return g_mode == Mode::Disk && !g_pieces.empty();
+}
+
+std::string DiskStateQuery(const char *activeKey)
+{
+	g_diskStateStamp = std::max<std::uint64_t>(g_diskStateStamp + 1, os_gettime_ns());
+	return std::string("?") + activeKey + (DiskCapturing() ? "=1" : "=0") +
+	       (DiskCanSaveRetained() ? "&retained=1" : "&retained=0") + "&clipStamp=" + std::to_string(g_diskStateStamp);
+}
+
 void ReportState()
 {
-	const std::string path = std::string("/clip-buffer/state?active=") + (DiskActive() ? "1" : "0");
+	const std::string path = "/clip-buffer/state" + DiskStateQuery("active");
 	RunAsync([path]() { HttpRequest("POST", path.c_str(), nullptr, 2000); });
 }
 
@@ -150,7 +198,7 @@ void ClearPieceDir()
 // pieces older than the clip length plus a spare piece are no use to any clip and go; never while a save is reading them
 void Purge()
 {
-	if (g_saving)
+	if (g_saving || g_pendingStop)
 		return;
 	std::vector<std::string> doomed;
 	doomed.swap(g_doomed);
@@ -166,7 +214,7 @@ void Purge()
 // the time split of the obs mp4 writer only fires on a keyframe that lands within a millisecond of the piece length, so one frame the encoder drops moves every later keyframe off that grid and the writer never splits by time again, leaving one piece that grows for as long as clipping runs; the pieces are split from here instead, on the first keyframe after the piece length
 void SplitWhenDue()
 {
-	if (!DiskActive() || g_splitAsked || g_current.path.empty() || NowMs() - g_current.startMs < qint64(kPieceSeconds) * 1000)
+	if (g_pendingStop || !DiskActive() || g_splitAsked || g_current.path.empty() || NowMs() - g_current.startMs < qint64(kPieceSeconds) * 1000)
 		return;
 	g_splitAsked = true;
 	calldata_t cd = {};
@@ -190,21 +238,51 @@ void OnOutputStop(void *, calldata_t *cd);
 void StartDisk(bool keepPieces);
 void SendSave();
 
-void DiskStopped()
+void DisconnectOutput(obs_output_t *output)
+{
+	obs_output_remove_packet_callback(output, CapturePacket, nullptr);
+	signal_handler_t *handler = obs_output_get_signal_handler(output);
+	signal_handler_disconnect(handler, "file_changed", OnFileChanged, output);
+	signal_handler_disconnect(handler, "stop", OnOutputStop, output);
+}
+
+void StartAfterDrain()
+{
+	if (g_startAfterDisk != g_startRequest) {
+		g_startAfterDisk.reset();
+		return;
+	}
+	if (g_out || g_pendingStop || g_closing || g_shuttingDown || GraphicsStatus().Lost())
+		return;
+	g_startAfterDisk.reset();
+	g_failedGraphics.reset();
+	ClipBufferStart(true);
+}
+
+void ResumeAfterGraphics()
+{
+	if (!g_failedGraphics || g_closing || g_shuttingDown || g_mode != Mode::Disk)
+		return;
+	if (g_matchGraphicsUntil && GetTickCount64() > g_matchGraphicsUntil) {
+		g_failedGraphics.reset();
+		return;
+	}
+	const GraphicsState current = GraphicsStatus();
+	if (current.Lost())
+		g_matchGraphicsUntil = 0;
+	if (current.RecoveredSince(*g_failedGraphics)) {
+		g_failedGraphics.reset();
+		ClipBufferStart(true);
+	}
+}
+
+void DiskStopped(long long code)
 {
 	if (g_shuttingDown)
 		return;
-	if (g_out) {
-		obs_output_remove_packet_callback(g_out, CapturePacket, nullptr);
-		signal_handler_t *sh = obs_output_get_signal_handler(g_out);
-		signal_handler_disconnect(sh, "file_changed", OnFileChanged, nullptr);
-		signal_handler_disconnect(sh, "stop", OnOutputStop, nullptr);
-		obs_output_release(g_out);
-		g_out = nullptr;
-	}
-	ReleaseEncoders();
-	if (g_restartShared) {
-		g_restartShared = false;
+	const bool movingEncoders = g_restartShared;
+	g_restartShared = false;
+	if (movingEncoders && code == OBS_OUTPUT_SUCCESS) {
 		// the piece that was being written is finished by the stop and stays part of the buffer
 		if (!g_current.path.empty() && os_file_exists(g_current.path.c_str())) {
 			g_current.endMs = NowMs();
@@ -213,7 +291,8 @@ void DiskStopped()
 			g_pieces.push_back(g_current);
 		}
 		g_current = Piece();
-		StartDisk(true);
+		g_startAfterDisk = g_startRequest;
+		StartAfterDrain();
 		return;
 	}
 	if (g_purgeTimer)
@@ -224,19 +303,67 @@ void DiskStopped()
 		g_awaitingSplit = false;
 		SendSave();
 	}
-	g_pieces.clear();
+	const bool preserve = code != OBS_OUTPUT_SUCCESS && g_mode == Mode::Disk && !g_closing;
+	if (preserve && code == OBS_OUTPUT_ENCODE_ERROR && (!g_diskStopRequested || movingEncoders)) {
+		const auto lastPacketGraphics = g_packetGraphics.load();
+		g_failedGraphics = lastPacketGraphics == NoPacketRevision ? g_outputGraphics : GraphicsState{lastPacketGraphics};
+		const auto status = GraphicsStatus();
+		g_matchGraphicsUntil = status.revision == g_failedGraphics->revision ? GetTickCount64() + GraphicsFailureMatchMs : 0;
+	}
+	if (preserve) {
+		++g_pieceGroup;
+		if (!g_current.path.empty())
+			g_doomed.push_back(g_current.path);
+	} else {
+		g_pieces.clear();
+		// the muxer lets go of its last file a moment after it reports the stop
+		QTimer::singleShot(1500, g_callbacks, []() {
+			if (!g_out && !g_pendingStop && g_pieces.empty())
+				ClearPieceDir();
+		});
+	}
 	g_current = Piece();
 	g_splitAsked = false;
-	// the muxer lets go of its last file a moment after it reports the stop
-	QTimer::singleShot(1500, g_callbacks, []() {
-		if (!g_out)
-			ClearPieceDir();
-	});
 	ReportState();
 	RefreshTrayIcon();
 	blog(LOG_INFO, "[replaykit] disk clip buffer stopped");
 	if (g_resumeAfterClose && !g_closing)
 		ClipBufferCancelClose();
+	StartAfterDrain();
+	ResumeAfterGraphics();
+}
+
+void FinishDiskStopWhenInactive()
+{
+	if (!g_pendingStop || g_shuttingDown || DiskActive())
+		return;
+	if (!g_outputRelease.valid()) {
+		// even an inactive output can wait for the writer or a shared encoder lock when released
+		try {
+			g_outputRelease = std::async(std::launch::async, [output = g_out, video = g_video, audio = g_audio]() {
+				DisconnectOutput(output);
+				obs_output_release(output);
+				obs_encoder_release(video);
+				for (obs_encoder_t *encoder : audio)
+					obs_encoder_release(encoder);
+			});
+		} catch (const std::exception &ex) {
+			g_stopTimer->stop();
+			blog(LOG_ERROR, "[replaykit] could not start disk clip cleanup: %s", ex.what());
+			return;
+		}
+		g_out = nullptr;
+		g_video = nullptr;
+		g_audio.clear();
+		g_sharedEncoders = false;
+	}
+	if (g_outputRelease.wait_for(std::chrono::seconds(0)) != std::future_status::ready)
+		return;
+	g_outputRelease.get();
+	const long long code = *g_pendingStop;
+	g_pendingStop.reset();
+	g_stopTimer->stop();
+	DiskStopped(code);
 }
 
 // a piece is finished when the muxer moves on to the next file; a save waiting on that split goes ahead from here
@@ -250,29 +377,46 @@ void PieceChanged(const std::string &next, qint64 captureAt)
 		g_current.captureEndMs = captureAt;
 		g_pieces.push_back(g_current);
 	}
-	g_current = Piece{next, now, 0, captureAt, 0};
+	g_current = Piece{next, now, 0, captureAt, 0, g_pieceGroup};
 	if (g_awaitingSplit) {
 		g_awaitingSplit = false;
 		SendSave();
 	}
 }
 
-void OnFileChanged(void *, calldata_t *cd)
+void OnFileChanged(void *output, calldata_t *cd)
 {
 	const char *next = calldata_string(cd, "next_file");
 	const std::string path = next ? next : "";
 	const qint64 captured = lastKeyframeAt.load();
 	if (g_callbacks)
-		QMetaObject::invokeMethod(g_callbacks, [path, captured]() { PieceChanged(path, captured); }, Qt::QueuedConnection);
+		QMetaObject::invokeMethod(g_callbacks, [output, path, captured]() {
+			if (g_out == output)
+				PieceChanged(path, captured);
+		}, Qt::QueuedConnection);
 }
 
-void OnOutputStop(void *, calldata_t *cd)
+void OnOutputStop(void *output, calldata_t *cd)
 {
 	const long long code = calldata_int(cd, "code");
 	if (code != OBS_OUTPUT_SUCCESS)
 		blog(LOG_WARNING, "[replaykit] disk clip buffer stopped with code %lld", code);
 	if (g_callbacks)
-		QMetaObject::invokeMethod(g_callbacks, []() { DiskStopped(); }, Qt::QueuedConnection);
+		QMetaObject::invokeMethod(g_callbacks, [output, code]() {
+			if (g_out != output || g_shuttingDown)
+				return;
+			if (g_pendingStop) {
+				if (*g_pendingStop == OBS_OUTPUT_SUCCESS)
+					g_pendingStop = code;
+				return;
+			}
+			// obs signals stop before the encoder drains, and releasing the output would wait on it
+			g_pendingStop = code;
+			ReportState();
+			RefreshTrayIcon();
+			g_stopTimer->start();
+			FinishDiskStopWhenInactive();
+		}, Qt::QueuedConnection);
 }
 
 std::string ProfileString(config_t *config, const char *section, const char *key)
@@ -433,8 +577,10 @@ bool BuildEncoders(config_t *config)
 
 void StartDisk(bool keepPieces)
 {
-	if (g_out || g_mode != Mode::Disk || g_closing || g_shuttingDown)
+	if (g_out || g_pendingStop || g_mode != Mode::Disk || g_closing || g_shuttingDown || GraphicsStatus().Lost())
 		return;
+	g_failedGraphics.reset();
+	g_diskStopRequested = false;
 	config_t *config = obs_frontend_get_profile_config();
 	if (!config || ProfileString(config, "Output", "Mode") != "Advanced") {
 		blog(LOG_WARNING, "[replaykit] disk clip buffer needs the advanced output mode of obs, not started");
@@ -488,19 +634,19 @@ void StartDisk(bool keepPieces)
 	for (size_t i = 0; i < g_audio.size(); i++)
 		obs_output_set_audio_encoder(g_out, g_audio[i], i);
 	signal_handler_t *sh = obs_output_get_signal_handler(g_out);
-	signal_handler_connect(sh, "file_changed", OnFileChanged, nullptr);
-	signal_handler_connect(sh, "stop", OnOutputStop, nullptr);
+	signal_handler_connect(sh, "file_changed", OnFileChanged, g_out);
+	signal_handler_connect(sh, "stop", OnOutputStop, g_out);
 	firstFrameAt.store(0);
 	lastFrameAt.store(0);
 	lastKeyframeAt.store(0);
+	g_packetGraphics.store(NoPacketRevision);
 	obs_output_add_packet_callback(g_out, CapturePacket, nullptr);
-	g_current = Piece{path, NowMs(), 0};
+	g_outputGraphics = GraphicsStatus();
+	g_current = Piece{path, NowMs(), 0, 0, 0, g_pieceGroup};
 	if (!obs_output_start(g_out)) {
 		const char *error = obs_output_get_last_error(g_out);
 		blog(LOG_WARNING, "[replaykit] disk clip buffer did not start: %s", error ? error : "no reason given");
-		obs_output_remove_packet_callback(g_out, CapturePacket, nullptr);
-		signal_handler_disconnect(sh, "file_changed", OnFileChanged, nullptr);
-		signal_handler_disconnect(sh, "stop", OnOutputStop, nullptr);
+		DisconnectOutput(g_out);
 		obs_output_release(g_out);
 		g_out = nullptr;
 		ReleaseEncoders();
@@ -528,8 +674,13 @@ void StartDisk(bool keepPieces)
 
 void StopDisk()
 {
-	if (g_out && obs_output_active(g_out))
+	g_diskStopRequested = true;
+	if (g_pendingStop) {
+		if (!g_stopTimer->isActive())
+			g_stopTimer->start();
+	} else if (DiskActive()) {
 		obs_output_stop(g_out);
+	}
 }
 
 // the clips pages put a card in for a clip that is being saved, and the clip takes its place once it is written
@@ -554,6 +705,8 @@ void SendSave()
 	std::vector<std::string> paths;
 	qint64 covered = 0;
 	for (auto it = g_pieces.rbegin(); it != g_pieces.rend(); ++it) {
+		if (it->group != g_pieces.back().group)
+			break;
 		paths.insert(paths.begin(), it->path);
 		// the piece just taken is the spare once the ones after it already cover the clip
 		if (covered >= qint64(g_clipSeconds) * 1000)
@@ -596,7 +749,8 @@ void SendSave()
 			[answer]() {
 				g_saving = false;
 				g_savePieceNames.clear();
-				Purge();
+				if (DiskActive())
+					Purge();
 				if (!JsonBoolField(answer, "ok", false)) {
 					const std::string message = ExtractJsonStringField(answer, "message");
 					blog(LOG_WARNING, "[replaykit] disk clip buffer save failed: %s", message.empty() ? "no answer from the helper" : message.c_str());
@@ -618,7 +772,8 @@ void SendSave()
 
 void SaveDisk()
 {
-	if (!DiskActive())
+	const bool capturing = DiskCapturing();
+	if (!capturing && g_pieces.empty())
 		return;
 	if (g_saving) {
 		blog(LOG_INFO, "[replaykit] disk clip buffer is already saving a clip");
@@ -628,7 +783,7 @@ void SaveDisk()
 	CaptureContextRefresh();
 	g_saveFormat = CurrentReplayFormat();
 	g_saveFolder = GameFolder(g_gameName);
-	g_awaitingSplit = true;
+	g_awaitingSplit = capturing;
 	const int gen = ++g_saveGen;
 	g_saveStamp = QDateTime::currentMSecsSinceEpoch();
 	// play the save sound on the press; the confirmation waits for the finished file
@@ -637,6 +792,10 @@ void SaveDisk()
 	calldata_free(&saving);
 	TellPagesClipSaving("start");
 	TellHelperClipSaving(g_saveStamp, "start");
+	if (!capturing) {
+		SendSave();
+		return;
+	}
 	// the piece being written is closed first, so the clip runs right up to the press
 	calldata_t cd = {};
 	proc_handler_call(obs_output_get_proc_handler(g_out), "split_file", &cd);
@@ -744,8 +903,15 @@ void ClipSaveProc(void *, calldata_t *cd)
 
 void SwitchMode(Mode next)
 {
-	const bool wasActive = ClipBufferActive();
 	const Mode previous = g_mode;
+	const bool pendingStart = g_startAfterDisk == g_startRequest || g_restartShared || g_resumeAfterClose;
+	const bool diskWanted = (!g_diskStopRequested && (DiskActive() || g_pendingStop.has_value())) ||
+				(g_failedGraphics && !g_matchGraphicsUntil);
+	const bool wasActive = pendingStart || (previous == Mode::Disk ? diskWanted : ClipBufferActive());
+	++g_startRequest;
+	g_failedGraphics.reset();
+	g_restartShared = false;
+	g_resumeAfterClose = false;
 	g_mode = next;
 	blog(LOG_INFO, "[replaykit] clip buffer moves from %s to %s", ModeName(previous), ModeName(next));
 	SyncSaveHotkey();
@@ -753,25 +919,10 @@ void SwitchMode(Mode next)
 		StopDisk();
 	else if (obs_frontend_replay_buffer_active())
 		obs_frontend_replay_buffer_stop();
-	if (!wasActive)
-		return;
-	if (next == Mode::Disk) {
-		ClipBufferStart();
-		return;
+	if (wasActive) {
+		g_startAfterDisk = g_startRequest;
+		StartAfterDrain();
 	}
-	// the disk output lets go of the encoders a moment after the stop; obs builds its own, so the memory buffer can start once the old one is down
-	auto tries = std::make_shared<int>(0);
-	auto attempt = std::make_shared<std::function<void()>>();
-	*attempt = [tries, attempt]() {
-		if (g_mode != Mode::Memory)
-			return;
-		if (!DiskActive() || ++*tries > 50) {
-			ClipBufferStart();
-			return;
-		}
-		QTimer::singleShot(100, g_callbacks, *attempt);
-	};
-	(*attempt)();
 }
 
 } // namespace
@@ -779,6 +930,9 @@ void SwitchMode(Mode next)
 void ClipBufferInit()
 {
 	g_mode = ModeFromSettingsFile();
+	g_stopTimer = new QTimer(g_callbacks);
+	g_stopTimer->setInterval(StopCheckMs);
+	QObject::connect(g_stopTimer, &QTimer::timeout, g_stopTimer, FinishDiskStopWhenInactive);
 	signal_handler_add(obs_get_signal_handler(), "void replaykit_clip_saving()");
 	signal_handler_add(obs_get_signal_handler(), "void replaykit_clip_saved(string path)");
 	proc_handler_add(obs_get_proc_handler(), "void replaykit_clip_start(out bool handled)", ClipStartProc, nullptr);
@@ -794,6 +948,11 @@ void ClipBufferShutdown()
 		return;
 	g_shuttingDown = true;
 	g_restartShared = false;
+	if (g_stopTimer)
+		g_stopTimer->stop();
+	if (g_outputRelease.valid())
+		g_outputRelease.get();
+	g_pendingStop.reset();
 	if (g_purgeTimer)
 		g_purgeTimer->stop();
 	if (g_splitTimer)
@@ -804,10 +963,7 @@ void ClipBufferShutdown()
 	g_saveHotkey = OBS_INVALID_HOTKEY_ID;
 	if (g_out) {
 		blog(LOG_INFO, "[replaykit] stopping disk clip buffer before scene teardown");
-		obs_output_remove_packet_callback(g_out, CapturePacket, nullptr);
-		signal_handler_t *sh = obs_output_get_signal_handler(g_out);
-		signal_handler_disconnect(sh, "file_changed", OnFileChanged, nullptr);
-		signal_handler_disconnect(sh, "stop", OnOutputStop, nullptr);
+		DisconnectOutput(g_out);
 		obs_output_force_stop(g_out);
 		obs_output_release(g_out);
 		g_out = nullptr;
@@ -816,13 +972,30 @@ void ClipBufferShutdown()
 	blog(LOG_INFO, "[replaykit] clip buffer shutdown complete");
 }
 
+void ClipBufferGraphicsChanged()
+{
+	if (g_shuttingDown)
+		return;
+	if (GraphicsStatus().Lost()) {
+		auto *tray = static_cast<QSystemTrayIcon *>(obs_frontend_get_system_tray());
+		if (tray)
+			tray->showMessage(TrMessage("common.replaykit"), TrMessage("capture.graphicsDeviceLost"), QSystemTrayIcon::Warning);
+	}
+	ReportState();
+	RefreshTrayIcon();
+	StartAfterDrain();
+	ResumeAfterGraphics();
+}
+
 bool ClipBufferPrepareClose()
 {
-	if (!g_out)
+	++g_startRequest;
+	g_failedGraphics.reset();
+	if (!g_out && !g_pendingStop)
 		return true;
 	if (!g_closing) {
 		g_closing = true;
-		g_resumeAfterClose = DiskActive();
+		g_resumeAfterClose = !g_pendingStop && DiskActive();
 		g_restartShared = false;
 		blog(LOG_INFO, "[replaykit] draining disk clip buffer before closing");
 		StopDisk();
@@ -833,26 +1006,42 @@ bool ClipBufferPrepareClose()
 void ClipBufferCancelClose()
 {
 	g_closing = false;
-	if (g_resumeAfterClose && !g_out) {
+	if (g_resumeAfterClose && !g_out && !g_pendingStop) {
 		g_resumeAfterClose = false;
-		ClipBufferStart();
+		ClipBufferStart(true);
 	}
 }
 
 bool ClipBufferActive()
 {
-	return g_mode == Mode::Disk ? DiskActive() : obs_frontend_replay_buffer_active();
+	return g_mode == Mode::Disk ? DiskCapturing() : obs_frontend_replay_buffer_active();
 }
 
-void ClipBufferStart()
+bool ClipBufferCanSave()
+{
+	return ClipBufferActive() || DiskCanSaveRetained();
+}
+
+bool ClipBufferCanStop()
+{
+	return g_mode == Mode::Disk ? DiskActive() || g_pendingStop.has_value() || g_startAfterDisk == g_startRequest : ClipBufferActive();
+}
+
+void ClipBufferStart(bool deferUntilReady)
 {
 	if (g_closing || g_shuttingDown)
 		return;
-	ShellStartOutputWhenFree([]() {
-		if (g_closing || g_shuttingDown)
+	const auto request = ++g_startRequest;
+	ShellStartOutputWhenFree([request, deferUntilReady]() {
+		if (g_closing || g_shuttingDown || request != g_startRequest)
 			return;
+		if (GraphicsStatus().Lost() || g_pendingStop || (g_out && (g_mode == Mode::Memory || g_diskStopRequested))) {
+			if (deferUntilReady)
+				g_startAfterDisk = request;
+			return;
+		}
 		if (g_mode == Mode::Disk)
-			StartDisk(false);
+			StartDisk(!g_pieces.empty());
 		else
 			obs_frontend_replay_buffer_start();
 	});
@@ -860,15 +1049,19 @@ void ClipBufferStart()
 
 void ClipBufferStop()
 {
+	++g_startRequest;
+	g_failedGraphics.reset();
+	g_restartShared = false;
+	g_resumeAfterClose = false;
 	if (g_mode == Mode::Disk)
 		StopDisk();
-	else
+	else if (obs_frontend_replay_buffer_active())
 		obs_frontend_replay_buffer_stop();
 }
 
 void ClipBufferToggle()
 {
-	const bool active = ClipBufferActive();
+	const bool active = ClipBufferCanStop();
 	blog(LOG_INFO, "[replaykit] clip buffer toggle (%s): active=%d", ModeName(g_mode), active);
 	if (active)
 		ClipBufferStop();
@@ -928,14 +1121,15 @@ int ClipBufferNameWindow()
 
 std::string ClipBufferPollQuery()
 {
-	return std::string("?clip=") + (DiskActive() ? "1" : "0");
+	return DiskStateQuery("clip");
 }
 
 namespace {
 
 void MoveOntoRecordingEncoders()
 {
-	if (g_closing || g_shuttingDown || g_mode != Mode::Disk || !DiskActive() || g_sharedEncoders || g_restartShared)
+	if (g_closing || g_shuttingDown || g_mode != Mode::Disk || !DiskActive() || g_pendingStop || g_diskStopRequested ||
+	    g_sharedEncoders || g_restartShared)
 		return;
 	// a save reads the pieces as they are, so the move waits for it
 	if (g_saving) {
@@ -970,8 +1164,9 @@ void ClipBufferOnFrontendEvent(enum obs_frontend_event event)
 		MoveOntoRecordingEncoders();
 	// another profile has its own encoders and clip length
 	if (event == OBS_FRONTEND_EVENT_PROFILE_CHANGED && DiskActive()) {
+		g_restartShared = false;
+		g_startAfterDisk = ++g_startRequest;
 		StopDisk();
-		QTimer::singleShot(1500, g_callbacks, []() { ClipBufferStart(); });
 	}
 }
 
@@ -979,7 +1174,9 @@ QJsonObject ClipBufferProbe()
 {
 	return {{"mode", ModeName(g_mode)},
 		{"active", ClipBufferActive()},
-		{"outputPending", g_out != nullptr},
+		{"outputPending", g_out != nullptr || g_pendingStop.has_value()},
+		{"outputDraining", g_pendingStop.has_value()},
+		{"graphicsDeviceLost", GraphicsStatus().Lost()},
 		{"closing", g_closing},
 		{"shuttingDown", g_shuttingDown},
 		{"diskPieces", (int)g_pieces.size()},

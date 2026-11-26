@@ -8,6 +8,7 @@
 #include "app/sdk_commands.hpp"
 #include "core/async.hpp"
 #include "core/crash_reporter.hpp"
+#include "core/graphics_device.hpp"
 #include "core/ipc_pipe.hpp"
 #include "core/idle_memory.hpp"
 #include "core/locale.hpp"
@@ -44,6 +45,7 @@ bool obs_module_load(void)
 	InstallOpenClipsHotkeyFilter();
 	obs_frontend_add_event_callback(OnFrontendEvent, nullptr);
 	StartPipeServer();
+	StartGraphicsWatch(*g_callbacks, ReleaseShareGraphics, ClipBufferGraphicsChanged);
 	ShareLinkStart();
 	ShareAudioRegisterHold();
 	return true;
@@ -73,13 +75,14 @@ void obs_module_unload(void)
 	StopPipeServer();
 	IdleMemory::Stop();
 	StopWorkers();
+	StopGraphicsWatch();
+	ClipBufferShutdown();
 	ClipToastDestroy();
 	// destroy queued callbacks before their code is unloaded with this module.
 	delete g_callbacks;
 	g_callbacks = nullptr;
 	RemoveNotifyTrackFilter();
 	RemoveOpenClipsHotkey();
-	ClipBufferShutdown();
 	RemoveMainWindowCloseFilter();
 	StopReplayKitCrashReporter();
 	StopProcessGroup();

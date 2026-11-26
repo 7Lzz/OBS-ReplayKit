@@ -15,6 +15,6 @@ namespace ReplayKitShared
         public const string InstanceMutexName = "ReplayKitShareWindow.Instance";
         public const string WindowClass = "ReplayKitShareWindow";
         // bumps whenever the shared state, the pipe commands or what they mean change, so an older window still running after an update is replaced instead of misread
-        public const int ProtocolVersion = 1;
+        public const int ProtocolVersion = 2;
     }
 }

@@ -38,6 +38,7 @@ set(REPLAYKIT_SOURCES
     src/core/crash_reporter.cpp
     src/core/dev_log.cpp
     src/core/draw_util.cpp
+    src/core/graphics_device.cpp
     src/core/helper_client.cpp
     src/core/idle_memory.cpp
     src/core/ipc_pipe.cpp

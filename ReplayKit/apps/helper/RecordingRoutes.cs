@@ -34,7 +34,7 @@ namespace ReplayKitHelper
             if (path == "/clip-buffer/state")
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
-                ClipBuffer.ReportDiskState(QFlag("active"));
+                ClipBuffer.ReportDiskState(QFlag("active"), QFlag("retained"), Q("clipStamp"));
                 HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true });
                 return false;
             }
@@ -101,7 +101,8 @@ namespace ReplayKitHelper
                 {
                     var status = ObsWebSocket.InvokeRequest("GetReplayBufferStatus");
                     bool active = status.Ok && (status.Data?["outputActive"]?.Value<bool>() ?? false);
-                    if (want != "" && status.Ok && active == (want == "on"))
+                    bool cancelDiskRecovery = want == "off" && ClipBuffer.EffectiveMode(ReplaykitSettings.ReadSettings()) == ClipBuffer.Disk;
+                    if (want != "" && status.Ok && active == (want == "on") && !cancelDiskRecovery)
                     {
                         HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["active"] = active });
                         return false;

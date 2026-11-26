@@ -19,20 +19,6 @@ namespace ReplayKitSetup
         // the clip state that is kept across an uninstall; it is looked up with StateLayout.Resolve, so an install that has not been moved to the new layout yet is kept too
         internal static readonly string[] ReplaykitRuntimeStateFiles = { StateLayout.ClipsDbFile, StateLayout.ClipsIndexFile, StateLayout.CompressionHistoryFile };
 
-        [StructLayout(LayoutKind.Sequential)]
-        private struct PROCESS_BASIC_INFORMATION
-        {
-            public IntPtr ExitStatus;
-            public IntPtr PebBaseAddress;
-            public IntPtr AffinityMask;
-            public IntPtr BasePriority;
-            public IntPtr UniqueProcessId;
-            public IntPtr InheritedFromUniqueProcessId;
-        }
-
-        [DllImport("ntdll.dll")]
-        private static extern int NtQueryInformationProcess(IntPtr processHandle, int processInformationClass, ref PROCESS_BASIC_INFORMATION processInformation, int processInformationLength, out int returnLength);
-
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
         private static extern bool MoveFileEx(string existingFileName, string newFileName, uint flags);
@@ -40,53 +26,42 @@ namespace ReplayKitSetup
         // MoveFileEx with a null target queues the path for deletion by the session manager on the next boot; needs admin, which this setup exe already has
         private const uint MOVEFILE_DELAY_UNTIL_REBOOT = 0x00000004;
 
-        // own parent pid. was a Win32_Process wmi lookup; it reads ProcessBasicInformation directly so the setup carries no System.Management. null on any failure -- caller just skips adding it to the keep-set.
-        private static int? CurrentParentPid()
-        {
-            try
-            {
-                var pbi = new PROCESS_BASIC_INFORMATION();
-                using var process = Process.GetCurrentProcess();
-                int rc = NtQueryInformationProcess(process.Handle, 0, ref pbi, Marshal.SizeOf(pbi), out _);
-                if (rc != 0) return null;
-                return pbi.InheritedFromUniqueProcessId.ToInt32();
-            }
-            catch (Exception ex) when (ex is DllNotFoundException || ex is EntryPointNotFoundException || ex is InvalidOperationException)
-            {
-                return null;
-            }
-        }
-
-        // close obs and replaykit helper processes while keeping this setup process alive.
+        // required before recovery or removal can change the installation
         public static bool StopObsAndHelpers(Action<string> log = null)
         {
-            Obs.CloseObs(log);
-            // every caller removes replaykit or its share preview audio, and with that no share window may stay
-            bool windowStopped = ShareWindowInstall.Stop(log);
-            var keep = new HashSet<int> { Process.GetCurrentProcess().Id };
-            var parent = CurrentParentPid();
-            if (parent.HasValue) keep.Add(parent.Value);
-            // the helper of an older release and the encoder of one ran as OBSReplayKit*.exe, the same name as this setup exe, so this process and the one that started it are kept
-            bool stopped = true;
-            foreach (string name in new[] { "OBSReplayKit", "OBSReplayKit-Encoder" })
+            Obs.CloseObs(log, forceCloseRemaining: true);
+            StopLegacyEncoder(log);
+            if (!ShareWindowInstall.Stop(log))
+                throw new IOException(SetupLocale.Message("screenshare.theShareWindowDidNotClose"));
+            return true;
+        }
+
+        private static void StopLegacyEncoder(Action<string> log)
+        {
+            string target = Path.GetFullPath(Path.Combine(Config.REPLAYKIT_CONFIG, "scripts", "helper", "OBSReplayKit-Encoder.exe"));
+            foreach (var process in Process.GetProcessesByName(Path.GetFileNameWithoutExtension(target)))
             {
-                foreach (var process in Process.GetProcessesByName(name))
+                using (process)
                 {
-                    using (process)
+                    try
                     {
-                        if (keep.Contains(process.Id)) continue;
-                        try { process.Kill(); }
-                        // a process that ended on its own in the meantime is what was wanted
-                        catch (InvalidOperationException) { }
-                        catch (System.ComponentModel.Win32Exception exc)
-                        {
-                            log?.Invoke("warn: helper stop failed for pid " + process.Id + ": " + exc.Message);
-                            stopped = false;
-                        }
+                        if (process.HasExited) continue;
+                        // hold the process handle from the image check through termination and the exit wait
+                        _ = process.Handle;
+                        string image = process.MainModule?.FileName;
+                        if (image == null) throw new IOException("could not verify the legacy encoder image path");
+                        if (!string.Equals(Path.GetFullPath(image), target, StringComparison.OrdinalIgnoreCase)) continue;
+                        process.Kill();
+                        if (!process.WaitForExit(3000)) throw new IOException("the legacy encoder did not exit in time");
+                    }
+                    catch (Exception ex) when ((ex is InvalidOperationException || ex is System.ComponentModel.Win32Exception) && process.HasExited) { }
+                    catch (Exception ex) when (ex is InvalidOperationException || ex is System.ComponentModel.Win32Exception || ex is IOException)
+                    {
+                        log?.Invoke("warn: legacy encoder stop failed for pid " + process.Id + ": " + ex.Message);
+                        throw new IOException(SetupLocale.Message("setup.obsOrItsHelperBrowserProcesses"), ex);
                     }
                 }
             }
-            return stopped && windowStopped;
         }
 
         public static bool RemoveReplaykitPlugins(Action<string> log = null)
@@ -826,9 +801,9 @@ namespace ReplayKitSetup
             {
                 (SetupLocale.Pair("setup.closeObs"), SetupLocale.Pair("setup.stopsObsAndReplaykitHelpersBut"), () =>
                 {
-                    bool stopped = StopObsAndHelpers(progress.LogLine);
+                    StopObsAndHelpers(progress.LogLine);
                     transaction.Recover(progress.LogLine);
-                    return stopped;
+                    return true;
                 }),
                 (SetupLocale.Pair("setup.restoreObsBrowser"), SetupLocale.Pair("setup.restoresTheOriginalObsBrowserProcess"), () => ProcessHost.Restore(progress.LogLine)),
                 (SetupLocale.Pair("setup.removeLaunchPermission"), SetupLocale.Pair("setup.deletesTheReplaykitScheduledTask"), () => ScheduledTask.DeleteElevationTask(progress.LogLine)),

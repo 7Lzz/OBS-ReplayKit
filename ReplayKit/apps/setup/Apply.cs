@@ -68,9 +68,12 @@ namespace ReplayKitSetup
         // clean setup uses the defaults and clears old settings only after prerequisites and backup succeed. an update keeps the obs config as obs saved it and refreshes the replaykit files the way the in-app updater does; one asked for where there is no settings file to keep becomes a full install, since a first install is what that pc needs
         public static List<string> RunInstallFlow(bool? discordScreenshare, IInstallProgress progress, SetupMode mode)
         {
+            using var operation = ObsExit.TryTakeOperation(ObsExit.SetupGateWaitMs);
+            if (operation == null) throw new IOException(SetupLocale.Message("setup.anotherReplaykitUpdateIsAlready"));
             using var transaction = RuntimeTransaction.Open();
             bool cleanInstall = mode == SetupMode.Reinstall;
-            bool update = mode == SetupMode.Update && File.Exists(Prefs.RUNTIME_SETTINGS_FILE);
+            bool updateRequested = mode == SetupMode.Update;
+            bool update = updateRequested && File.Exists(Prefs.RUNTIME_SETTINGS_FILE);
             if (mode == SetupMode.Update && !update) progress.LogLine("no ReplayKit settings to keep, so this update runs as a full install");
             Transform.CleanReinstall = cleanInstall;
             var prefs = Prefs.LoadPrefs(cleanInstall);
@@ -93,10 +96,10 @@ namespace ReplayKitSetup
             Add(SetupLocale.Pair("setup.installObsStudio"), SetupLocale.Pair("setup.installsObsOrUpdatesItTo"), () =>
             {
                 Installer.ValidateRuntimeAssets();
-                if (transaction.Pending) Obs.CloseObs(progress.LogLine);
+                if (transaction.Pending) Obs.CloseObs(progress.LogLine, forceCloseRemaining: !updateRequested);
                 transaction.Recover(progress.LogLine);
                 externalRuntimeWriting = Obs.FindObsExe() != null && !ObsVersions.IsInstalledSupported();
-                ObsDownloader.EnsureObsVersion(progress);
+                ObsDownloader.EnsureObsVersion(progress, forceClose: !updateRequested);
                 if (Obs.FindObsExe() == null)
                 {
                     var reason = SetupLocale.Pair("setup.obsCouldNotBeInstalledAutomatically");
@@ -117,8 +120,9 @@ namespace ReplayKitSetup
             ConfigBackups.Snapshot configBackup = null;
             Add(SetupLocale.Pair("setup.closeObs"), SetupLocale.Pair("setup.stopsObsToWriteSettings"), () =>
             {
+                int closed = Obs.CloseObs(progress.LogLine, forceCloseRemaining: !updateRequested);
                 obsClosed = true;
-                return (object)Obs.CloseObs(progress.LogLine);
+                return (object)closed;
             });
             Add(SetupLocale.Pair("setup.backUpCurrentObsSettings"), SetupLocale.Pair("setup.savesARestoreCopyFirst"), () =>
             {

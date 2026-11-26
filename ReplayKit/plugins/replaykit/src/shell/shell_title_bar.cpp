@@ -195,7 +195,7 @@ ShellTitleBar::ShellTitleBar(QMainWindow *mw)
 	m_clip->SetLabel(TrMessage("common.clip"));
 	m_clip->onClick = [this]() {
 		m_hotkeys->Hide();
-		if (ClipBufferActive())
+		if (ClipBufferCanSave())
 			ClipBufferSave();
 		else
 			ShellOpenSettingsPage(QStringLiteral("output"));
@@ -293,7 +293,7 @@ void ShellTitleBar::RefreshStates()
 
 	m_clip->SetState(false, !clipping, false, QString());
 	m_clip->SetArmed(clipping);
-	m_clip->SetTip(clipping ? TrMessage("shell.saveAClip") : TrMessage("shell.clippingIsOffClickToOpen"));
+	m_clip->SetTip(ClipBufferCanSave() ? TrMessage("shell.saveAClip") : TrMessage("shell.clippingIsOffClickToOpen"));
 	QString timer;
 	if (recording) {
 		const qint64 s = g_recMs / 1000;

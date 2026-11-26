@@ -4,6 +4,7 @@
 
 #include "app/clip_buffer.hpp"
 #include "core/async.hpp"
+#include "core/graphics_device.hpp"
 #include "core/helper_client.hpp"
 #include "core/json_lite.hpp"
 #include "core/locale.hpp"
@@ -19,6 +20,8 @@ namespace {
 // generic obs-lifecycle confirm (Exit / Restart). plain QMessageBox on purpose -- it should read like obss own dialogs, not the in-obs themed sheet. non-modal + single-instance: pressing the tray item again drops the box that is showing and pops a fresh one instead of stacking or being ignored.
 QPointer<QMessageBox> g_lifecycleBox;
 
+void ReportActionFailure(const QString &title, const std::string &response);
+
 void ShowLifecycleConfirm(const QString &title, const QString &body, const char *route)
 {
 	if (g_lifecycleBox)
@@ -27,9 +30,9 @@ void ShowLifecycleConfirm(const QString &title, const QString &body, const char 
 	auto *box = new QMessageBox(QMessageBox::Question, title, body, QMessageBox::Yes | QMessageBox::No, nullptr);
 	box->setDefaultButton(QMessageBox::No);
 	std::string r(route);
-	QObject::connect(box, &QMessageBox::finished, box, [r](int result) {
+	QObject::connect(box, &QMessageBox::finished, box, [r, title](int result) {
 		if (result == QMessageBox::Yes)
-			RunAsync([r]() { HttpRequest("POST", r.c_str(), nullptr, 5000); });
+			RunAsync([r, title]() { ReportActionFailure(title, HttpRequest("POST", r.c_str(), nullptr, 5000)); });
 	});
 	QObject::connect(box, &QMessageBox::finished, box, &QObject::deleteLater);
 	g_lifecycleBox = box;
@@ -119,7 +122,6 @@ void ToggleSharePreview(bool checked)
 	});
 }
 
-// posts to the helpers /restart-obs, a plain close-and-reopen (not the settings pages signed-out "clean" restart) -- confirms first since it force-kills obs rather than stopping gracefully, then fires and forgets since obs is about to die anyway.
 void RestartObs()
 {
 	if (g_menuShownTimer.isValid() && g_menuShownTimer.elapsed() < kMenuClickDebounceMs)
@@ -140,7 +142,7 @@ void OpenCrashLogsFolder()
 	QDesktopServices::openUrl(QUrl::fromLocalFile(path));
 }
 
-// obss own exit never confirmed and sits right where an upward-opening menu leaves the cursor, an easy accidental click the debounce cant catch since its aimed right, not just early -- same confirm-first shape as RestartObs. posts to the helpers /exit-obs instead of calling mainWindow->close() directly so this gets the same graceful-close-then-force-kill-if-needed handling restart already gets (see Stop-ReplayKitObsForRestart), which is what actually lets obs save window position/state on the way out.
+// confirm the tray exit because the upward-opening menu can place it under the cursor
 void ConfirmedExit()
 {
 	if (g_menuShownTimer.isValid() && g_menuShownTimer.elapsed() < kMenuClickDebounceMs)
@@ -159,7 +161,10 @@ void ToggleRecording()
 	if (active)
 		obs_frontend_recording_stop();
 	else
-		ShellStartOutputWhenFree([]() { obs_frontend_recording_start(); });
+		ShellStartOutputWhenFree([]() {
+			if (!GraphicsStatus().Lost())
+				obs_frontend_recording_start();
+		});
 }
 
 void ToggleReplayBuffer()

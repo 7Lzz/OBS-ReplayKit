@@ -137,7 +137,7 @@ namespace ReplayKitSetup
             return OBS_PROCESSES.Contains(name) && File.Exists(path);
         }
 
-        private static string ObsExeFromRoot(string root)
+        internal static string ObsExeFromRoot(string root)
         {
             return Path.Combine(root, "bin", "64bit", "obs64.exe");
         }

@@ -205,15 +205,12 @@ namespace ReplayKitSetup
             bool externalRuntimeWriting = false;
             ConfigBackups.Snapshot configBackup = null;
             string failureStage = "startup";
-            Mutex updateGate = null;
-            bool updateGateHeld = false;
+            IDisposable updateGate = null;
             RuntimeTransaction transaction = null;
             try
             {
-                updateGate = new Mutex(false, @"Local\OBSReplayKit-runtime-update");
-                try { updateGateHeld = updateGate.WaitOne(TimeSpan.FromSeconds(5)); }
-                catch (AbandonedMutexException) { updateGateHeld = true; }
-                if (!updateGateHeld)
+                updateGate = ObsExit.TryTakeOperation(ObsExit.SetupGateWaitMs);
+                if (updateGate == null)
                 {
                     string busy = SetupLocale.Message("setup.anotherReplaykitUpdateIsAlready");
                     LogBoth(busy);
@@ -338,7 +335,6 @@ namespace ReplayKitSetup
                 }
                 configBackup?.Dispose();
                 transaction?.Dispose();
-                if (updateGateHeld) updateGate.ReleaseMutex();
                 updateGate?.Dispose();
             }
         }

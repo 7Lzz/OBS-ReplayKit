@@ -10,10 +10,13 @@ namespace rk {
 
 void ClipBufferInit();
 void ClipBufferShutdown();
+void ClipBufferGraphicsChanged();
 bool ClipBufferPrepareClose();
 void ClipBufferCancelClose();
 bool ClipBufferActive();
-void ClipBufferStart();
+bool ClipBufferCanSave();
+bool ClipBufferCanStop();
+void ClipBufferStart(bool deferUntilReady = false);
 void ClipBufferStop();
 void ClipBufferToggle();
 void ClipBufferSave();

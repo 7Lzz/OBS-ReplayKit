@@ -345,19 +345,17 @@ bool Renderer::TakeFrame()
 	HRESULT hr = sharedMutex->AcquireSync(0, 4);
 	if (hr == static_cast<HRESULT>(WAIT_TIMEOUT))
 		return false;
-	if (hr == static_cast<HRESULT>(WAIT_ABANDONED)) {
-		Log("obs abandoned the shared texture; replacing it");
+	if (hr == S_OK) {
+		context->CopyResource(frame.Get(), shared.Get());
+		hr = sharedMutex->ReleaseSync(0);
+	}
+	if (hr != S_OK) {
+		Log("the shared texture mutex failed (0x%08lx); replacing the texture", hr);
 		sharedMutex.Reset();
 		shared.Reset();
 		sharedHandle = 0;
 		return false;
 	}
-	if (hr != S_OK) {
-		Log("could not take the shared texture: 0x%08lx", hr);
-		return false;
-	}
-	context->CopyResource(frame.Get(), shared.Get());
-	sharedMutex->ReleaseSync(0);
 	hasFrame = true;
 	return true;
 }
@@ -365,7 +363,7 @@ bool Renderer::TakeFrame()
 bool Renderer::SetCard(const std::vector<uint8_t> &pixels, uint32_t width, uint32_t height, CardMode mode)
 {
 	cardView.Reset();
-	if (!width || !height || pixels.size() != size_t(width) * height * 4)
+	if (!device || !width || !height || pixels.size() != size_t(width) * height * 4)
 		return false;
 	if (!MakeImageView(device.Get(), pixels, width, height, &cardView)) {
 		Log("could not create the card texture %ux%u", width, height);

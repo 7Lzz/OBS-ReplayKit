@@ -51,6 +51,10 @@
     "source": "879ad747764bbbda",
     "text": "Войти в Streamable заново?"
   },
+  "capture.graphicsDeviceLost": {
+    "source": "ee5556a1cd8bbd5a",
+    "text": "OBS потеряла доступ к графическому устройству. Захват видео прерван."
+  },
   "capture.recordingStarted": {
     "source": "c9ad24bd74b949ab",
     "text": "Запись начата"
@@ -9647,8 +9651,8 @@
     "text": "Не давать монитору и ПК засыпать"
   },
   "setup.anotherReplaykitUpdateIsAlready": {
-    "source": "fcd92a1e168a4f54",
-    "text": "Уже выполняется другое обновление ReplayKit."
+    "source": "1009b6c4daadb600",
+    "text": "ReplayKit уже изменяет установку OBS или перезапускает OBS."
   },
   "setup.appliesYourThemeBeforeObsStarts": {
     "source": "9ff460540709c340",
@@ -9945,6 +9949,10 @@
   "setup.obsCouldNotBeInstalledAutomatically": {
     "source": "b9ec5649ef71e37c",
     "text": "Не удалось автоматически установить OBS Studio. Установите OBS с obsproject.com и снова запустите этот установщик."
+  },
+  "setup.obsDidNotExitGracefully": {
+    "source": "d232068992159151",
+    "text": "OBS или один из её процессов всё ещё работает. Установка остановлена."
   },
   "setup.obsIsStartingBackUp": {
     "source": "13a7f357aa36308e",

@@ -51,6 +51,10 @@
     "context": "Text in a dialog in OBS.",
     "text": "Force re-login to Streamable?"
   },
+  "capture.graphicsDeviceLost": {
+    "context": "Windows tray notification when OBS loses its Direct3D graphics device.",
+    "text": "OBS lost access to the graphics device. Video capture is interrupted."
+  },
   "capture.recordingStarted": {
     "context": "Native toast after an OBS recording starts.",
     "text": "Recording started"
@@ -9642,8 +9646,8 @@
     "text": "Allow monitor and PC sleep"
   },
   "setup.anotherReplaykitUpdateIsAlready": {
-    "context": "Error message shown when an installer step fails in the installer and uninstaller.",
-    "text": "Another ReplayKit update is already running."
+    "context": "Setup error when an installation change or OBS restart already holds the shared operation lock.",
+    "text": "ReplayKit is already changing the OBS installation or restarting OBS."
   },
   "setup.appliesYourThemeBeforeObsStarts": {
     "context": "Title or description of an installer step in the installer and uninstaller.",
@@ -9940,6 +9944,10 @@
   "setup.obsCouldNotBeInstalledAutomatically": {
     "context": "Reason a step of the installer stopped, shown in the installer window.",
     "text": "OBS Studio could not be installed automatically. Install OBS from obsproject.com, then run this installer again."
+  },
+  "setup.obsDidNotExitGracefully": {
+    "context": "Setup error when OBS or a related process is still running after setup requested an ordinary close.",
+    "text": "OBS or one of its processes is still running. Setup stopped."
   },
   "setup.obsIsStartingBackUp": {
     "context": "Text in the installer window. Also used in the uninstall window.",

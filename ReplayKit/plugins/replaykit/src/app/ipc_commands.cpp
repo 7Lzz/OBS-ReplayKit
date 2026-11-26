@@ -157,7 +157,7 @@ void PipeDispatchLine(const std::string &line)
 				ClipBufferToggle();
 			else if (state == "on" && !ClipBufferActive())
 				ClipBufferStart();
-			else if (state == "off" && ClipBufferActive())
+			else if (state == "off")
 				ClipBufferStop();
 		}, Qt::QueuedConnection);
 	} else if (line.rfind("QUICKACTION ", 0) == 0) {

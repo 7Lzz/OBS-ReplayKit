@@ -106,6 +106,7 @@ namespace ReplayKitHelper
         [DllImport("kernel32.dll")] private static extern uint GetCurrentProcessId();
         [DllImport("kernel32.dll", SetLastError = true)] private static extern IntPtr OpenProcess(uint dwAccess, bool inherit, uint pid);
         [DllImport("kernel32.dll")] private static extern bool GetExitCodeProcess(IntPtr hHandle, out uint exitCode);
+        [DllImport("kernel32.dll")] private static extern uint WaitForSingleObject(IntPtr handle, uint milliseconds);
         [DllImport("kernel32.dll")] private static extern bool CloseHandle(IntPtr hHandle);
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode)] private static extern IntPtr CreateJobObject(IntPtr lpJobAttributes, string lpName);
         [DllImport("kernel32.dll")] private static extern bool SetInformationJobObject(IntPtr hJob, int jobObjectInformationClass, IntPtr lpJobObjectInformation, uint cbJobObjectInformationLength);
@@ -285,30 +286,16 @@ namespace ReplayKitHelper
             return closed;
         }
 
-        internal static int ObsMainWindowPid()
+        internal static IntPtr ObsMainWindow()
         {
-            long hwndVal;
-            lock (Server.State.IpcLock) hwndVal = Server.State.ObsMainWindowHwnd;
-            var hwnd = new IntPtr(hwndVal);
-            return IsWindow(hwnd) && GetWindowThreadProcessId(hwnd, out uint pid) != 0 ? (int)pid : 0;
+            lock (Server.State.IpcLock) return new IntPtr(Server.State.ObsMainWindowHwnd);
         }
 
-        // the native plugin supplies the real obs main window over the pipe.
-        public static bool CloseObsMainWindow(uint requireOwnerPid)
-        {
-            long hwndVal;
-            lock (Server.State.IpcLock) hwndVal = Server.State.ObsMainWindowHwnd;
-            if (hwndVal == 0) return false;
-            IntPtr hWnd = new IntPtr(hwndVal);
-            if (!IsWindow(hWnd)) return false;
-            if (requireOwnerPid != 0)
-            {
-                GetWindowThreadProcessId(hWnd, out uint ownerPid);
-                if (ownerPid != requireOwnerPid) return false;
-            }
-            PostMessage(hWnd, WM_CLOSE, IntPtr.Zero, IntPtr.Zero);
-            return true;
-        }
+        internal static int WindowOwnerPid(IntPtr hwnd) =>
+            IsWindow(hwnd) && GetWindowThreadProcessId(hwnd, out uint pid) != 0 ? (int)pid : 0;
+
+        internal static bool CloseObsWindow(IntPtr hwnd, int pid) =>
+            pid > 0 && WindowOwnerPid(hwnd) == pid && PostMessage(hwnd, WM_CLOSE, IntPtr.Zero, IntPtr.Zero);
 
         // enumerates windows matching google/streamable/loader/about:blank title heuristics for the sign-in popup flow and hand-builds the json for its one caller
         public static string ListSignInWindows(uint requireOwnerPid, bool hideGoogle, bool overlayGoogle)
@@ -1023,16 +1010,31 @@ namespace ReplayKitHelper
         // raw CreateProcessW with CREATE_NO_WINDOW | CREATE_BREAKAWAY_FROM_JOB -- escapes the kill-on-close job so the spawned process (relauncher/installer/uninstaller/transcode-poll) survives this process exiting. ProcessStartInfo has no equivalent to CREATE_BREAKAWAY_FROM_JOB, so this raw P/Invoke path is required. returns spawned pid, or 0 on failure.
         public static int SpawnDetached(string commandLine, string workingDirectory)
         {
+            IntPtr process = StartDetached(commandLine, workingDirectory, out int pid);
+            if (process != IntPtr.Zero) CloseHandle(process);
+            return pid;
+        }
+
+        internal static bool RunDetached(string commandLine, string workingDirectory, out uint exitCode)
+        {
+            exitCode = 0;
+            IntPtr process = StartDetached(commandLine, workingDirectory, out _);
+            if (process == IntPtr.Zero) return false;
+            try { return WaitForSingleObject(process, uint.MaxValue) == 0 && GetExitCodeProcess(process, out exitCode); }
+            finally { CloseHandle(process); }
+        }
+
+        private static IntPtr StartDetached(string commandLine, string workingDirectory, out int pid)
+        {
             var si = new STARTUPINFOW { cb = Marshal.SizeOf<STARTUPINFOW>(), dwFlags = STARTF_USESHOWWINDOW, wShowWindow = SW_HIDE };
             var cmd = new StringBuilder(commandLine);
             bool ok = CreateProcessW(null, cmd, IntPtr.Zero, IntPtr.Zero, false,
                 CREATE_NO_WINDOW | CREATE_BREAKAWAY_FROM_JOB, IntPtr.Zero,
                 string.IsNullOrEmpty(workingDirectory) ? null : workingDirectory, ref si, out PROCESS_INFORMATION pi);
-            if (!ok) return 0;
-            int pid = pi.dwProcessId;
+            pid = ok ? pi.dwProcessId : 0;
+            if (!ok) return IntPtr.Zero;
             CloseHandle(pi.hThread);
-            CloseHandle(pi.hProcess);
-            return pid;
+            return pi.hProcess;
         }
 
         // PROCESS_QUERY_LIMITED_INFORMATION works cross-integrity-level (non-elevated helper watching an elevated obs), unlike SYNCHRONIZE access.
