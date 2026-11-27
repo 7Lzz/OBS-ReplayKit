@@ -11,7 +11,7 @@ using ReplayKitShared;
 
 namespace ReplayKitHelper
 {
-    // entry point: a normal launch binds the loopback listener and runs the accept loop, each connection on the thread pool; the hidden --transcode-poll, --update-watchdog, --update-startup-check, --update-window, --playback-wake and --relaunch-obs modes run one job and exit
+    // entry point: a normal launch binds the loopback listener and runs the accept loop, each connection on the thread pool; the hidden --host-info, --prepare-theme, --relaunch-obs, --restart-obs, --playback-wake, --transcode-poll, --update-watchdog, --update-startup-check and --update-window modes run one job and exit
     internal static class Program
     {
         [DllImport("kernel32.dll", SetLastError = true)]

@@ -5710,10 +5710,6 @@
     "source": "406358587f02767d",
     "text": "Helferrolle fehlt."
   },
-  "helper.missingOrInvalidWH": {
-    "source": "6b7dd926d5afccc5",
-    "text": "Breite/Höhe fehlt oder ist ungültig."
-  },
   "helper.noiseSuppressionMustBe0Or": {
     "source": "2ba4dec793b56033",
     "text": "Rauschunterdrückung muss 0 oder 1 sein."
@@ -5801,6 +5797,10 @@
   "helper.playbackMustBe0Or1": {
     "source": "aa8fc43405e6644a",
     "text": "Wiedergabe muss 0 oder 1 sein."
+  },
+  "helper.replayBufferStateMustBeOnOrOff": {
+    "source": "42df0010abfa65dd",
+    "text": "Der Status des Replaypuffers muss on oder off sein."
   },
   "helper.replaykitColorPicker": {
     "source": "0a202a9157a65797",
@@ -7028,10 +7028,6 @@
   "settings.countSettingsFound": {
     "source": "2e3619b670873aaf",
     "text": "{count} Einstellungen gefunden"
-  },
-  "settings.ctrlShiftS": {
-    "source": "bd633c78a353e76e",
-    "text": "Strg + Umschalt + S"
   },
   "settings.custom": {
     "source": "0e2a2ec02ef95ce2",
@@ -8697,6 +8693,10 @@
     "source": "40c2985c92ed985e",
     "text": "Erneut parken"
   },
+  "settings.unknownSettingName": {
+    "source": "3e39c9e6dada019a",
+    "text": "Die Einstellung {name} ist unbekannt."
+  },
   "settings.whileObsIsAway": {
     "source": "ff7f616253d9151a",
     "text": "Während OBS weg ist"
@@ -9067,10 +9067,6 @@
   "settings.sharperEdgesAndLessShimmerWhen": {
     "source": "4cc7419e3b24a712",
     "text": "Schärfere Kanten und weniger Flimmern, wenn Videos verkleinert werden. Benötigt mehr GPU-Leistung."
-  },
-  "settings.shift": {
-    "source": "3e337e3e95c5e981",
-    "text": "Umschalt + \\"
   },
   "settings.shortDate": {
     "source": "5fd7ac127ddb935f",

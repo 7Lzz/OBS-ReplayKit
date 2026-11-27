@@ -95,22 +95,12 @@ namespace ReplayKitHelper
                     HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["closed"] = 1 });
                     return false;
                 }
-                // the update popup can be hosted by msedge.exe (--app launched from the bootstrap), which is not an obs-family process, so pass 0 for that title so CloseWindowsByTitle finds it by title alone; settings still goes thru the obs-family gate.
+                // the update window is the --update-window process of the helper, which is not an obs-family process, so pass 0 for that title so CloseWindowsByTitle finds it by title alone; settings still goes thru the obs-family gate.
                 uint ownerPid = title == WindowLayout.UpdateTitle ? 0 : (ParentWatchdog.ParentPid > 0 ? (uint)ParentWatchdog.ParentPid : 0);
                 int closed = 0;
                 // settings and setup are only hidden by the plugin and shown again later, so their taskbar tab has to survive the close; only the update popup really goes away
                 try { closed = Native.CloseWindowsByTitle(new[] { title }, ownerPid, title == WindowLayout.UpdateTitle); } catch (Exception ex) { Log.Write(path + ": " + ex.Message); }
                 HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["closed"] = closed });
-                return false;
-            }
-
-            if (path == "/window/maximize")
-            {
-                // server-side maximize for a dock-spawned popup. called from clips.html when the user enters fullscreen on a clip so the host window fills the screen. js in cef cant resize its own host, hence the win32 round-trip. the native side snapshots the original rect so /window/restore can put it back unless the user manually unmaximized or dragged the host while fullscreened.
-                string title = Q("title", WindowLayout.ClipsTitle);
-                bool maximized = false;
-                try { maximized = Native.MaximizeObsWindow(title); } catch (Exception ex) { Log.Write(path + ": " + ex.Message); }
-                HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["maximized"] = maximized });
                 return false;
             }
 
@@ -148,16 +138,6 @@ namespace ReplayKitHelper
                 return false;
             }
 
-            if (path == "/window/restore")
-            {
-                // counterpart to /window/maximize: restore the saved rect only if the Clips host is still maximized. if the user dragged or unmaximized it while fullscreened, their manual placement wins.
-                string title = Q("title", WindowLayout.ClipsTitle);
-                bool restored = false;
-                try { restored = Native.RestoreObsWindow(title); } catch (Exception ex) { Log.Write(path + ": " + ex.Message); }
-                HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["restored"] = restored });
-                return false;
-            }
-
             if (path == "/window/resize")
             {
                 // drag-to-resize for the borderless popups, started from the resize-grip dots the dock/clips pages draw in their bottom-right corner. BeginResizeWindow polls the mouse button instead of a message-based handoff -- see its comment in Native.cs. each window gets its own floor/ceiling since Settings is a fixed two-pane form while Clips is a fluid grid that tolerates a smaller floor; both axes always move together off the one drag.
@@ -184,29 +164,6 @@ namespace ReplayKitHelper
                 if (edge != "right" && edge != "bottom" && edge != "corner") { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("helper.unknownEdge") }); return false; }
                 bool resizing = Native.ObsMainResizable() && PipeClient.SendShellResize(edge);
                 HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["resizing"] = resizing });
-                return false;
-            }
-
-            if (path == "/window/set-size")
-            {
-                // one-shot corrective resize for a window we just spawned via "chrome --app=" -- see SetWindowSizeCentereds comment for why the spawn-time --window-size flag alone is not reliable.
-                if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
-                string title = Q("title");
-                if (!int.TryParse(Q("w"), out int w) || !int.TryParse(Q("h"), out int h) || w <= 0 || h <= 0)
-                {
-                    HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("helper.missingOrInvalidWH") });
-                    return false;
-                }
-                bool applied = false;
-                try { applied = Native.SetWindowSizeCentered(title, w, h); } catch (Exception ex) { Log.Write(path + ": " + ex.Message); }
-                HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["applied"] = applied });
-                return false;
-            }
-
-            if (path == "/open_clips")
-            {
-                var h = HttpResponse.GetNoStoreHeaders(new Dictionary<string, string> { ["Location"] = "/clips-view" });
-                HttpResponse.SendBytes(stream, 302, "Found", h, new byte[0]);
                 return false;
             }
 

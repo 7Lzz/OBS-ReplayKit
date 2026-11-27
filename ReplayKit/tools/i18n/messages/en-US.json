@@ -5711,10 +5711,6 @@
     "context": "Error message in a ReplayKit window, sent by the background helper.",
     "text": "Missing helper role."
   },
-  "helper.missingOrInvalidWH": {
-    "context": "Message the helper shows when an action fails or finishes in a ReplayKit window, sent by the background helper.",
-    "text": "Missing or invalid w/h."
-  },
   "helper.noiseSuppressionMustBe0Or": {
     "context": "Message the helper shows when an action fails or finishes in a ReplayKit window, sent by the background helper.",
     "text": "Noise suppression must be 0 or 1."
@@ -5802,6 +5798,10 @@
   "helper.playbackMustBe0Or1": {
     "context": "Message the helper shows when an action fails or finishes in a ReplayKit window, sent by the background helper.",
     "text": "Playback must be 0 or 1."
+  },
+  "helper.replayBufferStateMustBeOnOrOff": {
+    "context": "Message the helper shows when an action fails or finishes in a ReplayKit window, sent by the background helper. on and off are the two values the request may carry.",
+    "text": "The replay buffer state must be on or off."
   },
   "helper.replaykitColorPicker": {
     "context": "Text in a ReplayKit window, sent by the background helper.",
@@ -7029,10 +7029,6 @@
   "settings.countSettingsFound": {
     "context": "Text in the Settings window. Keep {count} as written.",
     "text": "{count} settings found"
-  },
-  "settings.ctrlShiftS": {
-    "context": "Name of a choice in a settings dropdown in a ReplayKit window, sent by the background helper.",
-    "text": "Ctrl + Shift + S"
   },
   "settings.custom": {
     "context": "Text in Settings > Appearance. Also used in the Settings window.",
@@ -8698,6 +8694,10 @@
     "context": "Button label in Settings > Screenshare > Discord Screenshare. Also used in the Settings window.",
     "text": "Repark"
   },
+  "settings.unknownSettingName": {
+    "context": "Error message in a ReplayKit window, sent by the background helper when a page saves a setting it does not have. {name} is the internal name of the setting, left as it is.",
+    "text": "The setting {name} is not known."
+  },
   "settings.whileObsIsAway": {
     "context": "On the Screenshare page of ReplayKit Settings, in the box about the card Discord viewers see while OBS is closed or restarting. Box title.",
     "text": "While OBS is away"
@@ -9068,10 +9068,6 @@
   "settings.sharperEdgesAndLessShimmerWhen": {
     "context": "Label in the Settings window.",
     "text": "Sharper edges and less shimmer when videos are scaled down. Uses more GPU power."
-  },
-  "settings.shift": {
-    "context": "Name of a choice in a settings dropdown in a ReplayKit window, sent by the background helper.",
-    "text": "Shift + \\"
   },
   "settings.shortDate": {
     "context": "Label in the Settings window.",

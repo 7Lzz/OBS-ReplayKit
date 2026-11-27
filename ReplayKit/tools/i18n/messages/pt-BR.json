@@ -5711,10 +5711,6 @@
     "source": "406358587f02767d",
     "text": "Papel do auxiliar ausente."
   },
-  "helper.missingOrInvalidWH": {
-    "source": "6b7dd926d5afccc5",
-    "text": "w/h ausente ou inválido."
-  },
   "helper.noiseSuppressionMustBe0Or": {
     "source": "2ba4dec793b56033",
     "text": "A supressão de ruído deve ser 0 ou 1."
@@ -5802,6 +5798,10 @@
   "helper.playbackMustBe0Or1": {
     "source": "aa8fc43405e6644a",
     "text": "A reprodução deve ser 0 ou 1."
+  },
+  "helper.replayBufferStateMustBeOnOrOff": {
+    "source": "42df0010abfa65dd",
+    "text": "O estado do buffer de repetição deve ser on ou off."
   },
   "helper.replaykitColorPicker": {
     "source": "0a202a9157a65797",
@@ -7030,10 +7030,6 @@
   "settings.countSettingsFound": {
     "source": "2e3619b670873aaf",
     "text": "{count} configurações encontradas"
-  },
-  "settings.ctrlShiftS": {
-    "source": "bd633c78a353e76e",
-    "text": "Ctrl + Shift + S"
   },
   "settings.custom": {
     "source": "0e2a2ec02ef95ce2",
@@ -8699,6 +8695,10 @@
     "source": "40c2985c92ed985e",
     "text": "Estacionar novamente"
   },
+  "settings.unknownSettingName": {
+    "source": "3e39c9e6dada019a",
+    "text": "A configuração {name} não é conhecida."
+  },
   "settings.whileObsIsAway": {
     "source": "ff7f616253d9151a",
     "text": "Enquanto o OBS está fora"
@@ -9070,10 +9070,6 @@
   "settings.sharperEdgesAndLessShimmerWhen": {
     "source": "4cc7419e3b24a712",
     "text": "Bordas mais nítidas e menos cintilação quando os vídeos são reduzidos. Usa mais potência da GPU."
-  },
-  "settings.shift": {
-    "source": "3e337e3e95c5e981",
-    "text": "Shift + \\"
   },
   "settings.shortDate": {
     "source": "5fd7ac127ddb935f",

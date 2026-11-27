@@ -5709,10 +5709,6 @@
     "source": "406358587f02767d",
     "text": "ヘルパーの役割がありません。"
   },
-  "helper.missingOrInvalidWH": {
-    "source": "6b7dd926d5afccc5",
-    "text": "w/h がないか不正です。"
-  },
   "helper.noiseSuppressionMustBe0Or": {
     "source": "2ba4dec793b56033",
     "text": "ノイズ抑制は 0 か 1 を指定してください。"
@@ -5800,6 +5796,10 @@
   "helper.playbackMustBe0Or1": {
     "source": "aa8fc43405e6644a",
     "text": "再生は 0 または 1 にしてください。"
+  },
+  "helper.replayBufferStateMustBeOnOrOff": {
+    "source": "42df0010abfa65dd",
+    "text": "リプレイバッファの状態は on か off である必要があります。"
   },
   "helper.replaykitColorPicker": {
     "source": "0a202a9157a65797",
@@ -7026,10 +7026,6 @@
   "settings.countSettingsFound": {
     "source": "2e3619b670873aaf",
     "text": "設定が {count} 件見つかりました"
-  },
-  "settings.ctrlShiftS": {
-    "source": "bd633c78a353e76e",
-    "text": "Ctrl + Shift + S"
   },
   "settings.custom": {
     "source": "0e2a2ec02ef95ce2",
@@ -8695,6 +8691,10 @@
     "source": "40c2985c92ed985e",
     "text": "待機位置に戻す"
   },
+  "settings.unknownSettingName": {
+    "source": "3e39c9e6dada019a",
+    "text": "設定 {name} は不明です。"
+  },
   "settings.whileObsIsAway": {
     "source": "ff7f616253d9151a",
     "text": "OBS が閉じている間"
@@ -9064,10 +9064,6 @@
   "settings.sharperEdgesAndLessShimmerWhen": {
     "source": "4cc7419e3b24a712",
     "text": "動画を縮小したときにエッジがくっきりし、ちらつきが減ります。GPU の負荷が増えます。"
-  },
-  "settings.shift": {
-    "source": "3e337e3e95c5e981",
-    "text": "Shift + \\"
   },
   "settings.shortDate": {
     "source": "5fd7ac127ddb935f",

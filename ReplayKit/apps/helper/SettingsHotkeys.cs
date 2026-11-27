@@ -25,11 +25,9 @@ using static ReplayKitHelper.SettingsHttp;
 
 namespace ReplayKitHelper
 {
-    // hotkey capture for the press a key to bind fields, and reading the hotkeys back from obs
+    // hotkey capture for the press a key to bind fields, which blanks the native hotkeys of obs while one listens, and reading the hotkeys back from obs, so a hotkey rebound in the settings dialog of obs is shown instead of silently reverted
     internal static class SettingsHotkeys
     {
-        // -- hotkey capture + sync-from-obs: lets the docks "press a key to bind" ui temporarily blank obss native hotkeys while listening, and detects when the user rebinds a hotkey through obss own Settings dialog instead of the dock, so the dock does not silently fight/revert that edit.
-
         private static string captureOwner;
         private static DateTime captureExpires;
         private const int CaptureLeaseSeconds = 15;

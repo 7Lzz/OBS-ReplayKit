@@ -5711,10 +5711,6 @@
     "source": "406358587f02767d",
     "text": "Rôle d'assistant manquant."
   },
-  "helper.missingOrInvalidWH": {
-    "source": "6b7dd926d5afccc5",
-    "text": "w/h manquant ou invalide."
-  },
   "helper.noiseSuppressionMustBe0Or": {
     "source": "2ba4dec793b56033",
     "text": "La suppression du bruit doit valoir 0 ou 1."
@@ -5802,6 +5798,10 @@
   "helper.playbackMustBe0Or1": {
     "source": "aa8fc43405e6644a",
     "text": "La lecture doit valoir 0 ou 1."
+  },
+  "helper.replayBufferStateMustBeOnOrOff": {
+    "source": "42df0010abfa65dd",
+    "text": "L'état du tampon de relecture doit être on ou off."
   },
   "helper.replaykitColorPicker": {
     "source": "0a202a9157a65797",
@@ -7030,10 +7030,6 @@
   "settings.countSettingsFound": {
     "source": "2e3619b670873aaf",
     "text": "Paramètres trouvés : {count}"
-  },
-  "settings.ctrlShiftS": {
-    "source": "bd633c78a353e76e",
-    "text": "Ctrl + Maj + S"
   },
   "settings.custom": {
     "source": "0e2a2ec02ef95ce2",
@@ -8699,6 +8695,10 @@
     "source": "40c2985c92ed985e",
     "text": "Replacer"
   },
+  "settings.unknownSettingName": {
+    "source": "3e39c9e6dada019a",
+    "text": "Le paramètre {name} est inconnu."
+  },
   "settings.whileObsIsAway": {
     "source": "ff7f616253d9151a",
     "text": "Pendant l'absence d'OBS"
@@ -9070,10 +9070,6 @@
   "settings.sharperEdgesAndLessShimmerWhen": {
     "source": "4cc7419e3b24a712",
     "text": "Contours plus nets et moins de scintillement quand les vidéos sont réduites. Consomme davantage de puissance GPU."
-  },
-  "settings.shift": {
-    "source": "3e337e3e95c5e981",
-    "text": "Maj + \\"
   },
   "settings.shortDate": {
     "source": "5fd7ac127ddb935f",

@@ -56,10 +56,10 @@ namespace ReplayKitHelper
                 return false;
             }
 
-            // the overlay items live rect on the canvas, and a setter the Apply path calls once the user has dragged it in the in-page projector. obss own scene item stays the source of truth for position, so a drag done in the projector and one done in obs converge on the same value.
+            // the overlay items live rect on the canvas. obss own scene item stays the source of truth for position, so a drag done in the projector and one done in obs converge on the same value
             if (path == "/overlay/position")
             {
-                // read-only: a drag is saved as the overlayPosition setting and reaches obs through the normal settings apply, so it survives the scene rewrite + restart an overlay-style change forces
+                // read-only: a drag is saved as the overlayPosition setting and reaches obs through the normal settings apply
                 if (req.Method != "GET") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "GET required"); return false; }
                 HttpResponse.SendJson(stream, 200, ReplaykitSettings.GetOverlayPositionLive());
                 return false;

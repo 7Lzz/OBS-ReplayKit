@@ -25,11 +25,9 @@ using static ReplayKitHelper.SettingsHotkeys;
 
 namespace ReplayKitHelper
 {
-    // the http side of the settings: the payload the pages load, change detection and the save handler
+    // the http side of the settings: the payload the pages load (GetSettingsPayload), change detection and the save handler (SaveSettingsFromRequest), which picks the cheapest live-apply path that covers what changed instead of always running the full ApplyLiveSettings orchestrator
     internal static class SettingsHttp
     {
-        // -- http-facing settings payload + change-detection + save-request handler: the docks initial page load fetches GetSettingsPayload; every settings-form submit goes through SaveSettingsFromRequest, which picks the cheapest live-apply path that actually covers what changed instead of always running the full ApplyLiveSettings orchestrator.
-
         // resolved theme colours for the tray menus custom keybind rows -- text is the normal (at-rest) label colour (a widget stylesheet on the row otherwise breaks the labels inherited menu colour), accentLight + onAccent are the active/hovered fill + ink so the rows match a native QMenu::item:selected
         internal static JObject ThemeMenuColors(JObject settings)
         {
@@ -40,10 +38,11 @@ namespace ReplayKitHelper
                 {
                     ["text"] = t.Text,
                     ["muted"] = t.Muted,
-                    // the window ground the clean-layout title bar and rail paint with, and the green of a live status light
+                    // the window ground the clean-layout title bar and rail paint with
                     ["bg"] = t.Bg,
                     // one colour for the title bar and the rail, so a theme can set it apart from the stage
                     ["bar"] = t.BarColor,
+                    // the green of a live status light
                     ["success"] = t.Success,
                     ["warning"] = t.Warning,
                     ["accent"] = t.Accent,
@@ -178,16 +177,6 @@ namespace ReplayKitHelper
                         ),
                         ["screenshareGameWindows"] = new JArray(GetGameWindowCandidates(settings["screenshareGameWindow"]?.Value<string>() ?? "")),
                         ["captureDisplays"] = CaptureDisplayOptions(settings["captureDisplay"]?.Value<string>() ?? "primary"),
-                        ["discordOutputModes"] = new JArray(
-                            new JObject { ["value"] = "projector", ["label"] = Locales.Message("common.projector"), ["blurb"] = "OBS Windowed Projector parked by ReplayKit." }
-                        ),
-                        ["keybinds"] = new JArray(
-                            new JObject { ["value"] = "f8", ["label"] = "F8", ["blurb"] = "Default ReplayKit save hotkey.", ["combo"] = new JObject { ["key"] = "OBS_KEY_F8" } },
-                            new JObject { ["value"] = "shift_backslash", ["label"] = Locales.Message("settings.shift"), ["blurb"] = "The classic ReplayKit save hotkey.", ["combo"] = new JObject { ["shift"] = true, ["key"] = "OBS_KEY_BACKSLASH" } },
-                            new JObject { ["value"] = "ctrl_shift_s", ["label"] = Locales.Message("settings.ctrlShiftS"), ["blurb"] = "Easy to remember, uses two modifiers.", ["combo"] = new JObject { ["control"] = true, ["shift"] = true, ["key"] = "OBS_KEY_S" } },
-                            new JObject { ["value"] = "f9", ["label"] = "F9", ["blurb"] = "Single function key.", ["combo"] = new JObject { ["key"] = "OBS_KEY_F9" } },
-                            new JObject { ["value"] = "f10", ["label"] = "F10", ["blurb"] = "Single function key.", ["combo"] = new JObject { ["key"] = "OBS_KEY_F10" } }
-                        ),
                     },
                     // resolved default so the clip-dir field can show a real path (with the actual username) as its placeholder.
                     ["defaultClipDir"] = AppConfig.GetDefaultClipDir(),
@@ -249,8 +238,6 @@ namespace ReplayKitHelper
             }
             return false;
         }
-
-        internal static bool TestShareModeOnlyRequest(JObject incoming) => incoming.Count == 1 && incoming["shareMode"] != null;
 
         internal static readonly string[] DiscordOutputOnlyAllowedKeys =
         {
@@ -406,7 +393,7 @@ namespace ReplayKitHelper
             });
         }
 
-        // self-heal: obs can end up recording at a different size or fps than the saved settings say -- the installer re-seeding the profile, an apply that failed after the settings file was already written, a change made inside obs -- and nothing compared the two, so it stayed that way unnoticed. once per helper start this checks the live video settings against the saved recording resolution and fps and applies the saved ones when they differ; only the output size and fps move (the base canvas is left alone) and a recording or stream in progress is never stopped for it. the choices of the recording audio tab live in the settings, so a scene that came back with the plain list (an update, a fresh template) is put right once obs answers. with no choice made nothing is touched, the source keeps running exactly as it always did
+        // self-heal: the choices of the recording audio tab live in the settings, so a scene that came back with the plain list (an update, a fresh template) is put right once obs answers. with no choice made nothing is touched, the source keeps running exactly as it always did
         public static void EnsureRecordingAudioProgramsAtStartup()
         {
             Task.Run(() =>
@@ -462,6 +449,7 @@ namespace ReplayKitHelper
             }
         }
 
+        // self-heal: obs can end up recording at a different size or fps than the saved settings say -- the installer re-seeding the profile, an apply that failed after the settings file was already written, a change made inside obs -- and nothing compared the two, so it stayed that way unnoticed. once per helper start this checks the live video settings against the saved recording resolution and fps and applies the saved ones when they differ; only the output size and fps move (the base canvas is left alone) and a recording or stream in progress is never stopped for it
         public static void EnsureObsVideoMatchesSettingsAtStartup()
         {
             Task.Run(() =>
@@ -636,7 +624,7 @@ namespace ReplayKitHelper
             }
             return previous["overlayOpacity"]?.Value<int>() != settings["overlayOpacity"]?.Value<int>() ||
                 previous["overlayScale"]?.Value<int>() != settings["overlayScale"]?.Value<int>() ||
-                    previous["overlayRotation"]?.Value<int>() != settings["overlayRotation"]?.Value<int>() ||
+                previous["overlayRotation"]?.Value<int>() != settings["overlayRotation"]?.Value<int>() ||
                 previous["overlayFlipH"]?.Value<bool>() != settings["overlayFlipH"]?.Value<bool>() ||
                 previous["overlayHueShift"]?.Value<double>() != settings["overlayHueShift"]?.Value<double>() ||
                 previous["overlayColorMultiply"]?.Value<string>() != settings["overlayColorMultiply"]?.Value<string>() ||
@@ -672,7 +660,7 @@ namespace ReplayKitHelper
 
         // the settings that are read where they are used and need nothing from obs when they change (start minimized is carried into obs by the native plugin), and the one that only rewrites the startup shortcut
         internal static readonly string[] BehaviorKeys =
-            { "autoCopyLink", "linkNotificationEnabled", "hevcFixEnabled", "compressSkipFavorites", "storageCompressionType", "deletedHistoryDays", "browserSleepSeconds", "startMinimized", "hideNotificationsFromCapture", "trimPreciseDefault", "trimGpuEncode", "editorAutoplay", "editorLoopPreview", "editorSeekStep", "gifFrameDelay", "editorWheelZoom", "editorZoomScaling", "clipAntialiasing", "gameRecognition", "discordRichPresence","cardDateFormat", "developmentMode", "sdkMode", "checkObsUpdates", "logInterfaceEvents", "debugLoggingEnabled", "autoDeleteLogsOnLaunch", "clipSoundVolume", "recordingSoundVolume", "clipNotificationEnabled", "recordingNotificationEnabled", "closeToTray", "alwaysOnTop", "disableObsCrashPopup", "lastUpdatePromptVersion", "openClipsKeybind", "openClipsKeybindExtra", "pinObsTrayIcon", "runObsAsAdmin", "setupWizardPending", "showCodecTags" };
+            { "autoCopyLink", "linkNotificationEnabled", "hevcFixEnabled", "compressSkipFavorites", "storageCompressionType", "deletedHistoryDays", "browserSleepSeconds", "startMinimized", "hideNotificationsFromCapture", "trimPreciseDefault", "trimGpuEncode", "editorAutoplay", "editorLoopPreview", "editorSeekStep", "gifFrameDelay", "editorWheelZoom", "editorZoomScaling", "clipAntialiasing", "gameRecognition", "discordRichPresence", "cardDateFormat", "developmentMode", "sdkMode", "checkObsUpdates", "logInterfaceEvents", "debugLoggingEnabled", "autoDeleteLogsOnLaunch", "clipSoundVolume", "recordingSoundVolume", "clipNotificationEnabled", "recordingNotificationEnabled", "closeToTray", "alwaysOnTop", "disableObsCrashPopup", "lastUpdatePromptVersion", "openClipsKeybind", "openClipsKeybindExtra", "pinObsTrayIcon", "runObsAsAdmin", "setupWizardPending", "showCodecTags" };
 
         internal static readonly string[] StartupKeys = { "obsStartupEnabled" };
 
@@ -710,8 +698,6 @@ namespace ReplayKitHelper
             if (b != null) foreach (var item in b) result.Add(item);
             return result;
         }
-
-        public static JObject SaveOverlayPreviewFromRequest(string body) => OverlayPreviewFromRequest(body, "preview");
 
         // the language is the one obs keeps in user.ini rather than a key of the settings file: it is taken out of the request and checked before anything is saved, and written to obs once the rest has saved; a pick other than the language obs runs in restarts obs, which reads it only as it starts
         public static JObject SaveSettingsFromRequest(string body)
@@ -751,7 +737,7 @@ namespace ReplayKitHelper
                 var previous = Normalize(current);
                 foreach (var prop in incoming.Properties())
                 {
-                    if (current[prop.Name] == null) throw new InvalidOperationException("Unknown setting: " + prop.Name);
+                    if (current[prop.Name] == null) throw new InvalidOperationException(Locales.Message("settings.unknownSettingName", "name", prop.Name));
                     current[prop.Name] = prop.Value;
                 }
                 var settings = Normalize(current);
@@ -1033,6 +1019,5 @@ namespace ReplayKitHelper
                 };
             }
         }
-
     }
 }

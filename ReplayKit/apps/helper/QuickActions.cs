@@ -21,7 +21,7 @@ namespace ReplayKitHelper
 
         public static bool IsId(string id) => id != null && IdPattern.IsMatch(id);
 
-        // what a page offers, checked field by field; null and a message when any of it is not what a page sends
+        // what a page offers, checked field by field; ok false and a message when any of it is not what a page sends, and the list kept before stays
         public static JObject Set(string view, string body)
         {
             if (!IsPageView(view)) return new JObject { ["ok"] = false, ["message"] = Locales.Message("helper.unknownView") };

@@ -68,12 +68,10 @@ namespace ReplayKitHelper
                 if (headerBytes > 32768) throw new InvalidDataException("HTTP headers too large.");
                 int idx = line.IndexOf(':');
                 if (idx <= 0) throw new InvalidDataException("Invalid HTTP header.");
-                {
-                    string k = line.Substring(0, idx).Trim().ToLowerInvariant();
-                    string v = line.Substring(idx + 1).Trim();
-                    if (headers.ContainsKey(k)) throw new InvalidDataException("Duplicate HTTP header.");
-                    headers.Add(k, v);
-                }
+                string k = line.Substring(0, idx).Trim().ToLowerInvariant();
+                string v = line.Substring(idx + 1).Trim();
+                if (headers.ContainsKey(k)) throw new InvalidDataException("Duplicate HTTP header.");
+                headers.Add(k, v);
             }
 
             if (headers.ContainsKey("transfer-encoding"))

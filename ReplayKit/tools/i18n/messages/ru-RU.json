@@ -5712,10 +5712,6 @@
     "source": "406358587f02767d",
     "text": "Отсутствует роль помощника."
   },
-  "helper.missingOrInvalidWH": {
-    "source": "6b7dd926d5afccc5",
-    "text": "Отсутствует или некорректная ширина/высота (w/h)."
-  },
   "helper.noiseSuppressionMustBe0Or": {
     "source": "2ba4dec793b56033",
     "text": "Подавление шума должно быть 0 или 1."
@@ -5803,6 +5799,10 @@
   "helper.playbackMustBe0Or1": {
     "source": "aa8fc43405e6644a",
     "text": "Параметр воспроизведения должен быть 0 или 1."
+  },
+  "helper.replayBufferStateMustBeOnOrOff": {
+    "source": "42df0010abfa65dd",
+    "text": "Состояние буфера повтора должно быть on или off."
   },
   "helper.replaykitColorPicker": {
     "source": "0a202a9157a65797",
@@ -7032,10 +7032,6 @@
   "settings.countSettingsFound": {
     "source": "2e3619b670873aaf",
     "text": "Найдено настроек: {count}"
-  },
-  "settings.ctrlShiftS": {
-    "source": "bd633c78a353e76e",
-    "text": "Ctrl + Shift + S"
   },
   "settings.custom": {
     "source": "0e2a2ec02ef95ce2",
@@ -8701,6 +8697,10 @@
     "source": "40c2985c92ed985e",
     "text": "Отложить снова"
   },
+  "settings.unknownSettingName": {
+    "source": "3e39c9e6dada019a",
+    "text": "Параметр {name} неизвестен."
+  },
   "settings.whileObsIsAway": {
     "source": "ff7f616253d9151a",
     "text": "Пока OBS закрыт"
@@ -9073,10 +9073,6 @@
   "settings.sharperEdgesAndLessShimmerWhen": {
     "source": "4cc7419e3b24a712",
     "text": "Резче края и меньше мерцания при уменьшении видео. Использует больше ресурсов GPU."
-  },
-  "settings.shift": {
-    "source": "3e337e3e95c5e981",
-    "text": "Shift + \\"
   },
   "settings.shortDate": {
     "source": "5fd7ac127ddb935f",

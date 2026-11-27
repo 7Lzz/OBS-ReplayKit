@@ -80,7 +80,7 @@ namespace ReplayKitHelper
                 int parentPid = ParentWatchdog.GetParentPid();
                 if (parentPid > 0)
                 {
-                    var proc = Process.GetProcessById(parentPid);
+                    using var proc = Process.GetProcessById(parentPid);
                     if (IsObsProcessName(proc.ProcessName) && proc.MainModule != null && !IsRoleHost(proc.MainModule.FileName))
                     {
                         return proc.MainModule.FileName;
@@ -199,17 +199,17 @@ namespace ReplayKitHelper
     // one shared mutable-state instance; fields are grouped by the lock that protects them, and ConfigLock is always taken before ClipsMetaLock, never the reverse
     internal sealed class ServerState
     {
-        // -- ConfigLock --
+        // guarded by ConfigLock
         public readonly object ConfigLock = new object();
         public JObject Config;
         public DateTime ConfigMTime;
         public string ConfigPath;
 
-        // -- LogLock --
+        // guarded by LogLock
         public readonly object LogLock = new object();
         public bool LogEnabled = Constants.DEFAULT_LOG_ENABLED;
 
-        // -- ClipsMetaLock -- snapshot publication, database/index caches, repair state and the folder watcher.
+        // guarded by ClipsMetaLock; snapshot publication, database/index caches, repair state and the folder watcher
         public readonly object ClipsMetaLock = new object();
         public JObject ClipsDbCache;
         public string ClipsDbCacheSig;
@@ -221,64 +221,63 @@ namespace ReplayKitHelper
         public FileSystemWatcher ClipWatcher;
         public string ClipWatcherPath;
 
-        // -- TrimKeyframeCacheLock / TrimKeyframeJobsLock --
+        // guarded by TrimKeyframeCacheLock and TrimKeyframeJobsLock
         public readonly object TrimKeyframeCacheLock = new object();
         public readonly Dictionary<string, TrimKeyframeCacheEntry> TrimKeyframeCache = new Dictionary<string, TrimKeyframeCacheEntry>();
         public readonly object TrimKeyframeJobsLock = new object();
         public readonly Dictionary<string, TrimKeyframeJob> TrimKeyframeJobs = new Dictionary<string, TrimKeyframeJob>();
 
-        // -- PreviewLock --
+        // guarded by PreviewLock
         public readonly object PreviewLock = new object();
         public int ActivePreviews;
 
-        // -- UploadLock -- job status records; operation ownership lives in JobCoordinator.
+        // guarded by UploadLock; the job status records, while who owns an operation lives in JobCoordinator
         public readonly object UploadLock = new object();
         public UploadJobRecord Upload = new UploadJobRecord { RequestId = "" };
         public readonly Dictionary<string, UploadJobRecord> Jobs = new Dictionary<string, UploadJobRecord>();
 
-        // -- ThumbQueueLock --
+        // guarded by ThumbQueueLock
         public readonly object ThumbQueueLock = new object();
 
         // written from both the accept loop and route handlers; read by the accept loop every iteration.
         public volatile bool Shutdown;
 
-
-        // -- AuthLock --
+        // guarded by AuthLock
         public readonly object AuthLock = new object();
         public AuthState Auth = new AuthState();
 
-        // -- CapabilitiesLock --
+        // guarded by CapabilitiesLock
         public readonly object CapabilitiesLock = new object();
         public JObject Capabilities;
         public DateTime CapabilitiesAt;
 
-        // -- OverlayPreviewLock --
+        // guarded by OverlayPreviewLock
         public readonly object OverlayPreviewLock = new object();
         public JObject ReplaykitOverlayPreviewState;
         public long ReplaykitOverlayPreviewRevision;
 
-        // -- HotkeyCaptureLock --
+        // guarded by HotkeyCaptureLock
         public readonly object HotkeyCaptureLock = new object();
 
-        // -- ProjectorLock --
+        // guarded by ProjectorLock
         public readonly object ProjectorLock = new object();
         public bool ReplaykitDiscordProjectorInspectMode;
 
-        // -- VideoApplyLock -- serializes the stop-outputs / SetVideoSettings (obs_reset_video) / restart-outputs cycle. concurrent obs_reset_video calls deadlock obss video graph -- 2026-08-28 a user hard-froze obs by rapidly re-applying the downscale resolution.
+        // guarded by VideoApplyLock; serializes the stop-outputs / SetVideoSettings (obs_reset_video) / restart-outputs cycle. concurrent obs_reset_video calls deadlock obss video graph -- 2026-08-28 a user hard-froze obs by rapidly re-applying the downscale resolution
         public readonly object VideoApplyLock = new object();
         public DateTime LastVideoApplyDoneUtc = DateTime.MinValue;
 
-        // -- IpcLock -- streamed in from the native plugin (core/ipc_pipe.cpp) over the OBSReplayKitIpc named pipe, replacing the old scratch-file handoff.
+        // guarded by IpcLock; streamed in from the native plugin (core/ipc_pipe.cpp) over the OBSReplayKitIpc named pipe, replacing the old scratch-file handoff
         public readonly object IpcLock = new object();
         public bool IpcClientConnected;
         public long ObsMainWindowHwnd;           // 0 until the plugin sends MAINWIN
 
-        // -- ObsWebSocketLock --
+        // guarded by ObsWebSocketLock
         public readonly object ObsWebSocketLock = new object();
         public ClientWebSocket ObsWebSocket;
         public int ObsWebSocketPort;
 
-        // -- UpdateCheckLock --
+        // guarded by UpdateCheckLock
         public readonly object UpdateCheckLock = new object();
         public bool ReplaykitStartupUpdateChecked;
         // set by the startup check when a newer release is waiting. the first-run wizard defers to it -- setting obs up against a build that is about to be replaced wastes the users time, and the install restarts obs out from under the wizard anyway.
@@ -286,7 +285,6 @@ namespace ReplayKitHelper
         // set the moment anything opens the first-run wizard. the helper opens it on its first pipe connect (which covers a launch straight to the tray) and the dock asks again once obs is on screen -- without this the second ask re-raises the window and reads as the wizard popping up a second time.
         public bool SetupWizardOpened;
         public bool UpdateApplyInProgress;
-
     }
 
     // one upload/compress/trim-overwrite job as the /status json shows it; StartedAt/UpdatedAt are unix milliseconds, the shape the pages expect. cancellation lives in JobCoordinator, not here

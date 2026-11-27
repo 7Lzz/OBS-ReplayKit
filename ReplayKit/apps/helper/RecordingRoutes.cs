@@ -96,7 +96,7 @@ namespace ReplayKitHelper
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
                 string want = Q("state");
-                if (want != "" && want != "on" && want != "off") { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "state must be on or off." }); return false; }
+                if (want != "" && want != "on" && want != "off") { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("helper.replayBufferStateMustBeOnOrOff") }); return false; }
                 try
                 {
                     var status = ObsWebSocket.InvokeRequest("GetReplayBufferStatus");

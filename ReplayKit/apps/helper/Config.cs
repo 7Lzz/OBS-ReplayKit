@@ -7,7 +7,7 @@ using ReplayKitShared;
 
 namespace ReplayKitHelper
 {
-    // logging, off by default and driven by loggingEnabled in the shared helper config so the lua side and this helper agree on one setting
+    // logging, off by default: LogEnabled follows the debugLoggingEnabled setting, which lua carries into the helper config as loggingEnabled and a settings save sets at once, so the lua side and this helper agree on one setting
     internal static class Log
     {
         private static string GetLogPath(string area)
@@ -28,7 +28,7 @@ namespace ReplayKitHelper
                 Directory.CreateDirectory(Constants.LOG_DIR);
                 string rid = string.IsNullOrEmpty(requestId) ? "" : " request=" + requestId;
                 string line = string.Format("[{0}] area={1}{2} {3}", DateTime.Now.ToString("o"), area, rid, msg);
-                // add-content opens/closes the file per call -- concurrent writers from pool threads can hit a sharing violation without this, and this is the single hottest call site in the helper.
+                // AppendAllText opens and closes the file per call -- concurrent writers from pool threads can hit a sharing violation without this, and this is the single hottest call site in the helper.
                 lock (Server.State.LogLock)
                 {
                     try { File.AppendAllText(GetLogPath(area), line + Environment.NewLine); }
@@ -155,6 +155,7 @@ namespace ReplayKitHelper
         }
 
         public static string GetScriptDir() => Server.State.Config?["scriptDir"]?.Value<string>();
+
         // the folder picked in ReplayKit Settings wins over helper_configs clipDir, which only ever carried the old Tools > Scripts value and is empty on installs that never set it there. without this a custom folder was saved and shown in Settings but the listing still walked the default folder and reported no clips. cached on the settings file mtime because the clip listing calls this per request.
         private static readonly object ClipDirSettingLock = new object();
         private static string _clipDirSetting;
@@ -173,7 +174,7 @@ namespace ReplayKitHelper
                     if (fi.LastWriteTimeUtc != _clipDirSettingMTime)
                     {
                         string text = File.ReadAllText(path);
-                        if (text.Length > 0 && text[0] == '﻿') text = text.Substring(1);
+                        if (text.Length > 0 && text[0] == '\uFEFF') text = text.Substring(1);
                         _clipDirSetting = JObject.Parse(text)["clipDir"]?.Value<string>();
                         _clipDirSettingMTime = fi.LastWriteTimeUtc;
                     }

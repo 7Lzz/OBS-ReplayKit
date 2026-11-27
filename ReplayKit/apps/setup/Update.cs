@@ -417,7 +417,7 @@ namespace ReplayKitSetup
             }
         }
 
-        // headless discord-screenshare install from the settings dock share preview audio row -- close obs, install the virtual audio cable, flip the prefs on. the helper already flipped replaykit_settings.json before spawning us.
+        // headless discord-screenshare install from the settings dock share preview audio row -- close obs, install the virtual audio cable, flip the prefs on. the helper flips replaykit_settings.json once this has started, inside the start delay.
         public static int RunInstallDiscordScreenshareMode(int startDelayMs = 0)
         {
             try

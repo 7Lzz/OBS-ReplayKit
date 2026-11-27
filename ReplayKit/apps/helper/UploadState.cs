@@ -173,7 +173,6 @@ namespace ReplayKitHelper
             string root = Path.GetFullPath(Constants.COMPRESS_TMP_DIR);
             if (root.StartsWith(Path.GetTempPath(), StringComparison.OrdinalIgnoreCase) && Directory.Exists(root))
                 found.AddRange(SafeEnumerateFiles(root));
-            // sweeps the current scratch dir plus bare %temp% root -- the latter only matters for leftovers from before everything moved under %temp%\ReplayKit (or from a pre-c# install that still wrote status files), and stays harmless once those are gone.
             var sweepRoots = includeLegacyTempRoot ? new[] { Constants.SCRATCH_DIR, Path.GetTempPath() } : new[] { Constants.SCRATCH_DIR };
             foreach (var sweepRoot in sweepRoots)
             {
@@ -191,7 +190,7 @@ namespace ReplayKitHelper
             if (Directory.Exists(Constants.SCRATCH_DIR))
             {
                 found.AddRange(SafeEnumerateFiles(Constants.SCRATCH_DIR, "*.tmp"));
-                // A detached status poll lasts at most thirty minutes; older private cookie copies are abandoned.
+                // a detached status poll lasts at most thirty minutes, so a cookie copy older than an hour was left behind
                 foreach (string file in SafeEnumerateFiles(Constants.SCRATCH_DIR, "streamable_*.cookies.txt"))
                 {
                     try { if (File.GetLastWriteTimeUtc(file) < DateTime.UtcNow.AddHours(-1)) found.Add(file); }

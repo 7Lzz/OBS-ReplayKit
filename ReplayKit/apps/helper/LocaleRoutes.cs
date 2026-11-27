@@ -21,9 +21,9 @@ namespace ReplayKitHelper
             if (req.Method != "GET") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "GET required"); return false; }
             string code = r.Q("lang", "");
             if (!Locales.IsAvailable(code)) { HttpResponse.SendJson(stream, 404, new JObject { ["ok"] = false, ["message"] = Locales.Message("common.unknownLanguage") }); return false; }
-            // escape < > so no string can close the script it is served in
             var messages = Locales.Messages(code);
             bool script = path == "/locale/messages.js";
+            // escape < > so no string can close the script it is served in
             var jsonSettings = new JsonSerializerSettings { StringEscapeHandling = StringEscapeHandling.EscapeHtml };
             string json = JsonConvert.SerializeObject(messages, jsonSettings);
             byte[] body = Encoding.UTF8.GetBytes(script ? "window.RK_MESSAGES=" + json + ";" : json);

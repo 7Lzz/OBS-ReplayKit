@@ -121,12 +121,10 @@ namespace ReplayKitHelper
             catch (ManagementException) { }
         }
 
-        // opens a handle on the parent so CheckAlive can poll GetExitCodeProcess; PROCESS_QUERY_LIMITED_INFORMATION works across integrity levels. false when there is no known parent or it cannot be opened, which the caller only logs
-        public static bool OpenHandle()
+        // opens a handle on the parent so CheckAlive can poll GetExitCodeProcess; PROCESS_QUERY_LIMITED_INFORMATION works across integrity levels. a parent that cannot be opened is still watched by the throttled lookup in CheckAlive
+        public static void OpenHandle()
         {
-            if (ParentPid <= 0) return true;
-            _parentHandle = Native.OpenParentForSync((uint)ParentPid);
-            return _parentHandle != IntPtr.Zero;
+            if (ParentPid > 0) _parentHandle = Native.OpenParentForSync((uint)ParentPid);
         }
 
         // kernel signal first, then a throttled lookup pinned by start time; a parent that was never known is never enforced

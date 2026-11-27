@@ -108,7 +108,7 @@ namespace ReplayKitHelper
             {
                 // ascii only, so nothing in the line can be read by the pipe as the end of it
                 string json = JsonConvert.SerializeObject(args, Formatting.None, new JsonSerializerSettings { StringEscapeHandling = StringEscapeHandling.EscapeNonAscii });
-                if (json.Length + name.Length + 32 > PipeClient.MaxLineChars) return Fail("args are too large to pass to the plugin.");
+                if (json.Length + name.Length + 32 > PipeClient.MaxLineBytes) return Fail("args are too large to pass to the plugin.");
                 if (!PipeClient.SendSdk(id, name, json)) return Fail(Locales.Message("helper.thePluginIsNotConnected"));
                 if (!waiting.Done.Wait(8000)) return Fail(Locales.Message("helper.thePluginDidNotAnswerIn"));
                 try { return JObject.Parse(waiting.Body); }

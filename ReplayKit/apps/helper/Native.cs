@@ -170,15 +170,15 @@ namespace ReplayKitHelper
             public UIntPtr ProcessMemoryLimit, JobMemoryLimit, PeakProcessMemoryUsed, PeakJobMemoryUsed;
         }
 
-        // is this pid part of the obs process family (used to scope window/close operations to obs-owned windows, not arbitrary chrome windows the user happens to have open).
+        // is this pid part of the obs process family (obs, its obs-browser-page children and the replaykit-host copy of obs64), which scopes the window and close operations to obs-owned windows, never the windows of a browser the user has open
         private static bool IsObsFamilyProcess(uint pid)
         {
             try
             {
-                string name = Process.GetProcessById((int)pid).ProcessName;
+                using var process = Process.GetProcessById((int)pid);
+                string name = process.ProcessName;
                 return string.Equals(name, "obs64", StringComparison.OrdinalIgnoreCase)
                     || string.Equals(name, "obs", StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(name, "chrome", StringComparison.OrdinalIgnoreCase)
                     || name.StartsWith("obs-", StringComparison.OrdinalIgnoreCase);
             }
             catch (ArgumentException) { return false; }
@@ -230,7 +230,7 @@ namespace ReplayKitHelper
             }
         }
 
-        // enumwindows + exact/prefix/suffix (ordinalignorecase) title match, scoped to obs-family windows when requireOwnerPid != 0. returns count closed. is a visible top-level window with this exact title already up? used to avoid stacking a second update window on top of one the user is already looking at -- the update popup is its own browser process, so it outlives the OBS restart that a failed update triggers.
+        // is a visible top-level window with this exact title already up? used to avoid stacking a second update window on top of one already on screen -- the update window is a process of its own, so it outlives the obs restart that a failed update triggers
         public static bool WindowWithTitleExists(string title)
         {
             if (string.IsNullOrEmpty(title)) return false;
@@ -254,7 +254,7 @@ namespace ReplayKitHelper
             return false;
         }
 
-        // removeTaskbarTab drops the taskbar button before the close so a window that takes a moment to go does not leave a ghost button behind; it is wrong for a window that is only hidden and shown again later, because ITaskbarList keeps a deleted tab deleted and that window never gets its button back
+        // closes the visible top-level windows whose title equals, starts or ends with one of titlePrefixes, scoped to obs-family windows when requireOwnerPid is not 0, and returns how many it closed; removeTaskbarTab drops the taskbar button before the close so a window that takes a moment to go does not leave a ghost button behind; it is wrong for a window that is only hidden and shown again later, because ITaskbarList keeps a deleted tab deleted and that window never gets its button back
         public static int CloseWindowsByTitle(string[] titlePrefixes, uint requireOwnerPid, bool removeTaskbarTab = true)
         {
             int closed = 0;
@@ -348,9 +348,10 @@ namespace ReplayKitHelper
 
         private static string JsonEscape(string s) => s.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\r", "").Replace("\n", "\\n");
 
-        // dark-mode dwm attrs + custom title/border/text colors + WM_SETICON, forcing a themechanged -> reapply dwm attrs -> ncactivate toggle -> setwindowpos(framechanged) -> redrawwindow sequence to defeat cefs non-client repaint race. returns match count.
+        // the icon pair the last styled window was given; WM_SETICON does not copy, so the pair stays alive until the next style replaces it, and IconGate keeps two styles at once from freeing the same pair twice
         private static IntPtr _styleOwnedSmall, _styleOwnedBig;
 
+        // styles the visible obs-family windows whose title contains needle (see ApplyWindowThemeCore) and returns how many matched
         public static int StyleWindow(string needle, string iconPath, bool taskbar)
         {
             int matched = 0;
@@ -401,13 +402,16 @@ namespace ReplayKitHelper
             {
                 try
                 {
-                    // WM_SETICON does not copy -- own a stable copy that outlives this Icon, and free the previous pair.
+                    // own a stable copy that outlives this Icon, and free the previous pair
                     using (var ico = new Icon(iconPath, 16, 16)) hIcon16 = CopyIcon(ico.Handle);
                     using (var ico = new Icon(iconPath, 32, 32)) hIcon32 = CopyIcon(ico.Handle);
-                    IntPtr oldS = _styleOwnedSmall, oldB = _styleOwnedBig;
-                    _styleOwnedSmall = hIcon16; _styleOwnedBig = hIcon32;
-                    if (oldS != IntPtr.Zero && oldS != hIcon16 && oldS != hIcon32) DestroyIcon(oldS);
-                    if (oldB != IntPtr.Zero && oldB != hIcon16 && oldB != hIcon32 && oldB != oldS) DestroyIcon(oldB);
+                    lock (IconGate)
+                    {
+                        IntPtr oldS = _styleOwnedSmall, oldB = _styleOwnedBig;
+                        _styleOwnedSmall = hIcon16; _styleOwnedBig = hIcon32;
+                        if (oldS != IntPtr.Zero && oldS != hIcon16 && oldS != hIcon32) DestroyIcon(oldS);
+                        if (oldB != IntPtr.Zero && oldB != hIcon16 && oldB != hIcon32 && oldB != oldS) DestroyIcon(oldB);
+                    }
                 }
                 catch (Exception ex) when (ex is IOException || ex is ArgumentException || ex is OutOfMemoryException) { }
             }
@@ -473,7 +477,7 @@ namespace ReplayKitHelper
             lock (_signInStyledTitles) _signInStyledTitles.Clear();
         }
 
-        // -- live app-icon swap (Appearance tab) -- WM_SETICON on obss real main window (taskbar button + title bar) and replaykits own helper-hosted windows. no restart, no admin: a window message in-session, same approach Voidstrap uses for the roblox window. the obs tray icon is done separately by the native plugin.
+        // the live app-icon swap of the Appearance tab: WM_SETICON on obss real main window (taskbar button + title bar) and replaykits own helper-hosted windows. no restart, no admin: a window message in-session, same approach Voidstrap uses for the roblox window. the obs tray icon is done separately by the native plugin.
 
         [DllImport("user32.dll", SetLastError = true)]
         private static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam, uint flags, uint timeoutMs, out IntPtr result);
@@ -765,8 +769,6 @@ namespace ReplayKitHelper
             return hWnd != IntPtr.Zero && FocusHwnd(hWnd);
         }
 
-        private static readonly Dictionary<long, RECT> SavedRects = new Dictionary<long, RECT>();
-        private static readonly object SavedRectsLock = new object();
         private sealed class FullscreenWindowState
         {
             public RECT Rect;
@@ -775,37 +777,6 @@ namespace ReplayKitHelper
         }
         private static readonly Dictionary<long, FullscreenWindowState> FullscreenWindows = new Dictionary<long, FullscreenWindowState>();
         private static readonly object FullscreenWindowsLock = new object();
-
-        public static bool MaximizeObsWindow(string needle)
-        {
-            var hWnd = FindObsWindow(needle);
-            if (hWnd == IntPtr.Zero) return false;
-            lock (SavedRectsLock)
-            {
-                long key = hWnd.ToInt64();
-                if (!SavedRects.ContainsKey(key) && !IsZoomed(hWnd) && GetWindowRect(hWnd, out RECT rect))
-                {
-                    SavedRects[key] = rect;
-                }
-            }
-            ShowWindow(hWnd, SW_MAXIMIZE);
-            return true;
-        }
-
-        public static bool RestoreObsWindow(string needle)
-        {
-            var hWnd = FindObsWindow(needle);
-            if (hWnd == IntPtr.Zero) return false;
-            lock (SavedRectsLock)
-            {
-                long key = hWnd.ToInt64();
-                if (!SavedRects.TryGetValue(key, out RECT rect)) return false;
-                SavedRects.Remove(key);
-                if (!IsZoomed(hWnd)) return false;
-                SetWindowPos(hWnd, IntPtr.Zero, rect.Left, rect.Top, rect.Right - rect.Left, rect.Bottom - rect.Top, SWP_NOZORDER | SWP_NOACTIVATE);
-            }
-            return true;
-        }
 
         // borderless monitor-sized mode for CEF popups. ShowWindow(SW_MAXIMIZE) leaves the caption/taskbar visible, so player fullscreen uses this instead and restores the exact original frame/rect afterward.
         public static bool EnterObsWindowFullscreen(string needle)
@@ -856,16 +827,6 @@ namespace ReplayKitHelper
             return SetWindowPos(hWnd, IntPtr.Zero, state.Rect.Left, state.Rect.Top,
                 state.Rect.Right - state.Rect.Left, state.Rect.Bottom - state.Rect.Top,
                 SWP_NOACTIVATE | SWP_FRAMECHANGED | SWP_SHOWWINDOW);
-        }
-
-        public static bool SetWindowSizeCentered(string needle, int width, int height)
-        {
-            var hWnd = FindObsWindow(needle);
-            var primary = ReplayKitShared.Monitors.Primary();
-            if (hWnd == IntPtr.Zero || primary == null) return false;
-            int x = Math.Max(0, (primary.Bounds.Width - width) / 2);
-            int y = Math.Max(0, (primary.Bounds.Height - height) / 2);
-            return SetWindowPos(hWnd, IntPtr.Zero, x, y, width, height, SWP_NOZORDER | SWP_NOACTIVATE);
         }
 
         private const int DWMWA_WINDOW_CORNER_PREFERENCE = 33;

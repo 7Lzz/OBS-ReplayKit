@@ -12,7 +12,7 @@ using Newtonsoft.Json.Linq;
 
 namespace ReplayKitHelper
 {
-    // client half of the ipc pipe with the native plugin (core/ipc_pipe.cpp), which is the server. replaces the old scratch-file handoff (obsreplaykit_main_window.txt / obsreplaykit_projector_windows.txt / open_clips.command / obs-allow-close). the plugin is the server because it outlives helper hot-swaps; this side just reconnects. inbound (plugin -> helper): MAINWIN <hwnd>, LOCALE <code>. outbound: OPENCLIPS, OPENSETTINGS [page], OPENSTORAGE, CLOSESTORAGE, OPENOBSSETTINGS, OPENSETUP / OPENSETUPQUIET, ALLOWCLOSE (+ ALLOWCLOSE_ACK back), LANGUAGE <code|-> (+ LANGUAGE_ACK back), SETICON <path|->, SETICONDOT <0|1>, RKICON <path>, CLIPSFULLSCREEN <0|1>, CLOSEVIEW <settings|setup|clips>, VIEWSHOWN <home|clips|settings|setup>, SHELLNAV <back|forward>, SHELLPONG <n>, CONFIRM <kind>, SHAREAUDIOHOLD <0|1>. newline-delimited utf8 text, one message per line.
+    // client half of the ipc pipe with the native plugin (core/ipc_pipe.cpp), which is the server because it outlives helper hot-swaps; this side just reconnects. newline-delimited utf8 text, one message per line: what goes out is the Send methods below, what comes in is the verbs Dispatch reads
     internal static class PipeClient
     {
         private const string PipeName = "OBSReplayKitIpc";
@@ -353,14 +353,17 @@ namespace ReplayKitHelper
         // asks the plugin to draw a themed confirm over the whole dimmed obs window (a cef dock cannot paint past its own panel). the plugin runs the follow-up action itself on ok, so nothing comes back. kind is one short token, letters and dashes only.
         public static void SendUiConfirm(string kind) { if (!string.IsNullOrEmpty(kind)) TryWrite("CONFIRM " + kind); }
 
-        // the plugin drops the whole connection on a line past 64 KB, which cut every message after it until the reconnect, so such a line is refused here instead
-        internal const int MaxLineChars = 60 * 1024;
+        // the plugin drops the whole connection on a line past 64 KB of utf8, which cut every message after it until the reconnect, so such a line is refused here instead; a character outside ascii takes more than one of those bytes
+        internal const int MaxLineBytes = 60 * 1024;
+
+        private static readonly Encoding LineEncoding = new UTF8Encoding(false);
 
         private static bool TryWrite(string line)
         {
-            if (line.Length > MaxLineChars)
+            int bytes = LineEncoding.GetByteCount(line);
+            if (bytes > MaxLineBytes)
             {
-                Log.Write("IPC: a " + line.Length + " character message was not sent, the plugin takes at most " + MaxLineChars);
+                Log.Write("IPC: a " + bytes + " byte message was not sent, the plugin takes at most " + MaxLineBytes);
                 return false;
             }
             lock (WriteLock)

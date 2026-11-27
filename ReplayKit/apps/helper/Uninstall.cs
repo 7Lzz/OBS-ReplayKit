@@ -34,39 +34,11 @@ namespace ReplayKitHelper
                 removeObs = removeObsToken.Value<bool>();
             }
 
-            string cacheDir = Path.GetFullPath(GetSetupCacheDir());
-            string setupExe = Path.GetFullPath(GetSetupExecutable());
-            string cachePrefix = cacheDir.TrimEnd('\\') + "\\";
-            if (!setupExe.StartsWith(cachePrefix, StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException(Locales.Message("update.invalidSetupExecutablePath"));
-            // a missing or damaged copy is downloaded again, checked against the release hash, before anything is started
-            SetupExe.Ensure(true);
-
             var argList = new List<string> { "--uninstall" };
             if (!keepUserSettings) argList.Add("--remove-user-settings");
             if (removeObs) argList.Add("--remove-obs");
-
-            if (Elevation.IsAdmin())
-            {
-                string cmdLine = ProcessArgs.Quote(setupExe) + " " + ProcessArgs.Join(argList.ToArray());
-                int uninstallPid = Native.SpawnDetached(cmdLine, cacheDir);
-                if (uninstallPid <= 0) throw new InvalidOperationException(Locales.Message("update.couldNotStartReplaykitUninstall"));
-                Log.Write("ReplayKit uninstall started detached as PID " + uninstallPid + ".");
-                return new JObject { ["ok"] = true, ["processId"] = uninstallPid, ["message"] = Locales.Message("update.uninstallStartedFollowTheProgressWindow") };
-            }
-
-            var psi = new ProcessStartInfo
-            {
-                FileName = setupExe,
-                Arguments = ProcessArgs.Join(argList.ToArray()),
-                WorkingDirectory = cacheDir,
-                UseShellExecute = true,
-                Verb = "runas",
-            };
-            var proc = Process.Start(psi);
-            if (proc == null) throw new InvalidOperationException(Locales.Message("update.couldNotStartReplaykitUninstall"));
-            Log.Write("ReplayKit uninstall started elevated as PID " + proc.Id + ".");
-            return new JObject { ["ok"] = true, ["processId"] = proc.Id, ["message"] = Locales.Message("update.uninstallStartedFollowTheProgressWindow") };
+            int pid = StartSetup(argList, Locales.Message("update.couldNotStartReplaykitUninstall"), "ReplayKit uninstall");
+            return new JObject { ["ok"] = true, ["processId"] = pid, ["message"] = Locales.Message("update.uninstallStartedFollowTheProgressWindow") };
         }
 
         // narrower siblings of StartCleanupFromSettings -- install / remove just the OBS Stream Audio virtual cable instead of touching the whole ReplayKit install, for the Share Preview audio row next to the main uninstall.
@@ -76,14 +48,11 @@ namespace ReplayKitHelper
 
         private static JObject RunDiscordScreenshareMode(bool install)
         {
-            string cacheDir = Path.GetFullPath(GetSetupCacheDir());
-            string setupExe = Path.GetFullPath(GetSetupExecutable());
-            string cachePrefix = cacheDir.TrimEnd('\\') + "\\";
-            if (!setupExe.StartsWith(cachePrefix, StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException(Locales.Message("update.invalidSetupExecutablePath"));
-            SetupExe.Ensure(true);
+            string verb = install ? "--install-discord-screenshare" : "--uninstall-discord-screenshare";
+            string failed = install ? Locales.Message("update.couldNotStartDiscordScreenshareInstall") : Locales.Message("update.couldNotStartDiscordScreenshareRemoval");
+            int pid = StartSetup(new List<string> { verb, "--start-delay-ms", "900" }, failed, "Discord screenshare " + (install ? "install" : "removal"));
 
-            // flip the runtime setting now so Share Preview is really on/off after the OBS relaunch -- the setup exe only writes its own prefs.json, and the helper reads discord_screenshare_enabled from replaykit_settings.json.
+            // the setup only writes its own prefs.json and the helper reads discord_screenshare_enabled from the settings, so the setting follows here; only once the setup runs, since a setup that never started (the uac prompt turned down) changes nothing, and well inside its start delay, before it closes obs
             try
             {
                 SettingsStore.Update(settings =>
@@ -94,18 +63,28 @@ namespace ReplayKitHelper
             }
             catch (Exception ex) { Log.Write("Discord screenshare settings flip failed: " + ex.Message); }
 
-            string verb = install ? "--install-discord-screenshare" : "--uninstall-discord-screenshare";
-            string what = install ? "install" : "removal";
             string message = install ? Locales.Message("common.installingDiscordScreenshareSupportObsWill") : Locales.Message("common.removingDiscordScreenshareSupportObsWill");
-            var argList = new List<string> { verb, "--start-delay-ms", "900" };
+            return new JObject { ["ok"] = true, ["processId"] = pid, ["message"] = message };
+        }
+
+        // runs the cached setup exe with these arguments, detached when the helper is elevated already and through the uac prompt otherwise, and returns its pid; failed is the message when it does not start
+        private static int StartSetup(List<string> argList, string failed, string what)
+        {
+            string cacheDir = Path.GetFullPath(GetSetupCacheDir());
+            string setupExe = Path.GetFullPath(GetSetupExecutable());
+            string cachePrefix = cacheDir.TrimEnd('\\') + "\\";
+            if (!setupExe.StartsWith(cachePrefix, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException(Locales.Message("update.invalidSetupExecutablePath"));
+            // a missing or damaged copy is downloaded again, checked against the release hash, before anything is started
+            SetupExe.Ensure(true);
 
             if (Elevation.IsAdmin())
             {
                 string cmdLine = ProcessArgs.Quote(setupExe) + " " + ProcessArgs.Join(argList.ToArray());
                 int pid = Native.SpawnDetached(cmdLine, cacheDir);
-                if (pid <= 0) throw new InvalidOperationException(install ? Locales.Message("update.couldNotStartDiscordScreenshareInstall") : Locales.Message("update.couldNotStartDiscordScreenshareRemoval"));
-                Log.Write("Discord screenshare " + what + " started detached as PID " + pid + ".");
-                return new JObject { ["ok"] = true, ["processId"] = pid, ["message"] = message };
+                if (pid <= 0) throw new InvalidOperationException(failed);
+                Log.Write(what + " started detached as PID " + pid + ".");
+                return pid;
             }
 
             var psi = new ProcessStartInfo
@@ -116,10 +95,12 @@ namespace ReplayKitHelper
                 UseShellExecute = true,
                 Verb = "runas",
             };
-            var proc = Process.Start(psi);
-            if (proc == null) throw new InvalidOperationException(install ? Locales.Message("update.couldNotStartDiscordScreenshareInstall") : Locales.Message("update.couldNotStartDiscordScreenshareRemoval"));
-            Log.Write("Discord screenshare " + what + " started elevated as PID " + proc.Id + ".");
-            return new JObject { ["ok"] = true, ["processId"] = proc.Id, ["message"] = message };
+            using (var proc = Process.Start(psi))
+            {
+                if (proc == null) throw new InvalidOperationException(failed);
+                Log.Write(what + " started elevated as PID " + proc.Id + ".");
+                return proc.Id;
+            }
         }
     }
 }
