@@ -150,4 +150,4 @@ Bug reports, feature suggestions, and pull requests are welcome in [Issues](http
 
 ReplayKit is my own project, inspired by [Medal](https://medal.tv/) and built around [OBS Studio](https://obsproject.com/). It is not affiliated with Medal or the OBS Project.
 
-There is currently no license file in this repository, so please don't assume the code can be reused or redistributed without permission.
+Original ReplayKit code is available under the [MIT License](LICENSE). Third-party components and assets are subject to their own licenses.
