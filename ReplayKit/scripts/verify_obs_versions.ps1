@@ -2,23 +2,25 @@
 
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'obs_versions.ps1')
-$dist = Join-Path $PSScriptRoot '..\dist'
+
 
 foreach ($name in 'SDL3.dll', 'uiohook.dll') {
-    $dependency = Join-Path $dist "input-overlay\$name"
+    $dependency = Join-Path $ReplayKitPlugins "input-overlay\$name"
     if (-not (Test-Path -LiteralPath $dependency -PathType Leaf)) { throw "input-overlay is missing $dependency" }
 }
 
 # each bundled plugin dll, by the archive it ships in, or loose when it ships as itself
 $plugins = @(
-    @{ Name = 'replaykit.dll'; Path = Join-Path $dist 'replaykit.dll' },
-    @{ Name = 'input-overlay.dll'; Path = Join-Path $dist 'input-overlay\input-overlay.dll' },
+    @{ Name = 'replaykit.dll'; Path = Join-Path $ReplayKitPlugins 'replaykit.dll' },
+    @{ Name = 'input-overlay.dll'; Path = Join-Path $ReplayKitPlugins 'input-overlay\input-overlay.dll' },
     @{ Name = 'obs-shaderfilter.dll'; Archive = Join-Path $PSScriptRoot '..\plugins\obs-shaderfilter\obs-shaderfilter.zip'; Entry = 'obs-plugins/64bit/obs-shaderfilter.dll' },
-    @{ Name = 'win-capture-audio.dll'; Path = Join-Path $dist 'win-capture-audio\win-capture-audio.dll' }
+    @{ Name = 'win-capture-audio.dll'; Path = Join-Path $ReplayKitPlugins 'win-capture-audio\win-capture-audio.dll' }
 )
 
 Add-Type -AssemblyName System.IO.Compression.FileSystem
-$scratch = Join-Path ([IO.Path]::GetTempPath()) ('ReplayKit-obs-verify-' + [Guid]::NewGuid().ToString('N'))
+$work = Join-Path $ReplayKitCache 'verification'
+$scratch = Join-Path $work ('plugins-' + [Guid]::NewGuid().ToString('N'))
+Assert-BuildPath $scratch
 New-Item -ItemType Directory -Force -Path $scratch | Out-Null
 try {
     foreach ($plugin in $plugins) {
@@ -48,5 +50,5 @@ try {
     if ($failures.Count -gt 0) { throw ("A bundled plugin would fail to load:`n" + ($failures -join "`n")) }
     Write-Output 'every bundled plugin loads in every OBS line of obs-versions.json'
 } finally {
-    Remove-Item -LiteralPath $scratch -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-WorkDirectory $work $scratch
 }

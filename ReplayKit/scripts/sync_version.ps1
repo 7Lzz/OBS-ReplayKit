@@ -1,10 +1,14 @@
-# writes dist/version.json and Version.props from version.json in the ReplayKit folder, the one place the release version is set; build.bat runs it before every build, VersionInfo.cs reads the version back from the setup assembly, and the installer writes the live version.json itself (Installer.WriteReplaykitVersion)
+# writes build/payload/version.json and Version.props from version.json in the ReplayKit folder, the one place the release version is set; build.bat runs it before every build, VersionInfo.cs reads the version back from the setup assembly, and the installer writes the live version.json itself (Installer.WriteReplaykitVersion)
 $ErrorActionPreference = "Stop"
 
+. (Join-Path $PSScriptRoot 'build_layout.ps1')
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $sourcePath = Join-Path $repoRoot "version.json"
-$outPath = Join-Path $repoRoot "dist\version.json"
-$propsPath = Join-Path $repoRoot "Version.props"
+$outPath = Join-Path $ReplayKitPayload 'version.json'
+$propsPath = Join-Path $ReplayKitGenerated 'Version.props'
+Assert-BuildPath $outPath
+Assert-BuildPath $propsPath
+New-Item -ItemType Directory -Force -Path $ReplayKitGenerated | Out-Null
 
 if (-not (Test-Path -LiteralPath $sourcePath)) {
     throw "Missing version source: $sourcePath"
@@ -25,7 +29,7 @@ $parts = @($version -split '\.' | Select-Object -First 4)
 while ($parts.Count -lt 4) { $parts += "0" }
 $fourPart = $parts -join "."
 
-# both csproj files import this -- without it every build shipped 1.0.0.0 in its own Win32 version resource (dotnets default when no <Version> is set) regardless of what the source version said, which is one of the things that makes a binary look machine-generated rather than a maintained release to some av heuristics. gitignored and regenerated every build, same as dist/version.json above, so version.json stays the only place a human edits a version number.
+# both csproj files import this -- without it every build shipped 1.0.0.0 in its own Win32 version resource (dotnets default when no <Version> is set) regardless of what the source version said, which is one of the things that makes a binary look machine-generated rather than a maintained release to some av heuristics. gitignored and regenerated every build, same as build/payload/version.json above, so version.json stays the only place a human edits a version number.
 $propsXml = @"
 <Project>
   <PropertyGroup>
@@ -36,6 +40,8 @@ $propsXml = @"
   </PropertyGroup>
 </Project>
 "@
-[System.IO.File]::WriteAllText($propsPath, $propsXml, [System.Text.UTF8Encoding]::new($false))
+if (-not (Test-Path -LiteralPath $propsPath) -or [IO.File]::ReadAllText($propsPath) -ne $propsXml) {
+    [IO.File]::WriteAllText($propsPath, $propsXml, [Text.UTF8Encoding]::new($false))
+}
 
 Write-Host "    ReplayKit version $version"

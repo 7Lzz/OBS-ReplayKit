@@ -124,6 +124,17 @@ gh auth login
 
 The build creates `build/OBSReplayKit.exe` and `build/OBSReplayKit.exe.sha256`. You can compare the checksum with `Get-FileHash`.
 
+| Folder | Contents |
+| --- | --- |
+| `build/` | Release installer and checksum |
+| `build/payload/helper/` | Packaged helper executable and WebView2 loader |
+| `build/payload/share-window/` | Packaged Share Preview executable |
+| `build/payload/process-host/<OBS version>/` | Packaged OBS role host, DLLs, and manifest |
+| `build/payload/plugins/` | Packaged ReplayKit and third-party plugin builds |
+| `build/cache/` | .NET `bin` and `obj`, native build trees, downloads, generated inputs, and verification files |
+
+Git ignores `build/`. To rebuild everything from scratch, close any installer running from that folder, remove `build/`, and run `build.bat`. The build downloads its dependencies again.
+
 The build packages browser and helper role launchers for each tested OBS version. Setup preserves the stock OBS executable and frontend, including its account connections, and keeps a verified copy of the original browser for uninstall. OBS and its child roles use the same executable name and app identity; Windows controls their visual grouping in Task Manager.
 
 > [!NOTE]

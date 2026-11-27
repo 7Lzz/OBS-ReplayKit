@@ -9,8 +9,8 @@
 #include <shlobj.h>
 #include <metahost.h>
 
-#include "obs_audio_group.hpp"
-#include "replaykit_folder.hpp"
+#include <obs_audio_group.hpp>
+#include <replaykit_folder.hpp>
 #include <wrl/client.h>
 
 #include <filesystem>

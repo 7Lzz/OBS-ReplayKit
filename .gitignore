@@ -4,18 +4,18 @@ ReplayKit/apps/setup/obj/
 ReplayKit/apps/helper/bin/
 ReplayKit/apps/helper/obj/
 
-# build.bat output: the release exe and its checksum land in build/, publish_tmp is its scratch folder (self-cleaned, ignored in case a build fails partway)
-build/
-ReplayKit/publish_tmp/
+# release installer, packaging inputs and build cache
+/build/
+
+# legacy build output from checkouts predating the centralized build
+/ReplayKit/dist/
+/ReplayKit/publish_tmp/
 # prefs the installer writes next to itself when it runs from a checkout
 /prefs.json
 
-# regenerated from ReplayKit/version.json by build.bat and by the installer at apply time, so a version bump only ever touches ReplayKit/version.json
-/ReplayKit/dist/version.json
-# same regeneration, feeds the win32 version resource of both csproj files
+# legacy generated inputs now written into build/cache/generated
 /ReplayKit/Version.props
 /ReplayKit/Bundle.props
-# written from ReplayKit/shared/HelperEndpoint.cs and StateLayout.cs by scripts/sync_shared.ps1 on every build, so those values are only ever edited there
 /ReplayKit/plugins/replaykit/src/core/shared_values.hpp
 /ReplayKit/apps/share-window/protocol/share_window_values.hpp
 /ReplayKit/apps/process-host/obs_audio_group.hpp

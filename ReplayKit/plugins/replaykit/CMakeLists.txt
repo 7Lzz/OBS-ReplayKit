@@ -113,11 +113,11 @@ set(REPLAYKIT_SOURCES
 add_library(replaykit MODULE ${REPLAYKIT_SOURCES})
 
 target_include_directories(replaykit PRIVATE
+    "${REPLAYKIT_GENERATED_DIR}"
     "${CMAKE_CURRENT_SOURCE_DIR}/src"
     "${CMAKE_CURRENT_SOURCE_DIR}/third_party/obs-browser"
     # the layout of the state shared with the share window, which owns it, and the generated names both use
     "${CMAKE_CURRENT_SOURCE_DIR}/../../apps/share-window/protocol"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../../apps/process-host"
     "${OBS_HEADERS_DIR}/libobs"
     "${OBS_HEADERS_DIR}/frontend/api"
 )

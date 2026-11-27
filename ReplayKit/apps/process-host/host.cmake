@@ -12,6 +12,7 @@ else()
   target_compile_definitions(replaykit-host PRIVATE OBS_BROWSER_ROLE_PATH=L"../../../obs-plugins/64bit/obs-browser-role.dll")
 endif()
 target_include_directories(replaykit-host PRIVATE
+  "${REPLAYKIT_GENERATED_DIR}"
   "${CMAKE_SOURCE_DIR}/frontend"
   "C:/Program Files (x86)/Windows Kits/NETFXSDK/4.8/Include/um")
 target_link_directories(replaykit-host PRIVATE "C:/Program Files (x86)/Windows Kits/NETFXSDK/4.8/Lib/um/x64")

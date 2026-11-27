@@ -1,11 +1,14 @@
 # publish the helper with its managed dependencies merged into the executable.
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'build_layout.ps1')
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $projectDir = Join-Path $repoRoot 'apps\helper'
 $csproj = Join-Path $projectDir 'ReplayKitHelper.csproj'
-$outDir = Join-Path $repoRoot 'dist\helper'
-$publishTmp = Join-Path $projectDir 'bin\Release\publish'
-$stampPath = Join-Path $projectDir 'obj\helper-build.json'
+$outDir = Join-Path $ReplayKitPayload 'helper'
+$publishTmp = Join-Path $ReplayKitCache 'helper\publish'
+$stampPath = Join-Path $ReplayKitCache 'helper\obj\helper-build.json'
+Assert-BuildPath $outDir
+Assert-BuildPath $stampPath
 $requiredFiles = @('OBSReplayKit.exe', 'WebView2Loader.dll')
 
 function Fingerprint([string[]]$paths) {
@@ -23,7 +26,8 @@ if ($linkedFiles.Count -eq 0) { throw 'The helper csproj lists no shared source 
 foreach ($file in $linkedFiles) { if (-not (Test-Path -LiteralPath $file -PathType Leaf)) { throw "Shared helper source is missing: $file" } }
 $inputs = @($sourceFiles.FullName) + $linkedFiles + @(
     $PSCommandPath,
-    (Join-Path $repoRoot 'Version.props'),
+    $BuildLayoutFile,
+    (Join-Path $ReplayKitGenerated 'Version.props'),
     (Join-Path $repoRoot 'lua\helper\obs-replaykit.ico')
 )
 $outputs = @($requiredFiles | ForEach-Object { Join-Path $outDir $_ })
@@ -37,6 +41,7 @@ if (Test-Path -LiteralPath $stampPath) {
     }
 }
 
+Remove-WorkDirectory $ReplayKitCache $publishTmp
 & dotnet publish $csproj -c Release -o $publishTmp --nologo
 if ($LASTEXITCODE -ne 0) { throw 'Helper publish failed.' }
 foreach ($name in $requiredFiles) {

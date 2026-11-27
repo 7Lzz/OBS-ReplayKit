@@ -1,0 +1,21 @@
+<Project>
+  <PropertyGroup>
+    <BuildDirectory>..\build\</BuildDirectory>
+    <BuildPayloadDirectory>payload\</BuildPayloadDirectory>
+    <BuildCacheDirectory>cache\</BuildCacheDirectory>
+    <BuildGeneratedDirectory>generated\</BuildGeneratedDirectory>
+    <BuildDependencyDirectory>dependencies\</BuildDependencyDirectory>
+    <BuildPluginsDirectory>plugins\</BuildPluginsDirectory>
+    <ReplayKitBuildRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)$(BuildDirectory)'))</ReplayKitBuildRoot>
+    <ReplayKitPayload>$(ReplayKitBuildRoot)$(BuildPayloadDirectory)</ReplayKitPayload>
+    <ReplayKitPlugins>$(ReplayKitPayload)$(BuildPluginsDirectory)</ReplayKitPlugins>
+    <ReplayKitCache>$(ReplayKitBuildRoot)$(BuildCacheDirectory)</ReplayKitCache>
+    <ReplayKitGenerated>$(ReplayKitCache)$(BuildGeneratedDirectory)</ReplayKitGenerated>
+    <ReplayKitDependencies>$(ReplayKitCache)$(BuildDependencyDirectory)</ReplayKitDependencies>
+    <BuildComponent>$([System.IO.Path]::GetFileName('$(MSBuildProjectDirectory)'))</BuildComponent>
+    <BaseOutputPath>$(ReplayKitCache)$(BuildComponent)\bin\</BaseOutputPath>
+    <BaseIntermediateOutputPath>$(ReplayKitCache)$(BuildComponent)\obj\</BaseIntermediateOutputPath>
+    <DefaultItemExcludes>$(DefaultItemExcludes);bin\**;obj\**</DefaultItemExcludes>
+    <RestorePackagesPath>$(ReplayKitDependencies)nuget\</RestorePackagesPath>
+  </PropertyGroup>
+</Project>

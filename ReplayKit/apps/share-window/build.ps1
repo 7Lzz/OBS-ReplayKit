@@ -1,16 +1,19 @@
-# builds ReplayKitShare.exe, the share window that outlives obs, with cmake/ninja from the vs build tools into dist/share-window/; it needs no obs sdk, and the build is skipped when the exe is newer than every input
+# builds ReplayKitShare.exe, the share window that outlives obs, with cmake/ninja from the vs build tools into build/payload/share-window/; it needs no obs sdk, and the build is skipped when the exe is newer than every input
 param(
-    [string]$WorkDir = (Join-Path $env:LOCALAPPDATA "ReplayKit\share-window-build"),
+    [string]$WorkDir = '',
     [string]$OutDir = ''
 )
 $ErrorActionPreference = "Stop"
 $ProgressPreference = 'SilentlyContinue'
 . (Join-Path $PSScriptRoot '..\..\scripts\obs_versions.ps1')
-# writes protocol/share_window_values.hpp, the names the window shares with the plugin and the helper
+if (-not $WorkDir) { $WorkDir = Join-Path $ReplayKitNative 'share-window' }
+Assert-BuildPath $WorkDir
+# writes share_window_values.hpp, the names the window shares with the plugin and the helper
 & (Join-Path $PSScriptRoot '..\..\scripts\sync_shared.ps1')
 
-if (-not $OutDir) { $OutDir = Join-Path $PSScriptRoot '..\..\dist\share-window' }
+if (-not $OutDir) { $OutDir = Join-Path $ReplayKitPayload 'share-window' }
 $outExe = Join-Path $OutDir 'ReplayKitShare.exe'
+Assert-BuildPath $outExe
 $iconDir = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\resources\icons'))
 $motion = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\ui\_share-motion.html'))
 $swirl = Join-Path $iconDir 'share\obs-swirl-mask.png'
@@ -20,6 +23,7 @@ if ($version -notmatch '^\d+(\.\d+){0,3}$') { throw "Unexpected ReplayKit versio
 
 # the version is stamped when the window is built but is no input, since an update ends a running window whose exe changed and a release that leaves the window alone should keep the stream
 $inputs = @(Get-ChildItem -LiteralPath $PSScriptRoot -Recurse -File | ForEach-Object { $_.FullName }) + @(
+    (Join-Path $ReplayKitGenerated 'share_window_values.hpp'),
     $motion,
     $swirl,
     (Join-Path $iconDir 'replaykit.ico'),
@@ -37,7 +41,7 @@ Remove-WorkDirectory $WorkDir $buildDir
 New-Item -ItemType Directory -Force -Path $buildDir | Out-Null
 Push-Location $buildDir
 try {
-    cmake -G Ninja "-DCMAKE_BUILD_TYPE=Release" "-DREPLAYKIT_VERSION=$version" "-DREPLAYKIT_ICON_DIR=$iconDir" "-DREPLAYKIT_SHARE_MOTION=$motion" "$PSScriptRoot"
+    cmake -G Ninja "-DCMAKE_BUILD_TYPE=Release" "-DREPLAYKIT_GENERATED_DIR=$ReplayKitGenerated" "-DREPLAYKIT_VERSION=$version" "-DREPLAYKIT_ICON_DIR=$iconDir" "-DREPLAYKIT_SHARE_MOTION=$motion" "$PSScriptRoot"
     if ($LASTEXITCODE -ne 0) { throw "share window cmake configure failed" }
     cmake --build . --config Release
     if ($LASTEXITCODE -ne 0) { throw "share window build failed" }

@@ -1,6 +1,6 @@
 # win-capture-audio, the ReplayKit build
 
-The two audio sources of the ReplayKit scene, "Desktop Audio (excl. Discord)" and "Discord Audio (record only)", are `audio_capture` sources of the OBS plugin win-capture-audio. The build writes the plugin files to `ReplayKit/dist/win-capture-audio/`. The setup project packs them into `win-capture-audio.zip` inside the installer, which extracts them into the OBS folder (`apps/setup/WinCapture.cs`).
+The two audio sources of the ReplayKit scene, "Desktop Audio (excl. Discord)" and "Discord Audio (record only)", are `audio_capture` sources of the OBS plugin win-capture-audio. The build writes the plugin files to `build/payload/plugins/win-capture-audio/`. The setup project packs them into `win-capture-audio.zip` inside the installer, which extracts them into the OBS folder (`apps/setup/WinCapture.cs`).
 
 ## Why it is not the old release
 
@@ -78,7 +78,7 @@ Patch 13 now counts the remaining frames in the WASAPI batch before anchoring to
 | `MANIFEST.sha256` | the sha256 of every file of `upstream/`; the build refuses to run when one differs, is missing or is extra |
 | `patches/` and `PATCHES.sha256` | the thirteen ReplayKit patches and their hashes, checked the same way |
 | `build.ps1` | fetches the pinned dependencies, verifies the inputs, builds and checks the dll, and stages the plugin files |
-| `BUILD-RECORD.json` | the hashes of both manifests, the toolchain, the dll's SHA-256 and size, and its imported modules |
+| `BUILD-RECORD.json` | historical record of the plugin binary. The current build writes its record to `build/cache/native/win-capture-audio/BUILD-RECORD.json` |
 
 Left out on purpose: README, CHANGELOG, CI files, the issue templates and `cmake/bootstrap-obs-sdk.ps1` (it would only run when libobs is not found, and the build supplies libobs itself, so it can never run). The git attributes of this folder (`-text`) keep the vendored files and the patches free of line ending conversion, or the hashes would depend on the checkout.
 
@@ -102,7 +102,7 @@ Left out on purpose: README, CHANGELOG, CI files, the issue templates and `cmake
 
 `build.ps1` verifies the manifest and the patch hashes, then takes only pinned inputs: the libobs headers of obs-studio tag 28.0.0 (commit `09da3ac4397ee9b1431c9c97cd2c71484b240382`, so the module reports API 28.0.0 and loads on obs 28 to 32), the import library made from the exports of the installed `obs.dll`, and microsoft/wil at the commit upstream pins as its submodule (`f02a61c68590c22de2efeeaf881032419f6fef54`, an ancestor of wil master). Both checkouts are verified by commit and by a clean `git status`. The unmodified cmake file of the fork does the configuring, with the libobs package supplied. The dll is compiled with `/Brepro`, so the same inputs on the same toolchain give the same bytes: two builds of the unpatched source on 2026-10-02 gave the identical dll (sha256 `b076592553a461c0ce50af948fc407d601c3ba6f80032c06714d468b6b0ab815`).
 
-The build then refuses a dll that imports anything outside the C runtime, kernel32, user32, ole32, oleaut32, advapi32, mmdevapi, ksuser, avrt, psapi, ntdll and obs, or that holds a url. `build.ps1 -Pristine` builds the exact upstream source with no patch into the work folder, for comparison. The pdb stays in `%LOCALAPPDATA%\ReplayKit\plugin-build\wca-build-replaykit\out\`; keep it, it symbolizes any crash dump of that dll.
+The build then refuses a dll that imports anything outside the C runtime, kernel32, user32, ole32, oleaut32, advapi32, mmdevapi, ksuser, avrt, psapi, ntdll and obs, or that holds a url. `build.ps1 -Pristine` builds the exact upstream source with no patch into the work folder, for comparison. The pdb stays in `build\cache\native\win-capture-audio\wca-build-replaykit\out\`; keep it, it symbolizes any crash dump of that dll.
 
 ## What was reviewed (2026-10-02)
 

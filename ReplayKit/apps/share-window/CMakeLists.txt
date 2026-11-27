@@ -58,8 +58,8 @@ foreach(shader IN ITEMS "VsMain|vs_4_0" "PsMain|ps_4_0" "PsGround|ps_4_0")
         VERBATIM)
     list(APPEND SHARE_SHADER_HEADERS "${header}")
 endforeach()
-if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/protocol/share_window_values.hpp")
-    message(FATAL_ERROR "protocol/share_window_values.hpp is missing; build.ps1 writes it thru scripts/sync_shared.ps1")
+if(NOT EXISTS "${REPLAYKIT_GENERATED_DIR}/share_window_values.hpp")
+    message(FATAL_ERROR "generated share_window_values.hpp is missing; run build.ps1")
 endif()
 # the version resource takes four numbers
 string(REPLACE "." ";" REPLAYKIT_VERSION_PARTS "${REPLAYKIT_VERSION}")
@@ -88,6 +88,7 @@ add_executable(ReplayKitShare WIN32
     ${SHARE_SHADER_HEADERS}
 )
 target_include_directories(ReplayKitShare PRIVATE
+    "${REPLAYKIT_GENERATED_DIR}"
     "${CMAKE_CURRENT_BINARY_DIR}"
     "${CMAKE_CURRENT_SOURCE_DIR}/src"
     "${CMAKE_CURRENT_SOURCE_DIR}/protocol"

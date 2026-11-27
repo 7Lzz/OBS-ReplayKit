@@ -2,7 +2,7 @@
 
 param(
     # kept out of %TEMP% because the cached qt sdk there kept losing every file the last build had not read
-    [string]$WorkDir = (Join-Path $env:LOCALAPPDATA "ReplayKit\plugin-build"),
+    [string]$WorkDir = '',
     # where the built dll ends up; defualt lands it in the bundled assets, same as build_helper.ps1s $outPath does for the helper exe.
     [string]$OutPath = '',
     [switch]$InstallAfterBuild
@@ -10,14 +10,18 @@ param(
 $ErrorActionPreference = "Stop"
 $ProgressPreference = 'SilentlyContinue'
 . (Join-Path $PSScriptRoot '..\..\scripts\obs_versions.ps1')
-# src/core/shared_values.hpp and the share_window_values.hpp it includes are generated, so a build started on its own makes them first
+if (-not $WorkDir) { $WorkDir = Join-Path $ReplayKitNative 'plugins' }
+Assert-BuildPath $WorkDir
+# the generated shared values header and the share_window_values.hpp it includes are generated, so a build started on its own makes them first
 & (Join-Path $PSScriptRoot '..\..\scripts\sync_shared.ps1')
 
 if (-not $OutPath) {
-    $OutPath = Join-Path $PSScriptRoot '..\..\dist\replaykit.dll'
+    $OutPath = Join-Path $ReplayKitPlugins 'replaykit.dll'
 }
 
 # the installer puts the dll at the root of the plugin folder for obs 33 and in bin\64bit for older obs, and obs 33 loads the root one first, so a fresh build goes wherever the installed one is
+Assert-BuildPath $OutPath
+
 function Install-BuiltPlugin([string]$builtDll) {
     $root = "C:\ProgramData\obs-studio\plugins\replaykit"
     $dest = if (Test-Path -LiteralPath (Join-Path $root "replaykit.dll")) { Join-Path $root "replaykit.dll" } else { Join-Path $root "bin\64bit\replaykit.dll" }
@@ -45,7 +49,9 @@ $buildInputs = $sourceFiles + @(
     (Join-Path $PSScriptRoot "CMakeLists.txt"),
     (Join-Path $PSScriptRoot "third_party\obs-browser\browser-panel.hpp"),
     (Join-Path $PSScriptRoot "..\..\apps\share-window\protocol\share_protocol.hpp"),
-    (Join-Path $PSScriptRoot "..\..\apps\share-window\protocol\share_window_values.hpp"),
+    (Join-Path $ReplayKitGenerated 'share_window_values.hpp'),
+    (Join-Path $ReplayKitGenerated 'core\shared_values.hpp'),
+    (Join-Path $ReplayKitGenerated 'obs_audio_group.hpp'),
     $ObsVersionsManifest,
     (Join-Path $PSScriptRoot '..\..\scripts\obs_versions.ps1'),
     $PSCommandPath
@@ -73,6 +79,7 @@ try {
     cmake -G Ninja `
         "-DCMAKE_BUILD_TYPE=Release" `
         "-DCMAKE_PREFIX_PATH=$($sdk.Qt)" `
+        "-DREPLAYKIT_GENERATED_DIR=$ReplayKitGenerated" `
         "-DOBS_HEADERS_DIR=$($sdk.Headers)" `
         "-DOBS_IMPLIB_DIR=$($sdk.Implibs)" `
         "$pluginSrcDir"

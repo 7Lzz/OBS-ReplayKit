@@ -1,12 +1,15 @@
 param(
     [string]$Version = '',
-    [string]$WorkDir = (Join-Path $env:LOCALAPPDATA 'ReplayKit/host-build'),
+    [string]$WorkDir = '',
     [string]$OutDir = ''
 )
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot '../../scripts/obs_versions.ps1')
 & (Join-Path $PSScriptRoot '..\..\scripts\sync_shared.ps1')
-if (-not $OutDir) { $OutDir = Join-Path $PSScriptRoot '../../dist/process-host' }
+if (-not $WorkDir) { $WorkDir = Join-Path $ReplayKitNative 'process-host' }
+if (-not $OutDir) { $OutDir = Join-Path $ReplayKitPayload 'process-host' }
+Assert-BuildPath $WorkDir
+Assert-BuildPath $OutDir
 $lines = @((Read-ObsVersions).lines)
 if ($Version) {
     $lines = @($lines | Where-Object tested -eq $Version)
@@ -15,17 +18,18 @@ if ($Version) {
 # release like the official obs builds, since obs adds /LTCG /OPT:REF /OPT:ICF only to release while relwithdebinfo links incrementally and keeps every unused function, which made obs-browser.dll three times the official one
 $config = 'Release'
 $inputs = @(Get-ChildItem -LiteralPath $PSScriptRoot -File | Where-Object { $_.Extension -in '.cpp', '.hpp', '.cmake', '.manifest', '.ps1' } | Sort-Object Name)
+$inputs += Get-Item -LiteralPath (Join-Path $ReplayKitGenerated 'replaykit_folder.hpp'), (Join-Path $ReplayKitGenerated 'obs_audio_group.hpp'), $ObsVersionsManifest
 $fingerprint = ($inputs | ForEach-Object { $_.Name + ':' + (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash }) -join '|'
 foreach ($line in $lines) {
     $version = $line.tested
     $output = Join-Path $OutDir $version
     $manifestPath = Join-Path $output 'manifest.json'
-    $browserDirectory = if ($line.pluginLayout -eq 'modern') { 'core/obs-browser' } else { 'obs-plugins/64bit' }
+    $hostPath, $browserPath, $rolePath = Get-HostComponentPaths $line
     $files = [ordered]@{
-        'bin/64bit/replaykit-host/obs64.exe' = "host/$config/obs64.exe"
+        $hostPath = "host/$config/obs64.exe"
+        $browserPath = "plugins/obs-browser/$config/obs-browser.dll"
+        $rolePath = "plugins/obs-browser/$config/obs-browser-role.dll"
     }
-    $files["$browserDirectory/obs-browser.dll"] = "plugins/obs-browser/$config/obs-browser.dll"
-    $files["$browserDirectory/obs-browser-role.dll"] = "plugins/obs-browser/$config/obs-browser-role.dll"
     if (Test-Path -LiteralPath $manifestPath) {
         $cached = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
         $valid = $cached.ObsVersion -eq $version -and $cached.Inputs -eq $fingerprint -and @($cached.Files).Count -eq $files.Count
@@ -51,12 +55,11 @@ foreach ($line in $lines) {
     if ($LASTEXITCODE -ne 0) { throw 'OBS component checkout failed.' }
     & (Join-Path $PSScriptRoot 'prepare.ps1') -Source $source
     $build = Join-Path $WorkDir ('build-' + $version)
-    $legacyBuild = Join-Path $WorkDir 'build'
-    if ($version -eq '32.2.2' -and (Test-Path -LiteralPath (Join-Path $legacyBuild 'CMakeCache.txt'))) { $build = $legacyBuild }
     $modern = if ($line.pluginLayout -eq 'modern') { 'ON' } else { 'OFF' }
     $configure = @('-S', $source, '-B', $build, '-G', 'Visual Studio 18 2026', '-A', 'x64,version=10.0.26100.0',
         '-DENABLE_BROWSER=ON', '-DENABLE_WEBSOCKET=OFF', '-DENABLE_SCRIPTING=ON', '-DCMAKE_COMPILE_WARNING_AS_ERROR=OFF',
-        ("-DREPLAYKIT_MODERN_PLUGINS=$modern"), ('-DREPLAYKIT_HOST_DIR=' + $PSScriptRoot.Replace('\','/')))
+        ("-DREPLAYKIT_MODERN_PLUGINS=$modern"), ("-DREPLAYKIT_HOST_DIR=" + $PSScriptRoot.Replace('\','/')),
+        ("-DREPLAYKIT_GENERATED_DIR=" + $ReplayKitGenerated.Replace('\','/')))
     & cmake @configure
     if ($LASTEXITCODE -ne 0) { throw "OBS $version host configuration failed." }
     cmake --build $build --config $config --target replaykit-host --parallel 8
@@ -70,14 +73,12 @@ foreach ($line in $lines) {
     $archive = [IO.Compression.ZipFile]::OpenRead($archivePath)
     $originals = @{}
     try {
-        foreach ($relative in @("$browserDirectory/obs-browser.dll")) {
-            $entry = $archive.GetEntry($relative)
-            if (-not $entry) { throw "The official OBS archive has no $relative." }
-            $stream = $entry.Open()
-            $sha = [Security.Cryptography.SHA256]::Create()
-            try { $originals[$relative] = ([BitConverter]::ToString($sha.ComputeHash($stream))).Replace('-', '') }
-            finally { $sha.Dispose(); $stream.Dispose() }
-        }
+        $entry = $archive.GetEntry($browserPath)
+        if (-not $entry) { throw "The official OBS archive has no $browserPath." }
+        $stream = $entry.Open()
+        $sha = [Security.Cryptography.SHA256]::Create()
+        try { $originals[$browserPath] = ([BitConverter]::ToString($sha.ComputeHash($stream))).Replace('-', '') }
+        finally { $sha.Dispose(); $stream.Dispose() }
     } finally { $archive.Dispose() }
     $manifest = @()
     foreach ($relative in $files.Keys) {

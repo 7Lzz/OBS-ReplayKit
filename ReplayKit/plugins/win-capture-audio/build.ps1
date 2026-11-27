@@ -1,7 +1,7 @@
 # builds win-capture-audio from the pinned upstream tree and replaykit patches against the obs 28.0.0 headers. verifies the sources and dll imports, then stages the plugin files for setup to package.
 
 param(
-    [string]$WorkDir = (Join-Path $env:LOCALAPPDATA "ReplayKit\plugin-build"),
+    [string]$WorkDir = '',
     [string]$OutDir = '',
     # the exact upstream source with no patch, for comparison: the zip goes to the work dir and never to the assets
     [switch]$Pristine,
@@ -9,6 +9,9 @@ param(
 )
 $ErrorActionPreference = "Stop"
 $ProgressPreference = 'SilentlyContinue'
+. (Join-Path $PSScriptRoot '..\..\scripts\build_layout.ps1')
+if (-not $WorkDir) { $WorkDir = Join-Path $ReplayKitNative 'win-capture-audio' }
+Assert-BuildPath $WorkDir
 
 # the pins: the commit of the vendored upstream tree, the obs tag the headers come from (module api version 28.0.0 loads on obs 28 to 32) and the wil commit the upstream repo pins as its submodule
 $upstreamCommit = 'd11b381d41333964735a57d60bda54747f2232d9'
@@ -17,20 +20,12 @@ $obsCommit = '09da3ac4397ee9b1431c9c97cd2c71484b240382'
 $wilCommit = 'f02a61c68590c22de2efeeaf881032419f6fef54'
 $repoUrl = 'https://github.com/7Lzz/OBS-ReplayKit'
 
-function RemoveBuildDirectory([string]$path) {
-    $root = [IO.Path]::GetFullPath($WorkDir).TrimEnd('\') + '\'
-    $target = [IO.Path]::GetFullPath($path).TrimEnd('\')
-    if (-not $target.StartsWith($root, [StringComparison]::OrdinalIgnoreCase)) {
-        throw "Build cleanup is outside the work directory: $target"
-    }
-    if (Test-Path -LiteralPath $target) { Remove-Item -LiteralPath $target -Recurse -Force }
-}
-
 # the plugin files land loose in this folder; the setup csproj zips them in the layout of the obs folder when it packs the release
 if (-not $OutDir) {
-    $OutDir = if ($Pristine) { Join-Path $WorkDir 'win-capture-audio.pristine' } else { Join-Path $PSScriptRoot '..\..\dist\win-capture-audio' }
+    $OutDir = if ($Pristine) { Join-Path $WorkDir 'win-capture-audio.pristine' } else { Join-Path $ReplayKitPlugins 'win-capture-audio' }
 }
 $OutDir = [IO.Path]::GetFullPath($OutDir)
+Assert-BuildPath $OutDir
 $outDll = Join-Path $OutDir 'win-capture-audio.dll'
 $upstreamDir = Join-Path $PSScriptRoot 'upstream'
 $patchDir = Join-Path $PSScriptRoot 'patches'
@@ -114,7 +109,7 @@ New-Item -ItemType Directory -Force -Path $WorkDir | Out-Null
 $obsSrcDir = Join-Path $WorkDir 'wca-obs-src'
 if (-not (Test-PinnedCheckout $obsSrcDir $obsCommit)) {
     Write-Output "checking out the libobs headers of obs-studio $obsTag..."
-    RemoveBuildDirectory $obsSrcDir
+    Remove-WorkDirectory $WorkDir $obsSrcDir
     git clone -q --filter=blob:none --no-checkout --depth 1 --branch $obsTag https://github.com/obsproject/obs-studio.git $obsSrcDir
     if ($LASTEXITCODE -ne 0) { throw 'OBS header checkout failed.' }
     git -C $obsSrcDir config core.autocrlf false
@@ -128,7 +123,7 @@ if (-not (Test-PinnedCheckout $obsSrcDir $obsCommit)) {
 $wilDir = Join-Path $WorkDir 'wca-wil'
 if (-not (Test-PinnedCheckout $wilDir $wilCommit)) {
     Write-Output "fetching microsoft/wil at $wilCommit..."
-    RemoveBuildDirectory $wilDir
+    Remove-WorkDirectory $WorkDir $wilDir
     New-Item -ItemType Directory -Force -Path $wilDir | Out-Null
     git -C $wilDir init -q
     git -C $wilDir remote add origin https://github.com/microsoft/wil.git
@@ -146,7 +141,7 @@ $sdkStamp = "$obsCommit|$((Get-Item $obsDll).Length)|$((Get-Item $obsDll).LastWr
 $stampFile = Join-Path $sdkDir 'sdk-stamp.txt'
 if ($Force -or -not (Test-Path -LiteralPath $stampFile) -or ((Get-Content -LiteralPath $stampFile -Raw).Trim() -ne $sdkStamp)) {
     Write-Output "assembling the libobs sdk..."
-    RemoveBuildDirectory $sdkDir
+    Remove-WorkDirectory $WorkDir $sdkDir
     $includeDir = Join-Path $sdkDir 'include'
     $libDir = Join-Path $sdkDir 'lib'
     $cmakeDir = Join-Path $sdkDir 'lib\cmake\libobs'
@@ -196,7 +191,7 @@ set_target_properties(OBS::libobs PROPERTIES
 $variant = if ($Pristine) { 'pristine' } else { 'replaykit' }
 $srcDir = Join-Path $WorkDir "wca-build-$variant\src"
 $buildDir = Join-Path $WorkDir "wca-build-$variant\out"
-RemoveBuildDirectory (Join-Path $WorkDir "wca-build-$variant")
+Remove-WorkDirectory $WorkDir (Join-Path $WorkDir "wca-build-$variant")
 New-Item -ItemType Directory -Force -Path $srcDir | Out-Null
 Copy-Item -Path (Join-Path $upstreamDir '*') -Destination $srcDir -Recurse
 if (-not $Pristine) {
@@ -268,9 +263,10 @@ The unmodified upstream files, the patches and the build script are in $repoUrl 
 Licensed GPL-2.0, see LICENSE. Copyright of the original plugin: bozbez; maintained fork: Ayrton09.
 "@
 # only the folder this script owns is ever cleared
-$allowedRoots = @([IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\dist')), [IO.Path]::GetFullPath($WorkDir)) | ForEach-Object { $_.TrimEnd('\') + '\' }
-if (-not ($allowedRoots | Where-Object { $OutDir.StartsWith($_, [StringComparison]::OrdinalIgnoreCase) })) { throw "Refusing to write win-capture-audio outside dist or the work dir: $OutDir" }
-if (Test-Path -LiteralPath $OutDir) { Remove-Item -LiteralPath $OutDir -Recurse -Force }
+$allowedRoots = @($ReplayKitPlugins, [IO.Path]::GetFullPath($WorkDir))
+$outputRoot = $allowedRoots | Where-Object { $OutDir.StartsWith(($_.TrimEnd('\') + '\'), [StringComparison]::OrdinalIgnoreCase) } | Select-Object -First 1
+if (-not $outputRoot) { throw "Refusing to write win-capture-audio outside the plugin payload or work directory: $OutDir" }
+Remove-WorkDirectory $outputRoot $OutDir
 New-Item -ItemType Directory -Force -Path (Join-Path $OutDir 'locale') | Out-Null
 foreach ($ini in (Get-ChildItem -LiteralPath (Join-Path $upstreamDir 'data\locale') -Filter '*.ini' | Sort-Object Name)) {
     Copy-Item -LiteralPath $ini.FullName -Destination (Join-Path $OutDir "locale\$($ini.Name)")
@@ -293,7 +289,7 @@ if (-not $Pristine) {
         dllBytes = $bytes.Length
         imports = $modules
     }
-    $record | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $PSScriptRoot 'BUILD-RECORD.json') -Encoding ascii
+    $record | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $WorkDir 'BUILD-RECORD.json') -Encoding ascii
 }
 
 Write-Output ""

@@ -1,7 +1,9 @@
-# dot-sourced by the plugin builds and verify_obs_versions.ps1: reads config/obs-versions.json, fetches the obs binaries of a lines tested version from its official release zip (hash checked against the manifest, cached under %LOCALAPPDATA%\ReplayKit\obs-versions), puts together the sdk a plugin is built against for that version, and lists what a dll imports that an obs does not export
+# dot-sourced by the plugin builds and verify_obs_versions.ps1: reads config/obs-versions.json, fetches the obs binaries of a lines tested version from its official release zip (hash checked against the manifest, cached under build/cache/dependencies/obs-versions), puts together the sdk a plugin is built against for that version, and lists what a dll imports that an obs does not export
 
+. (Join-Path $PSScriptRoot 'build_layout.ps1')
 $ObsVersionsManifest = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\config\obs-versions.json'))
-$ObsVersionsCache = Join-Path $env:LOCALAPPDATA 'ReplayKit\obs-versions'
+$ObsVersionsCache = Join-Path $ReplayKitDependencies 'obs-versions'
+Assert-BuildPath $ObsVersionsCache
 
 function Read-ObsVersions {
     $manifest = Get-Content -LiteralPath $ObsVersionsManifest -Raw | ConvertFrom-Json
@@ -16,6 +18,11 @@ function Read-ObsVersions {
 
 # the plugins are built against the oldest line, so they only import what every supported obs exports; verify_obs_versions.ps1 then checks them against each line
 function Get-ObsBuildLine { return @((Read-ObsVersions).lines)[0] }
+
+function Get-HostComponentPaths($line) {
+    $browser = if ($line.pluginLayout -eq 'modern') { 'core/obs-browser' } else { 'obs-plugins/64bit' }
+    return 'bin/64bit/replaykit-host/obs64.exe', "$browser/obs-browser.dll", "$browser/obs-browser-role.dll"
+}
 
 function Find-VsBuildTools {
     foreach ($year in @('2022', '2019')) {
@@ -37,15 +44,6 @@ function Enter-VsBuildEnvironment {
         if ($text -match '^([^=]+)=(.*)$') { [System.Environment]::SetEnvironmentVariable($matches[1], $matches[2]) }
     }
     $env:PATH = (Split-Path $ninja) + ";" + $env:PATH
-}
-
-function Remove-WorkDirectory([string]$workDir, [string]$path) {
-    $root = [IO.Path]::GetFullPath($workDir).TrimEnd('\') + '\'
-    $target = [IO.Path]::GetFullPath($path).TrimEnd('\')
-    if (-not $target.StartsWith($root, [StringComparison]::OrdinalIgnoreCase)) {
-        throw "Build cleanup is outside the work directory: $target"
-    }
-    if (Test-Path -LiteralPath $target) { Remove-Item -LiteralPath $target -Recurse -Force }
 }
 
 # the dlls of bin\64bit of a lines tested obs, which is all an import library or an import check needs

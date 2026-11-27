@@ -1,8 +1,10 @@
 param(
     [Parameter(Mandatory)][string]$Prototype,
-    [string]$HelperAssembly = (Join-Path $PSScriptRoot '../../dist/helper/OBSReplayKit.exe')
+    [string]$HelperAssembly = ''
 )
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot '../../scripts/build_layout.ps1')
+if (-not $HelperAssembly) { $HelperAssembly = Join-Path $ReplayKitPayload 'helper/OBSReplayKit.exe' }
 $root = [IO.Path]::GetFullPath($Prototype)
 if (-not (Test-Path -LiteralPath (Join-Path $root '.replaykit-portable') -PathType Leaf)) {
     throw 'Role verification requires a dedicated portable OBS fixture.'

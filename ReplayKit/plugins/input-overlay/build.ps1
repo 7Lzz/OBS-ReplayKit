@@ -1,13 +1,15 @@
-# builds input-overlay from its pinned upstream source release against the obs version of config/obs-versions.json, the same way replaykit.dll is built, instead of shipping the upstream windows zip (which carries a debug file and a remote-client exe replaykit does not use). the files land loose in dist\input-overlay, the dlls at its root and data beside them, and the release packs them as input-overlay-plugin.zip; the installer puts them where that obs loads plugins from
+# builds input-overlay from its pinned upstream source release against the obs version of config/obs-versions.json, the same way replaykit.dll is built, instead of shipping the upstream windows zip (which carries a debug file and a remote-client exe replaykit does not use). the files land loose in build/payload/plugins/input-overlay, the dlls at its root and data beside them, and the release packs them as input-overlay-plugin.zip; the installer puts them where that obs loads plugins from
 
 param(
     # shared with the replaykit plugin build, so the obs headers, qt6 and import libs are only fetched once
-    [string]$WorkDir = (Join-Path $env:LOCALAPPDATA "ReplayKit\plugin-build"),
+    [string]$WorkDir = '',
     [string]$OutDir = ''
 )
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 . (Join-Path $PSScriptRoot '..\..\scripts\obs_versions.ps1')
+if (-not $WorkDir) { $WorkDir = Join-Path $ReplayKitNative 'plugins' }
+Assert-BuildPath $WorkDir
 
 $Version = '5.1.3'
 $SourceUrl = "https://github.com/univrsal/input-overlay/releases/download/$Version/input-overlay-$Version-source.tar.xz"
@@ -15,12 +17,13 @@ $SourceUrl = "https://github.com/univrsal/input-overlay/releases/download/$Versi
 $SourceSha256 = '944151409f22b9cf2c3ea9b85514000d6c5c6d237f3dd4ab2bbf8781951adb99'
 
 # the plugin files land loose in this folder; the setup csproj zips them under input-overlay/ when it packs the release
-if (-not $OutDir) { $OutDir = Join-Path $PSScriptRoot '..\..\dist\input-overlay' }
+if (-not $OutDir) { $OutDir = Join-Path $ReplayKitPlugins 'input-overlay' }
 $OutDir = [IO.Path]::GetFullPath($OutDir)
 $outDll = Join-Path $OutDir 'input-overlay.dll'
+Assert-BuildPath $OutDir
 
 $buildInputs = @($PSCommandPath, (Join-Path $PSScriptRoot 'CMakeLists.txt'), $ObsVersionsManifest, (Join-Path $PSScriptRoot '..\..\scripts\obs_versions.ps1'))
-if (-not ('input-overlay.dll', 'SDL3.dll', 'uiohook.dll' | Where-Object { -not (Test-Path -LiteralPath (Join-Path $OutDir $_) -PathType Leaf) })) {
+if (-not ('input-overlay.dll', 'SDL3.dll', 'uiohook.dll', 'data\LICENSE' | Where-Object { -not (Test-Path -LiteralPath (Join-Path $OutDir $_) -PathType Leaf) })) {
     $built = (Get-Item -LiteralPath $outDll).LastWriteTimeUtc
     if (-not ($buildInputs | Where-Object { (Get-Item -LiteralPath $_).LastWriteTimeUtc -gt $built })) {
         Write-Output "Current: $OutDir"
@@ -97,16 +100,16 @@ $files['input-overlay.dll'] = Join-Path $buildDir 'input-overlay.dll'
 foreach ($path in $files.Values) { if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "The input-overlay build is missing $path" } }
 
 # only the folder this script owns is ever cleared
-$distRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\dist')).TrimEnd('\') + '\'
-if (-not $OutDir.StartsWith($distRoot, [StringComparison]::OrdinalIgnoreCase)) { throw "Refusing to write input-overlay outside dist: $OutDir" }
+$root = $ReplayKitPlugins.TrimEnd('\') + '\'
+if (-not $OutDir.StartsWith($root, [StringComparison]::OrdinalIgnoreCase)) { throw "Refusing to write input-overlay outside the plugin payload: $OutDir" }
 $temporary = "$OutDir.tmp"
-if (Test-Path -LiteralPath $temporary) { Remove-Item -LiteralPath $temporary -Recurse -Force }
+Remove-WorkDirectory $ReplayKitPlugins $temporary
 foreach ($name in $files.Keys) {
     $target = Join-Path $temporary $name.Replace('/', '\')
     New-Item -ItemType Directory -Force -Path (Split-Path -Parent $target) | Out-Null
     Copy-Item -LiteralPath $files[$name] -Destination $target -Force
 }
-if (Test-Path -LiteralPath $OutDir) { Remove-Item -LiteralPath $OutDir -Recurse -Force }
+Remove-WorkDirectory $ReplayKitPlugins $OutDir
 Move-Item -LiteralPath $temporary -Destination $OutDir
 (Get-Item -LiteralPath $outDll).LastWriteTimeUtc = [DateTime]::UtcNow
 Write-Output "bundled -> $OutDir ($($files.Count) files)"

@@ -1,6 +1,8 @@
-param([string]$Version = '', [string]$WorkDir = (Join-Path $env:LOCALAPPDATA 'ReplayKit/host-build/verification-roles'))
+param([string]$Version = '', [string]$WorkDir = '')
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot '../../scripts/obs_versions.ps1')
+if (-not $WorkDir) { $WorkDir = Join-Path $ReplayKitCache 'verification/roles' }
+Assert-BuildPath $WorkDir
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $lines = @((Read-ObsVersions).lines)
 if ($Version) {
@@ -22,7 +24,7 @@ foreach ($line in $lines) {
         [IO.Compression.ZipFile]::ExtractToDirectory($archive, $root)
         Set-Content -LiteralPath $marker -Value $line.portable.sha256 -Encoding ascii
     }
-    $components = Join-Path $PSScriptRoot "../../dist/process-host/$version"
+    $components = Join-Path $ReplayKitPayload "process-host/$version"
     $stock = @{}
     $zip = [IO.Compression.ZipFile]::OpenRead($archive)
     try {
@@ -40,8 +42,7 @@ foreach ($line in $lines) {
     } finally { $zip.Dispose() }
     $manifest = Get-Content -LiteralPath (Join-Path $components 'manifest.json') -Raw | ConvertFrom-Json
     if ($manifest.ObsVersion -ne $version) { throw 'The host manifest has the wrong OBS version.' }
-    $browser = if ($line.pluginLayout -eq 'modern') { 'core/obs-browser' } else { 'obs-plugins/64bit' }
-    $expected = @('bin/64bit/replaykit-host/obs64.exe', "$browser/obs-browser.dll", "$browser/obs-browser-role.dll")
+    $expected = @(Get-HostComponentPaths $line)
     if (@($manifest.Files).Count -ne $expected.Count) { throw 'The host manifest has an unexpected file count.' }
     foreach ($relative in $expected) {
         $entries = @($manifest.Files | Where-Object Path -eq $relative)
