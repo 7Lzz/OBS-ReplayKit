@@ -27,25 +27,28 @@ namespace ReplayKitSetup
         public static bool CoreInstalledAt(string obsRoot) =>
             !string.IsNullOrEmpty(obsRoot) && File.Exists(Config.ObsExeFromRoot(obsRoot));
 
+        // a process the setup closes before it writes: anything run from the obs folder (obs, its browser pages, the role host the helper runs under) or the helper exe itself
+        internal static bool IsOwnedImage(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return false;
+            string full = Path.GetFullPath(path);
+            string root = Path.GetFullPath(Config.PROGRAMFILES_OBS_DIR).TrimEnd('\\', '/') + Path.DirectorySeparatorChar;
+            return full.StartsWith(root, StringComparison.OrdinalIgnoreCase) || string.Equals(full, Path.GetFullPath(Config.HELPER_EXE), StringComparison.OrdinalIgnoreCase);
+        }
+
         private static Process[] ObsProcesses()
         {
-            string root = Path.GetFullPath(Config.PROGRAMFILES_OBS_DIR).TrimEnd('\\', '/') + Path.DirectorySeparatorChar;
-            string helper = Path.GetFullPath(Path.Combine(Config.REPLAYKIT_CONFIG, "scripts", "helper", "OBSReplayKit.exe"));
             using var current = Process.GetCurrentProcess();
             var result = new List<Process>();
             try
             {
-                foreach (string name in Config.OBS_PROCESSES.Concat(new[] { "obs-browser-page.exe", "OBSReplayKit.exe" }))
+                foreach (string name in Config.OBS_PROCESSES.Concat(new[] { "obs-browser-page.exe", Path.GetFileName(Config.HELPER_EXE) }))
                     foreach (var process in Process.GetProcessesByName(Path.GetFileNameWithoutExtension(name)))
                     {
                         try
                         {
                             if (process.Id == current.Id || process.HasExited) { process.Dispose(); continue; }
-                            string path = process.MainModule?.FileName;
-                            bool owned = string.Equals(name, "OBSReplayKit.exe", StringComparison.OrdinalIgnoreCase)
-                                ? string.Equals(path, helper, StringComparison.OrdinalIgnoreCase)
-                                : path != null && Path.GetFullPath(path).StartsWith(root, StringComparison.OrdinalIgnoreCase);
-                            if (owned) result.Add(process);
+                            if (IsOwnedImage(process.MainModule?.FileName)) result.Add(process);
                             else process.Dispose();
                         }
                         catch (InvalidOperationException) { process.Dispose(); }

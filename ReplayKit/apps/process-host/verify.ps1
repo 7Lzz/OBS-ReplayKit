@@ -76,7 +76,9 @@ $scene = @{
     )
 }
 [IO.File]::WriteAllText((Join-Path $scenes 'Role_Verification.json'), ($scene | ConvertTo-Json -Depth 10), [Text.UTF8Encoding]::new($false))
+# obs opens its auto-configuration wizard when FirstRun is missing and global.ini has no LastVersion, which a profile rewritten here and an obs killed before a normal exit never get
 Set-Content -LiteralPath (Join-Path $config 'user.ini') -Encoding Ascii -Value @(
+    '[General]', 'FirstRun=true',
     '[Basic]', 'ConfigOnNewProfile=false', 'SceneCollection=Role Verification', 'SceneCollectionFile=Role_Verification.json')
 $stock = Join-Path $root 'bin/64bit/obs64.exe'
 $obs = Start-RoleProcess $stock '--portable --multi --disable-updater --minimize-to-tray --disable-missing-files-check' $false

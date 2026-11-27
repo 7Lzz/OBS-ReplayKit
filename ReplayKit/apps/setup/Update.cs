@@ -27,14 +27,18 @@ namespace ReplayKitSetup
         [DllImport("kernel32.dll", SetLastError = true)]
         private static extern bool TerminateProcess(IntPtr handle, uint exitCode);
 
+        [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+        private static extern bool QueryFullProcessImageNameW(IntPtr handle, uint flags, StringBuilder path, ref uint size);
+
         private const uint SYNCHRONIZE = 0x00100000;
         private const uint PROCESS_TERMINATE = 0x0001;
+        private const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
         private const uint WAIT_OBJECT_0 = 0;
         private const string ReleasePage = "https://github.com/7Lzz/OBS-ReplayKit/releases/latest";
 
         private static string LogFile() => Path.Combine(Path.GetTempPath(), "OBSReplayKitUpdate.log");
 
-        // the helper serves this back over /update/install-result so the update popup can say what actually happened. it lives beside the helper logs, not in the update temp dir, which ScheduleCleanup wipes right after this process exits.
+        // the helper serves this back over /update/install-result so the update popup can say what actually happened. it lives beside the helper logs, not in the update folder this exe runs from, which the helper clears once the update is over (ClearStaleUpdateFolders).
         private static string ResultFile(string attemptId) => Path.Combine(TempLayout.Logs, TempLayout.UpdateFile(TempLayout.UpdateResultFile, attemptId));
 
         private static void WriteProgress(string path, JObject step)
@@ -150,13 +154,23 @@ namespace ReplayKitSetup
             }
         }
 
+        // the pid is checked against the image it runs: the close before this already waited for every owned process, so a pid that is still there can be one windows has handed to another program since
         private static bool WaitForPid(int pid, int timeoutS, Action<string> log)
         {
             if (pid <= 0) return true;
-            IntPtr handle = OpenProcess(SYNCHRONIZE | PROCESS_TERMINATE, false, pid);
+            IntPtr handle = OpenProcess(SYNCHRONIZE | PROCESS_TERMINATE | PROCESS_QUERY_LIMITED_INFORMATION, false, pid);
             if (handle == IntPtr.Zero) return true;
             try
             {
+                var image = new StringBuilder(32768);
+                uint size = (uint)image.Capacity;
+                if (!QueryFullProcessImageNameW(handle, 0, image, ref size))
+                    return WaitForSingleObject(handle, 0) == WAIT_OBJECT_0;
+                if (!Obs.IsOwnedImage(image.ToString(0, (int)size)))
+                {
+                    log?.Invoke("pid " + pid + " no longer belongs to the old ReplayKit helper; not waiting for it");
+                    return true;
+                }
                 uint result = WaitForSingleObject(handle, (uint)(timeoutS * 1000));
                 if (result == WAIT_OBJECT_0) return true;
                 log?.Invoke("old ReplayKit helper did not exit within " + timeoutS + "s; terminating it before the file transaction");
@@ -169,9 +183,12 @@ namespace ReplayKitSetup
             }
         }
 
+        // the update runs elevated and can hand obs its rights, so the path the command line names is only a check against the obs this setup found, never a program it starts
         private static bool LaunchObsPath(string obsPath, Action<string> log)
         {
-            string obs = !string.IsNullOrEmpty(obsPath) ? obsPath : Obs.FindObsExe();
+            string obs = Obs.FindObsExe();
+            if (!string.IsNullOrEmpty(obsPath) && !SamePath(obsPath, obs))
+                log?.Invoke("the OBS to relaunch is not the OBS this setup found, starting that one instead: " + obsPath);
             if (obs == null || !File.Exists(obs))
             {
                 log?.Invoke("OBS executable was not found for relaunch.");
@@ -180,6 +197,13 @@ namespace ReplayKitSetup
             bool started = Obs.LaunchObsAt(obs, log);
             log?.Invoke(started ? "relaunched OBS: " + obs : "OBS relaunch failed");
             return started;
+        }
+
+        private static bool SamePath(string a, string b)
+        {
+            if (string.IsNullOrEmpty(a) || string.IsNullOrEmpty(b)) return false;
+            try { return string.Equals(Path.GetFullPath(a), Path.GetFullPath(b), StringComparison.OrdinalIgnoreCase); }
+            catch (Exception ex) when (ex is ArgumentException || ex is NotSupportedException || ex is PathTooLongException) { return false; }
         }
 
         public static int RunUpdateMode(string relaunchObs = null, int waitPid = 0, int startDelayMs = 0, bool relaunch = true,
@@ -248,7 +272,7 @@ namespace ReplayKitSetup
                 failureStage = "install";
                 // stage markers: a process that is killed leaves no exception behind, so the last line in the log is the only thing that says where it got to.
                 Log("stage: obs closed, waiting for helper pid " + waitPid);
-                if (!WaitForPid(waitPid > 0 ? waitPid : 0, 60, LogBoth))
+                if (!WaitForPid(waitPid, 60, LogBoth))
                     throw new IOException(SetupLocale.Message("setup.theOldReplaykitHelperCouldNot"));
                 if (progress != null) Step(SetupLocale.Pair("setup.backUpCurrentObsSettings"), SetupLocale.Pair("setup.savesARestoreCopyFirst"));
                 try { configBackup = ConfigBackups.Create("app-update", LogBoth); }
@@ -339,7 +363,7 @@ namespace ReplayKitSetup
             }
         }
 
-        // headless progress reporter for --cleanup mode (log lines only). InstallerForm.FormProgress is the windowed equivalent; both implement IInstallProgress so Cleanup.RunCleanup and Apply.RunInstallFlow work from either caller.
+        // headless progress reporter for --cleanup and the discord screenshare modes (log lines only); PageProgress is the one of the setup and uninstall windows
         public sealed class CleanupProgress : IInstallProgress
         {
             public int TotalSteps { get; set; }
@@ -464,6 +488,13 @@ namespace ReplayKitSetup
                     int pid = DetachedSpawn.Relaunch(argv);
                     if (pid > 0) { Log("uninstall relaunched detached as pid " + pid + "; this launcher is done"); return 0; }
                     Log("warn: could not relaunch the uninstaller detached, running inline (an OBS teardown may kill it)");
+                }
+                // taken after the detached relaunch, so the launcher that hands over never holds it
+                using var instance = SetupInstance.TryTake();
+                if (instance == null)
+                {
+                    SetupInstance.ShowOpenWindow();
+                    return 0;
                 }
                 if (!WebView2Runtime.Ensure(null))
                     return RunCleanupMode(0, !removeUserSettings, removeObs); // no webview2 -> fall back to headless

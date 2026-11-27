@@ -8,6 +8,12 @@ namespace ReplayKitSetup
     {
         public static int Run()
         {
+            using var instance = SetupInstance.TryTake();
+            if (instance == null)
+            {
+                SetupInstance.ShowOpenWindow();
+                return 0;
+            }
             if (!WebView2Runtime.Ensure(null))
             {
                 ShowFatalError(
@@ -110,6 +116,15 @@ namespace ReplayKitSetup
 
         [DllImport("user32.dll")]
         public static extern bool UpdateWindow(IntPtr hWnd);
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        public static extern IntPtr FindWindowW(string lpClassName, string lpWindowName);
+
+        [DllImport("user32.dll")]
+        public static extern bool IsIconic(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        public static extern bool SetForegroundWindow(IntPtr hWnd);
 
         [DllImport("user32.dll", CharSet = CharSet.Unicode)]
         public static extern IntPtr SendMessageW(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);

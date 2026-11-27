@@ -9613,6 +9613,10 @@
     "source": "c61d0594a2a8fdfc",
     "text": "内置的进程宿主文件验证失败。"
   },
+  "setup.aCopiedFileDoesNotMatchItsSource": {
+    "source": "3c19c475dff15930",
+    "text": "复制的文件与源文件不一致：{path}"
+  },
   "setup.aProcessHostPathEscapesIts": {
     "source": "330500722fa73ec0",
     "text": "进程宿主路径超出了其文件夹。"
@@ -9656,6 +9660,22 @@
   "setup.applyDefaultSettings": {
     "source": "b8bbb12c63ba3d4c",
     "text": "应用默认设置"
+  },
+  "setup.aReplaykitFileChangedOutsideTheUpdate": {
+    "source": "ca32ecd29bec6cb9",
+    "text": "有一个 ReplayKit 文件在更新之外被更改：{path}"
+  },
+  "setup.aReplaykitFilePathEscapesItsFolder": {
+    "source": "42bbed43c78601fa",
+    "text": "ReplayKit 文件路径超出了其文件夹。"
+  },
+  "setup.aReplaykitFilePathIsInvalid": {
+    "source": "dfdbb7c483b4528e",
+    "text": "ReplayKit 文件路径无效。"
+  },
+  "setup.aStagedFileDoesNotMatchTheBundle": {
+    "source": "07045c5aeb3bda70",
+    "text": "为更新准备的 ReplayKit 文件与安装程序中的文件不一致：{path}"
   },
   "setup.backUpCurrentObsSettings": {
     "source": "66f2ce2cf31015c7",
@@ -9997,6 +10017,10 @@
     "source": "7c539494daa8d5db",
     "text": "ReplayKit 需要 OBS {version}，但无法将已安装的 OBS 调整到该版本。请从 obsproject.com 安装 OBS {version}，然后重新运行此安装程序。"
   },
+  "setup.olderStateCouldNotBeMoved": {
+    "source": "93add26cb7454bcc",
+    "text": "无法从旧文件夹移动 {file}，因此保留了原文件。"
+  },
   "setup.originalObsFilesRequired": {
     "source": "d1b83005942f04a8",
     "text": "安装共享进程宿主之前需要 OBS {version} 的原始文件。请修复 OBS Studio，然后重新运行 ReplayKit 安装程序。"
@@ -10116,6 +10140,10 @@
   "setup.replacesTheReplaykitFilesAndKeeps": {
     "source": "26559bd2d6df3743",
     "text": "替换 ReplayKit 文件，并保留您的 OBS 和 ReplayKit 设置不变。"
+  },
+  "setup.replaykitFilesCannotBeUpdatedThroughALink": {
+    "source": "df73dcd3a5944332",
+    "text": "无法通过链接或目录联接更新 ReplayKit 文件：{path}"
   },
   "setup.replaykitFilesWereInstalledButThe": {
     "source": "dbc739eb65009b26",
@@ -10287,6 +10315,10 @@
     "source": "4352d805a2e7d2f1",
     "text": "桌面音频插件"
   },
+  "setup.theInterruptedUpdateRecordIsInvalid": {
+    "source": "1f0431532bd690fc",
+    "text": "中断的 ReplayKit 更新记录无效。"
+  },
   "setup.theMotionBlurPlugin": {
     "source": "ec9eee00d7a677ce",
     "text": "动态模糊插件"
@@ -10306,6 +10338,10 @@
   "setup.theOriginalObsBackupFailedVerification": {
     "source": "48b46e260aa0edf2",
     "text": "原始 OBS 备份未通过校验。"
+  },
+  "setup.thePreviousUpdateFilesCouldNotBeCleared": {
+    "source": "58db83cc918b521f",
+    "text": "无法清除上一次 ReplayKit 更新留下的文件。"
   },
   "setup.theProcessRoleBackupIsMissing": {
     "source": "6c07b88b1b03685a",
@@ -10362,6 +10398,10 @@
   "setup.thisRemovesTheReplaykitDockScene2": {
     "source": "76eccee6e8f3ce3c",
     "text": "这将从 OBS 中移除 ReplayKit 停靠窗口、场景、源、脚本和设置。"
+  },
+  "setup.thisSetupHasNoReplaykitFiles": {
+    "source": "5c0d9ac3ca0163de",
+    "text": "此安装程序在构建时未包含 ReplayKit 文件。"
   },
   "setup.thisSetupWasBuiltWithoutIts": {
     "source": "eaa6a0db0d893c55",
@@ -10426,6 +10466,10 @@
   "setup.verifyUpdateFiles": {
     "source": "e5aa889b3d9cef79",
     "text": "验证更新文件"
+  },
+  "setup.windowsProgramFilesWasNotFound": {
+    "source": "ae428fc60ddcbf2c",
+    "text": "找不到 Windows 的 Program Files 文件夹。"
   },
   "setup.windowTitle": {
     "source": "2e0e00e71a75260a",

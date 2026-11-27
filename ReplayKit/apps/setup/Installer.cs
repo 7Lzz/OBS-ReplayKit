@@ -32,7 +32,7 @@ namespace ReplayKitSetup
         private static string InstallTextSource(string src, string rel, string dst, out bool userScene)
         {
             userScene = false;
-            if (rel == UserSceneRel && File.Exists(dst))
+            if (rel == UserSceneRel && !IsMissingOrEmpty(dst))
             {
                 string content = ReadTextFile(dst);
                 userScene = !IsEmptyDefaultScene(JObject.Parse(content));
@@ -41,7 +41,7 @@ namespace ReplayKitSetup
             return ReadTextFile(src);
         }
 
-        // retry a write for a while on a locked file -- during an update, the outgoing helper process can still hold its own exe file open for a moment after obs exits, since it notices obs is gone and self-exits asynchronously rather than at that same instant. an update-initiating caller may also be racing this on its own, so this retry is the backstop that holds regardless of what triggered the update. normally the old process is gone in well under a second; 20s is padding for a loaded system, not the expected case.
+        // retry a write on a file another process still holds for a moment; obs and its helpers have exited before any caller writes, so what holds it is short lived, such as a scanner reading a file that was just written
         internal static void WriteWithRetry(Action writeFn)
         {
             var deadline = DateTime.UtcNow.AddSeconds(20.0);
@@ -124,8 +124,8 @@ namespace ReplayKitSetup
 
         public static void PrepareObsTheme(Action<string> log = null)
         {
-            string helper = Path.Combine(Config.REPLAYKIT_CONFIG, "scripts", "helper", "OBSReplayKit.exe");
-            VerifyFile(Path.Combine(GetRuntimeAssetsDir(), "scripts", "helper", "OBSReplayKit.exe"), helper);
+            string helper = Config.HELPER_EXE;
+            VerifyFile(Path.Combine(GetRuntimeAssetsDir(), Config.HELPER_EXE_REL), helper);
             var start = new System.Diagnostics.ProcessStartInfo(helper, "--prepare-theme")
             {
                 UseShellExecute = false, CreateNoWindow = true, RedirectStandardError = true,
@@ -270,7 +270,8 @@ namespace ReplayKitSetup
                 }
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
                 {
-                    throw new IOException($"could not migrate legacy {kv.Key}; the original was kept", ex);
+                    var reason = SetupLocale.Pair("setup.olderStateCouldNotBeMoved", "file", kv.Key);
+                    throw new IOException(reason.Shown, ex).WithEnglish(reason);
                 }
             }
             if (!canRemove) return;
@@ -386,7 +387,7 @@ namespace ReplayKitSetup
             cursor[parts[parts.Length - 1]] = JToken.FromObject(value);
         }
 
-        // patch known ReplayKit-managed sources in the users scene file in place, walking SceneSourcePatches and overwriting only the listed fields; safe when the file is missing or has no matches (returns 0), and skips writing if nothing changed so the mtime doesnt bump for no reason.
+        // patch known ReplayKit-managed sources in the users scene file in place, walking SceneSourcePatches and overwriting only the listed fields; safe when the file is missing or has no matches (returns 0), and skips writing if nothing changed so the mtime doesnt bump for no reason. a save that fails throws, so the update lists the scene settings as not repaired instead of reporting them done.
         public static int ApplyScenePatches(Action<string> log = null)
         {
             if (SceneSourcePatches.Count == 0) return 0;
@@ -424,21 +425,11 @@ namespace ReplayKitSetup
             }
 
             if (patched > 0)
-            {
-                try
-                {
-                    File.WriteAllText(scenePath, data.ToString(Formatting.Indented) + "\n", new System.Text.UTF8Encoding(false));
-                }
-                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
-                {
-                    log?.Invoke($"warn: scene patch save failed: {ex.Message}");
-                    return 0;
-                }
-            }
+                WriteWithRetry(() => File.WriteAllText(scenePath, data.ToString(Formatting.Indented) + "\n", new System.Text.UTF8Encoding(false)));
             return patched;
         }
 
-        // runtime updates used to leave the existing user.ini alone. That preserved OBS layout, but also left the managed Controls dock on its legacy file:// URL after the helper moved to a protected loopback API. OBS is closed before this runs, so update only that canonical dock row while Transform preserves every unrelated dock and preference.
+        // an update leaves user.ini as obs saved it apart from what ApplyUserIni owns there: the controls dock row, which moved from a file:// url to the helper, and the exit confirmation the settings pick; every other dock and window key stays. obs is closed while this runs
         private static bool UpdateControlsDockUrl(Action<string> log)
         {
             string path = Path.Combine(Config.OBS_CONFIG, "user.ini");
@@ -476,7 +467,10 @@ namespace ReplayKitSetup
             if (text == null) File.Copy(src, staged, true);
             else File.WriteAllBytes(staged, text);
             if (!FileMatches(staged, length, hash))
-                throw new IOException("Staging verification failed: " + staged);
+            {
+                var reason = SetupLocale.Pair("setup.aStagedFileDoesNotMatchTheBundle", "path", staged);
+                throw new IOException(reason.Shown).WithEnglish(reason);
+            }
             return true;
         }
 
@@ -508,7 +502,10 @@ namespace ReplayKitSetup
         internal static void VerifyFile(string expected, string actual)
         {
             if (!FilesMatch(expected, actual))
-                throw new IOException("File verification failed: " + actual);
+            {
+                var reason = SetupLocale.Pair("setup.aCopiedFileDoesNotMatchItsSource", "path", actual);
+                throw new IOException(reason.Shown).WithEnglish(reason);
+            }
         }
 
         internal static void FlushFile(string path)
@@ -554,9 +551,8 @@ namespace ReplayKitSetup
         {
             string runtimeSrc = GetRuntimeAssetsDir();
             if (!Directory.Exists(runtimeSrc))
-                throw new DirectoryNotFoundException($"ReplayKit runtime assets not found: {runtimeSrc}. " +
-                    (AssetBundle.LastError ?? "This OBSReplayKit.exe was built without its bundled ReplayKit files."));
-            string helperSource = Path.Combine(runtimeSrc, "scripts", "helper", "OBSReplayKit.exe");
+                throw new DirectoryNotFoundException(SetupLocale.Message("setup.thisSetupHasNoReplaykitFiles"));
+            string helperSource = Path.Combine(runtimeSrc, Config.HELPER_EXE_REL);
             if (!File.Exists(helperSource) || new FileInfo(helperSource).Length < 256 * 1024)
                 throw new InvalidDataException(SetupLocale.Message("setup.theBundledReplaykitHelperIsMissing"));
             return runtimeSrc;
@@ -899,7 +895,7 @@ namespace ReplayKitSetup
         // configure authenticated OBS WebSocket access for the helper.
         public static bool ConfigureObsWebsocket(Action<string> log = null) => WebSocketConfig.InstallWebsocketConfig(log);
 
-        // clip-ready toasts (from the helper) need SOME Start Menu shortcut carrying the apps AppUserModelID -- windows' rule for an unpackaged app. instead of a separate "OBS ReplayKit" entry, stamp that id onto OBS Studios own shortcut (this runs elevated so the all-users .lnk is writable); fall back to a same-named user-scope copy only if OBSs is missing. also removes the old distinct "OBS ReplayKit.lnk" from earlier versions.
+        // clip-ready toasts (from the helper) need some Start Menu shortcut carrying the apps AppUserModelID -- the windows rule for an unpackaged app. instead of a separate "OBS ReplayKit" entry, stamp that id onto OBS Studios own shortcut (this runs elevated so the all-users .lnk is writable); fall back to a same-named user-scope copy only if OBSs is missing. also removes the old distinct "OBS ReplayKit.lnk" from earlier versions.
         public static bool RegisterClipNotificationShortcut(Action<string> log = null)
         {
             string aumid = Shortcuts.ClipNotifyAumid;
@@ -937,12 +933,11 @@ namespace ReplayKitSetup
         public static bool InstallObsSleepOverride(bool allowSleep = true, Action<string> log = null) =>
             allowSleep ? SleepOverride.InstallSleepOverride(log) : SleepOverride.RemoveSleepOverride(log);
 
-        // the helper (OBSReplayKit.exe under scripts/helper/) is a full compiled C# app (ReplayKitHelper), built by build.bat straight into assets/ the same way replaykit.dll is a prebuilt native plugin -- there is no lightweight on-the-fly compile step for it the way the old thin PowerShell-hosting launcher had (this one needs the .NET SDK, NuGet restore, and an ILRepack merge, all done at repo build time); this just confirms the bundle actually shipped it, since helper_bootstrap.lua has no fallback if its missing.
+        // the bundled helper was there when the bundle was unpacked (ValidateRuntimeAssets checked it), so one that is gone a few steps later was most likely quarantined by antivirus as a fresh unsigned exe; helper_bootstrap.lua has nothing to fall back on without it
         public static bool EnsureLauncherBuilt(Action<string> log = null)
         {
-            string launcherPath = Path.Combine(Config.OBS_ASSETS_DIR, "obs-replayKit", "scripts", "helper", "OBSReplayKit.exe");
+            string launcherPath = Path.Combine(GetRuntimeAssetsDir(), Config.HELPER_EXE_REL);
             if (File.Exists(launcherPath)) return true;
-            // "re-run build.bat" used to be here, which only makes sense to a dev with the source checked out -- an end user hitting this has no build.bat. the file was unpacked from the bundle successfully (AssetBundle.ExtractTo would have failed the whole install otherwise); it going missing right after almost always means antivirus quarantined it the moment it landed on disk as a fresh, unsigned exe. used to read Defenders wmi threat log to name Defender specifically -- dropped with System.Management; the generic pointer covers Defenders Protection History too.
             log?.Invoke($"warn: helper launcher missing at {launcherPath} -- your antivirus likely quarantined it right after install. check its quarantine or history (Windows Security > Protection History for Defender), restore or exclude the ReplayKit temp folder, then reinstall.");
             return false;
         }

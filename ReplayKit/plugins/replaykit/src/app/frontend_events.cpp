@@ -14,6 +14,7 @@
 #include "app/main_window_filter.hpp"
 #include "app/obs_menu.hpp"
 #include "app/settings_poll.hpp"
+#include "app/single_instance.hpp"
 #include "chrome/caption_track_filter.hpp"
 #include "chrome/title_keybind_badge.hpp"
 #include "core/app_icon.hpp"
@@ -134,6 +135,7 @@ void TellHelperFileSaved(const char *path, bool clip = false)
 void OnFrontendEvent(enum obs_frontend_event event, void *)
 {
 	if (event == OBS_FRONTEND_EVENT_SCRIPTING_SHUTDOWN) {
+		StopSingleInstanceWatch();
 		StopGraphicsWatch();
 		ShareLinkStop();
 		FocusCardStop();
@@ -141,6 +143,7 @@ void OnFrontendEvent(enum obs_frontend_event event, void *)
 		return;
 	}
 	if (event == OBS_FRONTEND_EVENT_EXIT) {
+		StopSingleInstanceWatch();
 		CaptureContextStop();
 		CefCloseForShutdown();
 		PatchBrowserDockTitleInUserIni(); // fires after obs already wrote user.ini, so this rename sticks
@@ -220,6 +223,7 @@ void OnFrontendEvent(enum obs_frontend_event event, void *)
 	FocusCardStart();
 	PublishMainWindow();
 	InstallMainWindowCloseFilter();
+	StartSingleInstanceWatch();
 	// obs restores its saved dock state during init, so the dock half of the layout has to wait for this event; the chrome half already ran from obs_module_post_load and is simply re-asserted here
 	ApplyLayout();
 	// the browser dock is built well after FINISHED_LOADING (cef init) and obs keeps re-showing the native one / re-titling ours, so this runs forever on a slow tick. each call is a cheap findChildren + a couple of string compares.

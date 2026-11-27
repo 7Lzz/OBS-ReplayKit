@@ -9619,6 +9619,10 @@
     "source": "c61d0594a2a8fdfc",
     "text": "Um arquivo do host de processos incluído falhou na verificação."
   },
+  "setup.aCopiedFileDoesNotMatchItsSource": {
+    "source": "3c19c475dff15930",
+    "text": "Um arquivo copiado não corresponde à sua origem: {path}"
+  },
   "setup.aProcessHostPathEscapesIts": {
     "source": "330500722fa73ec0",
     "text": "Um caminho do host de processos sai da própria pasta."
@@ -9662,6 +9666,22 @@
   "setup.applyDefaultSettings": {
     "source": "b8bbb12c63ba3d4c",
     "text": "Aplicar configurações padrão"
+  },
+  "setup.aReplaykitFileChangedOutsideTheUpdate": {
+    "source": "ca32ecd29bec6cb9",
+    "text": "Um arquivo do ReplayKit foi alterado fora da atualização: {path}"
+  },
+  "setup.aReplaykitFilePathEscapesItsFolder": {
+    "source": "42bbed43c78601fa",
+    "text": "Um caminho de arquivo do ReplayKit sai da própria pasta."
+  },
+  "setup.aReplaykitFilePathIsInvalid": {
+    "source": "dfdbb7c483b4528e",
+    "text": "Um caminho de arquivo do ReplayKit é inválido."
+  },
+  "setup.aStagedFileDoesNotMatchTheBundle": {
+    "source": "07045c5aeb3bda70",
+    "text": "Um arquivo do ReplayKit preparado para a atualização não corresponde ao do instalador: {path}"
   },
   "setup.backUpCurrentObsSettings": {
     "source": "66f2ce2cf31015c7",
@@ -10003,6 +10023,10 @@
     "source": "7c539494daa8d5db",
     "text": "O ReplayKit precisa do OBS {version} e o OBS instalado não pôde ser levado a essa versão. Instale o OBS {version} pelo obsproject.com e execute este instalador de novo."
   },
+  "setup.olderStateCouldNotBeMoved": {
+    "source": "93add26cb7454bcc",
+    "text": "Não foi possível mover {file} da pasta antiga, então o original foi mantido."
+  },
   "setup.originalObsFilesRequired": {
     "source": "d1b83005942f04a8",
     "text": "Os arquivos originais do OBS {version} são necessários antes de instalar o host de processos compartilhado. Repare o OBS Studio e execute a instalação do ReplayKit de novo."
@@ -10122,6 +10146,10 @@
   "setup.replacesTheReplaykitFilesAndKeeps": {
     "source": "26559bd2d6df3743",
     "text": "Substitui os arquivos do ReplayKit e mantém suas configurações do OBS e do ReplayKit como estão."
+  },
+  "setup.replaykitFilesCannotBeUpdatedThroughALink": {
+    "source": "df73dcd3a5944332",
+    "text": "Os arquivos do ReplayKit não podem ser atualizados por um link ou junção: {path}"
   },
   "setup.replaykitFilesWereInstalledButThe": {
     "source": "dbc739eb65009b26",
@@ -10295,6 +10323,10 @@
     "source": "4352d805a2e7d2f1",
     "text": "o plugin de áudio da área de trabalho"
   },
+  "setup.theInterruptedUpdateRecordIsInvalid": {
+    "source": "1f0431532bd690fc",
+    "text": "O registro da atualização interrompida do ReplayKit é inválido."
+  },
   "setup.theMotionBlurPlugin": {
     "source": "ec9eee00d7a677ce",
     "text": "o plugin de desfoque de movimento"
@@ -10314,6 +10346,10 @@
   "setup.theOriginalObsBackupFailedVerification": {
     "source": "48b46e260aa0edf2",
     "text": "A verificação do backup original do OBS falhou."
+  },
+  "setup.thePreviousUpdateFilesCouldNotBeCleared": {
+    "source": "58db83cc918b521f",
+    "text": "Não foi possível limpar os arquivos que sobraram da atualização anterior do ReplayKit."
   },
   "setup.theProcessRoleBackupIsMissing": {
     "source": "6c07b88b1b03685a",
@@ -10370,6 +10406,10 @@
   "setup.thisRemovesTheReplaykitDockScene2": {
     "source": "76eccee6e8f3ce3c",
     "text": "Isto remove o painel, a cena, as fontes, o script e as configurações do ReplayKit do OBS."
+  },
+  "setup.thisSetupHasNoReplaykitFiles": {
+    "source": "5c0d9ac3ca0163de",
+    "text": "Este instalador foi criado sem os arquivos do ReplayKit."
   },
   "setup.thisSetupWasBuiltWithoutIts": {
     "source": "eaa6a0db0d893c55",
@@ -10434,6 +10474,10 @@
   "setup.verifyUpdateFiles": {
     "source": "e5aa889b3d9cef79",
     "text": "Verificar os arquivos da atualização"
+  },
+  "setup.windowsProgramFilesWasNotFound": {
+    "source": "ae428fc60ddcbf2c",
+    "text": "A pasta Arquivos de Programas do Windows não foi encontrada."
   },
   "setup.windowTitle": {
     "source": "2e0e00e71a75260a",

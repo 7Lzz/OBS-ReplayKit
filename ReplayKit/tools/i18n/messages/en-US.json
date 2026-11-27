@@ -9617,6 +9617,10 @@
     "context": "Error message shown when an installer step fails in the installer and uninstaller.",
     "text": "A bundled process host file failed verification."
   },
+  "setup.aCopiedFileDoesNotMatchItsSource": {
+    "context": "Error message shown when an installer step fails in the installer and uninstaller. {path} is a file or folder path.",
+    "text": "A copied file does not match its source: {path}"
+  },
   "setup.aProcessHostPathEscapesIts": {
     "context": "Error message shown when an installer step fails in the installer and uninstaller.",
     "text": "A process host path escapes its folder."
@@ -9660,6 +9664,22 @@
   "setup.applyDefaultSettings": {
     "context": "Title or description of an installer step in the installer and uninstaller.",
     "text": "Apply default settings"
+  },
+  "setup.aReplaykitFileChangedOutsideTheUpdate": {
+    "context": "Error message shown when an installer step fails in the installer and uninstaller. {path} is a file or folder path.",
+    "text": "A ReplayKit file changed outside the update: {path}"
+  },
+  "setup.aReplaykitFilePathEscapesItsFolder": {
+    "context": "Error message shown when an installer step fails in the installer and uninstaller.",
+    "text": "A ReplayKit file path escapes its folder."
+  },
+  "setup.aReplaykitFilePathIsInvalid": {
+    "context": "Error message shown when an installer step fails in the installer and uninstaller.",
+    "text": "A ReplayKit file path is invalid."
+  },
+  "setup.aStagedFileDoesNotMatchTheBundle": {
+    "context": "Error message shown when an installer step fails in the installer and uninstaller. {path} is a file or folder path.",
+    "text": "A ReplayKit file prepared for the update does not match the one in the setup: {path}"
   },
   "setup.backUpCurrentObsSettings": {
     "context": "Title or description of an installer step in the installer and uninstaller.",
@@ -10001,6 +10021,10 @@
     "context": "Reason a step of the installer stopped, shown in the installer window. Keep {version} as written; it is an OBS version.",
     "text": "ReplayKit needs OBS {version} and the installed OBS could not be brought to it. Install OBS {version} from obsproject.com, then run this installer again."
   },
+  "setup.olderStateCouldNotBeMoved": {
+    "context": "Error message shown when an installer step fails in the installer and uninstaller. {file} is a file name.",
+    "text": "{file} could not be moved from its old folder, so the original was kept."
+  },
   "setup.originalObsFilesRequired": {
     "context": "Reason a step of the installer stopped, shown in the installer window. Keep {version} as written; it is an OBS version.",
     "text": "The original OBS {version} files are required before installing the shared process host. Repair OBS Studio, then run ReplayKit setup again."
@@ -10120,6 +10144,10 @@
   "setup.replacesTheReplaykitFilesAndKeeps": {
     "context": "Title or description of an installer step in the installer and uninstaller. Describes the step that updates an existing install in place.",
     "text": "Replaces the ReplayKit files and keeps your OBS and ReplayKit settings as they are."
+  },
+  "setup.replaykitFilesCannotBeUpdatedThroughALink": {
+    "context": "Error message shown when an installer step fails in the installer and uninstaller. {path} is a file or folder path.",
+    "text": "ReplayKit files cannot be updated through a link or junction: {path}"
   },
   "setup.replaykitFilesWereInstalledButThe": {
     "context": "Result of an update, shown in the ReplayKit update window. {version} is the ReplayKit version number. {parts} lists the parts that were not repaired.",
@@ -10292,6 +10320,10 @@
     "context": "Part of ReplayKit named in the update window when an update could not repair it; it fills {parts} of the message that lists what was not repaired.",
     "text": "the desktop audio plugin"
   },
+  "setup.theInterruptedUpdateRecordIsInvalid": {
+    "context": "Error message shown when an installer step fails in the installer and uninstaller.",
+    "text": "The record of the interrupted ReplayKit update is invalid."
+  },
   "setup.theMotionBlurPlugin": {
     "context": "Part of ReplayKit named in the update window when an update could not repair it; it fills {parts} of the message that lists what was not repaired.",
     "text": "the motion blur plugin"
@@ -10311,6 +10343,10 @@
   "setup.theOriginalObsBackupFailedVerification": {
     "context": "Error message shown when an installer step fails in the installer and uninstaller.",
     "text": "The original OBS backup failed verification."
+  },
+  "setup.thePreviousUpdateFilesCouldNotBeCleared": {
+    "context": "Error message shown when an installer step fails in the installer and uninstaller.",
+    "text": "The files kept from the previous ReplayKit update could not be cleared."
   },
   "setup.theProcessRoleBackupIsMissing": {
     "context": "Error message shown when an installer step fails in the installer and uninstaller.",
@@ -10367,6 +10403,10 @@
   "setup.thisRemovesTheReplaykitDockScene2": {
     "context": "Text in the uninstall window.",
     "text": "This removes the ReplayKit dock, scene, sources, script and settings from OBS."
+  },
+  "setup.thisSetupHasNoReplaykitFiles": {
+    "context": "Error message shown when an installer step fails in the installer and uninstaller.",
+    "text": "This setup was built without its ReplayKit files."
   },
   "setup.thisSetupWasBuiltWithoutIts": {
     "context": "Error message shown when an installer step fails in the installer and uninstaller.",
@@ -10431,6 +10471,10 @@
   "setup.verifyUpdateFiles": {
     "context": "First progress step in the setup window for a local update. Setup checks its bundled files before closing OBS.",
     "text": "Verify update files"
+  },
+  "setup.windowsProgramFilesWasNotFound": {
+    "context": "Error message shown when an installer step fails in the installer and uninstaller.",
+    "text": "The Windows Program Files folder was not found."
   },
   "setup.windowTitle": {
     "context": "Windows installer caption.",

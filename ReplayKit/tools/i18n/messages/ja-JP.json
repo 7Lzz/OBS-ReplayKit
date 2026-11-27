@@ -9613,6 +9613,10 @@
     "source": "c61d0594a2a8fdfc",
     "text": "同梱のプロセスホストファイルの検証に失敗しました。"
   },
+  "setup.aCopiedFileDoesNotMatchItsSource": {
+    "source": "3c19c475dff15930",
+    "text": "コピーしたファイルがコピー元と一致しません: {path}"
+  },
   "setup.aProcessHostPathEscapesIts": {
     "source": "330500722fa73ec0",
     "text": "プロセスホストのパスがフォルダの外を指しています。"
@@ -9656,6 +9660,22 @@
   "setup.applyDefaultSettings": {
     "source": "b8bbb12c63ba3d4c",
     "text": "既定の設定を適用"
+  },
+  "setup.aReplaykitFileChangedOutsideTheUpdate": {
+    "source": "ca32ecd29bec6cb9",
+    "text": "ReplayKit のファイルが更新以外で変更されました: {path}"
+  },
+  "setup.aReplaykitFilePathEscapesItsFolder": {
+    "source": "42bbed43c78601fa",
+    "text": "ReplayKit のファイルパスがフォルダの外を指しています。"
+  },
+  "setup.aReplaykitFilePathIsInvalid": {
+    "source": "dfdbb7c483b4528e",
+    "text": "ReplayKit のファイルパスが無効です。"
+  },
+  "setup.aStagedFileDoesNotMatchTheBundle": {
+    "source": "07045c5aeb3bda70",
+    "text": "更新用に準備した ReplayKit のファイルが、セットアップ内のファイルと一致しません: {path}"
   },
   "setup.backUpCurrentObsSettings": {
     "source": "66f2ce2cf31015c7",
@@ -9997,6 +10017,10 @@
     "source": "7c539494daa8d5db",
     "text": "ReplayKit には OBS {version} が必要ですが、インストール済みの OBS をこのバージョンにできませんでした。obsproject.com から OBS {version} をインストールしてから、このインストーラーをもう一度実行してください。"
   },
+  "setup.olderStateCouldNotBeMoved": {
+    "source": "93add26cb7454bcc",
+    "text": "{file} を以前のフォルダから移動できなかったため、元のファイルを残しました。"
+  },
   "setup.originalObsFilesRequired": {
     "source": "d1b83005942f04a8",
     "text": "共有プロセスホストをインストールする前に、OBS {version} の元のファイルが必要です。OBS Studio を修復してから、ReplayKit のセットアップをもう一度実行してください。"
@@ -10116,6 +10140,10 @@
   "setup.replacesTheReplaykitFilesAndKeeps": {
     "source": "26559bd2d6df3743",
     "text": "ReplayKit のファイルを置き換え、OBS と ReplayKit の設定はそのまま残します。"
+  },
+  "setup.replaykitFilesCannotBeUpdatedThroughALink": {
+    "source": "df73dcd3a5944332",
+    "text": "リンクまたはジャンクションを経由して ReplayKit のファイルを更新することはできません: {path}"
   },
   "setup.replaykitFilesWereInstalledButThe": {
     "source": "dbc739eb65009b26",
@@ -10287,6 +10315,10 @@
     "source": "4352d805a2e7d2f1",
     "text": "デスクトップ音声のプラグイン"
   },
+  "setup.theInterruptedUpdateRecordIsInvalid": {
+    "source": "1f0431532bd690fc",
+    "text": "中断された ReplayKit の更新の記録が無効です。"
+  },
   "setup.theMotionBlurPlugin": {
     "source": "ec9eee00d7a677ce",
     "text": "モーションブラーのプラグイン"
@@ -10306,6 +10338,10 @@
   "setup.theOriginalObsBackupFailedVerification": {
     "source": "48b46e260aa0edf2",
     "text": "元の OBS のバックアップの検証に失敗しました。"
+  },
+  "setup.thePreviousUpdateFilesCouldNotBeCleared": {
+    "source": "58db83cc918b521f",
+    "text": "前回の ReplayKit の更新で残ったファイルを削除できませんでした。"
   },
   "setup.theProcessRoleBackupIsMissing": {
     "source": "6c07b88b1b03685a",
@@ -10362,6 +10398,10 @@
   "setup.thisRemovesTheReplaykitDockScene2": {
     "source": "76eccee6e8f3ce3c",
     "text": "OBS から ReplayKit のドック、シーン、ソース、スクリプト、設定を削除します。"
+  },
+  "setup.thisSetupHasNoReplaykitFiles": {
+    "source": "5c0d9ac3ca0163de",
+    "text": "このセットアップは ReplayKit のファイルを含まずにビルドされています。"
   },
   "setup.thisSetupWasBuiltWithoutIts": {
     "source": "eaa6a0db0d893c55",
@@ -10426,6 +10466,10 @@
   "setup.verifyUpdateFiles": {
     "source": "e5aa889b3d9cef79",
     "text": "アップデートファイルを確認"
+  },
+  "setup.windowsProgramFilesWasNotFound": {
+    "source": "ae428fc60ddcbf2c",
+    "text": "Windows の Program Files フォルダが見つかりませんでした。"
   },
   "setup.windowTitle": {
     "source": "2e0e00e71a75260a",

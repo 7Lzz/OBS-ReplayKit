@@ -14,7 +14,7 @@ namespace ReplayKitSetup
     // the modern setup window: a raw win32 window (no WinForms/WPF) hosting a CoreWebView2 controller that renders setup_installer.html. the install itself still runs on a worker thread via Apply.RunInstallFlow; progress is pushed to the page as json messages. reuses the Native p/invoke surface from InstallerWindow.cs.
     internal sealed class SetupWindow : IDisposable
     {
-        private const string ClassName = "ReplayKitSetupWindow";
+        internal const string ClassName = "ReplayKitSetupWindow";
         private const uint WM_APP_DRAIN = 0x8000 + 1;
 
         [DllImport("dwmapi.dll")]

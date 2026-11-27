@@ -14,7 +14,7 @@ namespace ReplayKitSetup
     // the modern uninstall window: the twin of SetupWindow, hosting uninstall_prompt.html. the removal runs on a worker thread via Cleanup.RunCleanup; progress is pushed to the page as json messages. auto-runs on load (the confirm already happened in the settings dialog), then relaunches OBS unless OBS itself was removed.
     internal sealed class UninstallWindow : IDisposable
     {
-        private const string ClassName = "ReplayKitUninstallWindow";
+        internal const string ClassName = "ReplayKitUninstallWindow";
         private const uint WM_APP_DRAIN = 0x8000 + 1;
 
         [DllImport("dwmapi.dll")]

@@ -13,7 +13,7 @@ namespace ReplayKitSetup
     public static class FfmpegInstall
     {
         // next to OBSReplayKit.exe (the ReplayKitHelper server) under the consolidated obs-replayKit/ tree; Compression.FindToolInClipDirs probes Constants.HelperRoot first.
-        private static readonly string HelperDir = Path.Combine(Config.OBS_CONFIG, "obs-replayKit", "scripts", "helper");
+        private static readonly string HelperDir = Path.GetDirectoryName(Config.HELPER_EXE);
         private static readonly string FfmpegDst = Path.Combine(HelperDir, "ffmpeg.exe");
         private static readonly string FfprobeDst = Path.Combine(HelperDir, "ffprobe.exe");
 

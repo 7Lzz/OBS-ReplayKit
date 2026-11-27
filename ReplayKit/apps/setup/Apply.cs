@@ -5,7 +5,7 @@ using ReplayKitShared;
 
 namespace ReplayKitSetup
 {
-    // shared shape for a running install/cleanup progress view. the WinForms installer window (InstallerProgress), Update.CleanupProgress (headless --cleanup) and RunUninstallDiscordScreenshareMode all implement this so the apply flow and Cleanup.RunCleanup run from any caller.
+    // shared shape for a running install/cleanup progress view: PageProgress for the setup and uninstall windows, Update.CleanupProgress for the headless modes and the log-only one of ObsDownloader, so the apply flow and Cleanup.RunCleanup run from any caller
     public interface IInstallProgress
     {
         int TotalSteps { get; set; }
@@ -20,7 +20,7 @@ namespace ReplayKitSetup
     // the three buttons of the setup window: Install on a pc without replaykit, Update and Re-Install on one that has it
     public enum SetupMode { Install, Update, Reinstall }
 
-    // headless installer flow: make sure OBS is present, write the ReplayKit setup, launch OBS. the only interactive choice, discord screenshare, comes from the setup window.
+    // the flow behind the setup window buttons: make sure OBS is present, write the ReplayKit setup, launch OBS. the only choice it takes from the window is discord screenshare
     public static class Apply
     {
         private static readonly System.Text.RegularExpressions.Regex IssueWords = new System.Text.RegularExpressions.Regex(
@@ -77,7 +77,7 @@ namespace ReplayKitSetup
             if (mode == SetupMode.Update && !update) progress.LogLine("no ReplayKit settings to keep, so this update runs as a full install");
             Transform.CleanReinstall = cleanInstall;
             var prefs = Prefs.LoadPrefs(cleanInstall);
-            // the setup checkbox turns the whole Share Preview feature on or off: turning it on from off also switches Share Preview on, turning it off switches it off, and an update that leaves it on keeps the Share Preview state saved in the settings. null (headless) leaves whatever was loaded.
+            // the setup checkbox turns the whole Share Preview feature on or off: turning it on from off also switches Share Preview on, turning it off switches it off, and an update that leaves it on keeps the Share Preview state saved in the settings. null (the window did not show the checkbox) leaves whatever was loaded.
             if (discordScreenshare.HasValue)
             {
                 if (discordScreenshare.Value && !prefs.DiscordScreenshareEnabled) prefs.DiscordProjectorEnabled = true;

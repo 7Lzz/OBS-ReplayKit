@@ -18,7 +18,7 @@ namespace ReplayKitSetup
         public static RuntimeTransaction Open()
         {
             string programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
-            if (!NetCompat.IsPathFullyQualified(programFiles)) throw new IOException("Windows Program Files was not found.");
+            if (!NetCompat.IsPathFullyQualified(programFiles)) throw new IOException(SetupLocale.Message("setup.windowsProgramFilesWasNotFound"));
             string runtime = Path.GetFullPath(Config.REPLAYKIT_CONFIG);
             string key = NetCompat.ToHex(NetCompat.Sha256(Encoding.UTF8.GetBytes(runtime.ToUpperInvariant())));
             return new RuntimeTransaction(runtime, PathAt(programFiles, Path.Combine("OBS ReplayKit Recovery", key)));
@@ -76,7 +76,7 @@ namespace ReplayKitSetup
                 foreach (var entry in entries.Reverse())
                 {
                     if (entry is not JObject item || item["path"]?.Type != JTokenType.String || item["existed"]?.Type != JTokenType.Boolean)
-                        throw new InvalidDataException("The ReplayKit runtime recovery journal is invalid.");
+                        throw new InvalidDataException(SetupLocale.Message("setup.theInterruptedUpdateRecordIsInvalid"));
                     string relative = (string)item["path"];
                     string target = Target(relative);
                     bool exists = File.Exists(target);
@@ -84,14 +84,17 @@ namespace ReplayKitSetup
                     string backup = existed ? Backup(relative) : null;
                     if (exists && existed && Installer.FilesMatch(backup, target)) continue;
                     if (exists && !Installer.FilesMatch(Stage(relative), target))
-                        throw new IOException("A ReplayKit runtime file changed outside the update: " + relative);
+                    {
+                        var reason = SetupLocale.Pair("setup.aReplaykitFileChangedOutsideTheUpdate", "path", relative);
+                        throw new IOException(reason.Shown).WithEnglish(reason);
+                    }
                     if (existed) Installer.ReplaceFile(backup, target, Guid.NewGuid().ToString("N"));
                     else if (exists) File.Delete(target);
                 }
                 log?.Invoke("recovered the previous ReplayKit runtime update");
             }
             Complete(log);
-            if (Directory.Exists(work)) throw new IOException("Could not clear the previous ReplayKit update staging directory.");
+            if (Directory.Exists(work)) throw new IOException(SetupLocale.Message("setup.thePreviousUpdateFilesCouldNotBeCleared"));
         }
 
         public void Complete(Action<string> log)
@@ -108,11 +111,11 @@ namespace ReplayKitSetup
         {
             if (string.IsNullOrWhiteSpace(relative) || relative.Split('\\', '/').Any(part =>
                 part.Length == 0 || part.EndsWith(".", StringComparison.Ordinal) || part.EndsWith(" ", StringComparison.Ordinal) || part.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0))
-                throw new InvalidDataException("Invalid ReplayKit runtime path.");
+                throw new InvalidDataException(SetupLocale.Message("setup.aReplaykitFilePathIsInvalid"));
             string prefix = NetCompat.TrimEndingDirectorySeparator(Path.GetFullPath(root)) + Path.DirectorySeparatorChar;
             string path = Path.GetFullPath(Path.Combine(prefix, relative));
             if (!path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-                throw new InvalidDataException("A ReplayKit runtime path escaped its directory.");
+                throw new InvalidDataException(SetupLocale.Message("setup.aReplaykitFilePathEscapesItsFolder"));
             for (string parent = path; parent != null; parent = Path.GetDirectoryName(parent))
             {
                 FileAttributes attributes;
@@ -120,7 +123,10 @@ namespace ReplayKitSetup
                 catch (FileNotFoundException) { continue; }
                 catch (DirectoryNotFoundException) { continue; }
                 if ((attributes & FileAttributes.ReparsePoint) != 0)
-                    throw new IOException("ReplayKit runtime recovery cannot use reparse points: " + parent);
+                {
+                    var reason = SetupLocale.Pair("setup.replaykitFilesCannotBeUpdatedThroughALink", "path", parent);
+                    throw new IOException(reason.Shown).WithEnglish(reason);
+                }
             }
             return path;
         }

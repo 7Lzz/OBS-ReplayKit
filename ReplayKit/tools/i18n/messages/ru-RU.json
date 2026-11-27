@@ -9622,6 +9622,10 @@
     "source": "c61d0594a2a8fdfc",
     "text": "Файл встроенного хоста процессов не прошёл проверку."
   },
+  "setup.aCopiedFileDoesNotMatchItsSource": {
+    "source": "3c19c475dff15930",
+    "text": "Скопированный файл не совпадает с исходным: {path}"
+  },
   "setup.aProcessHostPathEscapesIts": {
     "source": "330500722fa73ec0",
     "text": "Путь хоста процессов выходит за пределы его папки."
@@ -9665,6 +9669,22 @@
   "setup.applyDefaultSettings": {
     "source": "b8bbb12c63ba3d4c",
     "text": "Применить настройки по умолчанию"
+  },
+  "setup.aReplaykitFileChangedOutsideTheUpdate": {
+    "source": "ca32ecd29bec6cb9",
+    "text": "Файл ReplayKit был изменён вне обновления: {path}"
+  },
+  "setup.aReplaykitFilePathEscapesItsFolder": {
+    "source": "42bbed43c78601fa",
+    "text": "Путь к файлу ReplayKit выходит за пределы его папки."
+  },
+  "setup.aReplaykitFilePathIsInvalid": {
+    "source": "dfdbb7c483b4528e",
+    "text": "Недопустимый путь к файлу ReplayKit."
+  },
+  "setup.aStagedFileDoesNotMatchTheBundle": {
+    "source": "07045c5aeb3bda70",
+    "text": "Подготовленный для обновления файл ReplayKit не совпадает с файлом из установщика: {path}"
   },
   "setup.backUpCurrentObsSettings": {
     "source": "66f2ce2cf31015c7",
@@ -10006,6 +10026,10 @@
     "source": "7c539494daa8d5db",
     "text": "ReplayKit нужна OBS {version}, а установленную OBS не удалось привести к этой версии. Установите OBS {version} с obsproject.com и снова запустите этот установщик."
   },
+  "setup.olderStateCouldNotBeMoved": {
+    "source": "93add26cb7454bcc",
+    "text": "Не удалось перенести {file} из старой папки, поэтому оригинал сохранён."
+  },
   "setup.originalObsFilesRequired": {
     "source": "d1b83005942f04a8",
     "text": "Перед установкой общего хоста процессов нужны исходные файлы OBS {version}. Восстановите OBS Studio и снова запустите установку ReplayKit."
@@ -10125,6 +10149,10 @@
   "setup.replacesTheReplaykitFilesAndKeeps": {
     "source": "26559bd2d6df3743",
     "text": "Заменяет файлы ReplayKit и сохраняет ваши настройки OBS и ReplayKit без изменений."
+  },
+  "setup.replaykitFilesCannotBeUpdatedThroughALink": {
+    "source": "df73dcd3a5944332",
+    "text": "Файлы ReplayKit нельзя обновить через ссылку или точку соединения: {path}"
   },
   "setup.replaykitFilesWereInstalledButThe": {
     "source": "dbc739eb65009b26",
@@ -10299,6 +10327,10 @@
     "source": "4352d805a2e7d2f1",
     "text": "плагин звука рабочего стола"
   },
+  "setup.theInterruptedUpdateRecordIsInvalid": {
+    "source": "1f0431532bd690fc",
+    "text": "Запись о прерванном обновлении ReplayKit недействительна."
+  },
   "setup.theMotionBlurPlugin": {
     "source": "ec9eee00d7a677ce",
     "text": "плагин размытия движения"
@@ -10318,6 +10350,10 @@
   "setup.theOriginalObsBackupFailedVerification": {
     "source": "48b46e260aa0edf2",
     "text": "Проверка исходной резервной копии OBS не пройдена."
+  },
+  "setup.thePreviousUpdateFilesCouldNotBeCleared": {
+    "source": "58db83cc918b521f",
+    "text": "Не удалось удалить файлы, оставшиеся от предыдущего обновления ReplayKit."
   },
   "setup.theProcessRoleBackupIsMissing": {
     "source": "6c07b88b1b03685a",
@@ -10374,6 +10410,10 @@
   "setup.thisRemovesTheReplaykitDockScene2": {
     "source": "76eccee6e8f3ce3c",
     "text": "Удаляет из OBS док-панель, сцену, источники, скрипт и настройки ReplayKit."
+  },
+  "setup.thisSetupHasNoReplaykitFiles": {
+    "source": "5c0d9ac3ca0163de",
+    "text": "Этот установщик собран без файлов ReplayKit."
   },
   "setup.thisSetupWasBuiltWithoutIts": {
     "source": "eaa6a0db0d893c55",
@@ -10438,6 +10478,10 @@
   "setup.verifyUpdateFiles": {
     "source": "e5aa889b3d9cef79",
     "text": "Проверить файлы обновления"
+  },
+  "setup.windowsProgramFilesWasNotFound": {
+    "source": "ae428fc60ddcbf2c",
+    "text": "Папка Program Files Windows не найдена."
   },
   "setup.windowTitle": {
     "source": "2e0e00e71a75260a",
