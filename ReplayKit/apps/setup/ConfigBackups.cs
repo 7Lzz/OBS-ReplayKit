@@ -345,7 +345,7 @@ namespace ReplayKitSetup
         private static void LogOmissions(Manifest manifest, Action<string> log)
         {
             foreach (string path in manifest.Omitted)
-                log?.Invoke("OBS config backup excludes a file over 50 MB: " + path);
+                log?.Invoke("OBS config backup excludes a file over " + FileLimit / (1024 * 1024) + " MB: " + path);
         }
 
         private static Snapshot OpenMatchingBackup(Manifest manifest, string path)
@@ -810,9 +810,12 @@ namespace ReplayKitSetup
                 string stamp = name.Groups["stamp"].Value;
                 if (!DateTime.TryParseExact(stamp, StampFormat, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out var created))
                     throw new InvalidDataException("Invalid legacy OBS backup timestamp.");
-                string archive = Path.Combine(Folder, stamp + name.Groups["fraction"].Value + "-" + ImportReason + ".zip");
+                // the old folders were stamped in local time while every archive name is utc, so the import takes its utc time to keep the newest-first order that prune and the duplicate check read
+                DateTime createdUtc = created.ToUniversalTime();
+                string archive = Path.Combine(Folder, createdUtc.ToString(StampFormat, CultureInfo.InvariantCulture) +
+                    name.Groups["fraction"].Value + "-" + ImportReason + ".zip");
                 string compare = Attributes(archive) == null ? null : archive;
-                using (Save(archive, ImportReason, created.ToUniversalTime(), path, path, compare, SetupLog.Line)) { }
+                using (Save(archive, ImportReason, createdUtc, path, path, compare, SetupLog.Line)) { }
                 SetupLog.Line("imported legacy OBS backup " + Path.GetFileName(path));
                 Prune(SetupLog.Line);
                 return identity;
@@ -952,7 +955,6 @@ namespace ReplayKitSetup
             FileMode mode = FileMode.Open, uint extraAccess = 0, bool missingOkay = false)
         {
             string full = Path.GetFullPath(path);
-            using var pinned = new PinnedPath(Path.GetDirectoryName(full));
             uint rights = extraAccess;
             if ((access & FileAccess.Read) != 0) rights |= ReadAccess;
             if ((access & FileAccess.Write) != 0) rights |= WriteAccess;
