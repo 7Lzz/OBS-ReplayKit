@@ -477,7 +477,7 @@
         document.documentElement.classList.add("rk-theme-swapping");
         themeLiveStyle.textContent = css;
         publishThemePreview(css);
-        // when a non-default theme is saved the helper injects its own <style id="rk-theme"> before </head>; rewriting this nodes text alone doesnt always make CEF redo the cascade tie-break, so move it back to last to guarantee the preview wins.
+        // the helper injects the saved theme as <style id="rk-theme"> before </head>; rewriting this nodes text alone doesnt always make CEF redo the cascade tie-break, so move it back to last to guarantee the preview wins.
         document.head.appendChild(themeLiveStyle);
         void document.documentElement.offsetHeight; // flush the swap under the freeze before re-enabling motion
         requestAnimationFrame(() => document.documentElement.classList.remove("rk-theme-swapping"));

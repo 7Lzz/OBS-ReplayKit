@@ -364,15 +364,14 @@ namespace ReplayKitHelper
             return sb.ToString();
         }
 
-        // physical stylesheet the dock html files <link> to. the "Custom Controls" dock is loaded from a file:// url (user.ini ExtraBrowserDocks), so the helpers http-time injection never reaches it -- this file does. rewritten on every theme change + at startup; empty-ish on the default theme.
+        // physical stylesheet the dock html files <link> to. the "Custom Controls" dock is loaded from a file:// url (user.ini ExtraBrowserDocks), so the helpers http-time injection never reaches it -- this file does. rewritten on every theme change + at startup, the default theme included.
         public static void WriteDockThemeCss(JObject settings)
         {
             try
             {
                 string dockDir = AppConfig.GetDockDir();
                 if (string.IsNullOrEmpty(dockDir) || !Directory.Exists(dockDir)) return;
-                string id = settings?["theme"]?.Value<string>() ?? "default";
-                string css = id == "default" ? "/* default theme -- dock uses its own :root */\n" : DockCss(Resolve(settings)) + "\n";
+                string css = DockCss(Resolve(settings)) + "\n";
                 File.WriteAllText(Path.Combine(dockDir, ReplayKitShared.ThemeSheet.FileName), css, new UTF8Encoding(false));
             }
             catch (Exception ex) { Log.Write("Themes.WriteDockThemeCss: " + ex.Message); }
@@ -383,8 +382,7 @@ namespace ReplayKitHelper
         {
             try
             {
-                string id = settings?["theme"]?.Value<string>() ?? "default";
-                if (id == "default") return "";
+                // the default theme is served too, since several pages define only some of the tokens in their own :root
                 return "<style id=\"rk-theme\">" + DockCss(Resolve(settings)) + "</style>";
             }
             catch (Exception ex) { Log.Write("Themes.DockStyleTag: " + ex.Message); return ""; }
