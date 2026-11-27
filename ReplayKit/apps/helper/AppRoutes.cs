@@ -26,7 +26,6 @@ namespace ReplayKitHelper
             HttpRequest req = r.Req;
             string path = r.Path;
 
-
             if (path == "/status")
             {
                 var status = UploadState.GetUploadStatusSnapshot();
@@ -87,7 +86,7 @@ namespace ReplayKitHelper
 
             if (path == "/restart-obs")
             {
-                // the detached relauncher starts obs only after the original process exits normally
+                // a detached restart process closes obs, forces the same verified process if the normal close stalls, and starts obs again once it has exited
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
                 using var close = ObsProcess.CloseRequest.Begin(out string error);
                 if (close == null) { HttpResponse.SendJson(stream, 409, new JObject { ["ok"] = false, ["message"] = error }); return false; }
@@ -110,9 +109,11 @@ namespace ReplayKitHelper
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
                 using var close = ObsProcess.CloseRequest.Begin(out string error);
                 if (close == null) { HttpResponse.SendJson(stream, 409, new JObject { ["ok"] = false, ["message"] = error }); return false; }
+                // setup forces the close itself when this one stalls, so a stall it asked for goes to the log and not the bell
+                bool notify = r.Q("reason") != "setup";
                 HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["message"] = Locales.Message("helper.obsIsClosing") });
                 stream.Dispose();
-                close.Run(path, restart: false);
+                close.Run(path, restart: false, notify);
                 return false;
             }
 

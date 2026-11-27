@@ -72,7 +72,7 @@
       }
       var size = Math.max(element.offsetWidth, element.offsetHeight);
       if (!size) return;
-      // Limit growth to 3px and shrinkage to 4px across the whole button.
+      // limit growth to 3px and shrinkage to 4px across the whole button.
       element.style.setProperty("--rk-hover-limit", String(1 + 3 / size));
       element.style.setProperty("--rk-press-limit", String(1 - 4 / size));
     });

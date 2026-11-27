@@ -58,7 +58,7 @@ namespace ReplayKitHelper
             }
 
             // lua can be hosted by a short-lived obs child process, so the running obs is watched instead and the helper does not exit as soon as that child does
-            if (!IsMainObsProcess(ParentName) || IsRoleHost(ParentPid)) ResolveRunningObs();
+            if (!Constants.IsObsProcessName(ParentName) || IsRoleHost(ParentPid)) ResolveRunningObs();
         }
 
         // a host copy of obs64.exe can start the helper too, and it ends with the page or helper it runs rather than with obs
@@ -71,14 +71,9 @@ namespace ReplayKitHelper
             catch (Exception ex) when (ex is ArgumentException || ex is InvalidOperationException || ex is System.ComponentModel.Win32Exception) { return false; }
         }
 
-        private static bool IsMainObsProcess(string name) =>
-            string.Equals(name, "obs64", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(name, "obs32", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(name, "obs", StringComparison.OrdinalIgnoreCase);
-
         private static void ResolveRunningObs()
         {
-            foreach (string name in new[] { "obs64", "obs32", "obs" })
+            foreach (string name in Constants.ObsProcessNames)
             {
                 var processes = Process.GetProcessesByName(name);
                 try

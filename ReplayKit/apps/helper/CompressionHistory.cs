@@ -97,7 +97,7 @@ namespace ReplayKitHelper
                 decimal before = 0, saved = 0;
                 foreach (var entry in Entries(db).OfType<JObject>())
                 {
-                    // Resizing changes savings, so full-size Storage estimates use full-size results.
+                    // resizing changes savings, so full-size Storage estimates use full-size results.
                     if (entry.Value<string>("mode") != mode || Integer(entry["scaleHeight"]) != 0) continue;
                     long size = Integer(entry["beforeBytes"]);
                     before += size;

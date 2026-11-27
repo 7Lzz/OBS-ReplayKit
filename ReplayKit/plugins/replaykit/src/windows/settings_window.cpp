@@ -30,10 +30,10 @@ void CreateSettingsWindow()
 
 	CefHostWindow *win = new CefHostWindow();
 	win->setAttribute(Qt::WA_DeleteOnClose, false);
-	win->setWindowTitle("ReplayKit Settings");
+	win->setWindowTitle(kSettingsWindowTitle);
 	win->resize(980, 760);
 	// derived from settings.htmls own grid, not guessed: .shell is a fixed 190px sidebar + flexible main column inside 18px of shell padding, .main adds another 10px right padding, and the widest row inside it (.form-row) needs 180px label + 8px gap + a 260px-minimum field (grid-template-columns:180px minmax(260px,1fr)) to avoid wrapping. 190+18+10+180+8+260 = 666px is the point a form row would start fighting for space; 700 gives a small margin. height has no equivalent hard floor (.main scrolls vertically), 500 is just enough to show a few rows without feeling cramped.
-	win->setMinimumSize(700, 500);
+	win->setMinimumSize(kSettingsWindowMinWidth, kSettingsWindowMinHeight);
 
 	QVBoxLayout *layout = new QVBoxLayout(win);
 	layout->setContentsMargins(0, 0, 0, 0);

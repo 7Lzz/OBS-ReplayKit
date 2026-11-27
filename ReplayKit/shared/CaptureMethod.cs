@@ -4,10 +4,10 @@ using Newtonsoft.Json.Linq;
 
 namespace ReplayKitShared
 {
-    // which way the Display Capture source reads the screen. obs's automatic choice uses desktop duplication (dxgi) unless the display sits on another gpu than obs, and dxgi gives a black picture on some machines anyway (all-in-ones, some laptops and hdr or very wide displays), where windows graphics capture (wgc) works. on windows 11 wgc captures without the yellow border windows 10 draws around the whole screen, so there it is the default; on windows 10 the source stays on automatic, since replaykit captures all the time and the border would never go away
+    // which way the Display Capture source reads the screen. the automatic choice of obs uses desktop duplication (dxgi) unless the display sits on another gpu than obs, and dxgi gives a black picture on some machines anyway (all-in-ones, some laptops and hdr or very wide displays), where windows graphics capture (wgc) works. on windows 11 wgc captures without the yellow border windows 10 draws around the whole screen, so there it is the default; on windows 10 the source stays on automatic, since replaykit captures all the time and the border would never go away
     internal static class CaptureMethod
     {
-        // the "method" values of obs's monitor_capture source
+        // the "method" values of the monitor_capture source of obs
         public const int Auto = 0, Dxgi = 1, Wgc = 2;
         public const string Key = "method";
 

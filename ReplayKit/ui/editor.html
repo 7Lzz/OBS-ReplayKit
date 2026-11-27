@@ -552,8 +552,8 @@ window.__rkEditorApi = (function () {
 
   enableCursorZoom(trimVideoWrap, trimVideo, () => !!trimSourceClip && replayKitSettings.editorWheelZoom);
 
-  // minimum trimmed length the backend will accept.
-  const TRIM_MIN_SECONDS = 0.5;
+  // the shortest trim the helper accepts
+  const TRIM_MIN_SECONDS = window.RK_EDITOR_LIMITS.clipSecondsMin;
   const TRIM_SNAP_EDGE_GUARD_PX = 10;
   const TRIM_SNAP_MIN_GAP_PX = 8;
   const TRIM_SNAP_MAX_MARKS = 96;
@@ -565,7 +565,6 @@ window.__rkEditorApi = (function () {
   let trimSourceClip = null;
   let trimSession = null;
   let trimRenaming = false;
-  // the save that is running, or null: the editor cannot be closed or changed while there is one
   // the draft of the open editor: armed once the editor is up, and what was last sent, so an edit that did not change is not sent again
   let trimDraftArmed = false;
   let trimDraftSaved = false;
@@ -923,7 +922,7 @@ window.__rkEditorApi = (function () {
     trimLanes.setPlayhead(time);
   }
 
-  // keep the playhead independent from the cut handles. the timeline is a normal editor scrub surface: click or drag the frames to inspect a moment, then only move a handle when that is the edit you intend.
+  // keep the playhead independent from the cut handles. the timeline is a normal editor scrub surface: click or drag the frames to inspect a moment, then only move a handle when that is the edit intended.
   function trimTimelineTimeAt(clientX) {
     if (!trimFilmstrip) return null;
     const rect = trimFilmstrip.getBoundingClientRect();
@@ -1931,7 +1930,7 @@ window.__rkEditorApi = (function () {
 
   function followSaveFill(percent) {
     const m = saveMotion;
-    // the fill only moves toward new measured values, including when decorative motion is off
+    // the fill only moves forward, toward the newest measured percent
     if (percent <= m.target) return;
     m.target = percent;
     if (m.raf) return;
@@ -1948,7 +1947,7 @@ window.__rkEditorApi = (function () {
   function paintTrimSave(save) {
     const finishing = save.phase === "finishing";
     const percent = finishing ? Math.max(save.percent, 98) : save.percent;
-    // Preparation and encoder startup have no measured percentage yet.
+    // preparation and encoder startup have no measured percentage yet.
     const known = finishing || percent > 0;
     saveTrack.classList.toggle("is-waiting", !known);
     if (known) followSaveFill(percent);

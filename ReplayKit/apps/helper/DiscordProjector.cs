@@ -635,7 +635,7 @@ namespace ReplayKitHelper
 
         private static void KeepProjectorAlive()
         {
-            // Complete an explicit off request once the timed-out operation and fresh window information are available.
+            // complete an explicit off request once the timed-out operation and fresh window information are available.
             if (disablePending)
             {
                 var pendingSettings = ReplaykitSettings.ReadSettings();

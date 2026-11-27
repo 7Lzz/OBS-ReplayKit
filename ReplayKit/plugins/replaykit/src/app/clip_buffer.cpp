@@ -38,10 +38,10 @@ enum class Mode { Memory, Disk };
 constexpr int kPieceSeconds = 10;
 // a split lands on the next keyframe and the next audio packet after it
 constexpr int kSplitWaitMs = 6000;
-constexpr int StopCheckMs = 100;
-constexpr ULONGLONG GraphicsFailureMatchMs = 1000;
-constexpr qint64 CaptureStallMs = 5000;
-constexpr auto NoPacketRevision = UINT64_MAX;
+constexpr int kStopCheckMs = 100;
+constexpr ULONGLONG kGraphicsFailureMatchMs = 1000;
+constexpr qint64 kCaptureStallMs = 5000;
+constexpr auto kNoPacketRevision = UINT64_MAX;
 
 struct Piece {
 	std::string path;
@@ -59,7 +59,7 @@ std::vector<obs_encoder_t *> g_audio;
 std::deque<Piece> g_pieces;
 Piece g_current;
 GraphicsState g_outputGraphics;
-std::atomic<std::uint64_t> g_packetGraphics{NoPacketRevision};
+std::atomic<std::uint64_t> g_packetGraphics{kNoPacketRevision};
 std::optional<GraphicsState> g_failedGraphics;
 ULONGLONG g_matchGraphicsUntil = 0;
 bool g_diskStopRequested = false;
@@ -156,12 +156,18 @@ bool DiskCapturing()
 	const auto graphics = GraphicsStatus();
 	const auto last = lastFrameAt.load();
 	return !g_pendingStop && DiskActive() && !graphics.Lost() && g_packetGraphics.load() == graphics.revision &&
-	       last > 0 && qint64(GetTickCount64()) - last < CaptureStallMs;
+	       last > 0 && qint64(GetTickCount64()) - last < kCaptureStallMs;
 }
 
 bool DiskCanSaveRetained()
 {
 	return g_mode == Mode::Disk && !g_pieces.empty();
+}
+
+// an encode error that a confirmed graphics loss explains, so the buffer starts again once obs recovers
+bool DiskWaitsForGraphics()
+{
+	return g_failedGraphics && !g_matchGraphicsUntil;
 }
 
 std::string DiskStateQuery(const char *activeKey)
@@ -306,9 +312,9 @@ void DiskStopped(long long code)
 	const bool preserve = code != OBS_OUTPUT_SUCCESS && g_mode == Mode::Disk && !g_closing;
 	if (preserve && code == OBS_OUTPUT_ENCODE_ERROR && (!g_diskStopRequested || movingEncoders)) {
 		const auto lastPacketGraphics = g_packetGraphics.load();
-		g_failedGraphics = lastPacketGraphics == NoPacketRevision ? g_outputGraphics : GraphicsState{lastPacketGraphics};
+		g_failedGraphics = lastPacketGraphics == kNoPacketRevision ? g_outputGraphics : GraphicsState{lastPacketGraphics};
 		const auto status = GraphicsStatus();
-		g_matchGraphicsUntil = status.revision == g_failedGraphics->revision ? GetTickCount64() + GraphicsFailureMatchMs : 0;
+		g_matchGraphicsUntil = status.revision == g_failedGraphics->revision ? GetTickCount64() + kGraphicsFailureMatchMs : 0;
 	}
 	if (preserve) {
 		++g_pieceGroup;
@@ -639,7 +645,7 @@ void StartDisk(bool keepPieces)
 	firstFrameAt.store(0);
 	lastFrameAt.store(0);
 	lastKeyframeAt.store(0);
-	g_packetGraphics.store(NoPacketRevision);
+	g_packetGraphics.store(kNoPacketRevision);
 	obs_output_add_packet_callback(g_out, CapturePacket, nullptr);
 	g_outputGraphics = GraphicsStatus();
 	g_current = Piece{path, NowMs(), 0, 0, 0, g_pieceGroup};
@@ -905,8 +911,7 @@ void SwitchMode(Mode next)
 {
 	const Mode previous = g_mode;
 	const bool pendingStart = g_startAfterDisk == g_startRequest || g_restartShared || g_resumeAfterClose;
-	const bool diskWanted = (!g_diskStopRequested && (DiskActive() || g_pendingStop.has_value())) ||
-				(g_failedGraphics && !g_matchGraphicsUntil);
+	const bool diskWanted = (!g_diskStopRequested && (DiskActive() || g_pendingStop.has_value())) || DiskWaitsForGraphics();
 	const bool wasActive = pendingStart || (previous == Mode::Disk ? diskWanted : ClipBufferActive());
 	++g_startRequest;
 	g_failedGraphics.reset();
@@ -931,7 +936,7 @@ void ClipBufferInit()
 {
 	g_mode = ModeFromSettingsFile();
 	g_stopTimer = new QTimer(g_callbacks);
-	g_stopTimer->setInterval(StopCheckMs);
+	g_stopTimer->setInterval(kStopCheckMs);
 	QObject::connect(g_stopTimer, &QTimer::timeout, g_stopTimer, FinishDiskStopWhenInactive);
 	signal_handler_add(obs_get_signal_handler(), "void replaykit_clip_saving()");
 	signal_handler_add(obs_get_signal_handler(), "void replaykit_clip_saved(string path)");
@@ -1024,7 +1029,8 @@ bool ClipBufferCanSave()
 
 bool ClipBufferCanStop()
 {
-	return g_mode == Mode::Disk ? DiskActive() || g_pendingStop.has_value() || g_startAfterDisk == g_startRequest : ClipBufferActive();
+	return g_mode == Mode::Disk ? DiskActive() || g_pendingStop.has_value() || g_startAfterDisk == g_startRequest || DiskWaitsForGraphics()
+				    : ClipBufferActive();
 }
 
 void ClipBufferStart(bool deferUntilReady)

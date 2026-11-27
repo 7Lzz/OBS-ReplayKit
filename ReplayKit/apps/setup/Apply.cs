@@ -38,7 +38,7 @@ namespace ReplayKitSetup
             return IssueWords.IsMatch(PathToken.Replace(text, " "));
         }
 
-        // Exceptions stop the flow; false results are reported as incomplete steps.
+        // exceptions stop the flow; false results are reported as incomplete steps.
         public static bool RunApplyStep(IInstallProgress progress, int index, SetupLocale.Text title, SetupLocale.Text detail, Func<object> action)
         {
             progress.Render(index - 1, title, detail, "working");

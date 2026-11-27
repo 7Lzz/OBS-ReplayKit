@@ -55,6 +55,8 @@ gs_texrender_t *g_render = nullptr;
 std::optional<uint32_t> g_attemptedTexture;
 uint32_t g_textureSerial = 0;
 uint64_t g_lastFrameTime = 0;
+// the window replaces a rejected texture once a second, so a failure that persists is logged once until a texture opens
+bool g_openFailedLogged = false;
 
 std::atomic<uint64_t> g_copied{0};
 std::atomic<uint64_t> g_busy{0};
@@ -288,8 +290,12 @@ void OnRendered(void *)
 		g_attemptedTexture = seq;
 		g_texture = gs_texture_open_shared(handle);
 		if (!g_texture) {
-			blog(LOG_WARNING, "[replaykit] the share window texture %08x could not be opened", handle);
+			if (!g_openFailedLogged)
+				blog(LOG_WARNING, "[replaykit] the share window texture %08x could not be opened", handle);
+			g_openFailedLogged = true;
 			RejectTexture(*attachment, seq);
+		} else {
+			g_openFailedLogged = false;
 		}
 	}
 	if (!g_texture)

@@ -620,7 +620,6 @@
   let hotkeyCaptureGeneration = 0;
   let activeHotkeyField = null;
   let hotkeyCaptureTimer = null;
-  const HOTKEY_CAPTURE_TIMEOUT_MS = 10000;
 
   function syncHotkeyField(name) {
     const field = hotkeyFields[name];
@@ -646,7 +645,7 @@
       }
       field.el.textContent = RK_M("settings.listening");
       field.el.classList.add("is-empty");
-      hotkeyCaptureTimer = setTimeout(() => { hotkeyCaptureTimer = null; if (activeHotkeyField === name) field.el.blur(); }, HOTKEY_CAPTURE_TIMEOUT_MS);
+      hotkeyCaptureTimer = setTimeout(() => { hotkeyCaptureTimer = null; if (activeHotkeyField === name) field.el.blur(); }, RKHotkeys.captureTimeoutMs);
     });
   }
   function releaseHotkeyCapture(keepalive) {
@@ -689,10 +688,8 @@
     syncHotkeyField(b.dataset.clear);
   }));
 
-  // theme + app icon come from the shared _appearance-panel partial; overlay controls from _overlay-controls;
-  // the fake overlay projector from _overlay-preview. wired in init() once state is seeded from /settings.
+  // theme + app icon come from the shared _appearance-panel partial; overlay controls from _overlay-controls; the fake overlay projector from _overlay-preview. wired in init() once state is seeded from /settings.
 
-  // ---- step navigation ---- set when the user drags the overlay in the projector, so Finish knows to push a position at the scene item
   let step = 1;
   // a wizard that was moved past its welcome step holds choices the user made, so the shell keeps its page until it is finished
   let wizardMoved = false;

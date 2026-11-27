@@ -1,6 +1,8 @@
 <script>
   // key naming shared by the pages that record a hotkey: the hotkeys tab of the settings and the menu that hangs off the clip and record badges of the title bar
   window.RKHotkeys = (function () {
+    // a hotkey field that is listening gives up after this long with nothing pressed
+    const captureTimeoutMs = 10000;
     function comboToLabel(combo) {
       combo = combo || {};
       if (!combo.key) return "";
@@ -85,6 +87,6 @@
       };
     }
 
-    return { comboToLabel:comboToLabel, keyLabel:keyLabel, obsKeyFromEvent:obsKeyFromEvent, comboFromEvent:comboFromEvent, captureClient:captureClient };
+    return { comboToLabel:comboToLabel, keyLabel:keyLabel, obsKeyFromEvent:obsKeyFromEvent, comboFromEvent:comboFromEvent, captureClient:captureClient, captureTimeoutMs:captureTimeoutMs };
   })();
 </script>

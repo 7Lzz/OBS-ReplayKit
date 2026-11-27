@@ -36,7 +36,7 @@ namespace ReplayKitHelper
             {
                 string name = filter["filterName"]?.Value<string>() ?? "";
                 if (string.IsNullOrWhiteSpace(name)) continue;
-                if (name == "ReplayKit Overlay Opacity")
+                if (name == OverlayScene.OpacityFilterName)
                 {
                     return new JObject
                     {
@@ -159,18 +159,18 @@ namespace ReplayKitHelper
             }
             else
             {
-                var create = ObsWebSocket.InvokeRequest("CreateSourceFilter", new JObject { ["sourceName"] = sourceName, ["filterName"] = "ReplayKit Overlay Opacity", ["filterKind"] = "color_filter_v2", ["filterSettings"] = filterSettings }, 3000);
+                var create = ObsWebSocket.InvokeRequest("CreateSourceFilter", new JObject { ["sourceName"] = sourceName, ["filterName"] = OverlayScene.OpacityFilterName, ["filterKind"] = OverlayScene.OpacityFilterVersionedKind, ["filterSettings"] = filterSettings }, 3000);
                 if (!create.Ok)
                 {
                     var createFallback = ObsWebSocket.InvokeRequest("CreateSourceFilter", new JObject
                     {
-                        ["sourceName"] = sourceName, ["filterName"] = "ReplayKit Overlay Opacity", ["filterKind"] = "color_filter",
+                        ["sourceName"] = sourceName, ["filterName"] = OverlayScene.OpacityFilterName, ["filterKind"] = OverlayScene.OpacityFilterKind,
                         ["filterSettings"] = OverlayOpacityFilterSettingsLive(opacityPercent, true, settings),
                     }, 3000);
                     if (!createFallback.Ok) return new JObject { ["ok"] = false, ["message"] = create.Message };
                     legacyPercent = true;
                 }
-                existingFilterName = "ReplayKit Overlay Opacity";
+                existingFilterName = OverlayScene.OpacityFilterName;
                 var createdList = GetSourceFilterListLive(sourceName);
                 if (createdList["ok"]?.Value<bool>() == true)
                 {
@@ -200,8 +200,8 @@ namespace ReplayKitHelper
             string sourceName = source["name"]?.Value<string>() ?? "";
             string sourceId = source["id"]?.Value<string>() ?? "";
             string key;
-            if (sourceName == "Display Capture" || sourceId == "monitor_capture") key = "showCursorDisplayCapture";
-            else if (sourceName == "Game Capture" || sourceId == "game_capture") key = "showCursorGameCapture";
+            if (sourceName == OverlayScene.DisplayCaptureSourceName || sourceId == "monitor_capture") key = "showCursorDisplayCapture";
+            else if (sourceName == OverlayScene.GameCaptureSourceName || sourceId == "game_capture") key = "showCursorGameCapture";
             else return;
             var sourceSettings = source["settings"] as JObject;
             if (sourceSettings == null) { sourceSettings = new JObject(); source["settings"] = sourceSettings; }
@@ -215,9 +215,9 @@ namespace ReplayKitHelper
             var warnings = new List<string>();
             foreach (var target in new[]
             {
-                new[] { "Display Capture", "capture_cursor", "showCursorDisplayCapture" },
-                new[] { "Game Capture", "capture_cursor", "showCursorGameCapture" },
-                new[] { "Window Capture", "cursor", "showCursorWindowCapture" },
+                new[] { OverlayScene.DisplayCaptureSourceName, "capture_cursor", "showCursorDisplayCapture" },
+                new[] { OverlayScene.GameCaptureSourceName, "capture_cursor", "showCursorGameCapture" },
+                new[] { OverlayScene.WindowCaptureSourceName, "cursor", "showCursorWindowCapture" },
             })
             {
                 var set = ObsWebSocket.InvokeRequest("SetInputSettings", new JObject
@@ -237,7 +237,7 @@ namespace ReplayKitHelper
         {
             var set = ObsWebSocket.InvokeRequest("SetInputSettings", new JObject
             {
-                ["inputName"] = "Display Capture",
+                ["inputName"] = OverlayScene.DisplayCaptureSourceName,
                 ["inputSettings"] = new JObject { ["capture_cursor"] = CursorSetting(settings, "showCursorDisplayCapture") },
                 ["overlay"] = true,
             }, 3000);
@@ -400,21 +400,21 @@ namespace ReplayKitHelper
             var items = itemsResult["items"] as JArray;
 
             var gameInputSettings = GetGameCaptureInputSettings(settings);
-            var displayEnsure = EnsureInputSceneItem(sceneName, "Display Capture", "monitor_capture", DisplayCaptureMethodSettings(), useDesktop);
+            var displayEnsure = EnsureInputSceneItem(sceneName, OverlayScene.DisplayCaptureSourceName, "monitor_capture", DisplayCaptureMethodSettings(), useDesktop);
             if (displayEnsure["ok"]?.Value<bool>() != true) warnings.Add(Locales.Message("settings.couldNotPrepareDisplayCaptureError", "error", displayEnsure["message"]));
-            var display = displayEnsure["ok"]?.Value<bool>() == true ? (JObject)displayEnsure["item"] : FindSceneItem(items, "Display Capture");
-            var gameEnsure = EnsureInputSceneItem(sceneName, "Game Capture", "game_capture", gameInputSettings, useGameCapture);
+            var display = displayEnsure["ok"]?.Value<bool>() == true ? (JObject)displayEnsure["item"] : FindSceneItem(items, OverlayScene.DisplayCaptureSourceName);
+            var gameEnsure = EnsureInputSceneItem(sceneName, OverlayScene.GameCaptureSourceName, "game_capture", gameInputSettings, useGameCapture);
             if (gameEnsure["ok"]?.Value<bool>() != true) warnings.Add(Locales.Message("settings.couldNotPrepareGameCaptureError", "error", gameEnsure["message"]));
-            var game = gameEnsure["ok"]?.Value<bool>() == true ? (JObject)gameEnsure["item"] : FindSceneItem(items, "Game Capture");
+            var game = gameEnsure["ok"]?.Value<bool>() == true ? (JObject)gameEnsure["item"] : FindSceneItem(items, OverlayScene.GameCaptureSourceName);
 
             var windowSettings = GetWindowCaptureInputSettings(settings);
             // in automatic mode the capture switch script picks the window; writing the specific game window here pointed the capture at whatever that setting last held while the script still believed it showed its game
             if (mode == "hybrid_auto") windowSettings.Remove("window");
-            var windowEnsure = EnsureInputSceneItem(sceneName, "Window Capture", "window_capture", windowSettings, useWindowCapture);
+            var windowEnsure = EnsureInputSceneItem(sceneName, OverlayScene.WindowCaptureSourceName, "window_capture", windowSettings, useWindowCapture);
             if (windowEnsure["ok"]?.Value<bool>() != true) warnings.Add(Locales.Message("settings.couldNotPrepareWindowCaptureError", "error", windowEnsure["message"]));
             itemsResult = GetSceneItems(sceneName);
             if (itemsResult["ok"]?.Value<bool>() == true) items = itemsResult["items"] as JArray;
-            var window = FindSceneItem(items, "Window Capture");
+            var window = FindSceneItem(items, OverlayScene.WindowCaptureSourceName);
 
             if (!useDesktop)
             {
@@ -425,10 +425,10 @@ namespace ReplayKitHelper
             var cursorResult = SetDisplayCaptureCursorLive(settings);
             if (cursorResult["ok"]?.Value<bool>() != true) warnings.Add(Locales.Message("settings.couldNotUpdateTheDisplayCapture", "error", cursorResult["message"]));
 
-            var setGame = ObsWebSocket.InvokeRequest("SetInputSettings", new JObject { ["inputName"] = "Game Capture", ["inputSettings"] = gameInputSettings, ["overlay"] = true }, 3000);
+            var setGame = ObsWebSocket.InvokeRequest("SetInputSettings", new JObject { ["inputName"] = OverlayScene.GameCaptureSourceName, ["inputSettings"] = gameInputSettings, ["overlay"] = true }, 3000);
             if (!setGame.Ok) warnings.Add(Locales.Message("settings.couldNotUpdateGameCaptureSettings", "error", setGame.Message));
 
-            var setWindow = ObsWebSocket.InvokeRequest("SetInputSettings", new JObject { ["inputName"] = "Window Capture", ["inputSettings"] = windowSettings, ["overlay"] = true }, 3000);
+            var setWindow = ObsWebSocket.InvokeRequest("SetInputSettings", new JObject { ["inputName"] = OverlayScene.WindowCaptureSourceName, ["inputSettings"] = windowSettings, ["overlay"] = true }, 3000);
             if (!setWindow.Ok) warnings.Add(Locales.Message("settings.couldNotUpdateWindowCaptureSettings", "error", setWindow.Message));
 
             if (useWindowCapture && string.IsNullOrWhiteSpace(settings["screenshareGameWindow"]?.Value<string>()))
@@ -449,7 +449,7 @@ namespace ReplayKitHelper
 
             if (preset != null)
             {
-                foreach (var captureName in new[] { "Display Capture", "Window Capture", "Game Capture" })
+                foreach (var captureName in new[] { OverlayScene.DisplayCaptureSourceName, OverlayScene.WindowCaptureSourceName, OverlayScene.GameCaptureSourceName })
                 {
                     var capture = FindSceneItem(items, captureName);
                     var captureTransform = MainCaptureTransform(captureName, preset);
@@ -493,7 +493,7 @@ namespace ReplayKitHelper
                 bool useMotionBlur = settings["motionBlurEnabled"]?.Value<bool>() ?? false;
                 double motionBlurStrength = MotionBlurStrength(settings);
                 var inputSources = new Dictionary<string, InputOverlaySourceRef>();
-                var inputSourceNames = new[] { "WASD Overlay", "Mouse Overlay" };
+                var inputSourceNames = new[] { OverlayScene.WasdSourceName, OverlayScene.MouseSourceName };
                 JObject inputGroup = null;
                 foreach (var group in groups)
                 {
@@ -516,7 +516,7 @@ namespace ReplayKitHelper
                 JObject bongoSource = null;
                 foreach (var source in sources)
                 {
-                    if (source["name"]?.Value<string>() == "Bongo Cat Overlay") { bongoSource = (JObject)source; break; }
+                    if (source["name"]?.Value<string>() == OverlayScene.BongoSourceName) { bongoSource = (JObject)source; break; }
                 }
                 if (bongoSource == null)
                 {
@@ -531,19 +531,19 @@ namespace ReplayKitHelper
                 {
                     string name = source["name"]?.Value<string>() ?? "";
                     string uuid = source["uuid"]?.Value<string>() ?? "";
-                    if (name == "Window Capture" || uuid == "edb2d9d4-7b53-4f3a-a760-61cd03ce9b6c") { windowCaptureSource = (JObject)source; break; }
+                    if (name == OverlayScene.WindowCaptureSourceName || uuid == "edb2d9d4-7b53-4f3a-a760-61cd03ce9b6c") { windowCaptureSource = (JObject)source; break; }
                 }
                 string windowCaptureUuid = windowCaptureSource?["uuid"]?.Value<string>() ?? "";
                 if (string.IsNullOrWhiteSpace(windowCaptureUuid)) windowCaptureUuid = "edb2d9d4-7b53-4f3a-a760-61cd03ce9b6c";
 
                 if (useInputOverlay)
                 {
-                    var keyboardFiles = InputOverlayMemberFiles("WASD Overlay", settings);
-                    var mouseFiles = InputOverlayMemberFiles("Mouse Overlay", settings);
+                    var keyboardFiles = InputOverlayMemberFiles(OverlayScene.WasdSourceName, settings);
+                    var mouseFiles = InputOverlayMemberFiles(OverlayScene.MouseSourceName, settings);
                     var inputSpecs = new[]
                     {
-                        new { name = "WASD Overlay", image = keyboardFiles?.Sheet ?? "", layout = keyboardFiles?.Json ?? "" },
-                        new { name = "Mouse Overlay", image = mouseFiles?.Sheet ?? "", layout = mouseFiles?.Json ?? "" },
+                        new { name = OverlayScene.WasdSourceName, image = keyboardFiles?.Sheet ?? "", layout = keyboardFiles?.Json ?? "" },
+                        new { name = OverlayScene.MouseSourceName, image = mouseFiles?.Sheet ?? "", layout = mouseFiles?.Json ?? "" },
                     };
                     foreach (var spec in inputSpecs)
                     {
@@ -589,7 +589,7 @@ namespace ReplayKitHelper
                 {
                     string bongoUuidCapture = bongoUuid;
                     RemoveJsonListWhere(sources, source =>
-                        source["name"]?.Value<string>() == "Bongo Cat Overlay" ||
+                        source["name"]?.Value<string>() == OverlayScene.BongoSourceName ||
                         IsBongoInputKind(source["id"]?.Value<string>()) ||
                         (!string.IsNullOrWhiteSpace(bongoUuidCapture) && source["uuid"]?.Value<string>() == bongoUuidCapture));
                 }
@@ -638,12 +638,12 @@ namespace ReplayKitHelper
                         {
                             string name = item["name"]?.Value<string>() ?? "";
                             string sourceUuid = item["source_uuid"]?.Value<string>() ?? "";
-                            return name == "Bongo Cat Overlay" || (!string.IsNullOrWhiteSpace(bongoUuidCapture) && sourceUuid == bongoUuidCapture);
+                            return name == OverlayScene.BongoSourceName || (!string.IsNullOrWhiteSpace(bongoUuidCapture) && sourceUuid == bongoUuidCapture);
                         });
                     }
 
                     bool foundBongoItem = false;
-                    var foundInputItems = new Dictionary<string, bool> { ["WASD Overlay"] = false, ["Mouse Overlay"] = false };
+                    var foundInputItems = new Dictionary<string, bool> { [OverlayScene.WasdSourceName] = false, [OverlayScene.MouseSourceName] = false };
                     bool foundInputGroupItem = false;
                     bool foundWindowCaptureItem = false;
                     bool windowCaptureVisible = settings["screenshareCaptureMode"]?.Value<string>() == "game_window";
@@ -652,16 +652,16 @@ namespace ReplayKitHelper
                         var item = (JObject)itemToken;
                         string name = item["name"]?.Value<string>() ?? "";
                         string sourceUuid = item["source_uuid"]?.Value<string>() ?? "";
-                        if (name == "Display Capture" || name == "Game Capture")
+                        if (name == OverlayScene.DisplayCaptureSourceName || name == OverlayScene.GameCaptureSourceName)
                         {
                             SetMainCaptureSceneItemJson(item, name, preset);
                         }
-                        else if (name == "Window Capture" || sourceUuid == windowCaptureUuid)
+                        else if (name == OverlayScene.WindowCaptureSourceName || sourceUuid == windowCaptureUuid)
                         {
                             SetWindowCaptureSceneItemJson(item, windowCaptureUuid, preset, windowCaptureVisible);
                             foundWindowCaptureItem = true;
                         }
-                        else if (name == "WASD Overlay" || name == "Mouse Overlay")
+                        else if (name == OverlayScene.WasdSourceName || name == OverlayScene.MouseSourceName)
                         {
                             string inputUuid = "";
                             if (inputSources.TryGetValue(name, out var srcRef)) inputUuid = srcRef.Uuid;
@@ -675,7 +675,7 @@ namespace ReplayKitHelper
                             SetInputOverlayGroupSceneItemJson(item, inputGroupUuid, preset, useInputOverlay, settings);
                             foundInputGroupItem = true;
                         }
-                        else if (name == "Bongo Cat Overlay" || sourceUuid == bongoUuid)
+                        else if (name == OverlayScene.BongoSourceName || sourceUuid == bongoUuid)
                         {
                             SetBongoSceneItemJson(item, bongoUuid, preset, useBongo, settings);
                             foundBongoItem = true;
@@ -689,12 +689,12 @@ namespace ReplayKitHelper
                         int insertAt = 0;
                         for (int i = 0; i < items.Count; i++)
                         {
-                            if (items[i]["name"]?.Value<string>() == "Display Capture") { insertAt = i + 1; break; }
+                            if (items[i]["name"]?.Value<string>() == OverlayScene.DisplayCaptureSourceName) { insertAt = i + 1; break; }
                         }
                         items.Insert(insertAt, newItem);
                         sceneSettings["id_counter"] = GetNextJsonSceneItemId(items);
                     }
-                    MoveJsonSceneItemAfter(items, "Window Capture", "Display Capture");
+                    MoveJsonSceneItemAfter(items, OverlayScene.WindowCaptureSourceName, OverlayScene.DisplayCaptureSourceName);
                     if (useBongo && !foundBongoItem)
                     {
                         var newItem = new JObject { ["id"] = GetNextJsonSceneItemId(items) };
@@ -704,7 +704,7 @@ namespace ReplayKitHelper
                     }
                     if (useInputOverlay)
                     {
-                        foreach (var name in new[] { "WASD Overlay", "Mouse Overlay" })
+                        foreach (var name in new[] { OverlayScene.WasdSourceName, OverlayScene.MouseSourceName })
                         {
                             if (foundInputItems[name]) continue;
                             if (!inputSources.TryGetValue(name, out var srcRef)) throw new InvalidOperationException("Input overlay source was not prepared for " + name + ".");
@@ -750,8 +750,8 @@ namespace ReplayKitHelper
 
         internal static string[] GetOverlaySourceNames(string overlayStyle)
         {
-            if (overlayStyle == "bongo_cat") return new[] { "Bongo Cat Overlay" };
-            if (overlayStyle == "input_overlay") return new[] { "Group", "WASD Overlay", "Mouse Overlay" };
+            if (overlayStyle == "bongo_cat") return new[] { OverlayScene.BongoSourceName };
+            if (overlayStyle == "input_overlay") return new[] { "Group", OverlayScene.WasdSourceName, OverlayScene.MouseSourceName };
             return new string[0];
         }
 
@@ -834,7 +834,7 @@ namespace ReplayKitHelper
             var group = FindSceneItem(items, "Group");
             if (group != null && (!visibleOnly || TestSceneItemVisible(group))) return new List<string> { "Group" };
             var targets = new List<string>();
-            foreach (var name in new[] { "WASD Overlay", "Mouse Overlay" })
+            foreach (var name in new[] { OverlayScene.WasdSourceName, OverlayScene.MouseSourceName })
             {
                 var item = FindSceneItem(items, name);
                 if (item == null) continue;
@@ -848,7 +848,7 @@ namespace ReplayKitHelper
         {
             if (overlayStyle == "bongo_cat")
             {
-                if (FindSceneItem(items, "Bongo Cat Overlay") != null) return new List<string> { "Bongo Cat Overlay" };
+                if (FindSceneItem(items, OverlayScene.BongoSourceName) != null) return new List<string> { OverlayScene.BongoSourceName };
             }
             if (overlayStyle == "input_overlay")
             {
@@ -856,11 +856,11 @@ namespace ReplayKitHelper
                 if (inputTargets.Count > 0) return inputTargets;
             }
 
-            var bongo = FindSceneItem(items, "Bongo Cat Overlay");
-            if (bongo != null && TestSceneItemVisible(bongo)) return new List<string> { "Bongo Cat Overlay" };
+            var bongo = FindSceneItem(items, OverlayScene.BongoSourceName);
+            if (bongo != null && TestSceneItemVisible(bongo)) return new List<string> { OverlayScene.BongoSourceName };
             var visibleInputTargets = GetExistingInputOverlayScaleTargets(items, true);
             if (visibleInputTargets.Count > 0) return visibleInputTargets;
-            if (bongo != null) return new List<string> { "Bongo Cat Overlay" };
+            if (bongo != null) return new List<string> { OverlayScene.BongoSourceName };
             return GetExistingInputOverlayScaleTargets(items, false);
         }
 
@@ -888,13 +888,13 @@ namespace ReplayKitHelper
             if (overlayStyle == "input_overlay")
             {
                 var fallback = new List<string>();
-                foreach (var name in new[] { "WASD Overlay", "Mouse Overlay" })
+                foreach (var name in new[] { OverlayScene.WasdSourceName, OverlayScene.MouseSourceName })
                 {
                     if (TestSourceExistsForFilters(name)) fallback.Add(name);
                 }
                 if (fallback.Count > 0) return fallback;
             }
-            if (overlayStyle == "bongo_cat" && TestSourceExistsForFilters("Bongo Cat Overlay")) return new List<string> { "Bongo Cat Overlay" };
+            if (overlayStyle == "bongo_cat" && TestSourceExistsForFilters(OverlayScene.BongoSourceName)) return new List<string> { OverlayScene.BongoSourceName };
             foreach (var name in names)
             {
                 if (TestSourceExistsForFilters(name)) return new List<string> { name };
@@ -983,7 +983,7 @@ namespace ReplayKitHelper
             string sceneName = scene["name"]?.Value<string>();
             var items = GetSceneItems(sceneName)["items"] as JArray;
             string style = settings["overlayStyle"]?.Value<string>() ?? "";
-            string itemName = style == "bongo_cat" ? "Bongo Cat Overlay" : style == "input_overlay" ? "Group" : null;
+            string itemName = style == "bongo_cat" ? OverlayScene.BongoSourceName : style == "input_overlay" ? "Group" : null;
             if (itemName == null) return new JObject { ["ok"] = true, ["applied"] = new JArray(applied), ["warnings"] = new JArray(warnings) };
             var item = FindSceneItem(items, itemName);
             if (item == null) return new JObject { ["ok"] = true, ["applied"] = new JArray(applied), ["warnings"] = new JArray(warnings) };
@@ -1151,7 +1151,7 @@ namespace ReplayKitHelper
             return revision;
         }
 
-        // Size is relative to the snapshot; flip and rotation preserve the current center. The snapshot remains the cancel target.
+        // size is relative to the snapshot; flip and rotation preserve the current center; the snapshot remains the cancel target.
         internal static JObject ApplyOverlayGeometryPreviewLive(JObject preview, JObject settings)
         {
             var warnings = new List<string>();
@@ -1214,7 +1214,7 @@ namespace ReplayKitHelper
             // flip: mirror the flip targets CURRENT transform in place -- looked up by style, independent of the snapshots transforms map (which can miss the item), so it never repositions to the canonical corner
             if (flipTransition)
             {
-                string itemName = style == "bongo_cat" ? "Bongo Cat Overlay" : style == "input_overlay" ? "Group" : null;
+                string itemName = style == "bongo_cat" ? OverlayScene.BongoSourceName : style == "input_overlay" ? "Group" : null;
                 var item = itemName == null ? null : ((transforms[itemName] as JObject)?["item"] as JObject ?? FindSceneItem(GetSceneItems(sceneName)["items"] as JArray, itemName));
                 if (item != null)
                 {
@@ -1297,8 +1297,8 @@ namespace ReplayKitHelper
                     if (filters["ok"]?.Value<bool>() != true) continue;
                     foreach (var filterToken in filters["filters"] as JArray ?? new JArray())
                     {
-                        if (filterToken["filterName"]?.Value<string>() != "ReplayKit Overlay Opacity") continue;
-                        var remove = ObsWebSocket.InvokeRequest("RemoveSourceFilter", new JObject { ["sourceName"] = sourceName, ["filterName"] = "ReplayKit Overlay Opacity" }, 3000);
+                        if (filterToken["filterName"]?.Value<string>() != OverlayScene.OpacityFilterName) continue;
+                        var remove = ObsWebSocket.InvokeRequest("RemoveSourceFilter", new JObject { ["sourceName"] = sourceName, ["filterName"] = OverlayScene.OpacityFilterName }, 3000);
                         if (remove.Ok) { applied.Add(sourceName + " opacity restored"); restoredExactOpacity = true; }
                         else warnings.Add(Locales.Message("settings.couldNotRemovePreviewOpacityFilter", "sourceName", sourceName, "error", remove.Message));
                         break;

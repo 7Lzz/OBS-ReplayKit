@@ -507,7 +507,7 @@
     }
   }
 
-  // The biggest verified clips are offered first, with more added a page at a time.
+  // the biggest verified clips are offered first, with more added a page at a time.
   const CMP_PAGE = 10;
   const CMP_MAX = 50;
   const cmp = { phase:"pick", mode:"fast", clips:[], picked:new Set(), timer:0, lastId:0, ackedId:0, starting:false, limit:CMP_PAGE, hasMore:false, loadedOnce:false, loading:false, loadGeneration:0 };
@@ -621,7 +621,7 @@
       cmp.loadedOnce = true;
       cmp.clips = Array.isArray(data.clips) ? data.clips : [];
       cmp.hasMore = !!data.hasMore;
-      // New verified clips start selected; clips already shown keep the user's choice.
+      // new verified clips start selected; clips already shown keep the choice of the user.
       const kept = new Set();
       cmp.clips.forEach(c => { if (firstPage || !previous.has(c.name) || (previous.get(c.name) === c.version && cmp.picked.has(c.name))) kept.add(c.name); });
       cmp.picked = kept;

@@ -801,7 +801,7 @@ local function repair_display_capture()
     if source == nil then monitor_check_at = now + 1000000000; return end
     monitor_check_at = now + 5 * 1000000000
     local settings = obs.obs_source_get_settings(source)
-    -- Live source properties run OBS's modified callbacks and reset display capture.
+    -- live source properties run the modified callbacks of obs and reset display capture.
     local properties = obs.obs_get_source_properties(obs.obs_source_get_id(source))
     local ok, err = pcall(function()
         if settings == nil or properties == nil then return end

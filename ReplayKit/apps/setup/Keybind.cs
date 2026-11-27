@@ -99,7 +99,7 @@ namespace ReplayKitSetup
         };
 
         // pretty modifier order for display labels, and the field order obs expects when serializing.
-        private static readonly string[] ModOrder = { "control", "alt", "shift", "command" };
+        private static readonly string[] ModOrder = ReplayKitShared.HotkeyModifiers.Order;
         private static readonly Dictionary<string, string> ModLabel = new Dictionary<string, string>
         {
             ["control"] = "Ctrl",

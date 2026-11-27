@@ -8,6 +8,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
+using ReplayKitShared;
 
 namespace ReplayKitHelper
 {
@@ -639,7 +640,7 @@ namespace ReplayKitHelper
                 if (!IsWindowVisible(hWnd)) continue;
                 GetWindowThreadProcessId(hWnd, out uint ownerPid);
                 if (!IsObsFamilyProcess(ownerPid)) continue;
-                if (GetTitle(hWnd).IndexOf("ReplayKit Settings", StringComparison.OrdinalIgnoreCase) >= 0) return hWnd;
+                if (GetTitle(hWnd).IndexOf(WindowLayout.SettingsTitle, StringComparison.OrdinalIgnoreCase) >= 0) return hWnd;
             }
             return IntPtr.Zero;
         }
@@ -665,8 +666,8 @@ namespace ReplayKitHelper
                     if (string.IsNullOrEmpty(title) || title.IndexOf("ReplayKit", StringComparison.OrdinalIgnoreCase) < 0)
                         continue;
                     // the native plugin owns these two -- leave them alone.
-                    if (title.Equals("Clips", StringComparison.OrdinalIgnoreCase) ||
-                        title.Equals("ReplayKit Settings", StringComparison.OrdinalIgnoreCase))
+                    if (title.Equals(WindowLayout.ClipsTitle, StringComparison.OrdinalIgnoreCase) ||
+                        title.Equals(WindowLayout.SettingsTitle, StringComparison.OrdinalIgnoreCase))
                         continue;
                     SendIcons(hWnd, useS, useB);
                     hit++;

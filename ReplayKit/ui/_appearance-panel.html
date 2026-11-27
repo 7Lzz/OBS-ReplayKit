@@ -328,8 +328,7 @@
     } catch (e) { return ""; }
   }
 
-  // -- Appearance tab: theme picker -- ReplayKit surfaces preview live here; OBS gets it on the restart that saving a theme needs.
-  // the shared close x, cropped to its drawing so the remove button keeps the size of the x it had
+  // appearance tab: theme picker -- ReplayKit surfaces preview live here; OBS gets it on the restart that saving a theme needs; the shared close x, cropped to its drawing so the remove button keeps the size of the x it had
   const APPICON_X_SVG = ((window.RK_ICONS || {})["editor/close"] || "").replace(/viewBox="[^"]*"/, 'viewBox="5 5 14 14"');
   const THEME_EDIT_SVG = (window.RK_ICONS || {})["action/edit"] || "";
   // last /appearance/themes payload -- lets selectTheme seed the custom editor from whatever preset the user was on
@@ -377,7 +376,7 @@
   function blankGradient() {
     return { enabled:false, type:"linear", angle:135, centerX:50, centerY:50, stops:[] };
   }
-  // every target always has an entry, so switching tabs never has to guard for a missing one; `enabled` is what decides whether it is written out, which keeps a half-built gradient around while you flip between surfaces.
+  // every target always has an entry, so switching tabs never has to guard for a missing one; `enabled` is what decides whether it is written out, which keeps a half-built gradient around while the surfaces are flipped between.
   let gradientByTarget = {};
   GRADIENT_TARGETS.forEach((entry) => { gradientByTarget[entry.key] = blankGradient(); });
 
@@ -478,9 +477,7 @@
         document.documentElement.classList.add("rk-theme-swapping");
         themeLiveStyle.textContent = css;
         publishThemePreview(css);
-        // when a non-default theme is saved the helper injects its own <style id="rk-theme"> before </head>;
-        // rewriting this nodes text alone doesnt always make CEF redo the cascade tie-break, so move it back
-        // to last to guarantee the preview wins.
+        // when a non-default theme is saved the helper injects its own <style id="rk-theme"> before </head>; rewriting this nodes text alone doesnt always make CEF redo the cascade tie-break, so move it back to last to guarantee the preview wins.
         document.head.appendChild(themeLiveStyle);
         void document.documentElement.offsetHeight; // flush the swap under the freeze before re-enabling motion
         requestAnimationFrame(() => document.documentElement.classList.remove("rk-theme-swapping"));
@@ -810,7 +807,7 @@
   }
   bindGradientCenter(els.themeGradientCenterX, els.themeGradientCenterXValue);
   bindGradientCenter(els.themeGradientCenterY, els.themeGradientCenterYValue);
-  // clicking the ramp itself adds a stop where you clicked, already the colour showing there, so adding one never jolts the gradient.
+  // clicking the ramp itself adds a stop where the click landed, already the colour showing there, so adding one never jolts the gradient.
   els.themeGradientRamp.addEventListener("pointerdown", (event) => {
     if (event.target.closest(".grad-ramp-handle")) return;
     if (gradientStops.length >= GRADIENT_MAX_STOPS) {

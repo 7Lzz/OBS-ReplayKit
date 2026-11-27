@@ -13,6 +13,7 @@ using System.Threading;
 using Microsoft.CSharp.RuntimeBinder;
 using Newtonsoft.Json.Linq;
 using static ReplayKitHelper.Routes;
+using ReplayKitShared;
 
 namespace ReplayKitHelper
 {
@@ -71,7 +72,7 @@ namespace ReplayKitHelper
             if (path == "/focus-window")
             {
                 // server-side foreground-raise for an existing dock-spawned popup (e.g. "view clips" clicked while the clips window is already open). the docks window.focus() is unreliable inside cef; this route uses win32 SetForegroundWindow + the AttachThreadInput dance which works regardless of who currently owns the foreground.
-                string title = Q("title", "Clips");
+                string title = Q("title", WindowLayout.ClipsTitle);
                 bool focused = false;
                 try { focused = Native.FocusWindow(title); } catch (Exception ex) { Log.Write(path + ": " + ex.Message); }
                 HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["focused"] = focused });
@@ -82,23 +83,23 @@ namespace ReplayKitHelper
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
                 string title = Q("title");
-                if (title != "ReplayKit Settings" && title != "ReplayKit Update" && title != "ReplayKit Setup")
+                if (title != WindowLayout.SettingsTitle && title != WindowLayout.UpdateTitle && title != WindowLayout.SetupTitle)
                 {
                     HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("helper.unsupportedWindowTitle") });
                     return false;
                 }
                 // a page the clean layout embeds in the obs window has no window of its own to close; the plugin just puts the obs window back on its home view
-                if (QFlag("embedded") && title != "ReplayKit Update")
+                if (QFlag("embedded") && title != WindowLayout.UpdateTitle)
                 {
-                    PipeClient.SendCloseView(title == "ReplayKit Setup" ? "setup" : "settings");
+                    PipeClient.SendCloseView(title == WindowLayout.SetupTitle ? "setup" : "settings");
                     HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["closed"] = 1 });
                     return false;
                 }
                 // the update popup can be hosted by msedge.exe (--app launched from the bootstrap), which is not an obs-family process, so pass 0 for that title so CloseWindowsByTitle finds it by title alone; settings still goes thru the obs-family gate.
-                uint ownerPid = title == "ReplayKit Update" ? 0 : (ParentWatchdog.ParentPid > 0 ? (uint)ParentWatchdog.ParentPid : 0);
+                uint ownerPid = title == WindowLayout.UpdateTitle ? 0 : (ParentWatchdog.ParentPid > 0 ? (uint)ParentWatchdog.ParentPid : 0);
                 int closed = 0;
                 // settings and setup are only hidden by the plugin and shown again later, so their taskbar tab has to survive the close; only the update popup really goes away
-                try { closed = Native.CloseWindowsByTitle(new[] { title }, ownerPid, title == "ReplayKit Update"); } catch (Exception ex) { Log.Write(path + ": " + ex.Message); }
+                try { closed = Native.CloseWindowsByTitle(new[] { title }, ownerPid, title == WindowLayout.UpdateTitle); } catch (Exception ex) { Log.Write(path + ": " + ex.Message); }
                 HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["closed"] = closed });
                 return false;
             }
@@ -106,7 +107,7 @@ namespace ReplayKitHelper
             if (path == "/window/maximize")
             {
                 // server-side maximize for a dock-spawned popup. called from clips.html when the user enters fullscreen on a clip so the host window fills the screen. js in cef cant resize its own host, hence the win32 round-trip. the native side snapshots the original rect so /window/restore can put it back unless the user manually unmaximized or dragged the host while fullscreened.
-                string title = Q("title", "Clips");
+                string title = Q("title", WindowLayout.ClipsTitle);
                 bool maximized = false;
                 try { maximized = Native.MaximizeObsWindow(title); } catch (Exception ex) { Log.Write(path + ": " + ex.Message); }
                 HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["maximized"] = maximized });
@@ -115,34 +116,34 @@ namespace ReplayKitHelper
 
             if (path == "/window/fullscreen")
             {
-                string title = Q("title", "Clips");
+                string title = Q("title", WindowLayout.ClipsTitle);
                 bool fullscreen = false;
                 // embedded in the obs window: the plugin widens the page over the whole window, there is no host window to make fullscreen
-                if (QFlag("embedded") && title == "Clips")
+                if (QFlag("embedded") && title == WindowLayout.ClipsTitle)
                 {
                     PipeClient.SendClipsFullscreen(true);
                     HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["fullscreen"] = true });
                     return false;
                 }
-                if (title == "Clips") PipeClient.SendClipsFullscreen(true);
+                if (title == WindowLayout.ClipsTitle) PipeClient.SendClipsFullscreen(true);
                 try { fullscreen = Native.EnterObsWindowFullscreen(title); } catch (Exception ex) { Log.Write(path + ": " + ex.Message); }
-                if (!fullscreen && title == "Clips") PipeClient.SendClipsFullscreen(false);
+                if (!fullscreen && title == WindowLayout.ClipsTitle) PipeClient.SendClipsFullscreen(false);
                 HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["fullscreen"] = fullscreen });
                 return false;
             }
 
             if (path == "/window/fullscreen/restore")
             {
-                string title = Q("title", "Clips");
+                string title = Q("title", WindowLayout.ClipsTitle);
                 bool restored = false;
-                if (QFlag("embedded") && title == "Clips")
+                if (QFlag("embedded") && title == WindowLayout.ClipsTitle)
                 {
                     PipeClient.SendClipsFullscreen(false);
                     HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["restored"] = true });
                     return false;
                 }
                 try { restored = Native.ExitObsWindowFullscreen(title); } catch (Exception ex) { Log.Write(path + ": " + ex.Message); }
-                if (title == "Clips") PipeClient.SendClipsFullscreen(false);
+                if (title == WindowLayout.ClipsTitle) PipeClient.SendClipsFullscreen(false);
                 HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["restored"] = restored });
                 return false;
             }
@@ -150,7 +151,7 @@ namespace ReplayKitHelper
             if (path == "/window/restore")
             {
                 // counterpart to /window/maximize: restore the saved rect only if the Clips host is still maximized. if the user dragged or unmaximized it while fullscreened, their manual placement wins.
-                string title = Q("title", "Clips");
+                string title = Q("title", WindowLayout.ClipsTitle);
                 bool restored = false;
                 try { restored = Native.RestoreObsWindow(title); } catch (Exception ex) { Log.Write(path + ": " + ex.Message); }
                 HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["restored"] = restored });
@@ -163,11 +164,11 @@ namespace ReplayKitHelper
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
                 string title = Q("title");
                 int minW, minH, maxW = 2400, maxH = 1800;
-                // kept in sync with the native QWidget::setMinimumSize() calls in the native plugins CreateSettingsWindow/CreateClipsWindow (windows/settings_window.cpp, windows/clips_window.cpp) -- this custom corner-grip resize used to enforce different bounds than obss own native edge/corner resize on the same windows, so the two disagreed about how small each window could get depending on which resize handle you used.
-                if (title == "ReplayKit Settings") { minW = 700; minH = 500; }
-                else if (title == "Clips") { minW = 850; minH = 620; }
-                else if (title == "ReplayKit Update") { minW = 480; minH = 400; }
-                else if (title == "ReplayKit Setup") { minW = 640; minH = 520; }
+                // the floors the plugin gives the native edges of these windows too, from shared/WindowLayout.cs, so the grip and the edges agree on how small a window gets
+                if (title == WindowLayout.SettingsTitle) { minW = WindowLayout.SettingsMinWidth; minH = WindowLayout.SettingsMinHeight; }
+                else if (title == WindowLayout.ClipsTitle) { minW = WindowLayout.ClipsMinWidth; minH = WindowLayout.ClipsMinHeight; }
+                else if (title == WindowLayout.UpdateTitle) { minW = WindowLayout.UpdateMinWidth; minH = WindowLayout.UpdateMinHeight; }
+                else if (title == WindowLayout.SetupTitle) { minW = WindowLayout.SetupMinWidth; minH = WindowLayout.SetupMinHeight; }
                 else { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("helper.unsupportedWindowTitle") }); return false; }
                 bool resizing = false;
                 try { resizing = Native.BeginResizeWindow(title, minW, minH, maxW, maxH); } catch (Exception ex) { Log.Write(path + ": " + ex.Message); }
@@ -313,6 +314,7 @@ namespace ReplayKitHelper
                 HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true });
                 return false;
             }
+            // the quick actions under the logo of the title bar: what a page offers, read back by the plugin, and a pick sent on to the plugin
             if (path == "/quick-actions/state")
             {
                 if (req.Method == "POST") { var set = QuickActions.Set(Q("view"), req.Body); HttpResponse.SendJson(stream, set.Value<bool>("ok") ? 200 : 400, set); return false; }
@@ -329,6 +331,7 @@ namespace ReplayKitHelper
                 return false;
             }
 
+            // the menus of the obs menu bar, opened from the Advanced tab now that the title bar has no menu button
             if (path == "/obs-menu")
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }

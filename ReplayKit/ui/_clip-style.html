@@ -2978,14 +2978,6 @@
     transform: none;
     transition: transform var(--anim_menu) var(--ease_smooth);
   }
-  @media (prefers-reduced-motion: reduce) {
-    .modal-veil.modal-motion, .modal-veil.modal-motion > .modal,
-    .modal-veil.modal-motion.is-open > .modal, .save-track.is-complete .save-fill { transition: none; }
-    .save-track.is-waiting .save-fill { visibility: hidden; }
-    .save-track.is-waiting .save-fill, .trim-processing-spinner, .editor-screenshot-spinner,
-    .toast.is-shown { animation: none; }
-    #trim-processing-veil .rk-skel-bone::after { display: none; }
-  }
 </style>
 
 <style>
@@ -3003,9 +2995,6 @@
   .name-edit-input.is-saving { opacity:.6; cursor:progress; }
   .name-edit-input.is-invalid { outline:1px solid var(--red); outline-offset:-1px; }
   .name-edit-input.is-rejected { --name-shake-distance:3px; animation:rk-name-reject 260ms ease-out; }
-  @media (prefers-reduced-motion: reduce) {
-    .name-edit-input.is-rejected { --name-shake-distance:1px; }
-  }
   @keyframes rk-name-reject {
     from, to {
       border-color:var(--red);

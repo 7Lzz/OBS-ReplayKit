@@ -100,7 +100,7 @@ namespace ReplayKitHelper
             return ini;
         }
 
-        // replaykit's supported languages with the names from the installed obs locale list
+        // the supported languages of replaykit with the names from the installed obs locale list
         public static List<Language> Available()
         {
             string ini = LocaleIni();

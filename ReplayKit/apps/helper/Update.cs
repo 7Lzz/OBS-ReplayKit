@@ -341,7 +341,7 @@ namespace ReplayKitHelper
                 lock (Server.State.UpdateCheckLock)
                     if (pollTimer == null || Server.State.UpdateApplyInProgress) return;
 
-                // The normal 30-minute cache can still contain the startup result at the first tick.
+                // the normal 30-minute cache can still contain the startup result at the first tick.
                 var status = GetAutoUpdateStatus(manual: true);
                 if (status["ok"]?.Value<bool>() != true)
                 {
@@ -434,7 +434,7 @@ namespace ReplayKitHelper
         {
             try
             {
-                if (Native.WindowWithTitleExists("ReplayKit Update"))
+                if (Native.WindowWithTitleExists(WindowLayout.UpdateTitle))
                     return Locales.Message("update.updateWindowAlreadyOpen");
             }
             catch (Exception ex) { WriteUpdateDebug("update window probe failed: " + ex.Message); }
@@ -610,9 +610,9 @@ namespace ReplayKitHelper
             // one window is enough -- bring the existing one forward rather than stacking another.
             try
             {
-                if (Native.WindowWithTitleExists("ReplayKit Update"))
+                if (Native.WindowWithTitleExists(WindowLayout.UpdateTitle))
                 {
-                    Native.FocusWindowByExactTitle("ReplayKit Update");
+                    Native.FocusWindowByExactTitle(WindowLayout.UpdateTitle);
                     WriteUpdateDebug("update window already open; focused it instead of opening another");
                     return new JObject { ["ok"] = true, ["alreadyOpen"] = true };
                 }
@@ -809,7 +809,7 @@ namespace ReplayKitHelper
         private static string GetUpdateObsPath()
         {
             var procs = new List<Process>();
-            foreach (var name in new[] { "obs64", "obs32", "obs" }) procs.AddRange(Process.GetProcessesByName(name));
+            foreach (var name in Constants.ObsProcessNames) procs.AddRange(Process.GetProcessesByName(name));
             try
             {
                 foreach (var p in procs)

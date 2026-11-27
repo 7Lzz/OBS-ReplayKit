@@ -90,7 +90,7 @@ namespace ReplayKitHelper
                 commonHead.AddRange(new[] { "-vf", "scale=-2:min(ih\\," + scaleHeight + ")" });
             bool videoProgress = caps["videoEncodeProgress"]?.Value<bool>() == true;
             var commonTail = new List<string> { "-c:a", "aac", "-b:a", "96k", "-metadata", "comment=" + comment, "-movflags", "+faststart", "-nostats" };
-            // encoded video timestamps arrive even when an audio track holds up the muxer.
+            // the timestamps of the encoded video keep coming while an audio track holds up the muxer, which stalls the aggregate -progress time
             commonTail.AddRange(videoProgress
                 ? new[] { "-stats_enc_post:v:0", "pipe:1", "-stats_enc_post_fmt:v:0", "{dt}" }
                 : new[] { "-progress", "pipe:1" });
@@ -120,6 +120,7 @@ namespace ReplayKitHelper
 
             var stderrTask = CompressionOutput.Read(proc.StandardError, proc);
 
+            // out_time_us and never out_time_ms, which ffmpeg 5 turned into microseconds and builds still report differently
             const string aggregateTime = "out_time_us=";
             double progressDuration = videoProgress ? durationSec : durationSec * 1000000.0;
             int lastReportedPct = 1;

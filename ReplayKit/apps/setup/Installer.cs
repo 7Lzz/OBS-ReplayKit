@@ -288,7 +288,7 @@ namespace ReplayKitSetup
         // scene-source patches applied during auto-update so property fixes (eg. flipping capture_audio on Game Capture) land on existing users without a fresh setup run -- each key is a source name in Untitled.json, each value a flat dotted-path -> value map, and only the listed fields are touched, everything else on that source is left alone. add entries here when a release needs to change a source property on existing installs.
         private static readonly Dictionary<string, Dictionary<string, object>> SceneSourcePatches = new Dictionary<string, Dictionary<string, object>>
         {
-            ["Game Capture"] = new Dictionary<string, object>
+            [OverlayScene.GameCaptureSourceName] = new Dictionary<string, object>
             {
                 ["settings.capture_audio"] = false,
                 ["settings.hook_rate"] = 2,
@@ -794,7 +794,7 @@ namespace ReplayKitSetup
             }
         }
 
-        // Verify the video tools and refresh managed plugins on update; report any repairs that did not finish.
+        // verify the video tools and refresh managed plugins on update; report any repairs that did not finish.
         public static List<string> RunUpdateDriverRefresh(Action<string> log = null)
         {
             var problems = new List<string>();

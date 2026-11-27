@@ -467,10 +467,10 @@ namespace ReplayKitSetup
         private const string MotionBlurFilterId = OverlayScene.MotionBlurFilterKind;
         private const string RetiredMotionBlurFilterId = OverlayScene.RetiredMotionBlurFilterKind;
         private const string GameCaptureSourceId = "game_capture";
-        private const string GameCaptureSourceName = "Game Capture";
+        private const string GameCaptureSourceName = OverlayScene.GameCaptureSourceName;
         private const int GameCaptureHookRateFast = 2;
         private const string WindowCaptureSourceId = "window_capture";
-        private const string WindowCaptureSourceName = "Window Capture";
+        private const string WindowCaptureSourceName = OverlayScene.WindowCaptureSourceName;
         private const string WindowCaptureSourceUuid = "edb2d9d4-7b53-4f3a-a760-61cd03ce9b6c";
         private const string DesktopAudioSourceName = "Desktop Audio (excl. Discord)";
         private static readonly IReadOnlyDictionary<string, string> MotionBlurSourceUuids = OverlayScene.MotionBlurFilterUuids;
@@ -877,7 +877,7 @@ namespace ReplayKitSetup
                 if (!File.Exists(Prefs.RUNTIME_SETTINGS_FILE)) return null;
                 if (!(JObject.Parse(File.ReadAllText(Prefs.RUNTIME_SETTINGS_FILE))[key] is JObject combo) || combo["key"]?.Type != JTokenType.String || string.IsNullOrWhiteSpace(combo["key"].Value<string>())) return null;
                 var dict = new Dictionary<string, object> { ["key"] = combo["key"].Value<string>() };
-                foreach (var mod in new[] { "control", "alt", "shift", "command" })
+                foreach (var mod in HotkeyModifiers.Order)
                 {
                     if (combo[mod]?.Type == JTokenType.Boolean && combo[mod].Value<bool>()) dict[mod] = true;
                 }
@@ -1091,7 +1091,7 @@ namespace ReplayKitSetup
             {
                 if (!(managedFilter["settings"] is JObject filterSettings)) { filterSettings = new JObject(); managedFilter["settings"] = filterSettings; }
                 string versionedId = managedFilter.Value<string>("versioned_id") ?? "";
-                var newSettings = managedFilter.Value<string>("id") == OverlayOpacityFilterId && versionedId != "color_filter_v2"
+                var newSettings = managedFilter.Value<string>("id") == OverlayOpacityFilterId && versionedId != OverlayScene.OpacityFilterVersionedKind
                     ? OverlayOpacityFilterSettings(prefs, true)
                     : OverlayOpacityFilterSettings(prefs, false);
                 foreach (var prop in newSettings.Properties()) filterSettings[prop.Name] = prop.Value;
@@ -1471,7 +1471,7 @@ namespace ReplayKitSetup
                             }
                             continue;
                         }
-                        if (name == "Display Capture")
+                        if (name == OverlayScene.DisplayCaptureSourceName)
                         {
                             item["visible"] = mode == "hybrid_auto" || mode == "desktop";
                             FitSceneItemToCanvas(item, canvasW, canvasH, primaryW, primaryH);
@@ -1483,7 +1483,7 @@ namespace ReplayKitSetup
                             item["visible"] = mode == "game_window";
                             FitSceneItemToCanvas(item, canvasW, canvasH);
                         }
-                        else if (name == "Game Capture")
+                        else if (name == OverlayScene.GameCaptureSourceName)
                         {
                             item["visible"] = mode == "game_auto";
                             // game capture has no install-time source dims -- bounds-based fit lets obs scale at runtime.
@@ -1498,13 +1498,13 @@ namespace ReplayKitSetup
                         int insertAt = 0;
                         for (int i = 0; i < keptItems.Count; i++)
                         {
-                            if ((keptItems[i] as JObject)?.Value<string>("name") == "Display Capture") { insertAt = i + 1; break; }
+                            if ((keptItems[i] as JObject)?.Value<string>("name") == OverlayScene.DisplayCaptureSourceName) { insertAt = i + 1; break; }
                         }
                         keptItems.Insert(insertAt, windowItem);
                         int existingCounter = settings["id_counter"] != null && int.TryParse(settings["id_counter"].ToString(), out var ic) ? ic : 0;
                         settings["id_counter"] = Math.Max(existingCounter, SceneItemIds(keptItems).DefaultIfEmpty(0).Max());
                     }
-                    MoveSceneItemAfter(keptItems, WindowCaptureSourceName, "Display Capture");
+                    MoveSceneItemAfter(keptItems, WindowCaptureSourceName, OverlayScene.DisplayCaptureSourceName);
 
                     if (useBongoCat) EnsureBongoSceneItem(keptItems, settings, canvasW, canvasH, prefs, bongoUuid, overlayContent, userScene);
                     settings["items"] = keptItems;

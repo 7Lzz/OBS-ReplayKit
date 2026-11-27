@@ -5361,6 +5361,10 @@
     "source": "89d918912b420e67",
     "text": "此速度会使关联音频超出支持范围。"
   },
+  "editor.thisSpeedWouldRunIntoTheNext": {
+    "source": "23dfee54366dde34",
+    "text": "此速度会使该视频片段与下一个片段重叠。请先移动下一个片段。"
+  },
   "editor.thisSubtitleWasHardToMake": {
     "source": "b17bc9bf84745f95",
     "text": "这条字幕难以辨认。请选择或输入所说的内容，保留或删除它。"
@@ -5422,8 +5426,8 @@
     "text": "裁剪失败：ReplayKit 辅助程序停止响应，保存可能未完成。再次编辑前请检查该剪辑。"
   },
   "editor.trimMustBeAtLeast0": {
-    "source": "187a35d6b253afde",
-    "text": "裁剪时长至少为 0.5 秒"
+    "source": "1cbd35b108ff88c7",
+    "text": "裁剪时长至少为 {seconds} 秒"
   },
   "editor.trimStart": {
     "source": "c0a342e8aad8de91",

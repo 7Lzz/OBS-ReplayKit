@@ -27,7 +27,7 @@ namespace ReplayKitHelper
                 foreach (var old in jobs.Where(p => !p.Value.Running && (now - p.Value.FinishedAt).TotalSeconds >= 10).Select(p => p.Key).ToList())
                     jobs.Remove(old);
                 if (jobs.TryGetValue(key, out var existing)) return existing.Running ? null : existing.Error;
-                // Describe is polled by the editor. Saturated requests stay pending without allocating queued workers.
+                // Describe is polled by the editor; saturated requests stay pending without allocating queued workers.
                 if (!Slots.Wait(0)) return null;
                 foreach (var old in jobs.Where(p => !p.Value.Running).OrderBy(p => p.Value.FinishedAt).Take(Math.Max(0, jobs.Count - 63)).Select(p => p.Key).ToList())
                     jobs.Remove(old);

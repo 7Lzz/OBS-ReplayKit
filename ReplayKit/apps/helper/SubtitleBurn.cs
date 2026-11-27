@@ -14,7 +14,6 @@ namespace ReplayKitHelper
         private const int MaxRows = 50;
         private const int MaxCues = 2000;
         private const int MaxLines = 20;
-        private const int MaxTextLength = 300;
         private const int MaxWords = 20000;
         public const string FileName = "subs.ass";
         // the soft shadow of the editor in pixels of a 1080p picture: its offset, a blur of half the css blur radius since ass blurs by spread, and 80 percent black
@@ -115,14 +114,14 @@ namespace ReplayKitHelper
                         if (line == null || double.IsNaN(width) || width < 0 || width > 200) { error = "Bad subtitles"; return null; }
                         line = Clean(line);
                         length += line.Length;
-                        if (line.Length == 0 || length > MaxTextLength) continue;
+                        if (line.Length == 0 || length > EditorLimits.SubtitleTextMax) continue;
                         kept.Add(line);
                         maxWidth = Math.Max(maxWidth, width);
                     }
                     List<double> words = null, ends = null;
                     if (c["words"] != null && c["words"].Type != JTokenType.Null)
                     {
-                        if (!(c["words"] is JArray list) || list.Count > MaxTextLength) { error = "Bad subtitles"; return null; }
+                        if (!(c["words"] is JArray list) || list.Count > EditorLimits.SubtitleTextMax) { error = "Bad subtitles"; return null; }
                         wordCount += list.Count;
                         if (wordCount > MaxWords) { error = Locales.Message("editor.tooManySubtitles"); return null; }
                         words = new List<double>(list.Count);
@@ -211,7 +210,7 @@ namespace ReplayKitHelper
             var sb = new StringBuilder();
             foreach (char ch in text)
             {
-                if (sb.Length >= MaxTextLength) break;
+                if (sb.Length >= EditorLimits.SubtitleTextMax) break;
                 if (char.IsControl(ch)) continue;
                 sb.Append(ch);
             }
@@ -304,8 +303,7 @@ namespace ReplayKitHelper
             return sb.ToString();
         }
 
-        // the look follows the size of the video, so a 720p and a 1440p save show the same subtitles
-        // offset is added to every time, for a filter that sees the frames in the time of the source rather than of the saved clip
+        // the look follows the size of the video, so a 720p and a 1440p save show the same subtitles; offset is added to every time, for a filter that sees the frames in the time of the source rather than of the saved clip
         public void Write(string dir, int width, int height, double offset)
         {
             if (width <= 0 || height <= 0) { width = 1920; height = 1080; }

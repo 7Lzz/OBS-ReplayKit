@@ -111,7 +111,6 @@ void InkSourceIcon(QLabel *label, bool on)
 	}
 }
 
-// the eye and the lock of a row are images of the obs theme, which no style can recolour, so copies in the ink of the accent are written to the scratch folder of replaykit and the selected rows point at those; made again only when the ink changes
 // the arrow of the dropdowns of the pages (nav/combo-arrow), in a colour of the theme and turned over for an open dropdown, written to the scratch folder of replaykit, since a qss image cannot be recoloured; made again only when the colour changes. empty when it cannot be written, and the dropdown then keeps the arrow of the obs theme
 QString TintedComboArrow(const QColor &ink, bool open)
 {
@@ -331,7 +330,7 @@ void ShellTintPreview()
 			sources->setStyleSheet(sourcesStyle);
 		HookSourceSelection(sources);
 	}
-	// the source settings use the editor toolbar's panel mix, rounded outline and inset ends
+	// the source settings use the panel mix of the editor toolbar, rounded outline and inset ends
 	const QColor editorPanel(qRound(g_menuPanel.red() * 0.45 + g_chromeBg.red() * 0.55),
 				 qRound(g_menuPanel.green() * 0.45 + g_chromeBg.green() * 0.55),
 				 qRound(g_menuPanel.blue() * 0.45 + g_chromeBg.blue() * 0.55));

@@ -37,7 +37,7 @@ const char kReadyScript[] = "(function(){var done=false;function go(){if(done)re
 
 bool WatchBrowserTitle(QCefWidget *browser, QWidget *owner, const char *title, std::function<void()> ready)
 {
-	// obs-browser's title signal is only available through the runtime meta-object
+	// the title signal of obs-browser is only available through the runtime meta-object
 	QLineEdit *probe = new QLineEdit(owner);
 	probe->hide();
 	if (!QObject::connect(browser, SIGNAL(titleChanged(QString)), probe, SLOT(setText(QString)))) {
@@ -80,7 +80,7 @@ void CefCloseForShutdown()
 
 void RunBrowserScript(QCefWidget *browser, const std::string &script)
 {
-	// Closing a CEF widget runs a nested event loop while its main frame is disappearing.
+	// closing a CEF widget runs a nested event loop while its main frame is disappearing.
 	if (CefOpen() && browser)
 		browser->executeJavaScript(script);
 }

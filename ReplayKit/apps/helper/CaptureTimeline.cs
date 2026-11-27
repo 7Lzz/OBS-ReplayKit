@@ -106,6 +106,8 @@ namespace ReplayKitHelper
         private static string ReadText(JToken token) => token?.Type == JTokenType.String ? token.Value<string>() : "";
         private static bool KnownGame(string id, string name) => id.Length > 0 && id.Length <= 80 && name.Length > 0 && name.Length <= 160;
         private const string VideoGamesKey = "videoGames";
+        // what a capture keeps about its game beside the timeline: the roblox experience and the icon the game had
+        internal static readonly string[] GameDetailKeys = { "experience", "gameIcon" };
         private const string VideoGameOrderKey = "manualVideoGameOrder";
 
         internal static bool HasVideoGames(JObject capture) => capture?[VideoGamesKey] is JArray;
@@ -157,7 +159,7 @@ namespace ReplayKitHelper
                 var source = (JObject)original.DeepClone();
                 source.Remove("original");
                 result["original"] = Cut(source, start, end, rate);
-                foreach (string key in new[] { "experience", "gameIcon" })
+                foreach (string key in GameDetailKeys)
                     if (source[key] is JObject detail) result["original"][key] = detail.DeepClone();
             }
             return result;

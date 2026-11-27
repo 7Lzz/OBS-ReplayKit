@@ -169,7 +169,7 @@ namespace ReplayKitHelper
                 ["lastUpdatePromptVersion"] = "",
                 ["clipSoundVolume"] = SettingDefaults.ClipSoundVolume,
                 ["recordingSoundVolume"] = SettingDefaults.RecordingSoundVolume,
-                // Mic volume uses a named gain filter; zero silences the input. Suppression uses RNNoise and sensitivity controls the noise gate.
+                // mic volume uses a named gain filter; zero silences the input; suppression uses RNNoise and sensitivity controls the noise gate.
                 ["micDeviceId"] = SettingDefaults.MicDeviceId,
                 ["micVolume"] = 100,
                 ["micNoiseSuppression"] = true,
@@ -334,7 +334,7 @@ namespace ReplayKitHelper
             string key = keyToken.Value<string>().Trim();
             if (!Regex.IsMatch(key, "^OBS_KEY_[A-Z0-9_]{1,48}$")) throw new InvalidOperationException("Invalid " + settingName + ".");
             var outObj = new JObject { ["key"] = key };
-            foreach (var mod in new[] { "control", "alt", "shift", "command" })
+            foreach (var mod in HotkeyModifiers.Order)
             {
                 if (data[mod] != null && GetBoolSetting(data, mod, false)) outObj[mod] = true;
             }
@@ -384,7 +384,7 @@ namespace ReplayKitHelper
 
         internal static JObject SyncCaptureDisplayFromObs(JObject settings)
         {
-            var input = ObsWebSocket.InvokeRequest("GetInputSettings", new JObject { ["inputName"] = "Display Capture" }, 3000);
+            var input = ObsWebSocket.InvokeRequest("GetInputSettings", new JObject { ["inputName"] = OverlayScene.DisplayCaptureSourceName }, 3000);
             if (!input.Ok) return settings;
             string wanted = NormalizeCaptureDisplay(input.Data?["inputSettings"]?[WantedMonitorKey]);
             if (string.Equals(wanted, settings["captureDisplay"]?.Value<string>(), StringComparison.Ordinal)) return settings;
@@ -397,7 +397,7 @@ namespace ReplayKitHelper
         internal static JObject DisplayCaptureMethodSettings()
         {
             if (!CaptureMethod.PreferWgc) return new JObject();
-            var input = ObsWebSocket.InvokeRequest("GetInputSettings", new JObject { ["inputName"] = "Display Capture" }, 3000);
+            var input = ObsWebSocket.InvokeRequest("GetInputSettings", new JObject { ["inputName"] = OverlayScene.DisplayCaptureSourceName }, 3000);
             JObject current = input.Ok ? input.Data?["inputSettings"] as JObject : null;
             // a source that does not exist yet is made with the method; one obs could not be asked about is left as it is
             if (!input.Ok && input.Code != 600) return new JObject();
@@ -414,7 +414,7 @@ namespace ReplayKitHelper
             var inputSettings = new JObject { [WantedMonitorKey] = wanted };
             // a chosen display that is not connected keeps whatever shows now, and the script moves to it once it is back
             if (chosen != null) inputSettings["monitor_id"] = chosen.Id;
-            var set = ObsWebSocket.InvokeRequest("SetInputSettings", new JObject { ["inputName"] = "Display Capture", ["inputSettings"] = inputSettings, ["overlay"] = true }, 3000);
+            var set = ObsWebSocket.InvokeRequest("SetInputSettings", new JObject { ["inputName"] = OverlayScene.DisplayCaptureSourceName, ["inputSettings"] = inputSettings, ["overlay"] = true }, 3000);
             if (set.Ok) return new JObject { ["applied"] = new JArray("Display Capture display"), ["warnings"] = new JArray() };
             if (set.Code == 600) return new JObject { ["applied"] = new JArray(), ["warnings"] = new JArray() };
             return new JObject { ["applied"] = new JArray(), ["warnings"] = new JArray(Locales.Message("settings.displayCaptureNotUpdatedError", "error", set.Message)) };
@@ -1406,7 +1406,7 @@ namespace ReplayKitHelper
         // the one scene item that carries the whole overlay for a style -- bongo is a single source, the input overlay is the wasd+mouse group.
         internal static string OverlayItemNameForStyle(string style)
         {
-            if (style == "bongo_cat") return "Bongo Cat Overlay";
+            if (style == "bongo_cat") return OverlayScene.BongoSourceName;
             if (style == "input_overlay") return "Group";
             return null;
         }
@@ -1592,9 +1592,9 @@ namespace ReplayKitHelper
         // keeps Window Capture positioned directly after Display Capture in scene-item order, so it paints on top when both happen to be enabled during a capture-mode switch.
         internal static JObject SetWindowCaptureSceneOrder(string sceneName, JArray items)
         {
-            var window = FindSceneItem(items, "Window Capture");
+            var window = FindSceneItem(items, OverlayScene.WindowCaptureSourceName);
             if (window == null) return new JObject { ["ok"] = true, ["skipped"] = true };
-            var display = FindSceneItem(items, "Display Capture");
+            var display = FindSceneItem(items, OverlayScene.DisplayCaptureSourceName);
             if (display == null) return new JObject { ["ok"] = true, ["skipped"] = true };
 
             var displayIndex = GetSceneItemIndexValue(sceneName, display);

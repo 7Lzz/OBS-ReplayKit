@@ -17,12 +17,7 @@ namespace {
 HICON g_ownedIconClips = nullptr;
 int g_taggedClips = -1;
 
-// -- live app-icon swap (helper Appearance tab) -- SETICON <path> over the ipc pipe. covers obss title bar, taskbar button and system-tray icon; "-" restores what obs shipped with (captured on first use). SETICONDOT toggles the red recording dot drawn on the tray icon, and only there, while a recording / replay buffer is running.
-//
-// win11 taskbar note: qt6 setWindowIcon (WM_SETICON at 16/32px) updates the title bar + alt-tab but NOT the
-// win11 taskbar button -- win11 only picks up an icon change when the WM_SETICON payload is large, and it also
-// reads the window CLASS icon. so we push one 256px HICON to every WM_SETICON slot AND the class, and re-assert
-// on Show/WindowStateChange (restoring from the tray rebuilds the taskbar button).
+// live app-icon swap (helper Appearance tab): SETICON <path> over the ipc pipe. covers obss title bar, taskbar button and system-tray icon; "-" restores what obs shipped with (captured on first use). SETICONDOT toggles the red recording dot drawn on the tray icon, and only there, while a recording / replay buffer is running; win11 taskbar note: qt6 setWindowIcon (WM_SETICON at 16/32px) updates the title bar + alt-tab but NOT the; win11 taskbar button -- win11 only picks up an icon change when the WM_SETICON payload is large, and it also; reads the window CLASS icon. so we push one 256px HICON to every WM_SETICON slot AND the class, and re-assert; on Show/WindowStateChange (restoring from the tray rebuilds the taskbar button).
 bool g_appIconDefaultsCaptured = false;
 QIcon g_appIconDefaultMain;
 // the tray icons obs puts on the tray itself, one per state (plain, something is on, recording paused), kept as obs set them
@@ -405,7 +400,7 @@ void RefreshAppIcon()
 	if (mw)
 		mw->setWindowIcon(baseMain);
 	RefreshTrayIcon();
-	// Windows can use Qts process-wide icon for an existing taskbar button. Always restore it too; otherwise a prior preset remains cached there after the user returns to Default.
+	// Windows can use Qts process-wide icon for an existing taskbar button; always restore it too; otherwise a prior preset remains cached there after the user returns to Default.
 	if (!baseMain.isNull())
 		QGuiApplication::setWindowIcon(baseMain);
 

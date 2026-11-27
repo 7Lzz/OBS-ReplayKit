@@ -203,7 +203,7 @@ namespace ReplayKitHelper
             }
         }
 
-        // Exercise the same options as Fast, including enough frames to initialize B-frames and lookahead.
+        // exercise the same options as Fast, including enough frames to initialize B-frames and lookahead.
         public static bool TestHwEncoderAvailable(string ffmpegPath, string encoder)
         {
             if (string.IsNullOrEmpty(ffmpegPath) || !File.Exists(ffmpegPath)) return false;
@@ -350,7 +350,7 @@ namespace ReplayKitHelper
                                 offset = end + 1;
                             }
                         }
-                        // the final fragment belongs to stderr's first line when stdout has no trailing newline
+                        // the final fragment belongs to the first line of stderr when stdout has no trailing newline
                         stdoutRemainder = line.ToString();
                     }
                     catch

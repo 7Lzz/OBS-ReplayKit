@@ -5363,6 +5363,10 @@
     "source": "89d918912b420e67",
     "text": "Esta velocidad dejaría el audio vinculado fuera de su rango admitido."
   },
+  "editor.thisSpeedWouldRunIntoTheNext": {
+    "source": "23dfee54366dde34",
+    "text": "Esta velocidad haría que el fragmento de vídeo se solapara con el siguiente. Mueva antes el siguiente fragmento."
+  },
   "editor.thisSubtitleWasHardToMake": {
     "source": "b17bc9bf84745f95",
     "text": "Este subtítulo era difícil de entender. Elija o escriba lo que se dijo, manténgalo o elimínelo."
@@ -5424,8 +5428,8 @@
     "text": "Falló el recorte: el auxiliar de ReplayKit dejó de responder, así que es posible que el guardado no haya terminado. Compruebe el clip antes de volver a editarlo."
   },
   "editor.trimMustBeAtLeast0": {
-    "source": "187a35d6b253afde",
-    "text": "El recorte debe durar al menos 0,5 s"
+    "source": "1cbd35b108ff88c7",
+    "text": "El recorte debe durar al menos {seconds} s"
   },
   "editor.trimStart": {
     "source": "c0a342e8aad8de91",

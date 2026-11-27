@@ -7,6 +7,7 @@ struct ID3D11Device;
 
 namespace rk {
 
+// the revision goes up by one at every loss and every recovery, so it is odd while the device is lost and a recovered device is told apart from the one before the loss
 struct GraphicsState {
 	std::uint64_t revision = 0;
 

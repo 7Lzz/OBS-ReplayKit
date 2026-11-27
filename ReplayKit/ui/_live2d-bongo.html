@@ -247,8 +247,7 @@
     });
   }
 
-  // View::Render with Live2D on: background, held keys, the cat, the hands, then the raised hands; a mode with no hand pictures has no raised hand either, since its hands are models only drawn with Live2D off
-  // other keys' labels drawn on the keys, as replaykit.dll draws them (overlay-preview/bongo-keys, tools/bongo-keys/README.md)
+  // the labels of other keys drawn on the keys, as replaykit.dll draws them (overlay-preview/bongo-keys, tools/bongo-keys/README.md)
   var labels = null, sprites = {};
   function labelsReady() {
     if (!labels) labels = fetchJson(HELPER + "/overlay-preview/bongo-keys/manifest.json").then(function (m) { return m && m.version === 2 ? m : null; }).catch(function () { return null; });
@@ -275,8 +274,7 @@
     if (entry.tiny && f < 0.55) return [entry.tiny, fit(entry.tiny)];
     return [entry, f];
   }
-  // the white label tinted and laid on its key: sprite pixel (u, v) lands at anchor + f * matrix @ (u - w/2, v - h/2); the manifest counts
-  // pixels from their middles and a canvas from their corners, so half a pixel each way
+  // the white label tinted and laid on its key: sprite pixel (u, v) lands at anchor + f * matrix @ (u - w/2, v - h/2); the manifest counts pixels from their middles and a canvas from their corners, so half a pixel each way
   function drawLabel(c, img, colour, slot, f) {
     var t = document.createElement("canvas"); t.width = img.width; t.height = img.height;
     var tc = t.getContext("2d");
@@ -299,8 +297,7 @@
     c.restore();
   }
   function freeTexture(t) { if (gl && t && t.gl) gl.deleteTexture(t.gl); }
-  // the mode's background, cat background and pressed keys drawn again from the pictures read, with the label of the key given to each key
-  // that has one; a key given its own key or one the labels do not know, and a picture that is not the one they were made for, stay as they are
+  // the background of the mode, the cat background and the pressed keys drawn again from the pictures read, with the label of the key given to each key that has one; a key given its own key or one the labels do not know, and a picture that is not the one they were made for, stay as they are
   function relabel(mode, codes) {
     var key = codes.join(",").replace(/,+$/, "");
     if (mode.labelled === key || mode.labelling === key) return;
@@ -348,6 +345,7 @@
     }).catch(function (error) { console.error(error); mode.labelling = null; });
   }
 
+  // View::Render with Live2D on: background, held keys, the cat, the hands, then the raised hands; a mode with no hand pictures has no raised hand either, since its hands are models only drawn with Live2D off
   function draw(now) {
     frame = 0;
     if (!running || !current) return;

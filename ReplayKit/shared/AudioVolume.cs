@@ -45,7 +45,7 @@ namespace ReplayKitShared
             outputLevel = inputLevel;
             if (percent == 0)
             {
-                // The gain filter's -30 dB floor is not silence. Preserve the fader before setting it to zero.
+                // the -30 dB floor of the gain filter is not silence; preserve the fader before setting it to zero.
                 if (inputLevel != 0 || next[SavedLevel] == null) next[SavedLevel] = inputLevel;
                 Level(next[SavedLevel]);
                 outputLevel = 0;

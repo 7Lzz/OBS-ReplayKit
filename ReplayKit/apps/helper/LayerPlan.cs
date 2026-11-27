@@ -9,7 +9,6 @@ namespace ReplayKitHelper
     // what the editor lays over the video: other clips of the folder, and pictures or gifs (shapes and stickers the page drew among them), each for a stretch of the saved clip, placed by its centre and its width as fractions of the picture, turned and with an opacity. every one is read as an input of its own and laid on in the order the page sends them, the last on top; all numbers are checked and anything missing, unknown or out of range stops the save
     internal sealed class LayerPlan
     {
-        private const int MaxLayers = 50;
 
         private sealed class Layer
         {
@@ -56,7 +55,7 @@ namespace ReplayKitHelper
             try
             {
                 if (!(token is JArray list) || list.Count == 0) throw new BadLayer("the list is empty");
-                if (list.Count > MaxLayers) throw new BadLayer("there are too many");
+                if (list.Count > EditorLimits.LayersMax) throw new BadLayer("there are too many");
                 var plan = new LayerPlan();
                 foreach (var item in list)
                 {
@@ -87,7 +86,7 @@ namespace ReplayKitHelper
                         if (clip == null || !File.Exists(clip.Full)) { error = VideoImports.IsRef(reference) ? Locales.Message("editor.addedVideoMoved") : Locales.Message("editor.addedClipNotInFolder"); return null; }
                         layer.Path = clip.Full;
                         layer.Clip = true;
-                        if (o["speed"] != null) layer.Speed = Num(o, "speed", 0.1, 5);
+                        if (o["speed"] != null) layer.Speed = Num(o, "speed", EditorLimits.VideoSpeedMin, EditorLimits.VideoSpeedMax);
                     }
                     else if (kind == "media")
                     {

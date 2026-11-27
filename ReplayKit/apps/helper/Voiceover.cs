@@ -66,6 +66,8 @@ namespace ReplayKitHelper
             lock (Gate)
             {
                 if (_session == null) return new JObject { ["ok"] = true, ["running"] = false };
+                // a take ends at the longest the record tab offers, so one left running stops instead of growing without end
+                if (_session.IsRunning && _session.RecordedSeconds >= EditorLimits.VoiceoverSecondsMax) _session.Stop();
                 var level = _session.ReadLevel();
                 return new JObject
                 {

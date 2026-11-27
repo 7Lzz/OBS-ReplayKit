@@ -381,9 +381,9 @@ function script_properties()
 end
 
 function script_defaults(settings)
-    obs.obs_data_set_default_string(settings, "game_source", "Game Capture")
-    obs.obs_data_set_default_string(settings, "display_source", "Display Capture")
-    obs.obs_data_set_default_string(settings, "window_source", "Window Capture")
+    obs.obs_data_set_default_string(settings, "game_source", SHARED.capture_sources.game)
+    obs.obs_data_set_default_string(settings, "display_source", SHARED.capture_sources.display)
+    obs.obs_data_set_default_string(settings, "window_source", SHARED.capture_sources.window)
     obs.obs_data_set_default_string(settings, "scene_name", "")
     obs.obs_data_set_default_int(settings, "check_interval", 500)
     obs.obs_data_set_default_bool(settings, "verbose", false)

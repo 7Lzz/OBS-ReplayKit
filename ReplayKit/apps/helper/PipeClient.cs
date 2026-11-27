@@ -323,7 +323,6 @@ namespace ReplayKitHelper
         // a page of the shell saw alt + an arrow or a side button of the mouse: the plugin keeps the history of the views and takes the step
         public static void SendShellNav(string direction) { if (direction == "back" || direction == "forward") TryWrite("SHELLNAV " + direction); }
 
-        // the settings page has unsaved edits or not, and its answer to the prompt the plugin raised when another view was picked meanwhile
         // the id is checked by the route already, the plugin checks it again before it reaches a script
         public static bool SendNotificationReader(string id) => TryWrite("NOTIFYREADER " + id);
         public static void SendNotificationReaderClose() => TryWrite("NOTIFYREADERCLOSE");
@@ -338,6 +337,7 @@ namespace ReplayKitHelper
         }
         public static void SendDonePopupClose() => TryWrite("DONEPOPUPCLOSE");
 
+        // the settings page has unsaved edits or not, and its answer to the prompt the plugin raised when another view was picked meanwhile
         public static void SendSettingsDirty(bool dirty) => TryWrite("SETTINGSDIRTY " + (dirty ? "1" : "0"));
         public static void SendSettingsLeave(string view) { if (view == "home" || view == "clips" || view == "setup" || view == "projector") TryWrite("SETTINGSLEAVE " + view); }
 

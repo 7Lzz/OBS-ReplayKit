@@ -89,7 +89,7 @@ namespace ReplayKitHelper
             }
             catch (Exception ex) when (ex is ArgumentException || ex is InvalidOperationException || ex is System.ComponentModel.Win32Exception) { }
 
-            foreach (var name in new[] { "obs64", "obs32", "obs" })
+            foreach (var name in ObsProcessNames)
             {
                 try
                 {
@@ -138,8 +138,11 @@ namespace ReplayKitHelper
             catch (Exception ex) when (ex is System.ComponentModel.Win32Exception || ex is InvalidOperationException) { return false; }
         }
 
-        private static bool IsObsProcessName(string name) =>
-            string.Equals(name, "obs64", StringComparison.OrdinalIgnoreCase) || string.Equals(name, "obs", StringComparison.OrdinalIgnoreCase);
+        // the names obs runs under; the role host shares obs64, so a caller that needs obs itself checks IsRoleHost too
+        internal static readonly string[] ObsProcessNames = { "obs64", "obs32", "obs" };
+
+        internal static bool IsObsProcessName(string name) =>
+            Array.Exists(ObsProcessNames, obs => string.Equals(obs, name, StringComparison.OrdinalIgnoreCase));
 
         // hard ceiling on any upload from the free / anon tier. 0 = unlimited only applies to a recognised paid plan.
         public const long HARD_UPLOAD_CAP = 1024L * 1024 * 1024;

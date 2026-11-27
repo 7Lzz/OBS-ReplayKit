@@ -145,7 +145,7 @@ namespace ReplayKitHelper
         internal static InputOverlayLayout.Fit InputOverlayMemberFit(string name, JObject settings)
         {
             InputOverlayLayout.Place(InputOverlayLayouts.Keyboard(settings), InputOverlayLayouts.Mouse(settings), out var keys, out var pointer, out _, out _);
-            if (name != "Mouse Overlay") return keys;
+            if (name != OverlayScene.MouseSourceName) return keys;
             return pointer ?? new InputOverlayLayout.Fit { X = 0.0, Y = 0.0, Scale = 0.001 };
         }
 
@@ -154,7 +154,7 @@ namespace ReplayKitHelper
         // the files of a member: the picked keyboard or mouse, and the default mouse for one that is off, since its source stays in the group hidden
         internal static InputOverlayLayout.Picked InputOverlayMemberFiles(string name, JObject settings)
         {
-            if (name != "Mouse Overlay") return InputOverlayLayouts.Keyboard(settings);
+            if (name != OverlayScene.MouseSourceName) return InputOverlayLayouts.Keyboard(settings);
             return InputOverlayLayouts.Mouse(settings) ?? InputOverlayLayouts.Mouse(new JObject { ["inputOverlayMouse"] = InputOverlayLayout.DefaultMouse });
         }
 
@@ -194,7 +194,7 @@ namespace ReplayKitHelper
             double canvasH = preset["video"]?["baseHeight"]?.Value<double>() ?? 0.0;
             if (canvasW <= 0.0 || canvasH <= 0.0) { canvasW = 1920.0; canvasH = 1080.0; }
 
-            if (name == "Display Capture")
+            if (name == OverlayScene.DisplayCaptureSourceName)
             {
                 double sourceW = canvasW, sourceH = canvasH;
                 if (preset["source"] != null)
@@ -390,7 +390,7 @@ namespace ReplayKitHelper
 
         internal static void SetWindowCaptureSourceJson(JObject source, string uuid, JObject settings)
         {
-            OverlayScene.SetSourceFields(source, "Window Capture", uuid, "window_capture", "window_capture", null, true);
+            OverlayScene.SetSourceFields(source, OverlayScene.WindowCaptureSourceName, uuid, "window_capture", "window_capture", null, true);
             source["settings"] = GetWindowCaptureInputSettings(settings);
         }
 
@@ -462,7 +462,7 @@ namespace ReplayKitHelper
 
         internal static void SetWindowCaptureSceneItemJson(JObject item, string uuid, JObject preset, bool visible)
         {
-            SetMainCaptureSceneItemJson(item, "Window Capture", preset);
+            SetMainCaptureSceneItemJson(item, OverlayScene.WindowCaptureSourceName, preset);
             item["source_uuid"] = uuid;
             item["visible"] = visible;
         }
@@ -493,8 +493,8 @@ namespace ReplayKitHelper
             double canvasH = preset["video"]?["baseHeight"]?.Value<double>() ?? 0.0;
             var transform = InputOverlayTransform(name, preset, settings);
             var files = InputOverlayMemberFiles(name, settings);
-            double sourceW = files?.Width ?? (name == "Mouse Overlay" ? InputOverlayLayout.DefaultMouseWidth : InputOverlayLayout.DefaultKeyboardWidth);
-            double sourceH = files?.Height ?? (name == "Mouse Overlay" ? InputOverlayLayout.DefaultMouseHeight : InputOverlayLayout.DefaultKeyboardHeight);
+            double sourceW = files?.Width ?? (name == OverlayScene.MouseSourceName ? InputOverlayLayout.DefaultMouseWidth : InputOverlayLayout.DefaultKeyboardWidth);
+            double sourceH = files?.Height ?? (name == OverlayScene.MouseSourceName ? InputOverlayLayout.DefaultMouseHeight : InputOverlayLayout.DefaultKeyboardHeight);
             SetSceneItemBaseJson(item, name, visible);
             if (!string.IsNullOrWhiteSpace(sourceUuid)) item["source_uuid"] = sourceUuid;
             item["scale_ref"] = new JObject { ["x"] = sourceW, ["y"] = sourceH };
@@ -512,7 +512,7 @@ namespace ReplayKitHelper
             const double canvasW = 2560.0, canvasH = 1440.0;
             var fit = InputOverlayMemberFit(name, overlaySettings);
             double x = fit.X, y = fit.Y, scaleX = fit.Scale, scaleY = fit.Scale;
-            SetSceneItemBaseJson(item, name, name != "Mouse Overlay" || InputOverlayMouseShown(overlaySettings));
+            SetSceneItemBaseJson(item, name, name != OverlayScene.MouseSourceName || InputOverlayMouseShown(overlaySettings));
             item["source_uuid"] = sourceUuid;
             item["scale_ref"] = new JObject { ["x"] = canvasW, ["y"] = canvasH };
             item["id"] = id;
@@ -541,7 +541,7 @@ namespace ReplayKitHelper
             InputOverlayLayouts.GroupSize(overlaySettings, out double groupW, out double groupH);
             var settings = new JObject { ["id_counter"] = 0, ["custom_size"] = true, ["cx"] = (int)Math.Round(groupW), ["cy"] = (int)Math.Round(groupH) };
             var items = new JArray();
-            foreach (var name in new[] { "WASD Overlay", "Mouse Overlay" })
+            foreach (var name in new[] { OverlayScene.WasdSourceName, OverlayScene.MouseSourceName })
             {
                 if (!inputSources.TryGetValue(name, out var src)) continue;
                 var member = new JObject();
@@ -555,7 +555,7 @@ namespace ReplayKitHelper
             group["enabled"] = true; group["muted"] = false;
             group["push-to-mute"] = false; group["push-to-mute-delay"] = 0; group["push-to-talk"] = false; group["push-to-talk-delay"] = 0;
             var hotkeys = new JObject();
-            foreach (var name in new[] { "WASD Overlay", "Mouse Overlay" })
+            foreach (var name in new[] { OverlayScene.WasdSourceName, OverlayScene.MouseSourceName })
             {
                 if (!inputSources.TryGetValue(name, out var src)) continue;
                 hotkeys["libobs.show_scene_item." + src.Id] = new JArray();
@@ -730,11 +730,11 @@ namespace ReplayKitHelper
 
         internal static bool OverlayOpacityFilterUsesLegacyPercent(string kind, JObject settings = null)
         {
-            if (kind == "color_filter_v2") return false;
-            if (kind == "color_filter") return true;
+            if (kind == OverlayScene.OpacityFilterVersionedKind) return false;
+            if (kind == OverlayScene.OpacityFilterKind) return true;
             if (settings != null)
             {
-                if (settings["versioned_id"]?.Value<string>() == "color_filter_v2") return false;
+                if (settings["versioned_id"]?.Value<string>() == OverlayScene.OpacityFilterVersionedKind) return false;
                 var raw = settings["opacity"];
                 if (raw != null)
                 {
@@ -763,7 +763,7 @@ namespace ReplayKitHelper
         {
             string name = filter["name"]?.Value<string>() ?? "";
             string filterUuid = filter["uuid"]?.Value<string>() ?? "";
-            return name == "ReplayKit Overlay Opacity" || (!string.IsNullOrWhiteSpace(uuid) && filterUuid == uuid);
+            return name == OverlayScene.OpacityFilterName || (!string.IsNullOrWhiteSpace(uuid) && filterUuid == uuid);
         }
 
         internal static void SetOverlayOpacitySourceJson(JObject source, JObject settings)
@@ -782,7 +782,7 @@ namespace ReplayKitHelper
                 var filter = (JObject)filterToken;
                 string name = filter["name"]?.Value<string>() ?? "";
                 string filterUuid = filter["uuid"]?.Value<string>() ?? "";
-                if (name != "ReplayKit Overlay Opacity" && (string.IsNullOrWhiteSpace(uuid) || filterUuid != uuid))
+                if (name != OverlayScene.OpacityFilterName && (string.IsNullOrWhiteSpace(uuid) || filterUuid != uuid))
                 {
                     keptFilters.Add(filter);
                     continue;
@@ -795,7 +795,7 @@ namespace ReplayKitHelper
                 var filterSettings = managedFilter["settings"] as JObject ?? new JObject();
                 string id = managedFilter["id"]?.Value<string>() ?? "";
                 string versionedId = managedFilter["versioned_id"]?.Value<string>() ?? "";
-                bool legacyPercent = id == "color_filter" && versionedId != "color_filter_v2";
+                bool legacyPercent = id == OverlayScene.OpacityFilterKind && versionedId != OverlayScene.OpacityFilterVersionedKind;
                 var opacitySettings = OverlayOpacityFilterSettingsLive(opacity, legacyPercent, settings);
                 foreach (var kv in opacitySettings) filterSettings[kv.Key] = kv.Value;
                 managedFilter["settings"] = filterSettings;

@@ -228,24 +228,6 @@ namespace ReplayKitHelper
             .Where(p => ValidId(p.Name) && p.Value is JObject row && row["hidden"]?.Type == JTokenType.Boolean && row["hidden"].Value<bool>())
             .Select(p => p.Name), StringComparer.Ordinal), 1024 * 1024);
 
-        internal static void Remove(string id)
-        {
-            var game = Get(id) ?? throw new ArgumentException(Locales.Message("clips.unknownGame2"));
-            ClipStore.Update(CustomFile, db =>
-            {
-                if (db[id] == null && db.Count >= 1000) throw new InvalidDataException(Locales.Message("clips.tooManySavedGames"));
-                var row = db[id] as JObject ?? new JObject { ["name"] = game.Name };
-                db[id] = row;
-                foreach (var entry in db.Properties().Where(p => p.Value is JObject && (p.Name == id || p.Name.StartsWith("custom-", StringComparison.Ordinal) &&
-                    string.Equals(p.Value["name"]?.Value<string>(), game.Name, StringComparison.OrdinalIgnoreCase))))
-                {
-                    entry.Value["played"] = false;
-                    entry.Value["hidden"] = true;
-                }
-                return true;
-            }, 1024 * 1024);
-        }
-
         internal static JArray Search(string query)
         {
             string text = (query ?? "").Trim();

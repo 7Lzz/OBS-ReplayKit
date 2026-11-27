@@ -122,7 +122,6 @@
   })();
 
   const HELPER = location.origin;
-  const CAPTURE_TIMEOUT_MS = 10000;
   const KINDS = {
     clip: { title:RK_M("common.clipping"), field:"clipKeybind", link:RK_M("controls.clipSettings") },
     record: { title:RK_M("common.recording"), field:"recordingKeybind", link:RK_M("controls.recordingSettings") },
@@ -217,7 +216,7 @@
     phase = "listening";
     render();
     els.key.focus();
-    captureTimer = setTimeout(cancelCapture, CAPTURE_TIMEOUT_MS);
+    captureTimer = setTimeout(cancelCapture, RKHotkeys.captureTimeoutMs);
   }
 
   function cancelCapture() {

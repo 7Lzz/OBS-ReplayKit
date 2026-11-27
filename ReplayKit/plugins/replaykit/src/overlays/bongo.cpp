@@ -1,6 +1,7 @@
 #include "prelude.hpp"
 #include "overlays/bongo.hpp"
 #include "core/locale.hpp"
+#include "core/shared_values.hpp"
 #include "overlays/bongo_animation.hpp"
 #include "overlays/bongo_input.hpp"
 #include "overlays/bongo_model.hpp"
@@ -229,8 +230,7 @@ std::unique_ptr<Mode> LoadMode(const QString &root, const QString &name, const Q
 	return mode;
 }
 
-// which form of a label fits a key (the long one, "short" or "tiny") and how much it is shrunk from its natural size, as
-// tools/bongo-keys/render.py choose()
+// which form of a label fits a key (the long one, "short" or "tiny") and how much it is shrunk from its natural size, as tools/bongo-keys/render.py choose()
 QJsonObject ChooseLabel(const QJsonObject &entry, const QJsonObject &slot, double &f)
 {
 	const QJsonArray room = slot["room"].toArray(), matrix = slot["matrix"].toArray();
@@ -573,9 +573,7 @@ struct Bongo {
 		return sum;
 	}
 
-	// the mode's background, cat background and pressed keys read again from their files, with the label of the key given to each
-	// key that has one drawn over its blank face; a key given its own key, a key the labels do not know, and a picture that is not the
-	// one the faces were cut from (the Bango Cat folder was changed by hand) keep the picture as it is. Runs on the graphics thread.
+	// the background of the mode, the cat background and the pressed keys read again from their files, with the label of the key given to each key that has one drawn over its blank face; a key given its own key, a key the labels do not know, and a picture that is not the one the faces were cut from (the Bango Cat folder was changed by hand) keep the picture as it is. Runs on the graphics thread.
 	void Relabel(Mode &mode, const QStringList &codes)
 	{
 		mode.labelled = codes;
@@ -605,8 +603,7 @@ struct Bongo {
 			QImage image(path);
 			if (image.isNull())
 				return;
-			// painted as straight alpha: a round trip through premultiplied would darken the nearly clear pixels at the keys' soft edges,
-			// and qt only converts the pixels a draw touches, all of them inside the keys
+			// painted as straight alpha: a round trip through premultiplied would darken the nearly clear pixels at the soft edges of the keys, and qt only converts the pixels a draw touches, all of them inside the keys
 			image = image.convertToFormat(QImage::Format_ARGB32);
 			const bool touched = std::any_of(changes.begin(), changes.end(), [&](const auto &change) { return only < 0 || change.first == only; });
 			if (touched) {
@@ -757,7 +754,7 @@ obs_properties_t *Properties()
 void RegisterBongo()
 {
 	obs_source_info info{};
-	info.id = "replaykit-bongo";
+	info.id = kBongoSourceKind;
 	info.type = OBS_SOURCE_TYPE_INPUT;
 	info.output_flags = OBS_SOURCE_VIDEO | OBS_SOURCE_CUSTOM_DRAW;
 	info.get_name = [](void *) { return "Bongo Cat"; };

@@ -2204,7 +2204,7 @@
   const raIconTried = {};
   // set when the user drags the overlay in the projector; obs owns that position so it is not part of state
   let projectorActionInFlight = false;
-  // Driver actions stay unavailable until the settings response supplies its state.
+  // driver actions stay unavailable until the settings response supplies its state.
   let shareAudioInstalled = null;
 
   const compressionByPreset = {
@@ -2408,7 +2408,6 @@
     resizeGrip: document.querySelector(".resize-grip"),
   };
 
-  // seeded here rather than with the other bindings: applyThemeCustomToEditor can run first, and selecting into an unfilled combo would quietly land on Linear.
   // the limits of the storage card, in GB; anything else is typed in through Custom
   const STORAGE_LIMITS = [{ value:"0", label:RK_M("settings.noLimit") }, { value:"25", label:"25 GB" }, { value:"50", label:"50 GB" }, { value:"100", label:"100 GB" }, { value:"250", label:"250 GB" }, { value:"500", label:"500 GB" }, { value:"1024", label:"1 TB" }, { value:"custom", label:RK_M("settings.custom") }];
   fillCombo(els.storageLimit, STORAGE_LIMITS);
@@ -2714,8 +2713,7 @@
     return Object.keys(state).some((key) => isRestartKey(key) && settingValueChanged(key));
   }
 
-  // what the quick action menu under the logo offers on this page; the helper keeps the list for the plugin, sent again only when it changed
-  // var, since updateFooter can run before this line has during the first load of the page
+  // what the quick action menu under the logo offers on this page; the helper keeps the list for the plugin, sent again only when it changed; var, since updateFooter can run before this line has during the first load of the page
   var quickSent = "";
   function publishQuickActions() {
     const actions = [
@@ -2842,7 +2840,7 @@
   }, true));
   function finishHistoryGesture() {
     const gesture = historyGesture;
-    // Native input, change and click handlers must finish before the gesture ends.
+    // native input, change and click handlers must finish before the gesture ends.
     setTimeout(() => { if (historyGesture === gesture) historyGesture = null; }, 0);
   }
   ["pointerup", "pointercancel"].forEach((name) => window.addEventListener(name, finishHistoryGesture, true));
@@ -3072,7 +3070,6 @@
   let hotkeyCaptureGeneration = 0;
   let activeHotkeyField = null;
   let hotkeyCaptureTimer = null;
-  const HOTKEY_CAPTURE_TIMEOUT_MS = 10000;
   const hotkeyFields = {
     clipKeybind: { el:els.clipKeybind, defaultValue:DEFAULT_CLIP_KEYBIND },
     recordingKeybind: { el:els.recordingKeybind, defaultValue:DEFAULT_RECORDING_KEYBIND },
@@ -3119,7 +3116,7 @@
       hotkeyCaptureTimer = setTimeout(() => {
         hotkeyCaptureTimer = null;
         if (activeHotkeyField === fieldName) field.el.blur();
-      }, HOTKEY_CAPTURE_TIMEOUT_MS);
+      }, RKHotkeys.captureTimeoutMs);
     });
   }
 
@@ -3357,7 +3354,7 @@
     els.screenshareAutoGameKeepFocused.disabled = !keepFocusUsed;
     els.screenshareAutoGameOutOfFocusRow.classList.toggle("is-disabled", !usesAutoList);
     els.screenshareAutoGameOutOfFocus.disabled = !usesAutoList;
-    // what the list does when you tab out depends on the two switches under it, so its note follows them
+    // what the list does on a tab out depends on the two switches under it, so its note follows them
     els.screenshareAutoGameListNote.textContent = els.screenshareAutoGameOutOfFocus.checked ? RK_M("settings.autoGameListNoteCard") : els.screenshareAutoGameKeepFocused.checked ? RK_M("settings.autoGameListNote") : RK_M("settings.autoGameListNoteSwitch");
     els.screenshareSwitchDelayRow.classList.toggle("is-disabled", !usesAutoList);
     els.screenshareSwitchDelay.disabled = !usesAutoList;
@@ -3480,8 +3477,7 @@
     els.fpsWarning.hidden = fps <= 60;
   }
 
-  // -- the keys and layouts of the overlays --
-  // the keyboards and mice the helper offers, with the keys of the custom keyboard and where they sit (options.inputOverlay)
+  // the keys and layouts of the overlays --; the keyboards and mice the helper offers, with the keys of the custom keyboard and where they sit (options.inputOverlay)
   let overlayLayouts = null;
   // the modes of the bongo cat folder with the keys each listens to, read once from the helper
   let bongoManifest = null, bongoManifestLoading = null;
@@ -3687,8 +3683,7 @@
     setComboValue(els.captureDisplay, settingOr("captureDisplay"), false);
     setComboValue(els.downscaleFilter, settingOr("downscaleFilter"), false);
     {
-      // match the stored height to a standard step (tolerating small OBS-rounding / monitor-mismatch drift, ~1%);
-      // only fall back to "Custom" for a genuinely off-list value.
+      // match the stored height to a standard step (tolerating small OBS-rounding / monitor-mismatch drift, ~1%); only fall back to "Custom" for a genuinely off-list value.
       const h = clampDownscaleHeight(settingOr("downscaleHeight"));
       const steps = comboOptions(els.downscaleTarget).filter((o) => o.value !== "custom");
       const near = steps.find((o) => Math.abs(Number(o.value) - h) <= Math.max(2, h * 0.01));
@@ -4065,8 +4060,7 @@
     });
   // the mic controls write straight into state (the host contract is get/set/onChange), so saving, undo and the dirty check treat them like every other field
   if (window.RKMic) RKMic.init({ get:(k) => state[k], set:(k, v) => { state[k] = v; }, onChange:() => markDirty() });
-  // the card editor writes the layout straight into state too, so saving, undo and the dirty check treat it like every other field
-  // settingOr reads an empty value as the default, but an empty card text is a card with no text
+  // the card editor writes the layout straight into state too, so saving, undo and the dirty check treat it like every other field; settingOr reads an empty value as the default, but an empty card text is a card with no text
   if (window.RKShareCardEditor) RKShareCardEditor.init({ get:(k) => k === "share_cover_text" ? state[k] : settingOr(k), set:(k, v) => { state[k] = v; }, onChange:() => markDirty() });
   els.screenshareGameOverridePicker.addEventListener("combochange", syncScreenshareCaptureFields);
   els.screenshareAutoGameOutOfFocus.addEventListener("change", syncScreenshareCaptureFields);
@@ -5298,7 +5292,7 @@
       raState.html = html;
       list.innerHTML = html;
     }
-    // The description follows the selected recording mode.
+    // the description follows the selected recording mode.
     const info = document.getElementById("raInfo");
     let text = RK_M("settings.recordsPcAudioAndDiscordDiscord");
     if (state.recordingAudioMode === "output_device") {
@@ -5414,7 +5408,7 @@
     helperJson("open-obs-settings", { method:"POST" }).catch((error) => setStatus(RK_M("settings.couldNotOpenTheObsSettings", { error: error.message || error }), "bad"));
   });
 
-  // Each enabled button opens its OBS menu at the pointer.
+  // each enabled button opens its OBS menu at the pointer.
   (function initObsMenu() {
     const buttons = document.getElementById("obsMenuButtons");
     buttons.addEventListener("click", (event) => {

@@ -67,9 +67,7 @@ namespace ReplayKitHelper
         // the audio streams of the source are numbered below this, and the files the editor brought in from here up
         internal const int ImportBase = 100;
         private const int MaxImports = 32;
-        private const int MaxLanes = 8;
         private const int MaxSegments = 200;
-        private const int MaxParts = 8;
         // source cuts in editor plans are rounded to milliseconds
         private const double MinPartLength = 0.0005;
         private static readonly Regex UnsafeLabel = new Regex(@"[^A-Za-z0-9 _.()&\-]", RegexOptions.Compiled);
@@ -83,7 +81,7 @@ namespace ReplayKitHelper
             error = null;
             var plan = new AudioPlan();
             var lanes = json?["lanes"] as JArray;
-            if (lanes == null || lanes.Count > MaxLanes) { error = Locales.Message("editor.badAudioEdit"); return null; }
+            if (lanes == null || lanes.Count > EditorLimits.AudioRowsMax) { error = Locales.Message("editor.badAudioEdit"); return null; }
             // the files brought in from outside the clip are listed by number and id; whether a file is still there is for the one who renders to check
             var importsToken = json["imports"];
             if (importsToken != null && importsToken.Type != JTokenType.Null)
@@ -131,7 +129,7 @@ namespace ReplayKitHelper
                     {
                         partsJson = new JArray(new JObject { ["src"] = o["src"], ["srcStart"] = o["srcStart"], ["srcEnd"] = o["srcEnd"] });
                     }
-                    bool valid = partsJson.Count >= 1 && partsJson.Count <= MaxParts;
+                    bool valid = partsJson.Count >= 1 && partsJson.Count <= EditorLimits.CombinedTracksMax;
                     foreach (var partToken in partsJson)
                     {
                         var po = partToken as JObject;
@@ -155,7 +153,7 @@ namespace ReplayKitHelper
                         && seg.At >= -86400 && seg.At <= 86400
                         && seg.Volume >= 0 && seg.Volume <= 4
                         && seg.FadeIn >= 0 && seg.FadeIn <= 3600 && seg.FadeOut >= 0 && seg.FadeOut <= 3600
-                        && seg.Speed >= 0.0625 && seg.Speed <= 16;
+                        && EditorLimits.AudioSpeed(seg.Speed);
                     if (!valid) { error = Locales.Message("editor.badAudioEdit"); return null; }
                     if (laneMuted || o.Value<bool?>("muted") == true || seg.Volume == 0) continue;
                     lane.Segments.Add(seg);

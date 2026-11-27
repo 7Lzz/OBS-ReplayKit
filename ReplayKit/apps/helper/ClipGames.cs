@@ -460,7 +460,7 @@ namespace ReplayKitHelper
             {
                 var earlier = result["original"] as JObject;
                 var details = primary == single.Id ? previous : MainGame(CaptureTimeline.Describe(earlier)) == single.Id ? earlier : null;
-                foreach (string key in new[] { "experience", "gameIcon" })
+                foreach (string key in CaptureTimeline.GameDetailKeys)
                     if (details?[key] is JObject detail) result[key] = detail.DeepClone();
             }
             return result;

@@ -299,6 +299,16 @@ namespace ReplayKitHelper
 
         private static string LimitText(JToken value) => value.Value<double>().ToString(System.Globalization.CultureInfo.InvariantCulture);
 
+        // the speed ranges of the clip editor, for pages that clamp with them; at the top of the head, since the editor partials read it while their scripts load
+        private static string InjectEditorLimits(string html)
+        {
+            if (html.IndexOf("RK_EDITOR_LIMITS", StringComparison.Ordinal) < 0) return html;
+            const string head = "<head>";
+            int i = html.IndexOf(head, StringComparison.OrdinalIgnoreCase);
+            if (i < 0) return html;
+            return html.Insert(i + head.Length, "<script>window.RK_EDITOR_LIMITS=" + EditorLimits.Json().ToString(Formatting.None) + ";</script>");
+        }
+
         // fragment: a page the clips page splices into itself (the editor) runs on the messages and error reporter that page already has, and its loader refuses any script tag with a src
         public static void ServeHtml(Stream stream, string filename, bool sameOriginFrame = false, bool fragment = false)
         {
@@ -316,7 +326,7 @@ namespace ReplayKitHelper
                     {
                         string source = File.ReadAllText(f);
                         if (!fragment) source = InjectLocale(source);
-                        string html = InjectNoTab(InjectLanguageList(InjectFontList(InjectSettingLimits(InjectSettingDefaults(InjectDockIcons(InjectFontStyle(InjectThemeStyle(ExpandGlyphs(InjectPartials(source))))))))));
+                        string html = InjectNoTab(InjectLanguageList(InjectFontList(InjectEditorLimits(InjectSettingLimits(InjectSettingDefaults(InjectDockIcons(InjectFontStyle(InjectThemeStyle(ExpandGlyphs(InjectPartials(source)))))))))));
                         if (html.Contains("__RK_CLIP_APP_VERSION__"))
                         {
                             using (var hash = SHA256.Create())

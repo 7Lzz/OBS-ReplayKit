@@ -71,7 +71,7 @@ void CloseCefWidgetsBeforeShutdown()
 		delete g_prewarmWindow.data();
 }
 
-// file the screenshot where the helper's gallery looks, even if obs saved it in a subfolder
+// file the screenshot where the gallery of the helper looks, even if obs saved it in a subfolder
 void FileScreenshot(const QString &path, const QString &folderPath, int tries, qint64 captureAt)
 {
 	const QFileInfo shot(path);
@@ -198,10 +198,10 @@ void OnFrontendEvent(enum obs_frontend_event event, void *)
 			});
 		return;
 	}
-	// recording / replay-buffer state drives the red dot on the tray icon, the only surface that wears it
 	// another profile has its own hotkeys and clip length
 	if (event == OBS_FRONTEND_EVENT_PROFILE_CHANGED)
 		RequestFullSettingsSync();
+	// recording / replay-buffer state drives the red dot on the tray icon, the only surface that wears it
 	if (event == OBS_FRONTEND_EVENT_RECORDING_STARTED || event == OBS_FRONTEND_EVENT_RECORDING_STOPPED ||
 	    event == OBS_FRONTEND_EVENT_RECORDING_PAUSED || event == OBS_FRONTEND_EVENT_RECORDING_UNPAUSED ||
 	    event == OBS_FRONTEND_EVENT_REPLAY_BUFFER_STARTED || event == OBS_FRONTEND_EVENT_REPLAY_BUFFER_STOPPED ||

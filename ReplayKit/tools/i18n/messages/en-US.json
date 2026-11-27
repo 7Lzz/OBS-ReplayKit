@@ -588,7 +588,7 @@
     "text": "Deleted {name}"
   },
   "clips.deletingDoneTotal": {
-    "context": "Tooltip in the clips library. Keep {done}, {total} as written.",
+    "context": "Notice in the clips library while selected clips are deleted, counting the clip being deleted. Keep {done}, {total} as written.",
     "text": "Deleting {done} / {total}"
   },
   "clips.deselectClip": {
@@ -1092,7 +1092,7 @@
     "text": "Moved {name} to the trash"
   },
   "clips.movingToTrashDoneTotal": {
-    "context": "Tooltip in the clips library. Keep {done}, {total} as written.",
+    "context": "Notice in the clips library while selected clips are deleted, counting the clip being deleted. Keep {done}, {total} as written.",
     "text": "Moving to trash {done} / {total}"
   },
   "clips.muteM": {
@@ -5363,6 +5363,10 @@
     "context": "Short notice that pops up in the timeline of the clip editor.",
     "text": "This speed would put the linked audio outside its supported range."
   },
+  "editor.thisSpeedWouldRunIntoTheNext": {
+    "context": "Short notice that pops up in the timeline of the clip editor when a slower video piece would overlap the piece after it.",
+    "text": "This speed would make the video piece run into the next one. Move the next piece first."
+  },
   "editor.thisSubtitleWasHardToMake": {
     "context": "Text in the look and effects panel of the clip editor.",
     "text": "This subtitle was hard to make out. Pick or type what was said, keep it, or delete it."
@@ -5424,8 +5428,8 @@
     "text": "Trim failed: ReplayKit's helper stopped answering, so the save may not have finished. Check the clip before editing it again."
   },
   "editor.trimMustBeAtLeast0": {
-    "context": "Message the helper shows when an action fails or finishes in a ReplayKit window, sent by the background helper.",
-    "text": "Trim must be at least 0.5s long"
+    "context": "Message the helper shows when an action fails or finishes in a ReplayKit window, sent by the background helper. Keep {seconds} as written.",
+    "text": "Trim must be at least {seconds}s long"
   },
   "editor.trimStart": {
     "context": "Screen reader label in the clip editor.",

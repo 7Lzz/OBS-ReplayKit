@@ -493,7 +493,7 @@ namespace ReplayKitHelper
         public static string GetLink(string name, string folder) =>
             ClipStore.ReadFolder(AppConfig.GetDbPath(), LibraryRoot(folder), db => (db[name] as JObject)?.Value<string>("url"));
 
-        // keep the clip's other metadata and leave a replacement link intact.
+        // keep the other metadata of the clip and leave a replacement link intact.
         public static bool RemoveLink(string name, string expectedUrl = null, string folder = null)
         {
             if (string.IsNullOrWhiteSpace(name)) return false;

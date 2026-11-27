@@ -198,7 +198,7 @@ namespace ReplayKitHelper
             var form = new RoundedBorderlessForm(ClientCssW, ClientCssH)
             {
                 // title kept exact -- WindowWithTitleExists / CloseWindowsByTitle / the /close-window route all match on it
-                Text = "ReplayKit Update",
+                Text = WindowLayout.UpdateTitle,
                 FormBorderStyle = FormBorderStyle.None,
                 StartPosition = FormStartPosition.Manual,
                 ShowInTaskbar = true,

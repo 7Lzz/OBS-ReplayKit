@@ -5361,6 +5361,10 @@
     "source": "89d918912b420e67",
     "text": "この速度にすると、リンクされた音声が対応範囲外になります。"
   },
+  "editor.thisSpeedWouldRunIntoTheNext": {
+    "source": "23dfee54366dde34",
+    "text": "この速度にすると、動画の部分が次の部分に重なります。先に次の部分を移動してください。"
+  },
   "editor.thisSubtitleWasHardToMake": {
     "source": "b17bc9bf84745f95",
     "text": "この字幕は聞き取りにくいものでした。話された内容を選ぶか入力して残すか、削除してください。"
@@ -5422,8 +5426,8 @@
     "text": "トリムに失敗しました: ReplayKit のヘルパーが応答を停止したため、保存が完了していない可能性があります。もう一度編集する前に、クリップを確認してください。"
   },
   "editor.trimMustBeAtLeast0": {
-    "source": "187a35d6b253afde",
-    "text": "トリムは 0.5 秒以上にしてください"
+    "source": "1cbd35b108ff88c7",
+    "text": "トリムは {seconds} 秒以上にしてください"
   },
   "editor.trimStart": {
     "source": "c0a342e8aad8de91",

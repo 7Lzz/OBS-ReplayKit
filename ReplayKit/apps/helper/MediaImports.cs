@@ -138,7 +138,7 @@ namespace ReplayKitHelper
             }
         }
 
-        // The temporary file is on the cache volume, so publishing never copies the payload again.
+        // the temporary file is on the cache volume, so publishing never copies the payload again.
         private static JObject Store(string temp, string id, string ext, string name)
         {
             string dir = Path.Combine(Root, id);

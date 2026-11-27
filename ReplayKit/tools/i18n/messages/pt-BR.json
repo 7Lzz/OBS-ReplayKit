@@ -5363,6 +5363,10 @@
     "source": "89d918912b420e67",
     "text": "Esta velocidade colocaria o áudio vinculado fora da faixa suportada."
   },
+  "editor.thisSpeedWouldRunIntoTheNext": {
+    "source": "23dfee54366dde34",
+    "text": "Esta velocidade faria a parte do vídeo invadir a próxima parte. Mova antes a próxima parte."
+  },
   "editor.thisSubtitleWasHardToMake": {
     "source": "b17bc9bf84745f95",
     "text": "Esta legenda era difícil de entender. Escolha ou digite o que foi dito, mantenha ou exclua."
@@ -5424,8 +5428,8 @@
     "text": "Falha no corte: o auxiliar do ReplayKit parou de responder, então o salvamento pode não ter terminado. Verifique o clipe antes de editá-lo novamente."
   },
   "editor.trimMustBeAtLeast0": {
-    "source": "187a35d6b253afde",
-    "text": "O corte deve ter pelo menos 0,5 s"
+    "source": "1cbd35b108ff88c7",
+    "text": "O corte deve ter pelo menos {seconds} s"
   },
   "editor.trimStart": {
     "source": "c0a342e8aad8de91",

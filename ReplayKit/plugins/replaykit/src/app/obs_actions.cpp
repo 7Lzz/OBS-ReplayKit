@@ -178,7 +178,7 @@ void GroupInputOverlay()
 	obs_source_t *current = obs_frontend_get_current_scene();
 	obs_scene_t *scene = obs_scene_from_source(current);
 	if (scene && !obs_scene_get_group(scene, "Group")) {
-		obs_sceneitem_t *items[] = {obs_scene_find_source(scene, "WASD Overlay"), obs_scene_find_source(scene, "Mouse Overlay")};
+		obs_sceneitem_t *items[] = {obs_scene_find_source(scene, kWasdSourceName), obs_scene_find_source(scene, kMouseSourceName)};
 		if (items[0] && items[1])
 			obs_scene_insert_group(scene, "Group", items, 2);
 		else

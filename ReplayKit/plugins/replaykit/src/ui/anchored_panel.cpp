@@ -316,7 +316,6 @@ bool AnchoredPanel::PlaceFromWindowRect(const QRect &tab)
 	return true;
 }
 
-// flush under the button with the edge on the side its tab sits on. the button is positioned in screen coordinates already, which mapToGlobal on a caption tool window mixes with client coordinates and left the panel visibly detached on some caption configurations
 // the height the panel opens with when there is room for it, else the room under its button; the page fills the window and scrolls what does not fit
 void AnchoredPanel::FitHeight(int room)
 {
@@ -332,6 +331,7 @@ void AnchoredPanel::FitHeight(int room)
 		m_rollTo = height;
 }
 
+// flush under the button with the edge on the side its tab sits on. the button is positioned in screen coordinates already, which mapToGlobal on a caption tool window mixes with client coordinates and left the panel visibly detached on some caption configurations
 void AnchoredPanel::Follow()
 {
 	QWidget *panel = m_window;

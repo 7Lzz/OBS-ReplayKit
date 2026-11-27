@@ -78,7 +78,7 @@ namespace ReplayKitSetup
                 Path.Combine(Config.PROGRAMDATA, "obs-studio", "plugins", "input-overlay"),
                 Path.Combine(obsRoot, "obs-plugins", "64bit", "bongobs-cat.dll"),
                 Path.Combine(obsRoot, "bin", "64bit", "Bango Cat"),
-                Path.Combine(obsRoot, "data", "obs-plugins", "bongobs-cat"),
+                Path.Combine(obsRoot, "data", "obs-plugins", OverlayScene.LegacyBongoSourceKind),
                 Path.Combine(obsRoot, "obs-plugins", "64bit", "obs-composite-blur.dll"),
                 Path.Combine(obsRoot, "obs-plugins", "64bit", "obs-composite-blur.pdb"),
                 Path.Combine(obsRoot, "data", "obs-plugins", "obs-composite-blur"),
@@ -539,9 +539,7 @@ namespace ReplayKitSetup
                 text = Regex.Replace(text, @"(\[BasicWindow\][^\[]*?\r?\nExtraBrowserDocks=)([^\r\n]*)",
                     m => m.Groups[1].Value + StripReplaykitDock(m.Groups[2].Value), RegexOptions.Singleline);
 
-                // [BasicWindow] DockState -- the native plugin hid OBSs native "Controls" dock and OBS persisted that
-                // into this blob. it is an opaque QMainWindow::saveState() so there is no clean way to flip one dock;
-                // drop the whole line and OBS rebuilds its default layout (Controls dock visible) on next launch. the
+                // [BasicWindow] DockState -- the native plugin hid OBSs native "Controls" dock and OBS persisted that into this blob. it is an opaque QMainWindow::saveState() so there is no clean way to flip one dock; drop the whole line and OBS rebuilds its default layout (Controls dock visible) on next launch.
                 text = Regex.Replace(text, @"(\[BasicWindow\][^\[]*?\r?\n)DockState=[^\r\n]*\r?\n",
                     "$1", RegexOptions.Singleline);
 
@@ -796,6 +794,9 @@ namespace ReplayKitSetup
 
         public static List<string> RunCleanup(IInstallProgress progress, bool keepUserSettings = true, bool removeObs = false)
         {
+            // a detached restart would start obs again in the middle of the removal
+            using var operation = ObsExit.TryTakeOperation(ObsExit.SetupGateWaitMs);
+            if (operation == null) throw new IOException(SetupLocale.Message("setup.anotherReplaykitUpdateIsAlready"));
             using var transaction = RuntimeTransaction.Open();
             var steps = new List<(SetupLocale.Text Title, SetupLocale.Text Detail, Func<object> Action)>
             {

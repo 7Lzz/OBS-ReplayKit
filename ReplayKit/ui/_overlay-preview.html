@@ -429,7 +429,6 @@
     }
   }
 
-  // ---- corner resize ----
   // the box grows or shrinks by how far the corner moved from where it was grabbed, measured on both axes and averaged so a diagonal pull feels even; the new size goes through the size slider, which is what obs and the save read
   var resize = null;
   function onGripDown(ev) {
@@ -534,7 +533,6 @@
     layout();
   }
 
-  // ---- live input ----
   // the cat and its mouse arm take the same normalised cursor and button state Model.cpp feeds the rig
   var pawMx = 0.5, pawMy = 0.5, pawL = 0, pawR = 0;
   function pushLive2d() {

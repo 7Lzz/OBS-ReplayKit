@@ -131,8 +131,6 @@ namespace ReplayKitHelper
                 return false;
             }
 
-            // the menus of the obs menu bar, opened from the Advanced tab now that the title bar has no menu button
-            // the quick actions under the logo of the title bar: what a page offers, read back by the plugin, and a pick sent on to the plugin
             if (path == "/editor/session")
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }

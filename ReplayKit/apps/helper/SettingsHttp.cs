@@ -588,7 +588,7 @@ namespace ReplayKitHelper
             if (kinds == null || !kinds.Ok) { Log.Write("CheckBongoCat: OBS did not answer in time, nothing checked."); return; }
 
             bool loaded = (kinds.Data?["inputKinds"] as JArray ?? new JArray()).Any(k => k.Value<string>() == BongoInputKind);
-            var input = ObsWebSocket.InvokeRequest("GetInputSettings", new JObject { ["inputName"] = "Bongo Cat Overlay" }, 3000);
+            var input = ObsWebSocket.InvokeRequest("GetInputSettings", new JObject { ["inputName"] = OverlayScene.BongoSourceName }, 3000);
             bool sourceCurrent = input.Ok && input.Data?["inputKind"]?.Value<string>() == BongoInputKind;
             // replaykit.dll draws the Bango Cat folder beside obs64.exe with the models ReplayKit baked from it, and a missing folder or bake leaves the cat silently empty
             string root = GetObsInstallRoot();

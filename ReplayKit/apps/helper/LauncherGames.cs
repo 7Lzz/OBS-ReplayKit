@@ -85,7 +85,7 @@ namespace ReplayKitHelper
             folder = LocalPath(folder);
             name = CleanName(name);
             if (folder == null || name == null || LauncherNames.IsMatch(name)) return;
-            // a drive root, or a folder one step under a drive, is too broad unless it is the game's own folder name (d:\Fortnite is fine, d:\Games is not)
+            // a drive root, or a folder one step under a drive, is too broad unless it is the folder name of the game itself (d:\Fortnite is fine, d:\Games is not)
             if (Path.GetPathRoot(folder).TrimEnd('\\').Length == folder.Length || BroadFolders.Value.Contains(folder)) return;
             if (list.Count >= 5000 || !Directory.Exists(folder)) return;
             list.Add(new Entry { Folder = folder + "\\", Name = name, Source = source });

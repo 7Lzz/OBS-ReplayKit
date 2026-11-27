@@ -1,75 +1,21 @@
 using System;
-using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
-using System.Linq;
-using System.Management;
 using System.Threading;
 using ReplayKitShared;
 
 namespace ReplayKitHelper
 {
-    // finds the running obs, closes it for a restart or an update and arms the relauncher that brings it back
+    // closes obs for an exit or a restart, runs the detached restart that brings it back, and the --relaunch-obs mode the elevation module of lua starts
     internal static class ObsProcess
     {
-        private static readonly string[] ObsProcessNames = { "obs64", "obs32", "obs" };
-
-        internal static Process[] GetProcessesByNames(params string[] names)
-        {
-            var list = new List<Process>();
-            int currentPid = Process.GetCurrentProcess().Id;
-            foreach (var name in names)
-            {
-                try
-                {
-                    foreach (var process in Process.GetProcessesByName(name))
-                    {
-                        if (process.Id == currentPid) process.Dispose();
-                        else list.Add(process);
-                    }
-                }
-                catch (InvalidOperationException) { }
-            }
-            return list.ToArray();
-        }
-
-        internal static string GetRunningObsPath()
-        {
-            var procs = GetProcessesByNames(ObsProcessNames);
-            try
-            {
-                foreach (var p in procs)
-                {
-                    try { if (!string.IsNullOrEmpty(p.MainModule?.FileName) && !Constants.IsRoleHost(p.MainModule.FileName)) return p.MainModule.FileName; }
-                    catch (Win32Exception) { } catch (InvalidOperationException) { }
-                }
-                foreach (var p in procs)
-                {
-                    try
-                    {
-                        using (var searcher = new ManagementObjectSearcher("SELECT ExecutablePath FROM Win32_Process WHERE ProcessId=" + p.Id))
-                        {
-                            foreach (ManagementObject mo in searcher.Get())
-                            {
-                                string exePath = mo["ExecutablePath"] as string;
-                                if (!string.IsNullOrEmpty(exePath)) return exePath;
-                            }
-                        }
-                    }
-                    catch (ManagementException) { }
-                }
-                return null;
-            }
-            finally { foreach (var p in procs) p.Dispose(); }
-        }
-
         private static string CloseTicketName(Guid ticket) => @"Local\OBSReplayKit-close-ticket-" + ticket.ToString("N");
 
         private static string CloseTargetPath(Process process)
         {
-            if (!ObsProcessNames.Contains(process.ProcessName, StringComparer.OrdinalIgnoreCase)) return null;
+            if (!Constants.IsObsProcessName(process.ProcessName)) return null;
             string path = process.MainModule?.FileName;
             return string.IsNullOrEmpty(path) || Constants.IsRoleHost(path) ? null : path;
         }
@@ -129,7 +75,7 @@ namespace ReplayKitHelper
                 this.started = started;
             }
 
-            internal void Run(string reason, bool restart)
+            internal void Run(string reason, bool restart, bool notify = true)
             {
                 try
                 {
@@ -145,7 +91,7 @@ namespace ReplayKitHelper
                 {
                     Log.Write(reason + ": could not close OBS: " + ex.Message);
                 }
-                ReportCloseFailure(reason);
+                ReportCloseFailure(reason, notify);
             }
 
             private bool CloseOriginal()
@@ -183,12 +129,12 @@ namespace ReplayKitHelper
             ObsWebSocket.DisconnectForObsClose();
         }
 
-        private static void ReportCloseFailure(string reason)
+        private static void ReportCloseFailure(string reason, bool notify)
         {
             ObsWebSocket.AllowConnect();
             string message = Locales.Message("helper.obsDidNotCloseSafelyReplaykit");
             Log.Write(reason + ": " + message);
-            Notifications.Add("warning", "obs-close-timeout", Locales.Message("helper.obsCouldNotCloseSafely"), message);
+            if (notify) Notifications.Add("warning", "obs-close-timeout", Locales.Message("helper.obsCouldNotCloseSafely"), message);
         }
 
         private static bool MatchesTarget(Process process, IntPtr window, long started) =>

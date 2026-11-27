@@ -9,8 +9,8 @@ namespace ReplayKitSetup
     // drop obs power requests so windows idle monitor/system sleep can still run
     public static class SleepOverride
     {
-        private const string ObsExeName = "obs64.exe";
-        private static readonly string[] RequestFlags = { "DISPLAY", "SYSTEM", "AWAYMODE" };
+        private const string ObsExeName = ReplayKitShared.SleepOverrideRequest.Process;
+        private static readonly string[] RequestFlags = ReplayKitShared.SleepOverrideRequest.Requests;
 
         // subprocess.run wrapper with our standard timeout + create_no_window flags. null on win32exception/timeout.
         private static (int ExitCode, string Stdout, string Stderr)? RunPowercfg(string arguments, Action<string> log = null)

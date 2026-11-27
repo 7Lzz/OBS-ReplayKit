@@ -119,7 +119,7 @@ namespace ReplayKitHelper
                 {
                     if (rate.Type != JTokenType.Float && rate.Type != JTokenType.Integer) { error = Locales.Message("editor.videoSpeedOutOfRange"); return null; }
                     double value = rate.Value<double>();
-                    if (!Finite(value) || value < 0.1 || value > 5) { error = Locales.Message("editor.videoSpeedOutOfRange"); return null; }
+                    if (!Finite(value) || !EditorLimits.VideoSpeed(value)) { error = Locales.Message("editor.videoSpeedOutOfRange"); return null; }
                     piece.Speed = value;
                 }
                 var look = po["look"];
@@ -186,8 +186,7 @@ namespace ReplayKitHelper
             return text == "-0" ? "0" : text;
         }
 
-        // the filter graph that puts the saved clip together: every piece is cut out of its clip and the places no piece covers are black frames of the same size and rate, all joined one after the other. the pieces of the source keep the order of the source, which is what keeps the decoder from having to hold frames back. a piece of another clip is fitted into the picture of the source with black bars where its shape differs, the way the editor shows it. reads the source from input inputIndex and the other clips from firstOther on, in the order of OtherClips, and ends in the label vout
-        // the source is read from readStart seconds on, so the cuts of its pieces move back by that much; the other clips are read from their start
+        // the filter graph that puts the saved clip together: every piece is cut out of its clip and the places no piece covers are black frames of the same size and rate, all joined one after the other. the pieces of the source keep the order of the source, which is what keeps the decoder from having to hold frames back. a piece of another clip is fitted into the picture of the source with black bars where its shape differs, the way the editor shows it. reads the source from input inputIndex and the other clips from firstOther on, in the order of OtherClips, and ends in the label vout; the source is read from readStart seconds on, so the cuts of its pieces move back by that much; the other clips are read from their start
         public string BuildGraph(int inputIndex, int firstOther, double speed, SourceInfo info, decimal readStart = 0)
         {
             var chains = new List<string>();

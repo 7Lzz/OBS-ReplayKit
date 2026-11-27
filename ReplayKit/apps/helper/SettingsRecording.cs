@@ -156,7 +156,7 @@ namespace ReplayKitHelper
             string compressionMode = settings["compressionMode"]?.Value<string>() ?? "balanced";
             var choice = Encoder.PickEncoder(gpu, codecPreference, cqp, compressionMode);
             string unloaded = null;
-            // an encoder obs could not load this session (an outdated driver) is never written to the profile: the best one that did load takes its place, another gpu's first, then the processor
+            // an encoder obs could not load this session (an outdated driver) is never written to the profile: the best one that did load takes its place, one of another gpu first, then the processor
             if (!GpuDrivers.IsAvailable(choice.ObsEncoderId))
             {
                 unloaded = choice.Label;
@@ -257,21 +257,21 @@ namespace ReplayKitHelper
                 return true;
             }
 
-            var current = FindSceneItem(items, "Bongo Cat Overlay");
+            var current = FindSceneItem(items, OverlayScene.BongoSourceName);
             var inactive = FindSceneItem(items, BongoInactiveName);
             JObject legacy = null;
-            if (current != null && Kind("Bongo Cat Overlay") != BongoInputKind)
+            if (current != null && Kind(OverlayScene.BongoSourceName) != BongoInputKind)
             {
-                if (!Enable(current, false) || !Rename("Bongo Cat Overlay", BongoSwitchingName)) return null;
+                if (!Enable(current, false) || !Rename(OverlayScene.BongoSourceName, BongoSwitchingName)) return null;
                 legacy = current;
                 current = null;
             }
             // a replaykit-bongo input parked by an earlier renderer switch comes back instead of a new one
             if (current == null && inactive != null && Kind(BongoInactiveName) == BongoInputKind)
             {
-                if (!Rename(BongoInactiveName, "Bongo Cat Overlay")) return null;
+                if (!Rename(BongoInactiveName, OverlayScene.BongoSourceName)) return null;
                 current = inactive;
-                current["sourceName"] = "Bongo Cat Overlay";
+                current["sourceName"] = OverlayScene.BongoSourceName;
                 inactive = null;
                 refresh = true;
             }
@@ -282,7 +282,7 @@ namespace ReplayKitHelper
                 refresh = true;
                 var created = ObsWebSocket.InvokeRequest("CreateInput", new JObject
                 {
-                    ["sceneName"] = sceneName, ["inputName"] = "Bongo Cat Overlay", ["inputKind"] = BongoInputKind,
+                    ["sceneName"] = sceneName, ["inputName"] = OverlayScene.BongoSourceName, ["inputKind"] = BongoInputKind,
                     ["inputSettings"] = inputSettings, ["sceneItemEnabled"] = true,
                 }, 5000);
                 if (!created.Ok)
@@ -290,13 +290,13 @@ namespace ReplayKitHelper
                     warnings.Add(Locales.Message("settings.couldNotCreateBongoCatOverlay", "error", created.Message));
                     return null;
                 }
-                current = new JObject { ["sceneItemId"] = created.Data?["sceneItemId"]?.Value<int>() ?? 0, ["sourceName"] = "Bongo Cat Overlay" };
+                current = new JObject { ["sceneItemId"] = created.Data?["sceneItemId"]?.Value<int>() ?? 0, ["sourceName"] = OverlayScene.BongoSourceName };
             }
             if (refresh)
             {
                 var update = ObsWebSocket.InvokeRequest("SetInputSettings", new JObject
                 {
-                    ["inputName"] = "Bongo Cat Overlay", ["inputSettings"] = inputSettings, ["overlay"] = true,
+                    ["inputName"] = OverlayScene.BongoSourceName, ["inputSettings"] = inputSettings, ["overlay"] = true,
                 }, 3000);
                 if (!update.Ok) warnings.Add(Locales.Message("settings.couldNotUpdateBongoCatSettings", "error", update.Message));
             }
@@ -340,7 +340,7 @@ namespace ReplayKitHelper
             if (member == null) return;
             var moved = SetSceneItemTransform("Group", member, InputOverlayMemberTransform(name, settings));
             if (moved["ok"]?.Value<bool>() != true) warnings.Add(Locales.Message("settings.couldNotPlaceNameError", "name", name, "error", moved["message"]));
-            if (name != "Mouse Overlay") return;
+            if (name != OverlayScene.MouseSourceName) return;
             var shown = SetSceneItemEnabled("Group", member, InputOverlayMouseShown(settings));
             if (shown["ok"]?.Value<bool>() != true) warnings.Add(Locales.Message("settings.couldNotShowOrHideName", "name", name, "error", shown["message"]));
         }
@@ -349,7 +349,7 @@ namespace ReplayKitHelper
         internal static bool RemoveInputOverlayLive(string sceneName, JArray items, List<string> warnings)
         {
             bool removed = false;
-            foreach (var name in new[] { "WASD Overlay", "Mouse Overlay" })
+            foreach (var name in new[] { OverlayScene.WasdSourceName, OverlayScene.MouseSourceName })
             {
                 if (!ObsWebSocket.InvokeRequest("GetInputSettings", new JObject { ["inputName"] = name }, 3000).Ok) continue;
                 var result = ObsWebSocket.InvokeRequest("RemoveInput", new JObject { ["inputName"] = name }, 3000);
@@ -372,7 +372,7 @@ namespace ReplayKitHelper
             var kinds = ObsWebSocket.InvokeRequest("GetInputKindList", new JObject { ["unversioned"] = true }, 3000);
             bool legacyLoaded = !kinds.Ok || (kinds.Data?["inputKinds"] as JArray ?? new JArray()).Any(k => k.Value<string>() == LegacyBongoInputKind);
             bool removed = false;
-            foreach (var name in new[] { "Bongo Cat Overlay", BongoInactiveName, BongoSwitchingName })
+            foreach (var name in new[] { OverlayScene.BongoSourceName, BongoInactiveName, BongoSwitchingName })
             {
                 var input = ObsWebSocket.InvokeRequest("GetInputSettings", new JObject { ["inputName"] = name }, 3000);
                 if (!input.Ok) continue;
@@ -406,7 +406,7 @@ namespace ReplayKitHelper
             if (overlayStyle != "input_overlay" || rebuildInputOverlay) removed |= RemoveInputOverlayLive(sceneName, items, warnings);
             // a removed source keeps its name until obs has let go of it, and a new source of that name is refused until then
             if (rebuildInputOverlay)
-                for (int i = 0; i < 30 && new[] { "WASD Overlay", "Mouse Overlay" }.Any(n => ObsWebSocket.InvokeRequest("GetInputSettings", new JObject { ["inputName"] = n }, 3000).Ok); i++)
+                for (int i = 0; i < 30 && new[] { OverlayScene.WasdSourceName, OverlayScene.MouseSourceName }.Any(n => ObsWebSocket.InvokeRequest("GetInputSettings", new JObject { ["inputName"] = n }, 3000).Ok); i++)
                     Thread.Sleep(100);
             if (overlayStyle != "bongo_cat") removed |= RemoveBongoLive(warnings);
             if (removed)
@@ -419,7 +419,7 @@ namespace ReplayKitHelper
             if (FindSceneItem(items, "Group") != null)
             {
                 foreach (var stray in items.OfType<JObject>()
-                             .Where(i => { var n = i["sourceName"]?.Value<string>(); return n == "WASD Overlay" || n == "Mouse Overlay"; })
+                             .Where(i => { var n = i["sourceName"]?.Value<string>(); return n == OverlayScene.WasdSourceName || n == OverlayScene.MouseSourceName; })
                              .ToList())
                 {
                     var rm = RemoveSceneItem(sceneName, stray);
@@ -430,7 +430,7 @@ namespace ReplayKitHelper
             }
 
             bool bongoEnabled = overlayStyle == "bongo_cat";
-            var bongo = FindSceneItem(items, "Bongo Cat Overlay");
+            var bongo = FindSceneItem(items, OverlayScene.BongoSourceName);
             if (bongoEnabled)
             {
                 var inputSettings = NewBongoSourceJson(Guid.NewGuid().ToString(), settings)["settings"] as JObject;
@@ -440,7 +440,7 @@ namespace ReplayKitHelper
             var cursorResult = SetDisplayCaptureCursorLive(settings);
             if (cursorResult["ok"]?.Value<bool>() != true) warnings.Add(Locales.Message("settings.couldNotUpdateTheDisplayCapture", "error", cursorResult["message"]));
 
-            foreach (var captureName in new[] { "Display Capture", "Window Capture", "Game Capture" })
+            foreach (var captureName in new[] { OverlayScene.DisplayCaptureSourceName, OverlayScene.WindowCaptureSourceName, OverlayScene.GameCaptureSourceName })
             {
                 var capture = FindSceneItem(items, captureName);
                 var captureTransform = MainCaptureTransform(captureName, preset);
@@ -452,7 +452,7 @@ namespace ReplayKitHelper
             {
                 var rTransform = SetSceneItemTransform(sceneName, bongo, BongoTransform(preset, settings));
                 if (rTransform["ok"]?.Value<bool>() != true) warnings.Add(Locales.Message("settings.couldNotPositionBongoCatOverlay", "error", rTransform["message"]));
-                var rOpacity = ApplyOverlayOpacityLive("Bongo Cat Overlay", opacity, settings);
+                var rOpacity = ApplyOverlayOpacityLive(OverlayScene.BongoSourceName, opacity, settings);
                 if (rOpacity["ok"]?.Value<bool>() != true) warnings.Add(Locales.Message("settings.couldNotSetBongoCatOverlay", "error", rOpacity["message"]));
             }
 
@@ -464,8 +464,8 @@ namespace ReplayKitHelper
                     var rGroupTransform = SetSceneItemTransform(sceneName, group, InputOverlayGroupTransform(preset, settings));
                     if (rGroupTransform["ok"]?.Value<bool>() != true) warnings.Add(Locales.Message("settings.couldNotPositionInputOverlayGroup", "error", rGroupTransform["message"]));
                 }
-                var keyboardFiles = InputOverlayMemberFiles("WASD Overlay", settings);
-                var mouseFiles = InputOverlayMemberFiles("Mouse Overlay", settings);
+                var keyboardFiles = InputOverlayMemberFiles(OverlayScene.WasdSourceName, settings);
+                var mouseFiles = InputOverlayMemberFiles(OverlayScene.MouseSourceName, settings);
                 string wasdPng = keyboardFiles?.Sheet, wasdJson = keyboardFiles?.Json, mousePng = mouseFiles?.Sheet, mouseJson = mouseFiles?.Json;
                 if (string.IsNullOrWhiteSpace(wasdPng) || string.IsNullOrWhiteSpace(wasdJson) || string.IsNullOrWhiteSpace(mousePng) || string.IsNullOrWhiteSpace(mouseJson))
                 {
@@ -475,8 +475,8 @@ namespace ReplayKitHelper
                 {
                     var entries = new[]
                     {
-                        new { name = "WASD Overlay", image = wasdPng, layout = wasdJson },
-                        new { name = "Mouse Overlay", image = mousePng, layout = mouseJson },
+                        new { name = OverlayScene.WasdSourceName, image = wasdPng, layout = wasdJson },
+                        new { name = OverlayScene.MouseSourceName, image = mousePng, layout = mouseJson },
                     };
                     // with a "Group" the two overlays are its members -- only refresh the source settings; adding them as standalone scene items is exactly the duplicate-stacking bug. without one (the overlay was just picked) they are built the way SetOverlaySceneFile builds them: members at their spots inside the group, grouped by the plugin, then the group placed
                     foreach (var entry in entries)
@@ -509,7 +509,7 @@ namespace ReplayKitHelper
                         if (group == null) warnings.Add(Locales.Message("settings.couldNotGroupTheWasdAnd"));
                         else
                         {
-                            if (!InputOverlayMouseShown(settings)) PlaceInputOverlayMember("Mouse Overlay", settings, warnings);
+                            if (!InputOverlayMouseShown(settings)) PlaceInputOverlayMember(OverlayScene.MouseSourceName, settings, warnings);
                             var rGroupTransform = SetSceneItemTransform(sceneName, group, InputOverlayGroupTransform(preset, settings));
                             if (rGroupTransform["ok"]?.Value<bool>() != true) warnings.Add(Locales.Message("settings.couldNotPositionInputOverlayGroup", "error", rGroupTransform["message"]));
                         }

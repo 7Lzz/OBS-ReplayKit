@@ -496,9 +496,7 @@ namespace ReplayKitHelper
             return reads;
         }
 
-        // the parts of a trim command that has video pieces: the video and the audio are both put together by the filter graph from one read of the source, so a piece may start anywhere on the timeline, and nothing is written for a clip without audio
-        // what follows the video as it was put together, in this order: the look, the layers over it, then the subtitles over everything; null with [vout] as the label when there is nothing
-        // the picture is cut to its aspect first, so the look, the layers and the subtitles are all laid out on the frame that is saved, the way the editor shows them; width and height are that frame
+        // what follows the video as it was put together, in this order: the look, the layers over it, then the subtitles over everything; null with [vout] as the label when there is nothing; the picture is cut to its aspect first, so the look, the layers and the subtitles are all laid out on the frame that is saved, the way the editor shows them; width and height are that frame
         private static string FinishGraph(string look, LayerPlan layers, int firstLayerInput, int width, int height, string subtitles, string frame, out string label, string output = null)
         {
             var steps = new List<string>();
@@ -587,8 +585,7 @@ namespace ReplayKitHelper
                 removeAudio = true;
                 audioEdit = null;
             }
-            // the editor offers a tenth of normal speed to five times normal
-            if (double.IsNaN(videoSpeed) || double.IsInfinity(videoSpeed) || videoSpeed < 0.1 || videoSpeed > 5)
+            if (double.IsNaN(videoSpeed) || double.IsInfinity(videoSpeed) || !EditorLimits.VideoSpeed(videoSpeed))
                 return new TrimResult { Ok = false, Message = Locales.Message("editor.badSpeed") };
             // a video that plays at another speed is made again frame by frame, so it is never a stream copy
             bool retimed = Math.Abs(videoSpeed - 1) > 1e-6;
@@ -608,7 +605,7 @@ namespace ReplayKitHelper
             if (startSec < 0) return new TrimResult { Ok = false, Message = Locales.Message("editor.startMustBe0") };
             if (endSec <= startSec) return new TrimResult { Ok = false, Message = Locales.Message("editor.endMustBeGreaterThanStart") };
             double duration = endSec - startSec;
-            if (duration < 0.5) return new TrimResult { Ok = false, Message = Locales.Message("editor.trimMustBeAtLeast0") };
+            if (duration < EditorLimits.ClipSecondsMin) return new TrimResult { Ok = false, Message = Locales.Message("editor.trimMustBeAtLeast0", "seconds", EditorLimits.ClipSecondsMin.ToString(Locales.Culture())) };
 
             mode = !string.IsNullOrEmpty(mode) ? mode.ToLowerInvariant() : "copy";
             if (mode != "copy" && mode != "overwrite" && mode != "screenshot") return new TrimResult { Ok = false, Message = "Unknown trim mode '" + mode + "'" };

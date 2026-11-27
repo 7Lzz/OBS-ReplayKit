@@ -5362,6 +5362,10 @@
     "source": "89d918912b420e67",
     "text": "Diese Geschwindigkeit würde das verknüpfte Audio außerhalb des unterstützten Bereichs bringen."
   },
+  "editor.thisSpeedWouldRunIntoTheNext": {
+    "source": "23dfee54366dde34",
+    "text": "Diese Geschwindigkeit würde den Videoteil in den nächsten Teil hineinlaufen lassen. Zuerst den nächsten Teil verschieben."
+  },
   "editor.thisSubtitleWasHardToMake": {
     "source": "b17bc9bf84745f95",
     "text": "Dieser Untertitel war schwer zu verstehen. Das Gesagte auswählen oder eintippen, behalten oder löschen."
@@ -5423,8 +5427,8 @@
     "text": "Schneiden fehlgeschlagen: Der ReplayKit-Hilfsprozess antwortet nicht mehr. Möglicherweise wurde der Clip nicht vollständig gespeichert. Prüfe ihn, bevor du ihn erneut bearbeitest."
   },
   "editor.trimMustBeAtLeast0": {
-    "source": "187a35d6b253afde",
-    "text": "Der Ausschnitt muss mindestens 0,5 s lang sein"
+    "source": "1cbd35b108ff88c7",
+    "text": "Der Ausschnitt muss mindestens {seconds} s lang sein"
   },
   "editor.trimStart": {
     "source": "c0a342e8aad8de91",

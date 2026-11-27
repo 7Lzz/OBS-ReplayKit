@@ -112,7 +112,7 @@ namespace ReplayKitHelper
 
         private static bool IsObsRunning()
         {
-            foreach (var name in new[] { "obs64", "obs32", "obs" })
+            foreach (var name in Constants.ObsProcessNames)
             {
                 var processes = Process.GetProcessesByName(name);
                 try { if (processes.Any(process => !Constants.IsRoleHost(process))) return true; }

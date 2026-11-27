@@ -8,7 +8,7 @@ using Newtonsoft.Json.Linq;
 
 namespace ReplayKitHelper
 {
-    // Drafts are tied to a source file and keep their imported assets in the cache.
+    // drafts are tied to a source file and keep their imported assets in the cache.
     internal static class EditDrafts
     {
         public const int MaxEditBytes = 512 * 1024;
@@ -50,7 +50,7 @@ namespace ReplayKitHelper
             return entry;
         }
 
-        // Show only drafts of the current folder. Switching folders never deletes another folder's edits.
+        // show only drafts of the current folder; switching folders never deletes the edits of another folder.
         public static JObject List()
         {
             var rows = new List<JObject>();

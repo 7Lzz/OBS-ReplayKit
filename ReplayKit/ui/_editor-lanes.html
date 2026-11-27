@@ -469,7 +469,20 @@
   "use strict";
   // everything this puts on the window or the document goes when the clips page unloads the editor
   var EDITOR_SIGNAL = window.__rkEditorScope && window.__rkEditorScope.signal;
+  // the limits of the helper, written into the page as it is served, so the editor never offers what the helper would refuse
+  var EDITOR_LIMITS = window.RK_EDITOR_LIMITS;
+  if (!EDITOR_LIMITS) throw new Error(RK_M("clips.theEditorCouldNotBeLoaded"));
 
+  // every time and speed is kept to thousandths (r3): values less than half a step apart are the same value, and pieces within two steps of each other touch
+  var ROUND_STEP = 0.001;
+  var SAME_VALUE = ROUND_STEP / 2;
+  var TOUCH = ROUND_STEP * 2;
+  // a comparison of times and speeds that rounding error must not tip
+  var EPSILON = 1e-6;
+  // a zoom this close to a limit is at the limit
+  var ZOOM_SLACK = 0.001;
+  // an audio piece that starts or ends this close to the edge of its video piece follows that edge when the edge is drawn out
+  var AUDIO_EDGE = 0.012;
   // the shortest a piece can be cut down to, in seconds
   var MIN_LEN = 0.05;
   // how close, in pixels, a piece has to come to another edge for the move to snap to it
@@ -499,13 +512,12 @@
   var DWELL_MS = 450;
   // how far, in pixels, the pointer may wander up or down inside the middle of a row before the wait starts over
   var DWELL_WANDER_PX = 8;
-  // the plan the helper accepts holds at most this many parts in one piece, and this many rows
-  var MAX_PARTS = 8;
-  var MAX_LANES = 8;
+  var MAX_PARTS = EDITOR_LIMITS.combinedTracks;
+  var MAX_LANES = EDITOR_LIMITS.audioRows;
   // audio files brought in from outside the clip are numbered from here, above any audio stream a clip can have
-  var IMPORT_BASE = 100;
-  // the helper takes a file of this size at most, so a bigger one is turned away here without being sent
-  var MAX_IMPORT_BYTES = 512 * 1024 * 1024;
+  var IMPORT_BASE = EDITOR_LIMITS.importBase;
+  // a bigger file is turned away here without being sent
+  var MAX_IMPORT_BYTES = EDITOR_LIMITS.importBytes;
   // a piece that is brought in starts at the playhead when at least this much of the cut is left after it, else at the start of the cut
   var IMPORT_ROOM = 1;
   var PREF_KEY = "rk-editor-timeline";
@@ -513,9 +525,10 @@
   var DEFAULT_HEIGHT = 343;
   var LANE_ICON = { "PC audio": "audio/desktop", "Discord": "editor/headset", "Microphone": "audio/microphone" };
   var SPEEDS = [0.5, 1, 1.5, 2];
-  // the speed of a piece and of the video goes from a tenth of normal to five times normal, in steps of 0.05; the helper accepts the same range
-  var SPEED_MIN = 0.1;
-  var SPEED_MAX = 5;
+  var SPEED_MIN = EDITOR_LIMITS.videoSpeed.min;
+  var SPEED_MAX = EDITOR_LIMITS.videoSpeed.max;
+  var AUDIO_SPEED_MIN = EDITOR_LIMITS.audioSpeed.min;
+  var AUDIO_SPEED_MAX = EDITOR_LIMITS.audioSpeed.max;
   var SPEED_STEP = 0.05;
 
   function icon(name) { return (window.RK_ICONS && window.RK_ICONS[name]) || ""; }
@@ -527,7 +540,7 @@
   // a time as minutes and seconds; the times before the start of the video, which the room past its start holds, carry a minus sign
   function fmt(s, decimals) {
     if (!isFinite(s)) s = 0;
-    var sign = s < -0.0005 ? "-" : "";
+    var sign = s < -SAME_VALUE ? "-" : "";
     s = Math.abs(s);
     var m = Math.floor(s / 60);
     var rest = s - m * 60;
@@ -603,7 +616,7 @@
     function seekT(t) { opts.seek(t * st.vspeed); }
     function previewEdge(start, end, left) {
       video.pause();
-      seekT(left ? start : Math.max(start, end - 0.001));
+      seekT(left ? start : Math.max(start, end - ROUND_STEP));
     }
 
     // model. a piece is made of parts, one cut of a source track each starting off seconds into the piece, so a piece that combines several tracks is still one piece
@@ -686,7 +699,7 @@
     // the video piece that lies over a time, or null atEnd also takes the piece that ends exactly at t, which is the last frame that stays on the screen when the clock stops at the end of the saved clip
     function vAt(t, atEnd) {
       for (var i = 0; i < st.vsegs.length; i++) {
-        if (t >= st.vsegs[i].at - 1e-6 && (t < vEnd(st.vsegs[i]) - 1e-6 || (atEnd && t <= vEnd(st.vsegs[i]) + 1e-6))) return st.vsegs[i];
+        if (t >= st.vsegs[i].at - EPSILON && (t < vEnd(st.vsegs[i]) - EPSILON || (atEnd && t <= vEnd(st.vsegs[i]) + EPSILON))) return st.vsegs[i];
       }
       return null;
     }
@@ -736,7 +749,7 @@
     // the video as it was recorded: one piece, all of it, at the start of the timeline
     function naturalV() {
       var v = st.vsegs;
-      return v.length === 1 && !v[0].ref && Math.abs(vSpeed(v[0]) - st.vspeed) < 1e-6 && Math.abs(v[0].at) < 0.002 && Math.abs(v[0].srcStart) < 0.002 && Math.abs(v[0].srcEnd - st.Dsrc) < 0.002;
+      return v.length === 1 && !v[0].ref && Math.abs(vSpeed(v[0]) - st.vspeed) < EPSILON && Math.abs(v[0].at) < TOUCH && Math.abs(v[0].srcStart) < TOUCH && Math.abs(v[0].srcEnd - st.Dsrc) < TOUCH;
     }
 
     // the part of the timeline that is the saved clip: the cut, which reaches past the video on a side when pieces of the video or of the audio do, unless the cut was drawn in from that side
@@ -1012,7 +1025,6 @@
       if (opts.onSubtitles) opts.onSubtitles();
     }
 
-    // the host shows the tabs of what is selected on the right
     // the panel of what is selected was closed with its x: it stays closed while that stays selected, the tab beside it opens it again, and anything else picked shows its own
     var panelClosedFor = "";
     function panelClosed() { return !!st.selected && panelClosedFor === st.selected; }
@@ -1022,6 +1034,7 @@
       if (opts.onPanel) opts.onPanel();
     }
 
+    // the host shows the tabs of what is selected on the right
     function reportKind() {
       var layer = findLayer(st.selected);
       if (opts.onSelectKind) opts.onSelectKind(videoSelected() || (layer && layer.kind === "clip") ? "video" : selected() ? "audio" : findSub(st.selected) ? "subtitle" : layer ? "layer" : "");
@@ -1055,7 +1068,7 @@
 
     // subtitles. a cue lives on the timeline like a piece does, in seconds of the timeline, in a row of subtitles of its own; every row has one style for all of its cues
     var SUB_MIN = 0.2;
-    var SUB_TEXT_MAX = 300;
+    var SUB_TEXT_MAX = EDITOR_LIMITS.subtitleText;
     var SUB_TITLE_MAX = 40;
     // the fonts the helper offers, the same list the font of the interface is picked from
     var SUB_FONTS = window.RK_FONTS;
@@ -1205,7 +1218,7 @@
       var out = [];
       st.subRows.forEach(function (row) {
         var hit = null;
-        st.subs.forEach(function (c) { if (c.row === row.id && t >= c.at - 0.0005 && t < c.end) hit = c; });
+        st.subs.forEach(function (c) { if (c.row === row.id && t >= c.at - SAME_VALUE && t < c.end) hit = c; });
         if (hit) out.push({ row: row, cue: hit });
       });
       return out;
@@ -1313,7 +1326,7 @@
           l.words.forEach(function (w, i) {
             var span = l.times[i];
             if (!span) return;
-            var part = t >= span[1] ? 1 : t <= span[0] ? 0 : (t - span[0]) / Math.max(0.001, span[1] - span[0]);
+            var part = t >= span[1] ? 1 : t <= span[0] ? 0 : (t - span[0]) / Math.max(ROUND_STEP, span[1] - span[0]);
             w.classList.toggle("is-done", part >= 1);
             w.classList.toggle("is-filling", part > 0 && part < 1);
             if (part > 0 && part < 1) w.style.setProperty("--fill", (part * 100).toFixed(1) + "%");
@@ -1322,7 +1335,7 @@
         }
         // a word lights up from its start until the next one starts, the way the saved copy draws it
         var on = -1;
-        for (var i = 0; i < l.times.length; i++) if (t >= l.times[i][0] - 0.0005) on = i;
+        for (var i = 0; i < l.times.length; i++) if (t >= l.times[i][0] - SAME_VALUE) on = i;
         if (l.on === on) return;
         if (l.words[l.on]) l.words[l.on].classList.remove("is-on");
         if (l.words[on]) l.words[on].classList.add("is-on");
@@ -1586,7 +1599,6 @@
       window.addEventListener("pointercancel", up, { signal: dragEvents.signal });
     }
 
-    // a corner of a subtitle on the preview resizes it the way a corner of the overlay preview does: by how far the corner moved from where it was grabbed, both axes averaged so a diagonal pull feels even; the size is the size of the row, held to its range
     // the stem above a subtitle turns it about its centre by the angle the pointer sweeps round that centre; it settles on the straight angles when it comes near one, and shift turns that off
     var ROT_SNAP_DEG = 5;
     function rotateSub(e, node, row) {
@@ -1621,6 +1633,7 @@
       window.addEventListener("pointercancel", up, { signal: dragEvents.signal });
     }
 
+    // a corner of a subtitle on the preview resizes it the way a corner of the overlay preview does: by how far the corner moved from where it was grabbed, both axes averaged so a diagonal pull feels even; the size is the size of the row, held to its range
     function resizeSub(e, node, row, corner) {
       var r = node.getBoundingClientRect();
       if (!r.width || !r.height) return;
@@ -1734,11 +1747,11 @@
         if (v.ref || start < v.srcStart || start >= v.srcEnd) continue;
         var mappedStart = v.at + (start - v.srcStart) / vSpeed(v);
         for (var j = i; ; j++) {
-          if (end <= v.srcEnd + 1e-6) {
+          if (end <= v.srcEnd + EPSILON) {
             return [mappedStart, v.at + (Math.min(end, v.srcEnd) - v.srcStart) / vSpeed(v)];
           }
           var next = st.vsegs[j + 1];
-          if (!next || next.ref || next.srcStart !== v.srcEnd || Math.abs(next.at - vEnd(v)) > 0.001) break;
+          if (!next || next.ref || next.srcStart !== v.srcEnd || Math.abs(next.at - vEnd(v)) > ROUND_STEP) break;
           v = next;
         }
       }
@@ -1772,7 +1785,7 @@
 
     // layers: other clips of the folder, pictures and gifs laid over the video, each for a stretch of the timeline, in a row of its own; the last one is on top. a layer is placed by its centre and its width as fractions of the picture, keeps the shape of what it shows, and has an opacity. a clip layer plays its own file from src, muted, since its sound comes in as a row of audio
     var LAYER_MIN = 0.2;
-    var LAYER_MAX = 50;
+    var LAYER_MAX = EDITOR_LIMITS.layers;
     var LAYER_RANGES = { w: [0.02, 4], opacity: [0, 1] };
 
     function findLayer(id) {
@@ -1919,7 +1932,7 @@
         if (!g.ready || g.dead || g.busy) return;
         var x = ((g.want % g.total) + g.total) % g.total;
         var idx = 0;
-        for (var i = 1; i < g.times.length; i++) if (g.times[i] <= x + 1e-6) idx = i;
+        for (var i = 1; i < g.times.length; i++) if (g.times[i] <= x + EPSILON) idx = i;
         if (idx === g.shown) return;
         g.busy = true;
         g.dec.decode({ frameIndex: idx }).then(function (r) {
@@ -2017,7 +2030,7 @@
         if (!v) v = layerViews[l.id] = makeLayerView(l);
         host.appendChild(v.box);
         live[l.id] = true;
-        var on = !document.hidden && t >= l.at - 1e-6 && t < l.end;
+        var on = !document.hidden && t >= l.at - EPSILON && t < l.end;
         v.box.hidden = !on;
         v.box.classList.toggle("is-selected", l.id === st.selected);
         v.box.style.left = (l.x * 100) + "%";
@@ -2352,7 +2365,7 @@
     // how far apart, in seconds, two pieces of a row may lie and still look as if they touch
     function touchGap() {
       var pps = pxPerSec();
-      return Math.max(0.002, pps > 0 ? 1.5 / pps : 0);
+      return Math.max(TOUCH, pps > 0 ? 1.5 / pps : 0);
     }
 
     function touches(piece, row, endOf) {
@@ -2418,7 +2431,7 @@
       var sorted = items.slice().sort(function (a, b) { return a.at - b.at; });
       var cursor = 0, gaps = [];
       sorted.forEach(function (item) {
-        if (item.at > cursor + 0.002) gaps.push({ start: r3(cursor), end: r3(item.at), next: item });
+        if (item.at > cursor + TOUCH) gaps.push({ start: r3(cursor), end: r3(item.at), next: item });
         cursor = Math.max(cursor, endOf(item));
       });
       return gaps;
@@ -2475,7 +2488,7 @@
           if (grouped && movementGroup(gap.next) !== group) return;
           var start = Math.max(source.start, gap.start), end = Math.min(source.end, gap.end);
           var length = end - start;
-          if (length <= 0.002) return;
+          if (length <= TOUCH) return;
           var moved = 0;
           for (var i = items.indexOf(gap.next); i < items.length; i++) {
             var item = items[i];
@@ -2489,7 +2502,7 @@
             movedIds.set(item.id, shift);
             shifts.set(item, shift);
           }
-          if (moved > 0.002) ranges.set(gapKey(row.kind, row.row, gap), { start: r3(end - moved), end: end });
+          if (moved > TOUCH) ranges.set(gapKey(row.kind, row.row, gap), { start: r3(end - moved), end: end });
         });
       });
       return { ranges: ranges, shifts: shifts };
@@ -2675,18 +2688,18 @@
         if (Math.min(before, after) <= MIN_LEN) t = before <= after ? under.at : r3(vEnd(under));
         else t = splitV(under, t).at;
       }
-      st.vsegs.forEach(function (v) { if (v.at >= t - 1e-6) v.at = r3(v.at + len); });
+      st.vsegs.forEach(function (v) { if (v.at >= t - EPSILON) v.at = r3(v.at + len); });
       if (st.ready) {
         allSegs().forEach(function (h) { if (!h.seg.link && t > h.seg.at + MIN_LEN && t < segEnd(h.seg) - MIN_LEN) splitPiece(h, t); });
-        allSegs().forEach(function (h) { if (!h.seg.link && h.seg.at >= t - 1e-6) h.seg.at = r3(h.seg.at + len); });
+        allSegs().forEach(function (h) { if (!h.seg.link && h.seg.at >= t - EPSILON) h.seg.at = r3(h.seg.at + len); });
       }
       st.subs.forEach(function (cue) {
-        if (cue.at < t - 1e-6) return;
+        if (cue.at < t - EPSILON) return;
         cue.at = r3(cue.at + len);
         cue.end = r3(cue.end + len);
         if (cue.words) cue.words = cue.words.map(function (w) { return [r3(w[0] + len), r3(w[1] + len)]; });
       });
-      st.layers.forEach(function (l) { if (l.at >= t - 1e-6) { l.at = r3(l.at + len); l.end = r3(l.end + len); } });
+      st.layers.forEach(function (l) { if (l.at >= t - EPSILON) { l.at = r3(l.at + len); l.end = r3(l.end + len); } });
       piece.at = t;
       var i = 0;
       while (i < st.vsegs.length && st.vsegs[i].at < piece.at) i++;
@@ -2948,7 +2961,7 @@
         piece.at = r3(seg.at + p.off / seg.speed);
         piece.volume = r3(Math.min(4, seg.volume * p.gain));
         // the fades belong to the piece as a whole, so a part that does not span all of it keeps none
-        var spans = p.off < 0.0005 && Math.abs(partLen(p) - localLen(seg)) < 0.0005;
+        var spans = p.off < SAME_VALUE && Math.abs(partLen(p) - localLen(seg)) < SAME_VALUE;
         if (!spans) { piece.fadeIn = 0; piece.fadeOut = 0; }
         made.push(piece);
       });
@@ -2964,7 +2977,7 @@
     function markIn() {
       var b = windowT();
       var t = nowT();
-      if ((b.end - t) * st.vspeed < 0.5) return;
+      if ((b.end - t) * st.vspeed < EDITOR_LIMITS.clipSecondsMin) return;
       applyCut(t, Infinity, prefs.trimAudioWithVideo);
       done();
     }
@@ -2972,7 +2985,7 @@
     function markOut() {
       var b = windowT();
       var t = nowT();
-      if ((t - b.start) * st.vspeed < 0.5) return;
+      if ((t - b.start) * st.vspeed < EDITOR_LIMITS.clipSecondsMin) return;
       applyCut(-Infinity, t, prefs.trimAudioWithVideo);
       done();
     }
@@ -2995,8 +3008,8 @@
             var a = Math.max(s.at, start);
             var b = Math.min(segEnd(s), end);
             if (b - a < MIN_LEN) return false;
-            if (b < segEnd(s) - 0.0005) trimRightTo(s, clone(s), b);
-            if (a > s.at + 0.0005) trimLeftTo(s, clone(s), a);
+            if (b < segEnd(s) - SAME_VALUE) trimRightTo(s, clone(s), b);
+            if (a > s.at + SAME_VALUE) trimLeftTo(s, clone(s), a);
             clampFades(s);
             return s.parts.length > 0;
           });
@@ -3030,7 +3043,7 @@
     function audioAtEdge(v) {
       if (!prefs.trimAudioWithVideo || v.ref) return [];
       return allSegs().filter(function (h) {
-        return !h.seg.link && movementGroup(h.seg) === movementGroup(v) && h.seg.at < vEnd(v) - 0.0005 && segEnd(h.seg) > v.at + 0.0005;
+        return !h.seg.link && movementGroup(h.seg) === movementGroup(v) && h.seg.at < vEnd(v) - SAME_VALUE && segEnd(h.seg) > v.at + SAME_VALUE;
       }).map(function (h) {
         return { seg: h.seg, lane: h.lane, index: h.lane.segments.indexOf(h.seg), orig: clone(h.seg) };
       });
@@ -3050,14 +3063,14 @@
 
     function trimAudioEdge(audio, oldEdge, at, left) {
       restoreEdgeAudio(audio);
-      if (Math.abs(at - oldEdge) < 0.0005) return;
+      if (Math.abs(at - oldEdge) < SAME_VALUE) return;
       var shortening = left ? at > oldEdge : at < oldEdge;
       var start = Math.min(oldEdge, at), end = Math.max(oldEdge, at);
       audio.forEach(function (h) {
         var o = h.orig, s = h.seg, last = segEnd(o);
         if (!shortening) {
-          if (left && Math.abs(o.at - oldEdge) < 0.012) trimLeftTo(s, o, Math.max(leftLimit(o), at));
-          else if (!left && Math.abs(last - oldEdge) < 0.012) trimRightTo(s, o, Math.min(rightLimit(o, true), at));
+          if (left && Math.abs(o.at - oldEdge) < AUDIO_EDGE) trimLeftTo(s, o, Math.max(leftLimit(o), at));
+          else if (!left && Math.abs(last - oldEdge) < AUDIO_EDGE) trimRightTo(s, o, Math.min(rightLimit(o, true), at));
           clampFades(s);
           return;
         }
@@ -3105,7 +3118,7 @@
     function settleStart(seg) {
       var first = Infinity;
       seg.parts.forEach(function (p) { first = Math.min(first, p.off); });
-      if (!isFinite(first) || first < 0.0005) return;
+      if (!isFinite(first) || first < SAME_VALUE) return;
       seg.parts.forEach(function (p) { p.off = r3(p.off - first); });
       seg.at = r3(seg.at + first / seg.speed);
     }
@@ -3118,10 +3131,10 @@
         var len = partLen(p);
         if (delta >= 0) {
           var off = p.off - delta;
-          if (off + len <= 0.0005) return;
+          if (off + len <= SAME_VALUE) return;
           if (off >= 0) c.off = r3(off);
           else { c.srcStart = r3(p.srcStart - off); c.off = 0; }
-        } else if (p.off < 0.0005) {
+        } else if (p.off < SAME_VALUE) {
           c.srcStart = r3(Math.max(0, p.srcStart + delta));
         } else {
           c.off = r3(p.off - delta);
@@ -3140,10 +3153,10 @@
       o.parts.forEach(function (p) {
         var c = clone(p);
         var len = partLen(p);
-        if (p.off >= local - 0.0005) return;
-        if (local < oldLocal - 0.0005) {
+        if (p.off >= local - SAME_VALUE) return;
+        if (local < oldLocal - SAME_VALUE) {
           if (p.off + len > local) c.srcEnd = r3(p.srcStart + (local - p.off));
-        } else if (p.off + len >= oldLocal - 0.0005) {
+        } else if (p.off + len >= oldLocal - SAME_VALUE) {
           c.srcEnd = r3(p.srcEnd + (local - oldLocal));
         }
         if (c.srcEnd > c.srcStart) parts.push(c);
@@ -3155,14 +3168,14 @@
     // how far the left edge of a piece may go back, and how far the right edge may go on, before a track runs out or the clip does; a piece that already lies past an end of the clip may not be drawn out any further there
     function leftLimit(o) {
       var room = Infinity;
-      o.parts.forEach(function (p) { if (p.off < 0.0005) room = Math.min(room, p.srcStart); });
+      o.parts.forEach(function (p) { if (p.off < SAME_VALUE) room = Math.min(room, p.srcStart); });
       var start = o.at - (isFinite(room) ? room : 0) / o.speed;
       return Math.max(0, start);
     }
     function rightLimit(o, extendTimeline) {
       var oldLocal = localLen(o);
       var room = Infinity;
-      o.parts.forEach(function (p) { if (p.off + partLen(p) >= oldLocal - 0.0005) room = Math.min(room, srcDuration(p.src) - p.srcEnd); });
+      o.parts.forEach(function (p) { if (p.off + partLen(p) >= oldLocal - SAME_VALUE) room = Math.min(room, srcDuration(p.src) - p.srcEnd); });
       var end = o.at + (oldLocal + (isFinite(room) ? Math.max(0, room) : 0)) / o.speed;
       return extendTimeline ? end : Math.min(Math.max(D(), segEnd(o)), end);
     }
@@ -3174,8 +3187,8 @@
       for (var i = 0; i < pieces.length; i++) {
         var s = pieces[i];
         count += s.parts.length;
-        if (s.fadeIn > 0.001 || s.fadeOut > 0.001) return RK_M("editor.takeTheFadesOffTheTracks");
-        if (Math.abs(s.speed - first.speed) > 1e-6 || s.pitch !== first.pitch) return RK_M("editor.giveTheTracksTheSameSpeed");
+        if (s.fadeIn > ROUND_STEP || s.fadeOut > ROUND_STEP) return RK_M("editor.takeTheFadesOffTheTracks");
+        if (Math.abs(s.speed - first.speed) > EPSILON || s.pitch !== first.pitch) return RK_M("editor.giveTheTracksTheSameSpeed");
       }
       if (count > MAX_PARTS) return RK_M("editor.aCombinedTrackCanHoldCount", { count: MAX_PARTS });
       return "";
@@ -3250,7 +3263,7 @@
       dom.content.style.setProperty("--tl-ext-r", right + "px");
       applyOverflow();
     }
-    function applyOverflow() { dom.frame.style.overflowX = st.zoom > 1.001 || st.extR > 0 ? "auto" : "hidden"; }
+    function applyOverflow() { dom.frame.style.overflowX = st.zoom > 1 + ZOOM_SLACK || st.extR > 0 ? "auto" : "hidden"; }
 
     function timeAtClient(clientX) {
       var rect = dom.axis.getBoundingClientRect();
@@ -3440,7 +3453,7 @@
       ctx.closePath();
     }
 
-    // overlap the border's inner antialiasing so a fractional edge leaves no dark hairline
+    // overlap the inner antialiasing of the border so a fractional edge leaves no dark hairline
     function piecePath(ctx, x, width, height, edges) {
       var seam = Math.min(1.5, width * .2), inset = 1.5;
       var left = x + (edges.l ? seam : 0) + inset;
@@ -3525,11 +3538,11 @@
       }
       // a fade is shown as the ramp it takes off the piece
       ctx.fillStyle = pal.ramp;
-      if (seg.fadeIn > 0.001) {
+      if (seg.fadeIn > ROUND_STEP) {
         var fx = seg.fadeIn * pps;
         ctx.beginPath(); ctx.moveTo(x0, 1); ctx.lineTo(x0 + fx, 1); ctx.lineTo(x0, h - 1); ctx.closePath(); ctx.fill();
       }
-      if (seg.fadeOut > 0.001) {
+      if (seg.fadeOut > ROUND_STEP) {
         var ox = seg.fadeOut * pps;
         ctx.beginPath(); ctx.moveTo(x1, 1); ctx.lineTo(x1 - ox, 1); ctx.lineTo(x1, h - 1); ctx.closePath(); ctx.fill();
       }
@@ -3738,7 +3751,7 @@
       paintLayers();
       if (els.time) els.time.firstChild.textContent = fmt(t, 1) + " ";
       var pps = pxPerSec();
-      if (pps > 0 && opts.isPlaying() && st.zoom > fitZoom() + 0.001) {
+      if (pps > 0 && opts.isPlaying() && st.zoom > fitZoom() + ZOOM_SLACK) {
         // playing past the edge of what is in view brings the next page of the timeline in
         var x = t * pps + axisLeft();
         var frame = dom.frame;
@@ -3895,7 +3908,7 @@
     }
 
     function refreshFit() {
-      if (els.fit) els.fit.disabled = Math.abs(st.zoom - fitZoom()) <= 0.001 && dom.frame.scrollLeft <= 1;
+      if (els.fit) els.fit.disabled = Math.abs(st.zoom - fitZoom()) <= ZOOM_SLACK && dom.frame.scrollLeft <= 1;
     }
 
     function savePrefs() {
@@ -3924,9 +3937,9 @@
       els.redo.disabled = st.future.length === 0;
       if (opts.onHistory) opts.onHistory();
       var lowest = minZoom();
-      els.zoomOut.disabled = st.zoom <= lowest + 0.001;
+      els.zoomOut.disabled = st.zoom <= lowest + ZOOM_SLACK;
       refreshFit();
-      els.zoomIn.disabled = st.zoom >= maxZoom() - 0.001;
+      els.zoomIn.disabled = st.zoom >= maxZoom() - ZOOM_SLACK;
       var playing = !!opts.isPlaying();
       if (playing !== playShown) {
         playShown = playing;
@@ -4019,12 +4032,12 @@
       return {
         show: function (speed) {
           row.show(speed);
-          list.forEach(function (x) { x.b.classList.toggle("is-active", Math.abs(x.v - speed) < 0.001); });
+          list.forEach(function (x) { x.b.classList.toggle("is-active", Math.abs(x.v - speed) < ROUND_STEP); });
         },
       };
     }
 
-    // Keep the explanation beneath the switch label.
+    // keep the explanation beneath the switch label.
     function checkRow(box, text, onChange, tip) {
       var label = el("div", "trim-mode-row");
       var input = el("input", "rk-switch");
@@ -4162,7 +4175,6 @@
       renderProps();
     }
 
-    // a change to the selected piece: what is on screen and what is heard follow it at once, the history waits for the change to end
     // what is selected put back the way it starts, as one step of undo: the video its speed, pitch, link and look; a clip row its look; a piece of audio its volume, fades, speed, pitch and sound; the subtitles the style of their rows, where they were dragged to included. returns the kind that was reset, or ""
     function resetSelected() {
       var hit = selected();
@@ -4222,6 +4234,7 @@
       return "";
     }
 
+    // a change to the selected piece: what is on screen and what is heard follow it at once, the history waits for the change to end
     function editPiece(fn) {
       var hit = selected();
       if (!hit) return;
@@ -4307,7 +4320,7 @@
       return pick && (st.vsegs.length > 1 || pick.seg.speed != null) ? pick.seg : null;
     }
 
-    // cut audio at the video piece's edges before changing only that piece's sound
+    // cut audio at the edges of the video piece before changing only the sound of that piece
     function audioForVideo(v) {
       var end = vEnd(v);
       var group = movementGroup(v);
@@ -4317,20 +4330,20 @@
           if (ownSound(h.seg) && t > h.seg.at + MIN_LEN && t < segEnd(h.seg) - MIN_LEN) splitPiece(h, t);
         });
       });
-      return allSegs().filter(function (h) { return h.seg.link === v.id || ownSound(h.seg) && h.seg.at >= v.at - 0.002 && segEnd(h.seg) <= end + 0.002; });
+      return allSegs().filter(function (h) { return h.seg.link === v.id || ownSound(h.seg) && h.seg.at >= v.at - TOUCH && segEnd(h.seg) <= end + TOUCH; });
     }
 
-    function audioSpeedOutOfRange(speed) { return speed < 0.0625 || speed > 16; }
+    function audioSpeedOutOfRange(speed) { return speed < AUDIO_SPEED_MIN || speed > AUDIO_SPEED_MAX; }
 
     function setPieceSpeed(v, speed) {
       var old = vSpeed(v);
-      if (Math.abs(old - speed) < 1e-6) { renderProps(); return; }
+      if (Math.abs(old - speed) < EPSILON) { renderProps(); return; }
       var end = vEnd(v), ratio = speed / old;
       var group = movementGroup(v);
       var independent = !!group || st.vsegs.some(function (piece) { return !!movementGroup(piece); });
       var next = st.vsegs[st.vsegs.indexOf(v) + 1];
-      if (independent && next && v.at + (end - v.at) / ratio > next.at + 0.001) {
-        opts.notify(RK_M("editor.videoSpeedOutOfRange"), "bad", RK_M("editor.videoSpeed"));
+      if (independent && next && v.at + (end - v.at) / ratio > next.at + ROUND_STEP) {
+        opts.notify(RK_M("editor.thisSpeedWouldRunIntoTheNext"), "bad", RK_M("editor.videoSpeed"));
         renderProps();
         return;
       }
@@ -4344,15 +4357,15 @@
       v.speed = speed;
       var delta = vEnd(v) - end;
       function retime(t) { return t <= v.at ? t : t < end ? v.at + (t - v.at) / ratio : t + delta; }
-      if (!independent) st.vsegs.forEach(function (other) { if (other !== v && other.at >= end - 0.002) other.at = r3(other.at + delta); });
+      if (!independent) st.vsegs.forEach(function (other) { if (other !== v && other.at >= end - TOUCH) other.at = r3(other.at + delta); });
       if (linked) {
         audio.forEach(function (h) {
           h.seg.at = r3(v.at + (h.seg.at - v.at) / ratio);
-          h.seg.speed = r3(clamp(h.seg.speed * ratio, 0.0625, 16));
+          h.seg.speed = r3(clamp(h.seg.speed * ratio, AUDIO_SPEED_MIN, AUDIO_SPEED_MAX));
           h.seg.pitch = v.pitch == null ? st.vpitch : v.pitch;
           clampFades(h.seg);
         });
-        if (!independent) allSegs().forEach(function (h) { if (!audio.some(function (a) { return a.seg === h.seg; }) && !h.seg.link && movementGroup(h.seg) === group && h.seg.at >= end - 0.002) h.seg.at = r3(h.seg.at + delta); });
+        if (!independent) allSegs().forEach(function (h) { if (!audio.some(function (a) { return a.seg === h.seg; }) && !h.seg.link && movementGroup(h.seg) === group && h.seg.at >= end - TOUCH) h.seg.at = r3(h.seg.at + delta); });
       }
       st.subs.forEach(function (cue) {
         if (independent && (cue.at < v.at || cue.end > end)) return;
@@ -4373,7 +4386,7 @@
       if (Math.abs(v - 1) < 0.006) v = 1;
       var pick = localVideo();
       if (pick) { setPieceSpeed(pick, v); return; }
-      if (Math.abs(v - st.vspeed) < 1e-6) { renderProps(); return; }
+      if (Math.abs(v - st.vspeed) < EPSILON) { renderProps(); return; }
       beginSpeedRun();
       var run = st.vsess;
       var ratio = v / run.v0;
@@ -4401,7 +4414,7 @@
         seg.fadeOut = base.fadeOut;
         if (st.vlink) {
           seg.at = r3(base.at / ratio);
-          seg.speed = r3(clamp(base.speed * ratio, 0.0625, 16));
+          seg.speed = r3(clamp(base.speed * ratio, AUDIO_SPEED_MIN, AUDIO_SPEED_MAX));
           if (v !== 1) seg.pitch = st.vpitch;
         }
         clampFades(seg);
@@ -4447,7 +4460,7 @@
         audio.forEach(function (h) {
           var seg = h.seg;
           seg.at = r3(seg.at / f);
-          seg.speed = r3(clamp(seg.speed * f, 0.0625, 16));
+          seg.speed = r3(clamp(seg.speed * f, AUDIO_SPEED_MIN, AUDIO_SPEED_MAX));
           clampFades(seg);
         });
         syncLinked();
@@ -4801,7 +4814,7 @@
 
     function placeGroup(group, delta) {
       group.pieces.forEach(function (base) {
-        if (base.item.link && !group.ids.has(base.item.link) && Math.abs(delta) >= 0.0005) unlink(base.item);
+        if (base.item.link && !group.ids.has(base.item.link) && Math.abs(delta) >= SAME_VALUE) unlink(base.item);
         base.item.at = r3(base.at + delta);
         if (base.end != null) base.item.end = r3(base.end + delta);
       });
@@ -5221,8 +5234,7 @@
       if (cancelLayerDrag) cancelLayerDrag();
     }
 
-    // a press that is not on the selected track, its handles, the video, the colour picker, the toolbar or a scrollbar lets go of the selection, and so does one on the blank space of the side panels, while one on a card, a tab or any control in them keeps it. it is judged at the click, once whatever was pressed has done its work, and only when the press and the click both landed outside, so a slider dragged past the edge of its panel keeps the selection
-    // the controls of the bar over the editor (rename, aspect, screenshot, exit, render) and what they open act on the clip, not on what is selected in it
+    // a press that is not on the selected track, its handles, the video, the colour picker, the toolbar or a scrollbar lets go of the selection, and so does one on the blank space of the side panels, while one on a card, a tab or any control in them keeps it. it is judged at the click, once whatever was pressed has done its work, and only when the press and the click both landed outside, so a slider dragged past the edge of its panel keeps the selection; the controls of the bar over the editor (rename, aspect, screenshot, exit, render) and what they open act on the clip, not on what is selected in it
     var KEEPS_SELECTION = ".tl-seg, .tl-vseg, .tl-vext, .tl-cue, .tl-subs, .tl-frame, .lay-item, .ed-lib-veil, .editor-stage, .cpick, .trim-bar, .tl-lanes, .tl-toolbar, .tl-menu, .tl-bar, .tl-resizer, " +
       ".editor-top button, .editor-top .combo, .editor-top input, .editor-title, .clip-sort-menu, .render-veil, .name-edit-input";
     var SIDE_PANELS = ".ed-left, .editor-side, .ed-rail-r";
@@ -5285,8 +5297,8 @@
       var into = t - seg.at;
       var left = len - into;
       var g = 1;
-      if (seg.fadeIn > 0.001 && into < seg.fadeIn) g *= Math.max(0, into / seg.fadeIn);
-      if (seg.fadeOut > 0.001 && left < seg.fadeOut) g *= Math.max(0, left / seg.fadeOut);
+      if (seg.fadeIn > ROUND_STEP && into < seg.fadeIn) g *= Math.max(0, into / seg.fadeIn);
+      if (seg.fadeOut > ROUND_STEP && left < seg.fadeOut) g *= Math.max(0, left / seg.fadeOut);
       return g;
     }
 
@@ -5299,14 +5311,14 @@
       st.lanes.forEach(function (lane) {
         lane.segments.forEach(function (s) {
           var tau = (t - s.at) * s.speed;
-          var inside = t >= s.at - 0.001 && t < segEnd(s);
+          var inside = t >= s.at - ROUND_STEP && t < segEnd(s);
           s.parts.forEach(function (part, pi) {
             var key = s.id + "#" + pi;
             live[key] = true;
             var item = eng.busy[key];
             var expected = part.srcStart + (tau - part.off);
             // a piece can run past the end of its file (a sound drawn to the end of its picture), where it stays silent -- an element told to play after its end would start over from the top
-            var active = playing && !s.muted && inside && tau >= part.off - 0.001 && tau < part.off + partLen(part) && expected < srcDuration(part.src) - 0.01;
+            var active = playing && !s.muted && inside && tau >= part.off - ROUND_STEP && tau < part.off + partLen(part) && expected < srcDuration(part.src) - 0.01;
             if (!active) { if (item) release(key); return; }
             if (!item) {
               item = ensureItem(part.src);
@@ -5393,7 +5405,7 @@
 
     // the element shows the piece under the playhead where it should be, and goes on playing it when the clock plays; a piece that goes on where the one before it ended needs no seek
     function vFollow() {
-      var piece = vAt(vt.T, vt.T >= windowT().end - 0.001);
+      var piece = vAt(vt.T, vt.T >= windowT().end - ROUND_STEP);
       var changedPiece = vt.fxPiece !== (piece ? piece.id : "");
       vt.fxPiece = piece ? piece.id : "";
       if (!piece || piece.ref) {
@@ -5516,7 +5528,7 @@
 
     function vPlay() {
       var w = windowT();
-      if (vt.T >= w.end - 0.001) vt.T = 0;
+      if (vt.T >= w.end - ROUND_STEP) vt.T = 0;
       vt.playing = true;
       vt.ended = false;
       vt.dirty = true;
@@ -5542,7 +5554,7 @@
       if (vt.playing) {
         vt.T += dt;
         var w = windowT();
-        if (vt.T >= w.end - 0.0005) {
+        if (vt.T >= w.end - SAME_VALUE) {
           vt.T = w.end;
           vt.playing = false;
           vt.ended = true;
@@ -5601,7 +5613,7 @@
       // an edit that made the saved clip shorter, a piece carried in from past its end, takes the playhead back inside it
       if (vt.on) {
         var w = windowT();
-        if (vt.T > w.end + 1e-6 || vt.T < 0) vSeek(vt.T);
+        if (vt.T > w.end + EPSILON || vt.T < 0) vSeek(vt.T);
       }
       // the end of the saved clip that the toolbar tells moves with the pieces
       refreshToolbar();
@@ -5618,7 +5630,7 @@
     function pictureAt(t) {
       if (!vt.on) return { ref: "", time: clamp(t, 0, st.Dsrc) };
       var T = t / st.vspeed;
-      var piece = vAt(T, T >= windowT().end - 0.001);
+      var piece = vAt(T, T >= windowT().end - ROUND_STEP);
       if (!piece) return null;
       return { ref: piece.ref || "", time: clamp(piece.srcStart + (T - piece.at) * vSpeed(piece), 0, piece.ref ? piece.dur || 0 : st.Dsrc) };
     }
@@ -6131,7 +6143,7 @@
 
     // whether the rows, the pieces, the speed or the look differ from the clip as it was recorded; the cut is for the host to judge
     function edited() {
-      return mainTransform.w !== 1 || mainTransform.rotate !== 0 || signature() !== st.initial || Math.abs(st.vspeed - 1) > 1e-6 || st.subs.length > 0 || st.layers.length > 0 || !!lookPlan() || !!st.aspect && st.aspect !== "original";
+      return mainTransform.w !== 1 || mainTransform.rotate !== 0 || signature() !== st.initial || Math.abs(st.vspeed - 1) > EPSILON || st.subs.length > 0 || st.layers.length > 0 || !!lookPlan() || !!st.aspect && st.aspect !== "original";
     }
 
     // the edit as it stands, for the host to keep as a draft: what the history takes, plus the files brought in from outside that a piece still uses, which a draft can only reach again by their ids
@@ -6409,7 +6421,7 @@
         if (!cue || !isFinite(at) || !isFinite(end)) return;
         at = clamp(at, 0, D());
         end = clamp(end, at + SUB_MIN, D());
-        if (cue.words && Math.abs((end - at) - (cue.end - cue.at)) < 0.001) cue.words = shiftWords(cue.words, r3(at) - cue.at);
+        if (cue.words && Math.abs((end - at) - (cue.end - cue.at)) < ROUND_STEP) cue.words = shiftWords(cue.words, r3(at) - cue.at);
         cue.at = r3(at);
         cue.end = r3(end);
         sortSubs();
@@ -6501,8 +6513,7 @@
     return {
       subtitles: subsApi,
       subtitlePlan: subtitlePlan,
-      // the look of the video, which the tabs on the right set; a slider being dragged says false and the history waits for checkpoint
-      // the look of what is selected: a clip row has its own, everything else is the look of the video
+      // the look of the video, which the tabs on the right set; a slider being dragged says false and the history waits for checkpoint; the look of what is selected: a clip row has its own, everything else is the look of the video
       fx: {
         get: function () { var row = fxRow(), pick = selectedV(); return clone(row ? row.fx || RKEditorFx.defaultFx() : pick ? pick.seg.fx || st.fx : st.fx); },
         set: function (next, record) {
@@ -6518,7 +6529,7 @@
           if (record !== false) commit();
         },
         // the look of the video itself, which its preview shows whatever is selected
-        main: function () { var piece = vAt(nowT(), nowT() >= windowT().end - 0.001); return clone(piece ? piece.fx || st.fx : RKEditorFx.defaultFx()); },
+        main: function () { var piece = vAt(nowT(), nowT() >= windowT().end - ROUND_STEP); return clone(piece ? piece.fx || st.fx : RKEditorFx.defaultFx()); },
         // the element whose frames the tiles show: the clip row that is selected, else the video
         picture: function () { var row = fxRow(); return row && layerViews[row.id] ? layerViews[row.id].media : null; },
         checkpoint: function () { commit(); },
@@ -6612,7 +6623,7 @@
       finishCut: function () { if (finishCut(false)) done(); },
       refresh: function () {
         var d = Number(opts.duration()) || st.Dsrc;
-        if (Math.abs(d - st.Dsrc) > 1e-6) {
+        if (Math.abs(d - st.Dsrc) > EPSILON) {
           var untouched = signature() === st.initial;
           var whole = naturalV();
           st.Dsrc = d;

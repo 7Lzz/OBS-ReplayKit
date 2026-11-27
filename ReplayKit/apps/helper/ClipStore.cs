@@ -95,7 +95,7 @@ namespace ReplayKitHelper
             var folders = db["_folders"] as JObject;
             if (folders == null)
             {
-                // Bind legacy filename-only state once; retain the original fields for recovery.
+                // bind legacy filename-only state once; retain the original fields for recovery.
                 var legacy = (JObject)db.DeepClone();
                 folders = new JObject { [key] = legacy };
                 db["_folders"] = folders;

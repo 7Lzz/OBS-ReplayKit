@@ -102,9 +102,9 @@ void CreateClipsWindow()
 	QWidget *win = new ClipsWindow();
 	// closing Clips only hides it. Keeping its CEF host alive avoids a deferred-delete race when a hotkey reopens it immediately after close, which could otherwise create a blank window or call Qt through a stale widget pointer.
 	win->setAttribute(Qt::WA_DeleteOnClose, false);
-	win->setWindowTitle("Clips");
+	win->setWindowTitle(kClipsWindowTitle);
 	win->resize(1280, 800);
-	win->setMinimumSize(850, 620);
+	win->setMinimumSize(kClipsWindowMinWidth, kClipsWindowMinHeight);
 
 	QVBoxLayout *layout = new QVBoxLayout(win);
 	layout->setContentsMargins(0, 0, 0, 0);

@@ -1,4 +1,4 @@
-// a gpu encoder whose driver is too old is left out by obs (nvenc logs "Test process failed: outdated_driver" and its module does not load), and a profile that still names it makes every recording and replay buffer fail with obs's "missing encoders" and "failed to start" dialogs. before obs builds its outputs, a missing encoder of the profile is swapped for the best one that did load (another gpu's hardware encoder first, then x264), so clipping keeps working, and the helper is told so it can say what happened and where to get the driver
+// a gpu encoder whose driver is too old is left out by obs (nvenc logs "Test process failed: outdated_driver" and its module does not load), and a profile that still names it makes every recording and replay buffer fail with the "missing encoders" and "failed to start" dialogs of obs. before obs builds its outputs, a missing encoder of the profile is swapped for the best one that did load (the hardware encoder of another gpu first, then x264), so clipping keeps working, and the helper is told so it can say what happened and where to get the driver
 #include "prelude.hpp"
 #include "app/encoder_guard.hpp"
 

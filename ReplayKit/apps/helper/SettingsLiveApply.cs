@@ -591,9 +591,9 @@ namespace ReplayKitHelper
             {
                 string name = filter["filterName"]?.Value<string>() ?? "";
                 if (string.IsNullOrWhiteSpace(name)) continue;
-                if (name == "ReplayKit Motion Blur") return name;
+                if (name == OverlayScene.MotionBlurFilterName) return name;
                 string kind = filter["filterKind"]?.Value<string>() ?? "";
-                if (kind == "shader_filter")
+                if (kind == OverlayScene.MotionBlurFilterKind)
                 {
                     var filterSettings = filter["filterSettings"];
                     string shaderFile = filterSettings?["shader_file_name"]?.Value<string>() ?? "";
@@ -610,7 +610,7 @@ namespace ReplayKitHelper
             {
                 string name = filter["filterName"]?.Value<string>() ?? "";
                 string kind = filter["filterKind"]?.Value<string>() ?? "";
-                if (!string.IsNullOrEmpty(name) && kind == "obs_composite_blur") names.Add(name);
+                if (!string.IsNullOrEmpty(name) && kind == OverlayScene.RetiredMotionBlurFilterKind) names.Add(name);
             }
             return names;
         }
@@ -621,8 +621,8 @@ namespace ReplayKitHelper
             var applied = new List<string>();
             bool enabled = settings["motionBlurEnabled"]?.Value<bool>() ?? false;
             double strength = MotionBlurStrength(settings);
-            string filterName = "ReplayKit Motion Blur";
-            var sourceNames = new[] { "Display Capture", "Game Capture", "Window Capture" };
+            string filterName = OverlayScene.MotionBlurFilterName;
+            var sourceNames = new[] { OverlayScene.DisplayCaptureSourceName, OverlayScene.GameCaptureSourceName, OverlayScene.WindowCaptureSourceName };
 
             if (enabled && !TestShaderfilterPluginInstalled())
             {
@@ -657,7 +657,7 @@ namespace ReplayKitHelper
                     {
                         var create = ObsWebSocket.InvokeRequest("CreateSourceFilter", new JObject
                         {
-                            ["sourceName"] = sourceName, ["filterName"] = filterName, ["filterKind"] = "shader_filter",
+                            ["sourceName"] = sourceName, ["filterName"] = filterName, ["filterKind"] = OverlayScene.MotionBlurFilterKind,
                             ["filterSettings"] = MotionBlurFilterSettingsLive(strength),
                         }, 3000);
                         if (!create.Ok) { warnings.Add(Locales.Message("settings.couldNotCreateSourcenameMotionBlur", "sourceName", sourceName, "error", create.Message)); continue; }
@@ -678,7 +678,7 @@ namespace ReplayKitHelper
             return new JObject { ["applied"] = new JArray(applied), ["warnings"] = new JArray(warnings) };
         }
 
-        // Microphone input and its OBS filters.
+        // microphone input and its OBS filters.
 
         internal const string MicInputName = "Audio Input Capture";
         internal const string MicNoiseFilterName = "ReplayKit Noise Suppression";
@@ -689,7 +689,7 @@ namespace ReplayKitHelper
         internal const double NoiseGateDefaultOpenDb = -26.0;
         internal const double NoiseGateDefaultCloseDb = -32.0;
         internal const double GateHysteresisDb = 5.0;
-        // Nonzero levels use a named gain filter. Zero also silences the input fader without changing its mute state.
+        // nonzero levels use a named gain filter; zero also silences the input fader without changing its mute state.
         internal const string GainFilterKind = "gain_filter";
         internal const string MicGainFilterName = "ReplayKit Mic Volume";
         internal const string DesktopGainFilterName = "ReplayKit Desktop Volume";
@@ -741,7 +741,7 @@ namespace ReplayKitHelper
                 return result.Ok;
             }
 
-            // Restore before removing the saved fader level, so a failed request can be retried safely.
+            // restore before removing the saved fader level, so a failed request can be retried safely.
             if (volumePercent > 0 && !SetLevel()) return;
             bool filterChanged = !JToken.DeepEquals(current, next);
             if (existing == null)
@@ -1180,11 +1180,7 @@ namespace ReplayKitHelper
             }
         }
 
-        // -- master orchestrator: given the new settings, do the minimum live work to bring a running obs (and
-        // its on-disk profile/ini config) in line with them. screenshare-capture and discord-output live-apply
-        // run unconditionally on every call, not gated behind applyOverlay/restartObs the way overlay and motion
-        // blur are -- there is deliberately no "prepare for restart via file edit instead" branch for those two;
-        // preserve that asymmetry, it is not an oversight to fix.
+        // master orchestrator: given the new settings, do the minimum live work to bring a running obs (and its on-disk profile/ini config) in line with them. screenshare-capture and discord-output live-apply run unconditionally on every call, not gated behind applyOverlay/restartObs the way overlay and motion blur are -- there is deliberately no "prepare for restart via file edit instead" branch for those two; preserve that asymmetry, it is not an oversight to fix.
         internal static JObject ApplyLiveSettings(JObject settings, bool restartObs = false, bool applyOverlay = true, bool recreateBongo = true, bool applyMotionBlur = true, bool applyRuntimeOutputs = true, bool applyVideoSettings = true, bool applyReplayBufferOutput = true, JObject previousMic = null, bool applyAudioVolumes = false, bool rebuildInputOverlay = false, bool applySleep = false)
         {
             var warnings = new List<string>();

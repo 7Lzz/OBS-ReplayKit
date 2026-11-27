@@ -28,17 +28,11 @@ namespace ReplayKitHelper
             string Q(string key, string def = "") => r.Q(key, def);
             bool QFlag(string key) => r.QFlag(key);
 
-            if (path == "/games/library" || path == "/games/search" || path == "/games/icon" || path == "/games/set" || path == "/games/reset" || path == "/games/mix" || path == "/games/remove")
+            if (path == "/games/library" || path == "/games/search" || path == "/games/icon" || path == "/games/set" || path == "/games/reset" || path == "/games/mix")
             {
                 try
                 {
-                    if (path == "/games/remove")
-                    {
-                        if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
-                        GameCatalog.Remove(Q("id"));
-                        HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true });
-                    }
-                    else if (path == "/games/set" || path == "/games/reset" || path == "/games/mix")
+                    if (path == "/games/set" || path == "/games/reset" || path == "/games/mix")
                     {
                         if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
                         bool screenshot = QFlag("screenshot");

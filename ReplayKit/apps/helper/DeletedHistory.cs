@@ -31,7 +31,7 @@ namespace ReplayKitHelper
             return kind == "screenshot" || kind == "gif" ? kind : "clip";
         }
 
-        // keep a damaged record aside and recover each library's unindexed files when that library is selected
+        // keep a damaged record aside and recover the unindexed files of each library when that library is selected
         private static void Heal()
         {
             string store = StorePath();

@@ -37,9 +37,9 @@ void CreateSetupWindow(bool quiet)
 
 	CefHostWindow *win = new CefHostWindow();
 	win->setAttribute(Qt::WA_DeleteOnClose, false);
-	win->setWindowTitle("ReplayKit Setup");
+	win->setWindowTitle(kSetupWindowTitle);
 	win->resize(820, 640);
-	win->setMinimumSize(640, 520);
+	win->setMinimumSize(kSetupWindowMinWidth, kSetupWindowMinHeight);
 
 	QVBoxLayout *layout = new QVBoxLayout(win);
 	layout->setContentsMargins(0, 0, 0, 0);

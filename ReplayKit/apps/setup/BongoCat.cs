@@ -18,7 +18,7 @@ namespace ReplayKitSetup
         private static readonly string[] LegacyPlugin =
         {
             Path.Combine(Config.PROGRAMFILES_OBS_DIR, "obs-plugins", "64bit", "bongobs-cat.dll"),
-            Path.Combine(Config.PROGRAMFILES_OBS_DIR, "data", "obs-plugins", "bongobs-cat"),
+            Path.Combine(Config.PROGRAMFILES_OBS_DIR, "data", "obs-plugins", OverlayScene.LegacyBongoSourceKind),
         };
 
         private static bool IsSafeRelative(string[] parts)
@@ -79,9 +79,9 @@ namespace ReplayKitSetup
             foreach (var source in (scene["sources"] as JArray ?? new JArray()).OfType<JObject>())
             {
                 string id = source.Value<string>("id");
-                if (id != "bongobs-cat" && (id != "replaykit-bongo" || source.Value<string>("versioned_id") != "bongobs-cat")) continue;
-                source["id"] = "replaykit-bongo";
-                source["versioned_id"] = "replaykit-bongo";
+                if (id != OverlayScene.LegacyBongoSourceKind && (id != OverlayScene.BongoSourceKind || source.Value<string>("versioned_id") != OverlayScene.LegacyBongoSourceKind)) continue;
+                source["id"] = OverlayScene.BongoSourceKind;
+                source["versioned_id"] = OverlayScene.BongoSourceKind;
                 changed++;
             }
             return changed;

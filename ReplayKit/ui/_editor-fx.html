@@ -317,8 +317,7 @@
     "out vec4 o;",
     "const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);",
     "vec3 raw(vec2 p, float lod) { p = clamp(p, vec2(0.5), uVid - 0.5); return textureLod(uTex, vec2(p.x / uVid.x, 1.0 - p.y / uVid.y), lod).rgb; }",
-    // every function that samples is called from one place inside a loop: the compiler behind webgl inlines each call, so a function called from several places, inside functions that are themselves called from several, multiplies until the shader no longer compiles
-    // the source with the blurred copies laid over it, each copy taken from the source as it was: tilt shift through a mask of rows in 8 bit steps, glow as a screen, bloom as the part of each colour over the threshold added. a copy is a gaussian of nine samples of the mipmap level that already averages blocks of about its size; the bloom cuts every sample before averaging, so it reads 25 samples of a finer level
+    // every function that samples is called from one place inside a loop: the compiler behind webgl inlines each call, so a function called from several places, inside functions that are themselves called from several, multiplies until the shader no longer compiles; the source with the blurred copies laid over it, each copy taken from the source as it was: tilt shift through a mask of rows in 8 bit steps, glow as a screen, bloom as the part of each colour over the threshold added. a copy is a gaussian of nine samples of the mipmap level that already averages blocks of about its size; the bloom cuts every sample before averaging, so it reads 25 samples of a finer level
     "vec3 at(vec2 p, float lod) {",
     "  vec3 c = raw(p, lod);",
     "  float m = 0.0;",
@@ -1005,13 +1004,13 @@
       return h;
     }
 
-    // the tiles of a pane in two grids, the favorites first, each in the order the list defines; a search hides tiles and a heading with nothing left under it
     // the pane names are keys, so each sentence that carries one is written out whole
     function kindText(kind) {
       if (kind === "filters") return { all: RK_M("editor.allFilters"), search: RK_M("editor.searchFilters"), none: RK_M("editor.noFiltersMatchThat") };
       return { all: RK_M("editor.allEffects"), search: RK_M("editor.searchEffects"), none: RK_M("editor.noEffectsMatchThat") };
     }
 
+    // the tiles of a pane in two grids, the favorites first, each in the order the list defines; a search hides tiles and a heading with nothing left under it
     function tileGroups(box, kind, list) {
       var favHead = groupHead("toggle/star", RK_M("clips.favorites"));
       var favGrid = el("div", "ed-fx-grid");

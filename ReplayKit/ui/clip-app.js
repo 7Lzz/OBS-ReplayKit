@@ -169,8 +169,7 @@ const CLIP_HOVER_PROFILES = {
     OPEN_EDITOR: _svgInner(_RKI["action/open-editor"]),
     RESET: _svgInner(_RKI["action/reset"]),
   };
-  // fill the <svg data-i="..."> placeholders from the same icon map, the way settings.html does
-  // an svg[data-i] takes the inner markup and the viewBox of its icon, so a page never draws an icon on the grid of another one
+  // fill the <svg data-i="..."> placeholders from the same icon map, the way settings.html does; an svg[data-i] takes the inner markup and the viewBox of its icon, so a page never draws an icon on the grid of another one
   const _fillIcon = (el) => {
     const full = _RKI[el.dataset.i] || "";
     const box = /^<svg[^>]*\sviewBox="([^"]+)"/i.exec(full);
@@ -446,7 +445,7 @@ const CLIP_HOVER_PROFILES = {
     } catch {}
     return null;
   })();
-  // linked count for the whole clip set (not just the loaded page) -- the backend /clips page response carries it. lets the Linked tab badge be right before you click it.
+  // linked count for the whole clip set (not just the loaded page) -- the backend /clips page response carries it. lets the Linked tab badge be right before it is clicked.
   let clipsLinkedTotal = 0;
   let clipsNextOffset = 0;
   let clipsLoadingMore = false;
@@ -1178,7 +1177,7 @@ const CLIP_HOVER_PROFILES = {
 
   function updateTabs(source) {
     source = Array.isArray(source) ? source : [];
-    // favorites + linked count the whole clip set, not just the loaded page -- favoriteNames is the full stored set, clipsLinkedTotal comes from the /clips page response. (they were being computed off `source`, i.e. only the loaded rows, so the badges read low until you opened the tab.) until the helper has answered the totals are the ones it gave last time; with none of those either, the tabs go without numbers instead of showing the number of rows that are loaded
+    // favorites + linked count the whole clip set, not just the loaded page -- favoriteNames is the full stored set, clipsLinkedTotal comes from the /clips page response. (they were being computed off `source`, i.e. only the loaded rows, so the badges read low until the tab was opened.) until the helper has answered the totals are the ones it gave last time; with none of those either, the tabs go without numbers instead of showing the number of rows that are loaded
     let total, linkedTotal;
     if (clipsTotalKnown) {
       total = clipsTotal;
@@ -1957,7 +1956,7 @@ const CLIP_HOVER_PROFILES = {
     };
   }
 
-  // The virtual list places its cards by index; Favorites and Screenshots use their actual row positions.
+  // the virtual list places its cards by index; Favorites and Screenshots use their actual row positions.
   function cardResizeTop(drag, columns) {
     const origin = scrollAreaEl.getBoundingClientRect().top - scrollAreaEl.scrollTop;
     if (drag.row) {
@@ -2576,8 +2575,7 @@ const CLIP_HOVER_PROFILES = {
 
   async function loadMoreClipsIfNeeded(force) {
     if (HOME_MODE || clipsLoadingMore || document.hidden || clipsNextOffset >= clipsTotal) return;
-    // a list that is not very long is read in full right away, so every clip is there before anybody scrolls to it; a very long one is read ahead of the scroll
-    // the games sections are laid out from every clip, so with them on the whole list is read
+    // a list that is not very long is read in full right away, so every clip is there before anybody scrolls to it; a very long one is read ahead of the scroll; the games sections are laid out from every clip, so with them on the whole list is read
     if (!force && clipsNextOffset >= CLIPS_EAGER_LIMIT && !clipGroupsActive()) {
       const loadedRows = Math.ceil(allClips.length / Math.max(1, virtualColumns));
       const loadedEnd = (gridEl.offsetTop - scrollAreaEl.offsetTop) + loadedRows * virtualRowStride;
@@ -3339,7 +3337,7 @@ const CLIP_HOVER_PROFILES = {
     if (playToggleBtn) {
       playToggleBtn.addEventListener("click", (e) => {
         e.stopPropagation();
-        // route thru the shared togglevideoplayback so the center-pulse fires whether you tap the bottom bar button, click on the video itself, or hit space -- one indicator, every toggle path.
+        // route thru the shared togglevideoplayback so the center-pulse fires whether the bottom bar button is tapped, the video itself is clicked or space is pressed -- one indicator, every toggle path.
         toggleVideoPlayback();
         try { playToggleBtn.blur(); } catch {}
       });
@@ -3646,7 +3644,7 @@ const CLIP_HOVER_PROFILES = {
       rate = Math.max(SPEED_MIN, Math.min(SPEED_MAX, parsed));
       // playbackrate has weird floating-point precision quirks; snap to the nearest 0.05 so the readout stays clean.
       rate = Math.round(rate * 20) / 20;
-      // Unloading the source restores playbackRate from defaultPlaybackRate.
+      // unloading the source restores playbackRate from defaultPlaybackRate.
       video.defaultPlaybackRate = rate;
       video.playbackRate = rate;
       syncPlaybackRate(source);
@@ -4360,9 +4358,7 @@ const CLIP_HOVER_PROFILES = {
     });
   }
 
-  // close any open 3-dot menu. three triggers, becuase no single one catches every "the user is interacting with something else now" case: mousedown on the document: in-page clicks. inspects e.target with .closest() directly so it doesnt matter if some handler in the click path calls stoppropagation. mouseleave on <html>: cursor left the viewport -- this is the one that catches a click on the os window title bar, becuase the cursor has to cross the document edge to get up there and the title bar doesnt dispatch any dom event to the page. window blur: the popup lost focus (alt-tab, another window clicked). belt-and-braces backup for the title-bar case on browsers where mouseleave doesnt fire reliably.
-  // opens the menu of a card, a clip or a screenshot, with its top-left corner at the pointer, clamped to the visible scroll area so every item stays reachable
-  // the screenshot button of the theater and fullscreen player: the whole clip is the one piece of video, and the frame at the playhead is rendered by the editor's own screenshot path
+  // the screenshot button of the theater and fullscreen player: the whole clip is the one piece of video, and the frame at the playhead is rendered by the screenshot path of the editor itself
   async function saveFrameScreenshot(card, video, button) {
     const name = card.dataset.name;
     const duration = (video && Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 0) || Number(card.dataset.duration) || durationCache.get(name) || 0;
@@ -4443,6 +4439,7 @@ const CLIP_HOVER_PROFILES = {
     return "";
   }
 
+  // opens the menu of a card, a clip or a screenshot, with its top-left corner at the pointer, clamped to the visible scroll area so every item stays reachable
   function openCardMenuAt(card, menuDropdown, e) {
     const gif = menuDropdown.querySelector(".export-gif-item");
     if (gif) {
@@ -4505,6 +4502,7 @@ const CLIP_HOVER_PROFILES = {
     }, 180);
   }
 
+  // close any open 3-dot menu. three triggers, becuase no single one catches every "the user is interacting with something else now" case: mousedown on the document: in-page clicks. inspects e.target with .closest() directly so it doesnt matter if some handler in the click path calls stoppropagation. mouseleave on <html>: cursor left the viewport -- this is the one that catches a click on the os window title bar, becuase the cursor has to cross the document edge to get up there and the title bar doesnt dispatch any dom event to the page. window blur: the popup lost focus (alt-tab, another window clicked). belt-and-braces backup for the title-bar case on browsers where mouseleave doesnt fire reliably.
   function closeAllMenus() {
     document.querySelectorAll(".menu-dropdown.is-open").forEach((d) => {
       closeCardMenu(d);
@@ -5659,7 +5657,7 @@ const CLIP_HOVER_PROFILES = {
     if (screenshotGallery) screenshotGallery.refresh();
     poll();
   });
-  // open the target's section and game group before scrolling to and highlighting the card
+  // open the section and game group of the target before scrolling to and highlighting the card
   let revealTimer = 0;
   function revealClip(name) {
     if (gameFilters && (gameFilters.state.game !== "all" || gameFilters.state.type !== "all")) gameFilters.reset();
@@ -5721,8 +5719,7 @@ const CLIP_HOVER_PROFILES = {
     step();
   }
 
-  // a see all on a shelf of the home view, or a show in clips on one clip, leaves a note in storage, since the clips view is another page; it is read when this view shows, and a note older than a few seconds is a leftover that is dropped
-  // the popup over the obs window is another browser of the same site, so a note it leaves while this view already shows arrives as a storage event
+  // a see all on a shelf of the home view, or a show in clips on one clip, leaves a note in storage, since the clips view is another page; it is read when this view shows, and a note older than a few seconds is a leftover that is dropped; the popup over the obs window is another browser of the same site, so a note it leaves while this view already shows arrives as a storage event
   if (!HOME_MODE) {
     window.addEventListener("storage", (e) => { if (e.key === OPEN_FILTER_KEY && e.newValue) applyPendingClipsFilter(); });
     window.addEventListener("replaykit-window", (e) => { if (e.detail?.shown) applyPendingClipsFilter(); });
@@ -6042,7 +6039,7 @@ const CLIP_HOVER_PROFILES = {
     }
   });
 
-  // The mode picker starts a compression that replaces the clip only when the output is smaller.
+  // the mode picker starts a compression that replaces the clip only when the output is smaller.
   const compressModeVeil     = document.getElementById("compress-mode-veil");
   const compressModeModal    = document.getElementById("compress-mode-modal");
   const compressModeCancel   = document.getElementById("compress-mode-cancel");
@@ -6652,7 +6649,7 @@ const CLIP_HOVER_PROFILES = {
     let firstFailure = "";
     try {
       for (let i = 0; i < names.length; i++) {
-        const count = { done: i, total: names.length };
+        const count = { done: i + 1, total: names.length };
         showToast(trashOn ? RK_M("clips.movingToTrashDoneTotal", count) : RK_M("clips.deletingDoneTotal", count), "info");
         if (i === 0) await afterPopupPaint();
         try {
@@ -6757,6 +6754,7 @@ const CLIP_HOVER_PROFILES = {
   const trimVeil         = document.getElementById("trim-veil");
   const trimProcessingVeil   = document.getElementById("trim-processing-veil");
   const saveVeil         = document.getElementById("save-veil");
+  // the save that is running, or null: the editor cannot be closed or changed while there is one
   let trimSaving = null;
   let editorLoad = null;
   let editorRequest = 0;
@@ -6945,7 +6943,7 @@ const CLIP_HOVER_PROFILES = {
   }
   new MutationObserver(rememberEditorShape).observe(trimVeil, { attributes:true, attributeFilter:["class"] });
   window.addEventListener("resize", rememberEditorShape);
-  // give the hidden editor's resize observer a frame to fit the video before measuring it
+  // give the resize observer of the hidden editor a frame to fit the video before measuring it
   new ResizeObserver(() => requestAnimationFrame(drawEditorSkeleton)).observe(trimProcessingVeil);
   // with no kept shape yet the editor is measured while it loads, and its parts are made as it goes (the video takes its size from the clip, the tool rail comes in after that), so it is measured again at every step the loading screen names
   new MutationObserver(() => {
@@ -6989,7 +6987,7 @@ const CLIP_HOVER_PROFILES = {
     cancelEditorLoading();
   }, true);
 
-  // Keep client-owned work. Accepted helper jobs continue without this page and restore their status when it opens again.
+  // keep client-owned work; accepted helper jobs continue without this page and restore their status when it opens again.
   window.__rkCanUnload = function () {
     if (trimSaving || editorHeldAway || clipStateSaveTimer || favoriteSaving || draftWritesPending) return false;
     if (trimVeil.classList.contains("is-open") || trimProcessingVeil.classList.contains("is-open") || document.querySelector(".modal-veil.is-open")) return false;

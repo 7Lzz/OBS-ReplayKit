@@ -137,10 +137,10 @@ namespace ReplayKitHelper
             }
         }
 
-        // requestsoverride is scoped to obs64.exe only -- this never touches system-wide power policy, just whether *this one process* is allowed to veto sleep/display-off while its running, and only for the duration the process holds the override (windows clears it automatically once obs exits).
+        // requestsoverride only covers obs64.exe and never changes the power plan, just whether that one process may hold off sleep and display-off; the override stays until powercfg clears it
         internal static JObject InvokePowerCfg(string[] arguments)
         {
-            var allowed = new HashSet<string> { "/requestsoverride", "PROCESS", "obs64.exe", "DISPLAY", "SYSTEM", "AWAYMODE" };
+            var allowed = new HashSet<string>(SleepOverrideRequest.Requests) { "/requestsoverride", "PROCESS", SleepOverrideRequest.Process };
             foreach (var arg in arguments)
             {
                 if (!allowed.Contains(arg)) return new JObject { ["ok"] = false, ["message"] = Locales.Message("settings.invalidPowerConfigurationRequest") };
@@ -182,8 +182,8 @@ namespace ReplayKitHelper
 
         internal static JObject SetSleepOverrideSetting(bool allowSleep)
         {
-            var args = new List<string> { "/requestsoverride", "PROCESS", "obs64.exe" };
-            if (allowSleep) args.AddRange(new[] { "DISPLAY", "SYSTEM", "AWAYMODE" });
+            var args = new List<string> { "/requestsoverride", "PROCESS", SleepOverrideRequest.Process };
+            if (allowSleep) args.AddRange(SleepOverrideRequest.Requests);
             var result = InvokePowerCfg(args.ToArray());
             if (result["ok"]?.Value<bool>() != true) return new JObject { ["ok"] = false, ["message"] = result["message"] };
             string mode = allowSleep ? "allow_sleep" : "obs_default";
@@ -201,8 +201,8 @@ namespace ReplayKitHelper
 
         internal static JObject SetSleepOverrideElevated(bool allowSleep)
         {
-            var args = new List<string> { "/requestsoverride", "PROCESS", "obs64.exe" };
-            if (allowSleep) args.AddRange(new[] { "DISPLAY", "SYSTEM", "AWAYMODE" });
+            var args = new List<string> { "/requestsoverride", "PROCESS", SleepOverrideRequest.Process };
+            if (allowSleep) args.AddRange(SleepOverrideRequest.Requests);
             try
             {
                 var psi = new ProcessStartInfo { FileName = SystemPrograms.Powercfg, Arguments = string.Join(" ", args), UseShellExecute = true, Verb = "runas", WindowStyle = ProcessWindowStyle.Hidden };
@@ -347,7 +347,7 @@ namespace ReplayKitHelper
         {
             if (combo == null || string.IsNullOrWhiteSpace(combo["key"]?.Value<string>())) return null;
             var bind = new JObject();
-            foreach (var mod in new[] { "control", "alt", "shift", "command" })
+            foreach (var mod in HotkeyModifiers.Order)
             {
                 if (combo[mod]?.Value<bool>() == true) bind[mod] = true;
             }

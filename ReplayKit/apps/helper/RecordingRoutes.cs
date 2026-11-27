@@ -39,7 +39,6 @@ namespace ReplayKitHelper
                 return false;
             }
 
-            // the plugin hands over the pieces of the disk buffer that cover the clip, and they are joined into the clip itself
             // the plugin says a clip press started a save, or that one ended before it reached the helper
             if (path == "/clip-buffer/saving")
             {
@@ -57,6 +56,7 @@ namespace ReplayKitHelper
                 return false;
             }
 
+            // the plugin hands over the pieces of the disk buffer that cover the clip, and they are joined into the clip itself
             if (path == "/clip-buffer/save")
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }

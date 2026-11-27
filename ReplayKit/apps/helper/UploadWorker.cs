@@ -203,7 +203,7 @@ namespace ReplayKitHelper
                 // cookie jar shared between step 1 (which sets the session cookie) and step 3 (which needs it -- transcode returns 403 without it).
                 try { if (File.Exists(jar)) File.Delete(jar); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
 
-                // The job owns the starting session, even if the account changes during compression.
+                // the job owns the starting session, even if the account changes during compression.
                 bool signedIn = false;
                 if (requireAuth && string.IsNullOrWhiteSpace(authCookies))
                     throw new InvalidOperationException(Locales.Message("share.signedInStreamableSessionIsUnavailable"));

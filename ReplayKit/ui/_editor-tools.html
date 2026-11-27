@@ -374,8 +374,8 @@
     ["1f4a1", RK_M("editor.lightBulb"), "idea"], ["1f512", RK_M("editor.emojiLock"), "locked secure"], ["1f9e0", RK_M("editor.emojiBrain"), "smart think"],
   ];
 
-  // the longest take the helper records, in minutes
-  var REC_MAX_MIN = 15;
+  // the longest take the helper records, in seconds
+  var REC_MAX_SECONDS = window.RK_EDITOR_LIMITS.voiceoverSecondsMax;
   var WAVE_BARS = 48;
   var HOVERS = { control: ".btn, .tl-mini, .ed-x" };
   var SPARKLE_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:editor-fx-5}}</svg>';
@@ -2011,7 +2011,7 @@
 
     // the voiceover. recording runs while the clip plays from the playhead; it stops with the stop button, when the clip stops playing, when it reaches its end or when the editor closes, and the take is placed where the playhead was
 
-    function paintTime(seconds) { els.recTime.textContent = clock(seconds) + " / " + clock(REC_MAX_MIN * 60); }
+    function paintTime(seconds) { els.recTime.textContent = clock(seconds) + " / " + clock(REC_MAX_SECONDS); }
 
     function paintWave() {
       var bars = els.wave.children;

@@ -8,13 +8,13 @@ namespace rk {
 
 namespace {
 
-constexpr ULONGLONG CheckIntervalMs = 250;
-std::atomic<std::uint64_t> revision{0};
-std::atomic<std::uint64_t> readySince{0};
-QObject *uiContext = nullptr;
-void (*releaseGraphics)() = nullptr;
-void (*graphicsChanged)() = nullptr;
-ULONGLONG checkAfter = 0;
+constexpr ULONGLONG kCheckIntervalMs = 250;
+std::atomic<std::uint64_t> g_revision{0};
+std::atomic<std::uint64_t> g_readySince{0};
+QObject *g_uiContext = nullptr;
+void (*g_releaseGraphics)() = nullptr;
+void (*g_graphicsChanged)() = nullptr;
+ULONGLONG g_checkAfter = 0;
 
 void Publish(HRESULT result)
 {
@@ -23,26 +23,26 @@ void Publish(HRESULT result)
 	if (current.revision == next.revision)
 		return;
 	if (!next.Lost())
-		readySince.store(os_gettime_ns());
-	revision.store(next.revision);
+		g_readySince.store(os_gettime_ns());
+	g_revision.store(next.revision);
 	if (next.Lost()) {
 		blog(LOG_WARNING, "[replaykit] obs lost its graphics device (0x%08lx)", result);
-		releaseGraphics();
+		g_releaseGraphics();
 	} else {
 		blog(LOG_INFO, "[replaykit] obs has a working graphics device again");
 	}
-	QMetaObject::invokeMethod(uiContext, [next]() {
-		if (graphicsChanged && next.revision == GraphicsStatus().revision)
-			graphicsChanged();
+	QMetaObject::invokeMethod(g_uiContext, [next]() {
+		if (g_graphicsChanged && next.revision == GraphicsStatus().revision)
+			g_graphicsChanged();
 	}, Qt::QueuedConnection);
 }
 
 void CheckDevice(void *)
 {
 	const auto now = GetTickCount64();
-	if (now < checkAfter)
+	if (now < g_checkAfter)
 		return;
-	checkAfter = now + CheckIntervalMs;
+	g_checkAfter = now + kCheckIntervalMs;
 	if (auto *device = ObsGraphicsDevice())
 		Publish(device->GetDeviceRemovedReason());
 }
@@ -64,12 +64,12 @@ void RebuiltDevice(void *device, void *)
 
 GraphicsState GraphicsStatus()
 {
-	return {revision.load()};
+	return {g_revision.load()};
 }
 
 std::uint64_t GraphicsReadySince()
 {
-	return readySince.load();
+	return g_readySince.load();
 }
 
 ID3D11Device *ObsGraphicsDevice()
@@ -79,12 +79,12 @@ ID3D11Device *ObsGraphicsDevice()
 
 void StartGraphicsWatch(QObject &context, void (*release)(), void (*changed)())
 {
-	uiContext = &context;
-	releaseGraphics = release;
-	graphicsChanged = changed;
+	g_uiContext = &context;
+	g_releaseGraphics = release;
+	g_graphicsChanged = changed;
 	obs_enter_graphics();
 	if (ObsGraphicsDevice()) {
-		const gs_device_loss callbacks{ReleaseDevice, RebuiltDevice, &revision};
+		const gs_device_loss callbacks{ReleaseDevice, RebuiltDevice, &g_revision};
 		gs_register_loss_callbacks(&callbacks);
 	}
 	obs_leave_graphics();
@@ -93,15 +93,15 @@ void StartGraphicsWatch(QObject &context, void (*release)(), void (*changed)())
 
 void StopGraphicsWatch()
 {
-	if (!uiContext)
+	if (!g_uiContext)
 		return;
 	obs_remove_main_rendered_callback(CheckDevice, nullptr);
 	obs_enter_graphics();
 	if (ObsGraphicsDevice())
-		gs_unregister_loss_callbacks(&revision);
+		gs_unregister_loss_callbacks(&g_revision);
 	obs_leave_graphics();
-	graphicsChanged = nullptr;
-	uiContext = nullptr;
+	g_graphicsChanged = nullptr;
+	g_uiContext = nullptr;
 }
 
 } // namespace rk

@@ -134,8 +134,8 @@ namespace ReplayKitSetup
                                 throw new IOException(SetupLocale.Message("setup.theRunningReplaykitHelperDoesNot"));
                         }
                     }
-                    // the plain close is graceful on older helpers too
-                    using (var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Post, HelperEndpoint.Origin + "/exit-obs"))
+                    // graceful on older helpers too, which only force a close for reason=update; this one tells the helper that setup owns the fallback
+                    using (var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Post, HelperEndpoint.Origin + "/exit-obs?reason=setup"))
                     {
                         // the helper only takes calls that come from its own page
                         request.Headers.Add("Origin", HelperEndpoint.Origin);
@@ -170,24 +170,27 @@ namespace ReplayKitSetup
             }
             if (closeRequested && WaitForObsProcesses(SetupCloseWaitMs)) return 0;
             if (!AnyObsRunning()) return 0;
+            int killed = 0;
             if (!forceCloseRemaining)
             {
                 if (target == null) throw new IOException(SetupLocale.Message("setup.obsDidNotExitGracefully"));
                 using var gate = new EventWaitHandle(false, EventResetMode.ManualReset, ObsExit.GateName(target.Id), out bool created);
                 if (!created) throw new IOException(SetupLocale.Message("setup.obsDidNotExitGracefully"));
-                int forced = 0;
                 if (!target.HasExited)
                 {
                     log?.Invoke("normal shutdown did not finish; force-closing OBS process pid " + target.Id);
                     if (!ObsExit.ForceAndWait(target)) throw new IOException(SetupLocale.Message("setup.obsDidNotExitGracefully"));
-                    forced = 1;
+                    killed = 1;
                 }
-                if (!WaitForObsProcesses(ObsExit.ForceWaitMs)) throw new IOException(SetupLocale.Message("setup.obsDidNotExitGracefully"));
-                return forced;
+                if (WaitForObsProcesses(ObsExit.ForceWaitMs)) return killed;
+                // the verified obs is gone, so what is left is what it left behind: its browser pages, the helper, or a detached streamable transcode poll that the helper resumes at its next start
+                log?.Invoke("OBS exited but some of its processes are still running; stopping them to continue the update");
             }
-            log?.Invoke("normal shutdown did not finish; force-closing OBS and its remaining processes to continue installation");
+            else
+            {
+                log?.Invoke("normal shutdown did not finish; force-closing OBS and its remaining processes to continue installation");
+            }
             var processes = ObsProcesses();
-            int killed = 0;
             try
             {
                 foreach (var process in processes)

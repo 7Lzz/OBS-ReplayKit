@@ -400,6 +400,9 @@ namespace ReplayKitSetup
             {
                 Log("discord screenshare install starting");
                 if (startDelayMs > 0) Thread.Sleep(Math.Min(startDelayMs, 5000));
+                // a detached restart would start obs again while the audio driver installs
+                using var operation = ObsExit.TryTakeOperation(ObsExit.SetupGateWaitMs);
+                if (operation == null) throw new IOException(SetupLocale.Message("setup.anotherReplaykitUpdateIsAlready"));
                 var progress = new CleanupProgress { TotalSteps = 2 };
                 Apply.RunApplyStep(progress, 1, SetupLocale.Pair("setup.closeObs"), SetupLocale.Pair("setup.stopsObsAndReplaykitHelpersSo"), () => Cleanup.StopObsAndHelpers(progress.LogLine));
                 Apply.RunApplyStep(progress, 2, SetupLocale.Pair("setup.installObsStreamAudio"), SetupLocale.Pair("setup.installsTheReplaykitVirtualAudioDevice"), () => VbCable.EnsureVbcable(progress.LogLine));
@@ -425,6 +428,9 @@ namespace ReplayKitSetup
             {
                 Log("discord screenshare removal starting");
                 if (startDelayMs > 0) Thread.Sleep(Math.Min(startDelayMs, 5000));
+                // a detached restart would start obs again while the audio driver is removed
+                using var operation = ObsExit.TryTakeOperation(ObsExit.SetupGateWaitMs);
+                if (operation == null) throw new IOException(SetupLocale.Message("setup.anotherReplaykitUpdateIsAlready"));
                 var progress = new CleanupProgress { TotalSteps = 2 };
                 Apply.RunApplyStep(progress, 1, SetupLocale.Pair("setup.closeObs"), SetupLocale.Pair("setup.stopsObsAndReplaykitHelpersSo2"), () => Cleanup.StopObsAndHelpers(progress.LogLine));
                 Apply.RunApplyStep(progress, 2, SetupLocale.Pair("setup.removeObsStreamAudio"), SetupLocale.Pair("setup.uninstallsTheReplaykitVirtualAudioDevice"), () => VbCable.UninstallVbcable(progress.LogLine));

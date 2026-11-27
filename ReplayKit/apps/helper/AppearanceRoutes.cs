@@ -13,6 +13,7 @@ using System.Threading;
 using Microsoft.CSharp.RuntimeBinder;
 using Newtonsoft.Json.Linq;
 using static ReplayKitHelper.Routes;
+using ReplayKitShared;
 
 namespace ReplayKitHelper
 {
@@ -31,12 +32,12 @@ namespace ReplayKitHelper
 
             if (path == "/style-window")
             {
-                string title = Q("title", "Clips");
+                string title = Q("title", WindowLayout.ClipsTitle);
                 bool taskbar = QFlag("taskbar");
                 int matched = -1;
                 // the native plugin owns the icon (title bar + win11 taskbar button) for its own Clips / ReplayKit Settings windows -- style their chrome here but leave the icon to the plugin.
-                bool pluginOwnsIcon = title.Equals("Clips", StringComparison.OrdinalIgnoreCase) ||
-                    title.Equals("ReplayKit Settings", StringComparison.OrdinalIgnoreCase);
+                bool pluginOwnsIcon = title.Equals(WindowLayout.ClipsTitle, StringComparison.OrdinalIgnoreCase) ||
+                    title.Equals(WindowLayout.SettingsTitle, StringComparison.OrdinalIgnoreCase);
                 // on the default app icon, leave the browser-hosted windows native OBS/SVG icon alone. Forcing the legacy ReplayKit ICO here replaces it with a distorted 16px caption image.
                 string iconPath = "";
                 if (!pluginOwnsIcon)

@@ -5,7 +5,7 @@ using Newtonsoft.Json.Linq;
 
 namespace ReplayKitHelper
 {
-    // the encoders obs could really load this session, and what to tell someone whose gpu encoder did not load. obs leaves a gpu encoder out when the driver is too old for it (nvenc says "outdated_driver" in the log), and a profile that still names it fails every recording with obs's own missing-encoder and failed-to-start dialogs. the plugin catches that before obs builds its outputs, moves the profile onto an encoder that did load, and reports here; this keeps the settings from naming the missing one again and tells the person how to get it back
+    // the encoders obs could really load this session, and what to tell someone whose gpu encoder did not load. obs leaves a gpu encoder out when the driver is too old for it (nvenc says "outdated_driver" in the log), and a profile that still names it fails every recording with the missing-encoder and failed-to-start dialogs of obs. the plugin catches that before obs builds its outputs, moves the profile onto an encoder that did load, and reports here; this keeps the settings from naming the missing one again and tells the person how to get it back
     internal static class GpuDrivers
     {
         private static readonly object Gate = new object();

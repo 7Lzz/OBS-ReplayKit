@@ -5363,6 +5363,10 @@
     "source": "89d918912b420e67",
     "text": "Cette vitesse placerait l'audio lié hors de sa plage prise en charge."
   },
+  "editor.thisSpeedWouldRunIntoTheNext": {
+    "source": "23dfee54366dde34",
+    "text": "Cette vitesse ferait chevaucher le morceau vidéo avec le suivant. Déplacez d'abord le morceau suivant."
+  },
   "editor.thisSubtitleWasHardToMake": {
     "source": "b17bc9bf84745f95",
     "text": "Ce sous-titre était difficile à comprendre. Choisissez ou saisissez ce qui a été dit, gardez-le ou supprimez-le."
@@ -5424,8 +5428,8 @@
     "text": "Échec du rognage : l'assistant de ReplayKit a cessé de répondre, l'enregistrement n'a peut-être pas été terminé. Vérifiez le clip avant de le modifier à nouveau."
   },
   "editor.trimMustBeAtLeast0": {
-    "source": "187a35d6b253afde",
-    "text": "Le rognage doit durer au moins 0,5 s"
+    "source": "1cbd35b108ff88c7",
+    "text": "Le rognage doit durer au moins {seconds} s"
   },
   "editor.trimStart": {
     "source": "c0a342e8aad8de91",
