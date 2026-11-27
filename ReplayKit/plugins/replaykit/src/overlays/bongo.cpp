@@ -2,6 +2,7 @@
 #include "overlays/bongo.hpp"
 #include "core/locale.hpp"
 #include "core/shared_values.hpp"
+#include "core/state_files.hpp"
 #include "overlays/bongo_animation.hpp"
 #include "overlays/bongo_input.hpp"
 #include "overlays/bongo_model.hpp"
@@ -317,7 +318,7 @@ struct Bongo {
 
 	explicit Bongo(obs_data_t *data, obs_source_t *owner) : source(owner)
 	{
-		const QString replaykit = qEnvironmentVariable("APPDATA") + "/obs-studio/obs-replayKit/";
+		const QString replaykit = ReplayKitRootPath() + QLatin1Char('/');
 		input = std::make_unique<BongoInput>();
 		const QString bakes = replaykit + "obs-custom-dock/overlay-preview/bongo-models";
 		const QString root = BangoCatFolder();

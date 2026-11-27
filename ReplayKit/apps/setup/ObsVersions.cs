@@ -88,7 +88,7 @@ namespace ReplayKitSetup
                 try { root = JObject.Parse(File.ReadAllText(path)); }
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is JsonException)
                 {
-                    throw new InvalidDataException($"The bundled {ManifestName} could not be read: {ex.Message}");
+                    throw new InvalidDataException(SetupLocale.Message("setup.theObsVersionListCouldNotBeRead"), ex).WithEnglish(new SetupLocale.Text(null, $"The bundled {ManifestName} could not be read: {ex.Message}"));
                 }
 
                 try { (lines, install) = Read(root); }
@@ -119,7 +119,8 @@ namespace ReplayKitSetup
             return (parsed, parsed[parsed.Count - 1]);
         }
 
-        private static InvalidDataException Bad(string why) => new InvalidDataException($"The bundled {ManifestName} is invalid: {why}.");
+        // the window says the list is broken, and the setup log keeps what is wrong with it
+        private static InvalidDataException Bad(string why) => new InvalidDataException(SetupLocale.Message("setup.theObsVersionListIsInvalid")).WithEnglish(new SetupLocale.Text(null, $"The bundled {ManifestName} is invalid: {why}."));
 
         private static string Text(JObject entry, string name)
         {

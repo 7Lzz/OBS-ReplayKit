@@ -15,9 +15,9 @@ PLURALS = {
     "fr": {"one", "many", "other"}, "ja": {"other"}, "pt": {"one", "many", "other"},
     "ru": {"one", "few", "many", "other"}, "zh": {"other"},
 }
-CALL = re.compile(r'\b(RK_MH?|(?:Locales|SetupLocale)\.Message|SetupLocale\.Pair|TrMessage|replaykit_message)\(\s*"([^"]+)"')
+CALL = re.compile(r'\b(RK_MH?|(?:Locales|SetupLocale)\.Message|SetupLocale\.Pair|SetupLocale\.Error|TrMessage|replaykit_message)\(\s*"([^"]+)"')
 # an id the checker cannot read could name a message that does not exist, which would show the raw id as text
-COMPUTED_CALL = re.compile(r'(?<!QString )(?<!function )\b(?:RK_MH?|(?:Locales|SetupLocale)\.Message|SetupLocale\.Pair|TrMessage|replaykit_message)\(\s*(?!")')
+COMPUTED_CALL = re.compile(r'(?<!QString )(?<!function )\b(?:RK_MH?|(?:Locales|SetupLocale)\.Message|SetupLocale\.Pair|SetupLocale\.Error|TrMessage|replaykit_message)\(\s*(?!")')
 ATTRIBUTE = re.compile(r'\bdata-i18n(?:-title|-placeholder|-aria-label|-data-tooltip|-alt)?\s*=\s*(["\'])([^"\']+)\1')
 # the english-keyed lookups the messages replaced; one that comes back would show english text again
 LEGACY_CALL = re.compile(r'\b(?:RK_T|(?:Locales|SetupLocale)\.T|Tr)\(')
@@ -95,7 +95,7 @@ def references(catalog):
                 used.add(ident)
                 if ident not in catalog:
                     yield f"{rel}:{source.count(chr(10), 0, match.start()) + 1}: unknown message {ident}"
-                elif isinstance(catalog[ident]["text"], dict) and (matcher is ATTRIBUTE or match[1] not in ("RK_M", "RK_MH", "Locales.Message", "SetupLocale.Message", "SetupLocale.Pair")):
+                elif isinstance(catalog[ident]["text"], dict) and (matcher is ATTRIBUTE or match[1] not in ("RK_M", "RK_MH", "Locales.Message", "SetupLocale.Message", "SetupLocale.Pair", "SetupLocale.Error")):
                     yield f"{rel}: plural message {ident} requires RK_M, Locales.Message or SetupLocale.Message with a numeric count"
     for ident in sorted(set(catalog) - used):
         yield f"en-US {ident}: unused message"

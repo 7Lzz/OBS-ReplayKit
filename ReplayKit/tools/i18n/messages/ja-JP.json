@@ -9617,6 +9617,58 @@
     "source": "3c19c475dff15930",
     "text": "コピーしたファイルがコピー元と一致しません: {path}"
   },
+  "setup.aFileIsMissingFromThisSetup": {
+    "source": "029bb2b88108fd44",
+    "text": "このセットアップに {file} がありません。"
+  },
+  "setup.anArchiveEntryIsOutsideItsFolder": {
+    "source": "5c34af0b62166c8e",
+    "text": "このセットアップ内のアーカイブに、フォルダの外に展開されてしまうファイルがあります: {path}"
+  },
+  "setup.anObsConfigBackupEntryDoesNotMatchItsList": {
+    "source": "a47f69c2d0079109",
+    "text": "OBS 設定のバックアップ内のファイルがファイル一覧と一致しません。"
+  },
+  "setup.anObsConfigBackupEntryIsTooLarge": {
+    "source": "c6201bd3f7680d6d",
+    "text": "OBS 設定のバックアップ内のファイルが想定より大きいです: {path}"
+  },
+  "setup.anObsConfigBackupFileFailedItsCheck": {
+    "source": "0283e4b420e625a1",
+    "text": "OBS 設定のバックアップ内のファイルが確認に失敗しました: {path}"
+  },
+  "setup.anObsConfigBackupFileIsAFolder": {
+    "source": "0aa3b0a1eb390153",
+    "text": "OBS 設定のバックアップのファイルがフォルダでした。"
+  },
+  "setup.anObsConfigBackupFolderCouldNotBeOpened": {
+    "source": "6b2e91eb8a333830",
+    "text": "OBS 設定のバックアップのフォルダを開けませんでした: {path}"
+  },
+  "setup.anObsConfigBackupNameIsInvalid": {
+    "source": "a40cbdc360689ed9",
+    "text": "OBS 設定のバックアップ名が無効です。"
+  },
+  "setup.anObsConfigFileNameIsInvalid": {
+    "source": "2dbb0101151a6fb1",
+    "text": "OBS 設定内のファイル名が無効です。"
+  },
+  "setup.anObsConfigPathShouldBeAFile": {
+    "source": "617a453dec602e16",
+    "text": "OBS 設定のこの項目はファイルである必要があります: {path}"
+  },
+  "setup.anObsConfigPathShouldBeAFolder": {
+    "source": "9f6851e6bcce9f28",
+    "text": "OBS 設定のこの項目はフォルダである必要があります: {path}"
+  },
+  "setup.anObsHostFileChangedOutsideReplaykit": {
+    "source": "5b79cce98daeac44",
+    "text": "OBS プロセス ホストのファイルが ReplayKit の外で変更されました: {path}"
+  },
+  "setup.aPreparedObsConfigFileFailedItsCheck": {
+    "source": "c623c081e7a2e13f",
+    "text": "OBS 設定の復元用に準備したファイルが確認に失敗しました: {path}"
+  },
   "setup.aProcessHostPathEscapesIts": {
     "source": "330500722fa73ec0",
     "text": "プロセスホストのパスがフォルダの外を指しています。"
@@ -9660,6 +9712,10 @@
   "setup.applyDefaultSettings": {
     "source": "b8bbb12c63ba3d4c",
     "text": "既定の設定を適用"
+  },
+  "setup.aReadOnlyHardLinkWasNotRemoved": {
+    "source": "b4035bd58e3e17a6",
+    "text": "読み取り専用のファイルがハードリンクで別のファイルと属性を共有しているため、削除しませんでした。"
   },
   "setup.aReplaykitFileChangedOutsideTheUpdate": {
     "source": "ca32ecd29bec6cb9",
@@ -9845,6 +9901,10 @@
     "source": "c7751b11fea2a62b",
     "text": "FFmpeg と FFprobe をインストールまたは検証できませんでした。接続を確認してから、インストーラーをもう一度実行してトリミングと圧縮を修復してください。"
   },
+  "setup.finishTheInterruptedProcessHostUpdate": {
+    "source": "03e941324b66dbe9",
+    "text": "中断された OBS プロセス ホストの更新を、それを開始した ReplayKit インストーラーで完了してから、もう一度お試しください。"
+  },
   "setup.hotkeyKeyMustBeAString": {
     "source": "e87973a990e24bc9",
     "text": "ホットキーのキーは文字列で指定してください。"
@@ -9961,6 +10021,14 @@
     "source": "66627ff5b476d1d5",
     "text": "Microsoft .NET Framework 4.8 をインストールできませんでした。\n\n［OK］を選ぶと Microsoft のダウンロード ページが開きます。そこから .NET Framework 4.8 をインストールし、そのインストーラーに求められた場合は PC を再起動してから、このインストーラーをもう一度実行してください。"
   },
+  "setup.obsConfigBackupsCannotFollowALink": {
+    "source": "bc3d6e06a1863f30",
+    "text": "OBS 設定のバックアップはリンクまたはジャンクションを経由できません: {path}"
+  },
+  "setup.obsConfigBackupsCannotUseAHardLink": {
+    "source": "005dd2534419785e",
+    "text": "OBS 設定のバックアップではハードリンクされたファイルを使えません: {path}"
+  },
   "setup.obsCouldNotBeInstalledAutomatically": {
     "source": "b9ec5649ef71e37c",
     "text": "OBS Studio を自動でインストールできませんでした。obsproject.com から OBS をインストールしてから、このインストーラーをもう一度実行してください。"
@@ -10056,6 +10124,10 @@
   "setup.processHostCopyVerificationFailed": {
     "source": "af2ae4d213a9e9ac",
     "text": "プロセスホストのコピーの検証に失敗しました。"
+  },
+  "setup.processHostFilesCannotUseALink": {
+    "source": "588400af68e3f220",
+    "text": "OBS プロセス ホストのファイルはリンクまたはジャンクションを経由できません: {path}"
   },
   "setup.reInstall": {
     "source": "c7ef1e068d271587",
@@ -10311,6 +10383,18 @@
     "source": "d3360f80cf319e32",
     "text": "既定値のマーカーに有効な手順の一覧がありません。"
   },
+  "setup.theDeletedHistoryFolderIsInvalid": {
+    "source": "a9d515b17215f856",
+    "text": "削除したクリップの履歴のフォルダが無効です。"
+  },
+  "setup.theDeletedHistoryPathIsInvalid": {
+    "source": "bafd7fdf3d1f3744",
+    "text": "削除したクリップの履歴のパスが無効です。"
+  },
+  "setup.theDeletedHistoryRunsThroughALink": {
+    "source": "9fc298bd98ecee2e",
+    "text": "削除したクリップの履歴がリンクまたはジャンクションを経由しています: {path}"
+  },
   "setup.theDesktopAudioPlugin": {
     "source": "4352d805a2e7d2f1",
     "text": "デスクトップ音声のプラグイン"
@@ -10323,6 +10407,34 @@
     "source": "ec9eee00d7a677ce",
     "text": "モーションブラーのプラグイン"
   },
+  "setup.theObsConfigBackupChangedWhileChecked": {
+    "source": "1f74401061fc2247",
+    "text": "OBS 設定のバックアップが確認中に変更されました。"
+  },
+  "setup.theObsConfigBackupHasABadEntry": {
+    "source": "cbb917c945ab0177",
+    "text": "OBS 設定のバックアップに無効なファイルまたは重複したファイルがあります。"
+  },
+  "setup.theObsConfigBackupListHasABadSkippedFile": {
+    "source": "c9d170b8de71a9ec",
+    "text": "OBS 設定のバックアップのファイル一覧で、省略したファイルの記録が無効です。"
+  },
+  "setup.theObsConfigBackupListHasExtraData": {
+    "source": "58cb642f3944ab7f",
+    "text": "OBS 設定のバックアップのファイル一覧の後に予期しないデータがあります。"
+  },
+  "setup.theObsConfigBackupListIsInvalid": {
+    "source": "9a864b90e352dda0",
+    "text": "OBS 設定のバックアップのファイル一覧が無効です。"
+  },
+  "setup.theObsConfigBackupListIsMissing": {
+    "source": "e74a3207dced7939",
+    "text": "OBS 設定のバックアップのファイル一覧がないか、大きすぎます。"
+  },
+  "setup.theObsConfigRestoreFolderWasReplaced": {
+    "source": "baa292aa6ada68ff",
+    "text": "OBS 設定の復元に使っていたフォルダが使用中に置き換えられました。"
+  },
   "setup.theObsProcessRoles": {
     "source": "7418924bad768581",
     "text": "OBS のプロセスロール"
@@ -10330,6 +10442,14 @@
   "setup.theObsUpdateLock": {
     "source": "34824a33ff9d5f00",
     "text": "OBS の更新ロック"
+  },
+  "setup.theObsVersionListCouldNotBeRead": {
+    "source": "18271e01b4fdb836",
+    "text": "このセットアップの対応 OBS バージョン一覧を読み取れませんでした。"
+  },
+  "setup.theObsVersionListIsInvalid": {
+    "source": "cd37c006c83e89ea",
+    "text": "このセットアップの対応 OBS バージョン一覧が無効です。"
   },
   "setup.theOldReplaykitHelperCouldNot": {
     "source": "99cc371f39d82ad5",
@@ -10339,9 +10459,29 @@
     "source": "48b46e260aa0edf2",
     "text": "元の OBS のバックアップの検証に失敗しました。"
   },
+  "setup.thePresetsInTheSetupHaveNoFile": {
+    "source": "6d6e5590cb5fe8c4",
+    "text": "このセットアップのオーバーレイ プリセットに {file} がありません。"
+  },
   "setup.thePreviousUpdateFilesCouldNotBeCleared": {
     "source": "58db83cc918b521f",
     "text": "前回の ReplayKit の更新で残ったファイルを削除できませんでした。"
+  },
+  "setup.theProcessHostListDoesNotMatchObs": {
+    "source": "bd389237dbe2f78a",
+    "text": "OBS プロセス ホストのファイル一覧が OBS {version} と一致しません。"
+  },
+  "setup.theProcessHostListHasABadFile": {
+    "source": "c40350f742eaf8c8",
+    "text": "OBS プロセス ホストのファイル一覧に無効なファイルがあります: {path}"
+  },
+  "setup.theProcessHostListHasABadOriginal": {
+    "source": "4458f87a8dcf2f47",
+    "text": "OBS プロセス ホストのファイル一覧に無効な元のファイルがあります: {path}"
+  },
+  "setup.theProcessHostUpdateAndRollbackFailed": {
+    "source": "fe22b39f1b99dbe7",
+    "text": "OBS プロセス ホストの更新とその取り消しの両方に失敗しました。復旧用のファイルは次の場所に残しました: {path}"
   },
   "setup.theProcessRoleBackupIsMissing": {
     "source": "6c07b88b1b03685a",
@@ -10355,6 +10495,14 @@
     "source": "8a9fc69bb15fb743",
     "text": "実行中の ReplayKit のヘルパーは、穏やかな終了のみのシャットダウンに対応していません。"
   },
+  "setup.theSceneInTheSetupHasNoFilter": {
+    "source": "e90d5470ca142e52",
+    "text": "このセットアップのシーン ファイルに {filter} フィルタがありません。"
+  },
+  "setup.theSceneInTheSetupIsMissing": {
+    "source": "bb93e9c930c6826c",
+    "text": "このセットアップのシーン ファイルが見つかりません: {path}"
+  },
   "setup.theSetupWindowCouldNotStart": {
     "source": "e7c9f6e2b0ee0d7b",
     "text": "セットアップウィンドウを開始できませんでした。\n\n{error}"
@@ -10363,9 +10511,17 @@
     "source": "b65bf65a5f38add6",
     "text": "Share Preview ウィンドウ"
   },
+  "setup.theStreamableSignInFolderIsALink": {
+    "source": "b057cc516d8adc03",
+    "text": "Streamable のサインイン フォルダがリンクまたはジャンクションのため、そのままにしました。"
+  },
   "setup.theUninstallWindowCouldNotStart": {
     "source": "55ebd1d805547641",
     "text": "アンインストールウィンドウを開始できませんでした。\n\n{error}"
+  },
+  "setup.theUnpackedWebview2LoaderDoesNotMatch": {
+    "source": "782d4160a9a1170c",
+    "text": "展開した WebView2Loader.dll がこのセットアップ内のものと一致しません。"
   },
   "setup.theUpdateFailedAndCouldNotRollBack": {
     "source": "4e502eb60596cfe9",
@@ -10411,6 +10567,10 @@
     "source": "6ad1da665e140849",
     "text": "このバージョンに含まれる既定値を適用します。"
   },
+  "setup.twoObsConfigRestoresTargetOnePlace": {
+    "source": "039d2876d012733a",
+    "text": "OBS 設定の復元で 2 つのファイルが同じ場所に書き込まれます: {path}"
+  },
   "setup.uninstallFailed": {
     "source": "c5aca41f97b2ec12",
     "text": "アンインストールに失敗しました"
@@ -10439,6 +10599,10 @@
     "source": "bca45daa794e5072",
     "text": "不明なエラー"
   },
+  "setup.unknownRecordingPreset": {
+    "source": "720b8eebedf6a4a9",
+    "text": "ReplayKit は録画品質 {name} を認識できません。"
+  },
   "setup.update": {
     "source": "71060b462f3d44a6",
     "text": "更新"
@@ -10466,6 +10630,10 @@
   "setup.verifyUpdateFiles": {
     "source": "e5aa889b3d9cef79",
     "text": "アップデートファイルを確認"
+  },
+  "setup.webview2LoaderHasNoFunction": {
+    "source": "c6071353d21dc2ad",
+    "text": "WebView2Loader.dll に {name} 関数がありません。"
   },
   "setup.windowsProgramFilesWasNotFound": {
     "source": "ae428fc60ddcbf2c",

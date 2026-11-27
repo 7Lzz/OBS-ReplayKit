@@ -84,10 +84,7 @@ namespace ReplayKitSetup
                     string backup = existed ? Backup(relative) : null;
                     if (exists && existed && Installer.FilesMatch(backup, target)) continue;
                     if (exists && !Installer.FilesMatch(Stage(relative), target))
-                    {
-                        var reason = SetupLocale.Pair("setup.aReplaykitFileChangedOutsideTheUpdate", "path", relative);
-                        throw new IOException(reason.Shown).WithEnglish(reason);
-                    }
+                        throw SetupLocale.Error("setup.aReplaykitFileChangedOutsideTheUpdate", m => new IOException(m), "path", relative);
                     if (existed) Installer.ReplaceFile(backup, target, Guid.NewGuid().ToString("N"));
                     else if (exists) File.Delete(target);
                 }
@@ -123,10 +120,7 @@ namespace ReplayKitSetup
                 catch (FileNotFoundException) { continue; }
                 catch (DirectoryNotFoundException) { continue; }
                 if ((attributes & FileAttributes.ReparsePoint) != 0)
-                {
-                    var reason = SetupLocale.Pair("setup.replaykitFilesCannotBeUpdatedThroughALink", "path", parent);
-                    throw new IOException(reason.Shown).WithEnglish(reason);
-                }
+                    throw SetupLocale.Error("setup.replaykitFilesCannotBeUpdatedThroughALink", m => new IOException(m), "path", parent);
             }
             return path;
         }

@@ -34,7 +34,7 @@ namespace ReplayKitSetup
             if (!string.Equals(target, targetRoot, StringComparison.OrdinalIgnoreCase) &&
                 !target.StartsWith(targetRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
             {
-                throw new InvalidOperationException("unsafe archive path: " + relPosix);
+                throw SetupLocale.Error("setup.anArchiveEntryIsOutsideItsFolder", m => new InvalidOperationException(m), "path", relPosix);
             }
             return target;
         }
@@ -176,7 +176,7 @@ namespace ReplayKitSetup
                         string relText = name.Substring(ZipRoot.Length).Trim('/');
                         if (relText.Length == 0) continue;
                         var parts = relText.Split('/');
-                        if (!IsSafeRelative(parts)) throw new InvalidOperationException("unsafe archive path: " + entry.FullName);
+                        if (!IsSafeRelative(parts)) throw SetupLocale.Error("setup.anArchiveEntryIsOutsideItsFolder", m => new InvalidOperationException(m), "path", entry.FullName);
                         string dest = TargetPath(relText);
                         bool isDir = name.EndsWith("/") && entry.Length == 0;
                         if (isDir)

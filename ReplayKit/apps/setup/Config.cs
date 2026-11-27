@@ -28,9 +28,8 @@ namespace ReplayKitSetup
         // dock html the local helper serves (HelperEndpoint).
         public static readonly string DOCK_TARGET;
 
-        // the helper exe inside the replaykit folder, at the same place in the bundle and in the live install
-        public static readonly string HELPER_EXE_REL = Path.Combine("scripts", "helper", "OBSReplayKit.exe");
-        public static string HELPER_EXE => Path.Combine(REPLAYKIT_CONFIG, HELPER_EXE_REL);
+        // the helper exe of the live install
+        public static string HELPER_EXE => Path.Combine(REPLAYKIT_CONFIG, ReplayKitFolder.HelperExe);
 
         public static readonly string[] OBS_PROCESSES = { "obs64.exe", "obs32.exe", "obs.exe" };
 
@@ -95,7 +94,7 @@ namespace ReplayKitSetup
             PROGRAMDATA = Environment.GetEnvironmentVariable("ProgramData") ?? @"C:\ProgramData";
 
             OBS_CONFIG = Path.Combine(APPDATA, "obs-studio");
-            REPLAYKIT_CONFIG = Path.Combine(OBS_CONFIG, "obs-replayKit");
+            REPLAYKIT_CONFIG = Path.Combine(OBS_CONFIG, ReplayKitFolder.Name);
             REPLAYKIT_SETUP_CACHE = Path.Combine(LOCALAPPDATA, "OBS ReplayKit");
             REPLAYKIT_SETUP_EXE = Path.Combine(REPLAYKIT_SETUP_CACHE, "OBSReplayKitSetup.exe");
             REPLAYKIT_USER_STATE_CACHE = Path.Combine(REPLAYKIT_SETUP_CACHE, "state");

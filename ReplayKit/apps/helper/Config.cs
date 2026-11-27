@@ -143,8 +143,8 @@ namespace ReplayKitHelper
         public static string GetDefaultDockDir()
         {
             string appData = Environment.GetEnvironmentVariable("APPDATA");
-            if (!string.IsNullOrEmpty(appData)) return Path.Combine(appData, "obs-studio", "obs-replayKit", "obs-custom-dock");
-            return Path.Combine(GetUserProfile(), "AppData", "Roaming", "obs-studio", "obs-replayKit", "obs-custom-dock");
+            if (!string.IsNullOrEmpty(appData)) return Path.Combine(appData, "obs-studio", ReplayKitShared.ReplayKitFolder.Name, "obs-custom-dock");
+            return Path.Combine(GetUserProfile(), "AppData", "Roaming", "obs-studio", ReplayKitShared.ReplayKitFolder.Name, "obs-custom-dock");
         }
 
         public static string ResolveDir(string value, string fallback)

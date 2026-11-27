@@ -16,7 +16,7 @@ namespace ReplayKitSetup
     {
         private const string BundleResource = "ReplayKitSetup.assets.bundle.zip";
         private const string RuntimeResource = "ReplayKitSetup._i18n.html";
-        private const string LocaleDir = "obs-studio/obs-replayKit/locale/";
+        private const string LocaleDir = "obs-studio/" + ReplayKitFolder.Name + "/locale/";
         private const long MaxLocaleBytes = 4 * 1024 * 1024;
         private static readonly Regex HeadOpen = new Regex(@"<head(\s[^>]*)?>", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
         private static readonly object Gate = new object();
@@ -39,6 +39,13 @@ namespace ReplayKitSetup
         {
             ex.Data["english"] = text.English;
             return ex;
+        }
+
+        // an exception that says message id in the language of the installer and keeps its english for the log; make builds it from the shown text, and the id comes first so the message checker finds the call
+        internal static T Error<T>(string id, Func<string, T> make, params object[] pairs) where T : Exception
+        {
+            var text = Pair(id, pairs);
+            return make(text.Shown).WithEnglish(text);
         }
 
         internal static string EnglishOf(Exception ex) => ex.Data["english"] as string ?? ToEnglish(ex.Message);

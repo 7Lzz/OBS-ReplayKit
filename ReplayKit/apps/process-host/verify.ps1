@@ -10,9 +10,15 @@ if (-not (Test-Path -LiteralPath (Join-Path $root '.replaykit-portable') -PathTy
 $exe = Join-Path $root 'bin/64bit/replaykit-host/obs64.exe'
 $profile = Join-Path $root 'verification-profile'
 $roaming = Join-Path $profile 'Roaming'
-$helper = Join-Path $roaming 'obs-studio/obs-replayKit/scripts/helper'
+# the helper goes where the role host looks for it, the place shared/ReplayKitFolder.cs names
+$folderSource = Get-Content -LiteralPath (Join-Path $PSScriptRoot '../../shared/ReplayKitFolder.cs') -Raw
+$folderName = [regex]::Match($folderSource, 'const\s+string\s+Name\s*=\s*"([^"]+)"').Groups[1].Value
+$helperExe = [regex]::Match($folderSource, 'const\s+string\s+HelperExe\s*=\s*@"([^"]+)"').Groups[1].Value
+if (-not $folderName -or -not $helperExe) { throw 'Could not read the replaykit folder from shared/ReplayKitFolder.cs' }
+$helperPath = Join-Path (Join-Path (Join-Path $roaming 'obs-studio') $folderName) $helperExe
+$helper = Split-Path -Parent $helperPath
 New-Item -ItemType Directory -Force -Path $helper,(Join-Path $profile 'Local'),(Join-Path $profile 'Temp') | Out-Null
-Copy-Item -LiteralPath $HelperAssembly -Destination (Join-Path $helper 'OBSReplayKit.exe') -Force
+Copy-Item -LiteralPath $HelperAssembly -Destination $helperPath -Force
 function Start-RoleProcess([string]$image, [string]$arguments, [bool]$redirect) {
     $start = [Diagnostics.ProcessStartInfo]::new($image, $arguments)
     $start.WorkingDirectory = Split-Path -Parent $image

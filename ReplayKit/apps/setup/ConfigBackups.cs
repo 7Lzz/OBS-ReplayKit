@@ -262,7 +262,7 @@ namespace ReplayKitSetup
         {
             var name = ArchiveName.Match(Path.GetFileName(path));
             if (!name.Success || name.Groups["reason"].Value != reason)
-                throw new InvalidDataException("Invalid OBS config backup name.");
+                throw new InvalidDataException(SetupLocale.Message("setup.anObsConfigBackupNameIsInvalid"));
 
             string partial = path + PartialSuffix;
             var manifest = new Manifest
@@ -309,7 +309,7 @@ namespace ReplayKitSetup
                 output.Flush(true);
                 var verified = ReadArchive(output, reason);
                 if (!SameFiles(manifest, verified))
-                    throw new InvalidDataException("The OBS config backup changed during verification.");
+                    throw new InvalidDataException(SetupLocale.Message("setup.theObsConfigBackupChangedWhileChecked"));
                 Rename(output.SafeFileHandle, path);
                 published = true;
                 log?.Invoke("verified OBS config backup " + Path.GetFileName(path));
@@ -379,7 +379,7 @@ namespace ReplayKitSetup
                 string directory = Path.Combine(root, relative);
                 var attributes = PlainPath(directory);
                 if (attributes == null) continue;
-                if (!IsDirectory(attributes.Value)) throw new IOException("Expected an OBS config folder: " + relative);
+                if (!IsDirectory(attributes.Value)) throw SetupLocale.Error("setup.anObsConfigPathShouldBeAFolder", m => new IOException(m), "path", relative);
                 foreach (var file in FolderFiles(directory, relative))
                     yield return file;
             }
@@ -418,7 +418,7 @@ namespace ReplayKitSetup
         {
             var attributes = PlainPath(path);
             if (attributes == null) yield break;
-            if (IsDirectory(attributes.Value)) throw new IOException("Expected an OBS config file: " + relative);
+            if (IsDirectory(attributes.Value)) throw SetupLocale.Error("setup.anObsConfigPathShouldBeAFile", m => new IOException(m), "path", relative);
             yield return new KeyValuePair<string, string>(relative, path);
         }
 
@@ -473,7 +473,7 @@ namespace ReplayKitSetup
         private static void RequirePlain(string path, FileAttributes attributes)
         {
             if ((attributes & FileAttributes.ReparsePoint) != 0)
-                throw new IOException("OBS config backups cannot follow a link: " + path);
+                throw SetupLocale.Error("setup.obsConfigBackupsCannotFollowALink", m => new IOException(m), "path", path);
         }
 
         private static FileAttributes? PlainPath(string path)
@@ -499,7 +499,7 @@ namespace ReplayKitSetup
             while ((read = input.Read(buffer, 0, buffer.Length)) != 0)
             {
                 length += read;
-                if (length > limit) throw new InvalidDataException("OBS config backup entry exceeds its expected size: " + path);
+                if (length > limit) throw SetupLocale.Error("setup.anObsConfigBackupEntryIsTooLarge", m => new InvalidDataException(m), "path", path);
                 hash.TransformBlock(buffer, 0, read, null, 0);
                 output?.Write(buffer, 0, read);
             }
@@ -520,11 +520,11 @@ namespace ReplayKitSetup
             foreach (var entry in zip.Entries)
             {
                 if ((entry.FullName != ManifestName && !SafeEntry(entry.FullName)) || entries.ContainsKey(entry.FullName))
-                    throw new InvalidDataException("The OBS config backup contains an invalid or duplicate entry.");
+                    throw new InvalidDataException(SetupLocale.Message("setup.theObsConfigBackupHasABadEntry"));
                 entries.Add(entry.FullName, entry);
             }
             if (!entries.TryGetValue(ManifestName, out var manifestEntry) || manifestEntry.Length > ManifestLimit)
-                throw new InvalidDataException("The OBS config backup manifest is missing or too large.");
+                throw new InvalidDataException(SetupLocale.Message("setup.theObsConfigBackupListIsMissing"));
 
             Manifest manifest;
             using (var input = manifestEntry.Open())
@@ -535,27 +535,27 @@ namespace ReplayKitSetup
                 using var reader = new JsonTextReader(new StreamReader(buffer, new UTF8Encoding(false, true))) { DateParseHandling = DateParseHandling.None };
                 manifest = JObject.Load(reader, new JsonLoadSettings { DuplicatePropertyNameHandling = DuplicatePropertyNameHandling.Error })
                     .ToObject<Manifest>();
-                if (reader.Read()) throw new InvalidDataException("Unexpected data after the OBS config backup manifest.");
+                if (reader.Read()) throw new InvalidDataException(SetupLocale.Message("setup.theObsConfigBackupListHasExtraData"));
             }
 
             if (manifest.Format != 1 || manifest.Reason != reason || string.IsNullOrWhiteSpace(manifest.ReplayKitVersion) ||
                 !DateTimeOffset.TryParseExact(manifest.Created, "o", CultureInfo.InvariantCulture, DateTimeStyles.None, out var created) ||
                 created.Offset != TimeSpan.Zero || manifest.Files.Count != entries.Count - 1)
-                throw new InvalidDataException("The OBS config backup manifest is invalid.");
+                throw new InvalidDataException(SetupLocale.Message("setup.theObsConfigBackupListIsInvalid"));
             var seen = new HashSet<string>(Paths);
             foreach (string omitted in manifest.Omitted)
                 if (!SafeEntry(omitted) || !seen.Add(omitted))
-                    throw new InvalidDataException("The OBS config backup manifest has an invalid omission.");
+                    throw new InvalidDataException(SetupLocale.Message("setup.theObsConfigBackupListHasABadSkippedFile"));
             foreach (var item in manifest.Files)
             {
                 if (item == null || !SafeEntry(item.Path) || !seen.Add(item.Path) || item.Size < 0 || item.Size > FileLimit ||
                     item.Sha256 == null || !HashPattern.IsMatch(item.Sha256) || !entries.TryGetValue(item.Path, out var entry) ||
                     item.Path != entry.FullName || item.Size != entry.Length)
-                    throw new InvalidDataException("An OBS config backup entry does not match its manifest.");
+                    throw new InvalidDataException(SetupLocale.Message("setup.anObsConfigBackupEntryDoesNotMatchItsList"));
                 using var input = entry.Open();
                 using var output = staging == null ? null : StageFile(staging, item.Path);
                 if (!SameFile(item, HashFile(item.Path, input, output, item.Size)))
-                    throw new InvalidDataException("OBS config backup hash verification failed: " + item.Path);
+                    throw SetupLocale.Error("setup.anObsConfigBackupFileFailedItsCheck", m => new InvalidDataException(m), "path", item.Path);
                 output?.Flush(true);
             }
             return manifest;
@@ -625,7 +625,7 @@ namespace ReplayKitSetup
                 foreach (var change in changes)
                 {
                     if (!targets.Add(Path.GetFullPath(change.Target)))
-                        throw new InvalidDataException("Conflicting OBS config rollback target: " + change.Target);
+                        throw SetupLocale.Error("setup.twoObsConfigRestoresTargetOnePlace", m => new InvalidDataException(m), "path", change.Target);
                     pinnedTargets.Pin(Path.GetDirectoryName(change.Target), create: change.Source != null);
                     if (change.Source == null) continue;
                     using (var current = OpenStream(change.Target, FileAccess.Read, FileShare.Read, missingOkay: true))
@@ -639,7 +639,7 @@ namespace ReplayKitSetup
                     change.Incoming = OpenStream(incoming, FileAccess.Write, FileShare.None, FileMode.CreateNew,
                         extraAccess: DeleteAccess | WriteDac);
                     if (!SameFile(change.Source, HashFile(change.Source.Path, input, change.Incoming, change.Source.Size)))
-                        throw new InvalidDataException("Staged OBS config failed verification: " + change.Source.Path);
+                        throw SetupLocale.Error("setup.aPreparedObsConfigFileFailedItsCheck", m => new InvalidDataException(m), "path", change.Source.Path);
                     change.Incoming.Flush(true);
                 }
 
@@ -715,7 +715,7 @@ namespace ReplayKitSetup
                 if (directory == null) return;
                 RequirePlain(path, FileAttributesOf(directory));
                 if (!MatchesIdentity(directory, expected))
-                    throw new IOException("OBS config rollback staging directory identity changed.");
+                    throw new IOException(SetupLocale.Message("setup.theObsConfigRestoreFolderWasReplaced"));
                 long bytes = 0;
                 if (DeleteChildren(directory, path, Children(path).Select(Path.GetFileName), SetupLog.Line, ref bytes))
                     MarkForDeletion(directory);
@@ -877,7 +877,7 @@ namespace ReplayKitSetup
             }
             int error = Marshal.GetLastWin32Error();
             handle.Dispose();
-            throw new IOException("could not open directory for OBS backup cleanup: " + path, new Win32Exception(error));
+            throw SetupLocale.Error("setup.anObsConfigBackupFolderCouldNotBeOpened", m => new IOException(m, new Win32Exception(error)), "path", path);
         }
 
         private static IOException FileError(int error)
@@ -891,7 +891,7 @@ namespace ReplayKitSetup
             FileMode mode, uint type, bool missingOkay = false, bool allowLink = false)
         {
             if (name.Length == 0 || name == "." || name == ".." || name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
-                throw new InvalidDataException("Invalid OBS config filename.");
+                throw new InvalidDataException(SetupLocale.Message("setup.anObsConfigFileNameIsInvalid"));
             uint disposition = mode == FileMode.Open ? 1u : mode == FileMode.CreateNew ? 2u : 3u;
             IntPtr text = Marshal.StringToHGlobalUni(name);
             IntPtr unicode = Marshal.AllocHGlobal(Marshal.SizeOf<UnicodeName>());
@@ -938,7 +938,7 @@ namespace ReplayKitSetup
                 RequirePlain(path, FileAttributesOf(handle));
                 if (!GetFileInformationByHandleEx(handle, FileStandardInfo, out StandardInfo standard, (uint)Marshal.SizeOf<StandardInfo>()))
                     throw FileError(Marshal.GetLastWin32Error());
-                if (standard.Links != 1) throw new IOException("OBS config backups cannot use a hard-linked file: " + path);
+                if (standard.Links != 1) throw SetupLocale.Error("setup.obsConfigBackupsCannotUseAHardLink", m => new IOException(m), "path", path);
                 return handle;
             }
             catch
@@ -1101,7 +1101,7 @@ namespace ReplayKitSetup
                     {
                         directory = PinDirectory(ancestor, out bool link);
                         directories.Add(ancestor, directory);
-                        if (link) throw new IOException("OBS config backups cannot traverse a link: " + ancestor);
+                        if (link) throw SetupLocale.Error("setup.obsConfigBackupsCannotFollowALink", m => new IOException(m), "path", ancestor);
                         continue;
                     }
                     directory = OpenChild(directories[parent], Path.GetFileName(ancestor), ListDirectory,
@@ -1160,7 +1160,7 @@ namespace ReplayKitSetup
 
         private static long DeleteFile(SafeFileHandle file, FileAttributes attributes)
         {
-            if (IsDirectory(attributes)) throw new IOException("expected an OBS backup file");
+            if (IsDirectory(attributes)) throw new IOException(SetupLocale.Message("setup.anObsConfigBackupFileIsAFolder"));
             long size = 0;
             if ((attributes & FileAttributes.ReparsePoint) == 0)
             {
@@ -1169,7 +1169,7 @@ namespace ReplayKitSetup
                 size = standard.Links == 1 ? standard.EndOfFile : 0;
                 if ((attributes & FileAttributes.ReadOnly) != 0)
                 {
-                    if (standard.Links > 1) throw new IOException("a read-only hard link shares its attributes with another file");
+                    if (standard.Links > 1) throw new IOException(SetupLocale.Message("setup.aReadOnlyHardLinkWasNotRemoved"));
                     var basic = new BasicInfo { Attributes = attributes & ~FileAttributes.ReadOnly };
                     if (basic.Attributes == 0) basic.Attributes = FileAttributes.Normal;
                     if (!SetFileInformationByHandle(file, FileBasicInfo, ref basic, (uint)Marshal.SizeOf<BasicInfo>()))

@@ -9626,6 +9626,58 @@
     "source": "3c19c475dff15930",
     "text": "Скопированный файл не совпадает с исходным: {path}"
   },
+  "setup.aFileIsMissingFromThisSetup": {
+    "source": "029bb2b88108fd44",
+    "text": "В этом установщике нет {file}."
+  },
+  "setup.anArchiveEntryIsOutsideItsFolder": {
+    "source": "5c34af0b62166c8e",
+    "text": "В архиве этого установщика есть файл, который оказался бы вне своей папки: {path}"
+  },
+  "setup.anObsConfigBackupEntryDoesNotMatchItsList": {
+    "source": "a47f69c2d0079109",
+    "text": "Файл в резервной копии настроек OBS не совпадает со своим списком файлов."
+  },
+  "setup.anObsConfigBackupEntryIsTooLarge": {
+    "source": "c6201bd3f7680d6d",
+    "text": "Файл в резервной копии настроек OBS больше ожидаемого: {path}"
+  },
+  "setup.anObsConfigBackupFileFailedItsCheck": {
+    "source": "0283e4b420e625a1",
+    "text": "Файл в резервной копии настроек OBS не прошёл проверку: {path}"
+  },
+  "setup.anObsConfigBackupFileIsAFolder": {
+    "source": "0aa3b0a1eb390153",
+    "text": "Файл резервных копий настроек OBS оказался папкой."
+  },
+  "setup.anObsConfigBackupFolderCouldNotBeOpened": {
+    "source": "6b2e91eb8a333830",
+    "text": "Не удалось открыть папку резервных копий настроек OBS: {path}"
+  },
+  "setup.anObsConfigBackupNameIsInvalid": {
+    "source": "a40cbdc360689ed9",
+    "text": "Имя резервной копии настроек OBS недопустимо."
+  },
+  "setup.anObsConfigFileNameIsInvalid": {
+    "source": "2dbb0101151a6fb1",
+    "text": "Имя файла в настройках OBS недопустимо."
+  },
+  "setup.anObsConfigPathShouldBeAFile": {
+    "source": "617a453dec602e16",
+    "text": "Здесь в настройках OBS должен быть файл: {path}"
+  },
+  "setup.anObsConfigPathShouldBeAFolder": {
+    "source": "9f6851e6bcce9f28",
+    "text": "Здесь в настройках OBS должна быть папка: {path}"
+  },
+  "setup.anObsHostFileChangedOutsideReplaykit": {
+    "source": "5b79cce98daeac44",
+    "text": "Файл хоста процессов OBS был изменён вне ReplayKit: {path}"
+  },
+  "setup.aPreparedObsConfigFileFailedItsCheck": {
+    "source": "c623c081e7a2e13f",
+    "text": "Файл, подготовленный для восстановления настроек OBS, не прошёл проверку: {path}"
+  },
   "setup.aProcessHostPathEscapesIts": {
     "source": "330500722fa73ec0",
     "text": "Путь хоста процессов выходит за пределы его папки."
@@ -9669,6 +9721,10 @@
   "setup.applyDefaultSettings": {
     "source": "b8bbb12c63ba3d4c",
     "text": "Применить настройки по умолчанию"
+  },
+  "setup.aReadOnlyHardLinkWasNotRemoved": {
+    "source": "b4035bd58e3e17a6",
+    "text": "Файл только для чтения делит свои атрибуты с другим файлом через жёсткую ссылку, поэтому он не был удалён."
   },
   "setup.aReplaykitFileChangedOutsideTheUpdate": {
     "source": "ca32ecd29bec6cb9",
@@ -9854,6 +9910,10 @@
     "source": "c7751b11fea2a62b",
     "text": "FFmpeg и FFprobe не удалось установить или проверить. Проверьте подключение и запустите установщик снова, чтобы восстановить обрезку и сжатие."
   },
+  "setup.finishTheInterruptedProcessHostUpdate": {
+    "source": "03e941324b66dbe9",
+    "text": "Завершите прерванное обновление хоста процессов OBS тем установщиком ReplayKit, который его начал, и повторите попытку."
+  },
   "setup.hotkeyKeyMustBeAString": {
     "source": "e87973a990e24bc9",
     "text": "Ключ горячей клавиши должен быть строкой."
@@ -9970,6 +10030,14 @@
     "source": "66627ff5b476d1d5",
     "text": "Не удалось установить Microsoft .NET Framework 4.8.\n\nНажмите «ОК», чтобы открыть страницу загрузки Microsoft. Установите оттуда .NET Framework 4.8, перезагрузите компьютер, если его установщик попросит об этом, и снова запустите этот установщик."
   },
+  "setup.obsConfigBackupsCannotFollowALink": {
+    "source": "bc3d6e06a1863f30",
+    "text": "Резервные копии настроек OBS не могут проходить через ссылку или точку соединения: {path}"
+  },
+  "setup.obsConfigBackupsCannotUseAHardLink": {
+    "source": "005dd2534419785e",
+    "text": "Резервные копии настроек OBS не могут использовать файл с жёсткой ссылкой: {path}"
+  },
   "setup.obsCouldNotBeInstalledAutomatically": {
     "source": "b9ec5649ef71e37c",
     "text": "Не удалось автоматически установить OBS Studio. Установите OBS с obsproject.com и снова запустите этот установщик."
@@ -10065,6 +10133,10 @@
   "setup.processHostCopyVerificationFailed": {
     "source": "af2ae4d213a9e9ac",
     "text": "Проверка копии узла процесса не пройдена."
+  },
+  "setup.processHostFilesCannotUseALink": {
+    "source": "588400af68e3f220",
+    "text": "Файлы хоста процессов OBS не могут проходить через ссылку или точку соединения: {path}"
   },
   "setup.reInstall": {
     "source": "c7ef1e068d271587",
@@ -10323,6 +10395,18 @@
     "source": "d3360f80cf319e32",
     "text": "В маркере значений по умолчанию нет корректного списка шагов."
   },
+  "setup.theDeletedHistoryFolderIsInvalid": {
+    "source": "a9d515b17215f856",
+    "text": "Папка истории удалённых клипов недопустима."
+  },
+  "setup.theDeletedHistoryPathIsInvalid": {
+    "source": "bafd7fdf3d1f3744",
+    "text": "Путь к истории удалённых клипов недопустим."
+  },
+  "setup.theDeletedHistoryRunsThroughALink": {
+    "source": "9fc298bd98ecee2e",
+    "text": "История удалённых клипов проходит через ссылку или точку соединения: {path}"
+  },
   "setup.theDesktopAudioPlugin": {
     "source": "4352d805a2e7d2f1",
     "text": "плагин звука рабочего стола"
@@ -10335,6 +10419,34 @@
     "source": "ec9eee00d7a677ce",
     "text": "плагин размытия движения"
   },
+  "setup.theObsConfigBackupChangedWhileChecked": {
+    "source": "1f74401061fc2247",
+    "text": "Резервная копия настроек OBS изменилась во время проверки."
+  },
+  "setup.theObsConfigBackupHasABadEntry": {
+    "source": "cbb917c945ab0177",
+    "text": "В резервной копии настроек OBS есть недопустимый или повторяющийся файл."
+  },
+  "setup.theObsConfigBackupListHasABadSkippedFile": {
+    "source": "c9d170b8de71a9ec",
+    "text": "Список файлов резервной копии настроек OBS неправильно отмечает пропущенный файл."
+  },
+  "setup.theObsConfigBackupListHasExtraData": {
+    "source": "58cb642f3944ab7f",
+    "text": "После списка файлов резервной копии настроек OBS идут неожиданные данные."
+  },
+  "setup.theObsConfigBackupListIsInvalid": {
+    "source": "9a864b90e352dda0",
+    "text": "Список файлов резервной копии настроек OBS недопустим."
+  },
+  "setup.theObsConfigBackupListIsMissing": {
+    "source": "e74a3207dced7939",
+    "text": "Список файлов резервной копии настроек OBS отсутствует или слишком велик."
+  },
+  "setup.theObsConfigRestoreFolderWasReplaced": {
+    "source": "baa292aa6ada68ff",
+    "text": "Папка для восстановления настроек OBS была заменена во время использования."
+  },
   "setup.theObsProcessRoles": {
     "source": "7418924bad768581",
     "text": "роли процессов OBS"
@@ -10342,6 +10454,14 @@
   "setup.theObsUpdateLock": {
     "source": "34824a33ff9d5f00",
     "text": "блокировка обновлений OBS"
+  },
+  "setup.theObsVersionListCouldNotBeRead": {
+    "source": "18271e01b4fdb836",
+    "text": "Не удалось прочитать список поддерживаемых версий OBS в этом установщике."
+  },
+  "setup.theObsVersionListIsInvalid": {
+    "source": "cd37c006c83e89ea",
+    "text": "Список поддерживаемых версий OBS в этом установщике недопустим."
   },
   "setup.theOldReplaykitHelperCouldNot": {
     "source": "99cc371f39d82ad5",
@@ -10351,9 +10471,29 @@
     "source": "48b46e260aa0edf2",
     "text": "Проверка исходной резервной копии OBS не пройдена."
   },
+  "setup.thePresetsInTheSetupHaveNoFile": {
+    "source": "6d6e5590cb5fe8c4",
+    "text": "В шаблонах наложения этого установщика нет {file}."
+  },
   "setup.thePreviousUpdateFilesCouldNotBeCleared": {
     "source": "58db83cc918b521f",
     "text": "Не удалось удалить файлы, оставшиеся от предыдущего обновления ReplayKit."
+  },
+  "setup.theProcessHostListDoesNotMatchObs": {
+    "source": "bd389237dbe2f78a",
+    "text": "Список файлов хоста процессов OBS не соответствует OBS {version}."
+  },
+  "setup.theProcessHostListHasABadFile": {
+    "source": "c40350f742eaf8c8",
+    "text": "В списке файлов хоста процессов OBS есть недопустимый файл: {path}"
+  },
+  "setup.theProcessHostListHasABadOriginal": {
+    "source": "4458f87a8dcf2f47",
+    "text": "В списке файлов хоста процессов OBS есть недопустимый исходный файл: {path}"
+  },
+  "setup.theProcessHostUpdateAndRollbackFailed": {
+    "source": "fe22b39f1b99dbe7",
+    "text": "Не удалось ни обновить хост процессов OBS, ни отменить это обновление. Файлы для восстановления сохранены в {path}"
   },
   "setup.theProcessRoleBackupIsMissing": {
     "source": "6c07b88b1b03685a",
@@ -10367,6 +10507,14 @@
     "source": "8a9fc69bb15fb743",
     "text": "Запущенный вспомогательный процесс ReplayKit не поддерживает только корректное завершение."
   },
+  "setup.theSceneInTheSetupHasNoFilter": {
+    "source": "e90d5470ca142e52",
+    "text": "В файле сцены этого установщика нет фильтра {filter}."
+  },
+  "setup.theSceneInTheSetupIsMissing": {
+    "source": "bb93e9c930c6826c",
+    "text": "Файл сцены в этом установщике отсутствует: {path}"
+  },
   "setup.theSetupWindowCouldNotStart": {
     "source": "e7c9f6e2b0ee0d7b",
     "text": "Не удалось запустить окно установки.\n\n{error}"
@@ -10375,9 +10523,17 @@
     "source": "b65bf65a5f38add6",
     "text": "окно Share Preview"
   },
+  "setup.theStreamableSignInFolderIsALink": {
+    "source": "b057cc516d8adc03",
+    "text": "Папка входа Streamable является ссылкой или точкой соединения, поэтому она не была затронута."
+  },
   "setup.theUninstallWindowCouldNotStart": {
     "source": "55ebd1d805547641",
     "text": "Не удалось запустить окно удаления.\n\n{error}"
+  },
+  "setup.theUnpackedWebview2LoaderDoesNotMatch": {
+    "source": "782d4160a9a1170c",
+    "text": "Распакованный WebView2Loader.dll не совпадает с тем, что в этом установщике."
   },
   "setup.theUpdateFailedAndCouldNotRollBack": {
     "source": "4e502eb60596cfe9",
@@ -10423,6 +10579,10 @@
     "source": "6ad1da665e140849",
     "text": "Включает значения по умолчанию, с которыми поставляется эта версия."
   },
+  "setup.twoObsConfigRestoresTargetOnePlace": {
+    "source": "039d2876d012733a",
+    "text": "Два файла при восстановлении настроек OBS попали бы в одно место: {path}"
+  },
   "setup.uninstallFailed": {
     "source": "c5aca41f97b2ec12",
     "text": "Не удалось удалить"
@@ -10451,6 +10611,10 @@
     "source": "bca45daa794e5072",
     "text": "неизвестная ошибка"
   },
+  "setup.unknownRecordingPreset": {
+    "source": "720b8eebedf6a4a9",
+    "text": "ReplayKit не знает качество записи {name}."
+  },
   "setup.update": {
     "source": "71060b462f3d44a6",
     "text": "Обновить"
@@ -10478,6 +10642,10 @@
   "setup.verifyUpdateFiles": {
     "source": "e5aa889b3d9cef79",
     "text": "Проверить файлы обновления"
+  },
+  "setup.webview2LoaderHasNoFunction": {
+    "source": "c6071353d21dc2ad",
+    "text": "В WebView2Loader.dll нет функции {name}."
   },
   "setup.windowsProgramFilesWasNotFound": {
     "source": "ae428fc60ddcbf2c",

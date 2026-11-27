@@ -93,25 +93,25 @@
     </PropertyGroup>
     <!-- where each repo folder lands inside the bundle. the bundle layout is what the installer and the updater of every earlier release read (obs-studio\ mirrors %APPDATA%\obs-studio\), so only the left side of this map ever changes -->
     <ItemGroup>
-      <AssetBundleFile Include="$(RepoDir)ui\**\*" Exclude="$(AssetBundleExclude)" BundleDir="obs-studio\obs-replayKit\obs-custom-dock\" />
-      <AssetBundleFile Include="$(RepoDir)lua\**\*" Exclude="$(AssetBundleExclude)" BundleDir="obs-studio\obs-replayKit\scripts\" />
-      <AssetBundleFile Include="$(RepoDir)dist\helper\*" Exclude="$(AssetBundleExclude)" BundleDir="obs-studio\obs-replayKit\scripts\helper\" />
-      <AssetBundleFile Include="$(RepoDir)dist\share-window\ReplayKitShare.exe" BundleDir="obs-studio\obs-replayKit\share-window\" />
-      <AssetBundleFile Include="$(RepoDir)resources\icons\**\*" Exclude="$(AssetBundleExclude)" BundleDir="obs-studio\obs-replayKit\icons\" />
-      <AssetBundleFile Include="$(RepoDir)resources\fonts\**\*" Exclude="$(AssetBundleExclude)" BundleDir="obs-studio\obs-replayKit\fonts\" />
-      <AssetBundleFile Include="$(RepoDir)resources\sounds\**\*" Exclude="$(AssetBundleExclude)" BundleDir="obs-studio\obs-replayKit\sounds\" />
-      <AssetBundleFile Include="$(RepoDir)resources\data\**\*" Exclude="$(AssetBundleExclude)" BundleDir="obs-studio\obs-replayKit\data\" />
-      <AssetBundleFile Include="$(RepoDir)config\replaykit_settings.json;$(RepoDir)dist\version.json" BundleDir="obs-studio\obs-replayKit\" />
+      <AssetBundleFile Include="$(RepoDir)ui\**\*" Exclude="$(AssetBundleExclude)" BundleDir="obs-studio\$(ReplayKitFolder)\obs-custom-dock\" />
+      <AssetBundleFile Include="$(RepoDir)lua\**\*" Exclude="$(AssetBundleExclude)" BundleDir="obs-studio\$(ReplayKitFolder)\scripts\" />
+      <AssetBundleFile Include="$(RepoDir)dist\helper\*" Exclude="$(AssetBundleExclude)" BundleDir="obs-studio\$(ReplayKitFolder)\scripts\helper\" />
+      <AssetBundleFile Include="$(RepoDir)dist\share-window\ReplayKitShare.exe" BundleDir="obs-studio\$(ReplayKitFolder)\share-window\" />
+      <AssetBundleFile Include="$(RepoDir)resources\icons\**\*" Exclude="$(AssetBundleExclude)" BundleDir="obs-studio\$(ReplayKitFolder)\icons\" />
+      <AssetBundleFile Include="$(RepoDir)resources\fonts\**\*" Exclude="$(AssetBundleExclude)" BundleDir="obs-studio\$(ReplayKitFolder)\fonts\" />
+      <AssetBundleFile Include="$(RepoDir)resources\sounds\**\*" Exclude="$(AssetBundleExclude)" BundleDir="obs-studio\$(ReplayKitFolder)\sounds\" />
+      <AssetBundleFile Include="$(RepoDir)resources\data\**\*" Exclude="$(AssetBundleExclude)" BundleDir="obs-studio\$(ReplayKitFolder)\data\" />
+      <AssetBundleFile Include="$(RepoDir)config\replaykit_settings.json;$(RepoDir)dist\version.json" BundleDir="obs-studio\$(ReplayKitFolder)\" />
       <AssetBundleFile Include="$(RepoDir)config\obs\**\*" Exclude="$(AssetBundleExclude)" BundleDir="obs-studio\" />
       <AssetBundleFile Include="$(RepoDir)config\obs-versions.json;$(RepoDir)plugins\obs-shaderfilter\$(ShaderfilterZip)" BundleDir="" />
       <AssetBundleFile Include="$(RepoDir)dist\replaykit.dll" BundleDir="obs-plugins\replaykit\bin\64bit\" />
     </ItemGroup>
-    <Error Condition="'$(BangoCatZipPrefix)' == '' Or '$(ShaderfilterZip)' == ''" Text="Bundle.props is missing or incomplete -- scripts/sync_shared.ps1 writes it, and build.bat runs that first." />
+    <Error Condition="'$(BangoCatZipPrefix)' == '' Or '$(ShaderfilterZip)' == '' Or '$(ReplayKitFolder)' == ''" Text="Bundle.props is missing or incomplete -- scripts/sync_shared.ps1 writes it, and build.bat runs that first." />
     <Error Condition="!Exists('$(RepoDir)dist\version.json') Or !Exists('$(RepoDir)dist\replaykit.dll') Or !Exists('$(RepoDir)dist\helper\OBSReplayKit.exe')" Text="A built part of the payload is missing from dist\ -- run build.bat so the release exe does not ship without it." />
     <Error Condition="!Exists('$(RepoDir)dist\input-overlay\input-overlay.dll') Or !Exists('$(RepoDir)dist\input-overlay\SDL3.dll') Or !Exists('$(RepoDir)dist\input-overlay\uiohook.dll')" Text="The input-overlay build is missing its plugin or runtime dependencies." />
     <RemoveDir Directories="$(AssetBundleStageDir)" />
     <Copy SourceFiles="@(AssetBundleFile)" DestinationFiles="@(AssetBundleFile->'$(AssetBundleStageDir)%(BundleDir)%(RecursiveDir)%(Filename)%(Extension)')" />
-    <Exec Command="python -B &quot;$(RepoDir)tools\i18n\messages.py&quot; --output &quot;$(AssetBundleStageDir)obs-studio\obs-replayKit\locale\messages&quot; --dock &quot;$(AssetBundleStageDir)obs-studio\obs-replayKit\obs-custom-dock&quot;" />
+    <Exec Command="python -B &quot;$(RepoDir)tools\i18n\messages.py&quot; --output &quot;$(AssetBundleStageDir)obs-studio\$(ReplayKitFolder)\locale\messages&quot; --dock &quot;$(AssetBundleStageDir)obs-studio\$(ReplayKitFolder)\obs-custom-dock&quot;" />
     <!-- the process host sits flat in dist\process-host\<version>\; its manifest says where each file installs, and the bundle keeps that layout -->
     <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(RepoDir)scripts\stage_process_host.ps1&quot; -Stage &quot;$(AssetBundleStageDir)process-host-roles&quot;" />
     <!-- plugin files are kept loose in the repo and zipped here by the names and folders of shared/BundleLayout.cs, the same constants the installer reads them back with -->

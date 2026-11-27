@@ -326,12 +326,12 @@ namespace ReplayKitSetup
             string html;
             using (var stream = asm.GetManifestResourceStream("ReplayKitSetup.uninstall_prompt.html"))
             {
-                if (stream == null) throw new InvalidOperationException("uninstall_prompt.html resource is missing from the build.");
+                if (stream == null) throw SetupLocale.Error("setup.aFileIsMissingFromThisSetup", m => new InvalidOperationException(m), "file", "uninstall_prompt.html");
                 using var reader = new StreamReader(stream, Encoding.UTF8);
                 html = reader.ReadToEnd();
             }
-            html = html.Replace("{{HERO_ART}}", BundledDataUri("obs-studio/obs-replayKit/obs-custom-dock/update-art.png", "image/png"));
-            html = html.Replace("{{BRAND_ICON}}", BundledDataUri("obs-studio/obs-replayKit/scripts/helper/obs-replaykit.ico", "image/x-icon"));
+            html = html.Replace("{{HERO_ART}}", BundledDataUri("obs-studio/" + ReplayKitShared.ReplayKitFolder.Name + "/obs-custom-dock/update-art.png", "image/png"));
+            html = html.Replace("{{BRAND_ICON}}", BundledDataUri("obs-studio/" + ReplayKitShared.ReplayKitFolder.Name + "/scripts/helper/obs-replaykit.ico", "image/x-icon"));
             html = html.Replace("{{UNINSTALL_STATE}}", new JObject { ["removeObs"] = _removeObs }.ToString(Formatting.None));
             return html;
         }

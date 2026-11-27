@@ -9621,6 +9621,58 @@
     "context": "Error message shown when an installer step fails in the installer and uninstaller. {path} is a file or folder path.",
     "text": "A copied file does not match its source: {path}"
   },
+  "setup.aFileIsMissingFromThisSetup": {
+    "context": "Error message shown when an installer step fails in the installer and uninstaller. {file} is a file name.",
+    "text": "{file} is missing from this setup."
+  },
+  "setup.anArchiveEntryIsOutsideItsFolder": {
+    "context": "Error message shown when an installer step fails in the installer and uninstaller. {path} is a file or folder path.",
+    "text": "An archive in this setup has a file that would land outside its folder: {path}"
+  },
+  "setup.anObsConfigBackupEntryDoesNotMatchItsList": {
+    "context": "Error message shown when an installer step fails in the installer and uninstaller.",
+    "text": "A file in the OBS settings backup does not match its file list."
+  },
+  "setup.anObsConfigBackupEntryIsTooLarge": {
+    "context": "Error message shown when an installer step fails in the installer and uninstaller. {path} is a file or folder path.",
+    "text": "A file in the OBS settings backup is larger than expected: {path}"
+  },
+  "setup.anObsConfigBackupFileFailedItsCheck": {
+    "context": "Error message shown when an installer step fails in the installer and uninstaller. {path} is a file or folder path.",
+    "text": "A file in the OBS settings backup failed its check: {path}"
+  },
+  "setup.anObsConfigBackupFileIsAFolder": {
+    "context": "Error message shown when an installer step fails in the installer and uninstaller.",
+    "text": "A file of the OBS settings backups turned out to be a folder."
+  },
+  "setup.anObsConfigBackupFolderCouldNotBeOpened": {
+    "context": "Error message shown when an installer step fails in the installer and uninstaller. {path} is a file or folder path.",
+    "text": "A folder of the OBS settings backups could not be opened: {path}"
+  },
+  "setup.anObsConfigBackupNameIsInvalid": {
+    "context": "Error message shown when an installer step fails in the installer and uninstaller.",
+    "text": "The name of an OBS settings backup is invalid."
+  },
+  "setup.anObsConfigFileNameIsInvalid": {
+    "context": "Error message shown when an installer step fails in the installer and uninstaller.",
+    "text": "The name of a file in the OBS settings is invalid."
+  },
+  "setup.anObsConfigPathShouldBeAFile": {
+    "context": "Error message shown when an installer step fails in the installer and uninstaller. {path} is a file or folder path.",
+    "text": "This should be a file in the OBS settings: {path}"
+  },
+  "setup.anObsConfigPathShouldBeAFolder": {
+    "context": "Error message shown when an installer step fails in the installer and uninstaller. {path} is a file or folder path.",
+    "text": "This should be a folder in the OBS settings: {path}"
+  },
+  "setup.anObsHostFileChangedOutsideReplaykit": {
+    "context": "Error message shown when an installer step fails in the installer and uninstaller. {path} is a file or folder path.",
+    "text": "An OBS process host file was changed outside ReplayKit: {path}"
+  },
+  "setup.aPreparedObsConfigFileFailedItsCheck": {
+    "context": "Error message shown when an installer step fails in the installer and uninstaller. {path} is a file or folder path.",
+    "text": "A file prepared to restore the OBS settings failed its check: {path}"
+  },
   "setup.aProcessHostPathEscapesIts": {
     "context": "Error message shown when an installer step fails in the installer and uninstaller.",
     "text": "A process host path escapes its folder."
@@ -9664,6 +9716,10 @@
   "setup.applyDefaultSettings": {
     "context": "Title or description of an installer step in the installer and uninstaller.",
     "text": "Apply default settings"
+  },
+  "setup.aReadOnlyHardLinkWasNotRemoved": {
+    "context": "Error message shown when an installer step fails in the installer and uninstaller.",
+    "text": "A read-only file shares its attributes with another file through a hard link, so it was not removed."
   },
   "setup.aReplaykitFileChangedOutsideTheUpdate": {
     "context": "Error message shown when an installer step fails in the installer and uninstaller. {path} is a file or folder path.",
@@ -9849,6 +9905,10 @@
     "context": "Error message shown when an installer step fails in the installer and uninstaller.",
     "text": "FFmpeg and FFprobe could not be installed or verified. Check your connection and run the installer again to repair trimming and compression."
   },
+  "setup.finishTheInterruptedProcessHostUpdate": {
+    "context": "Error message shown when an installer step fails in the installer and uninstaller.",
+    "text": "Finish the interrupted OBS process host update with the ReplayKit installer that started it, then try again."
+  },
   "setup.hotkeyKeyMustBeAString": {
     "context": "Error message shown when an installer step fails in the installer and uninstaller.",
     "text": "Hotkey key must be a string."
@@ -9965,6 +10025,14 @@
     "context": "Windows dialog shown when the Microsoft .NET Framework 4.8 installer could not be downloaded, was not signed by Microsoft or ended with an error. OK opens the Microsoft download page in the browser; use the label Windows gives the OK button in your language. Keep product names as written.",
     "text": "Microsoft .NET Framework 4.8 could not be installed.\n\nChoose OK to open the Microsoft download page. Install .NET Framework 4.8 from there, restart the PC if its installer asks you to, then run this installer again."
   },
+  "setup.obsConfigBackupsCannotFollowALink": {
+    "context": "Error message shown when an installer step fails in the installer and uninstaller. {path} is a file or folder path.",
+    "text": "OBS settings backups cannot go through a link or junction: {path}"
+  },
+  "setup.obsConfigBackupsCannotUseAHardLink": {
+    "context": "Error message shown when an installer step fails in the installer and uninstaller. {path} is a file or folder path.",
+    "text": "OBS settings backups cannot use a hard-linked file: {path}"
+  },
   "setup.obsCouldNotBeInstalledAutomatically": {
     "context": "Reason a step of the installer stopped, shown in the installer window.",
     "text": "OBS Studio could not be installed automatically. Install OBS from obsproject.com, then run this installer again."
@@ -10060,6 +10128,10 @@
   "setup.processHostCopyVerificationFailed": {
     "context": "Error message shown when an installer step fails in the installer and uninstaller.",
     "text": "Process host copy verification failed."
+  },
+  "setup.processHostFilesCannotUseALink": {
+    "context": "Error message shown when an installer step fails in the installer and uninstaller. {path} is a file or folder path.",
+    "text": "The OBS process host files cannot go through a link or junction: {path}"
   },
   "setup.reInstall": {
     "context": "Button label in the installer window.",
@@ -10316,6 +10388,18 @@
     "context": "Error message shown when an installer step fails in the installer and uninstaller.",
     "text": "The defaults marker has no valid steps list."
   },
+  "setup.theDeletedHistoryFolderIsInvalid": {
+    "context": "Error message shown when an installer step fails in the installer and uninstaller.",
+    "text": "The folder of the deleted clips history is invalid."
+  },
+  "setup.theDeletedHistoryPathIsInvalid": {
+    "context": "Error message shown when an installer step fails in the installer and uninstaller.",
+    "text": "The path of the deleted clips history is invalid."
+  },
+  "setup.theDeletedHistoryRunsThroughALink": {
+    "context": "Error message shown when an installer step fails in the installer and uninstaller. {path} is a file or folder path.",
+    "text": "The deleted clips history goes through a link or junction: {path}"
+  },
   "setup.theDesktopAudioPlugin": {
     "context": "Part of ReplayKit named in the update window when an update could not repair it; it fills {parts} of the message that lists what was not repaired.",
     "text": "the desktop audio plugin"
@@ -10328,6 +10412,34 @@
     "context": "Part of ReplayKit named in the update window when an update could not repair it; it fills {parts} of the message that lists what was not repaired.",
     "text": "the motion blur plugin"
   },
+  "setup.theObsConfigBackupChangedWhileChecked": {
+    "context": "Error message shown when an installer step fails in the installer and uninstaller.",
+    "text": "The OBS settings backup changed while it was being checked."
+  },
+  "setup.theObsConfigBackupHasABadEntry": {
+    "context": "Error message shown when an installer step fails in the installer and uninstaller.",
+    "text": "The OBS settings backup has an invalid or repeated file."
+  },
+  "setup.theObsConfigBackupListHasABadSkippedFile": {
+    "context": "Error message shown when an installer step fails in the installer and uninstaller.",
+    "text": "The file list of the OBS settings backup marks a skipped file in an invalid way."
+  },
+  "setup.theObsConfigBackupListHasExtraData": {
+    "context": "Error message shown when an installer step fails in the installer and uninstaller.",
+    "text": "The file list of the OBS settings backup is followed by unexpected data."
+  },
+  "setup.theObsConfigBackupListIsInvalid": {
+    "context": "Error message shown when an installer step fails in the installer and uninstaller.",
+    "text": "The file list of the OBS settings backup is invalid."
+  },
+  "setup.theObsConfigBackupListIsMissing": {
+    "context": "Error message shown when an installer step fails in the installer and uninstaller.",
+    "text": "The file list of the OBS settings backup is missing or too large."
+  },
+  "setup.theObsConfigRestoreFolderWasReplaced": {
+    "context": "Error message shown when an installer step fails in the installer and uninstaller.",
+    "text": "The folder used to restore the OBS settings was replaced while in use."
+  },
   "setup.theObsProcessRoles": {
     "context": "Part of ReplayKit named in the update window when an update could not repair it; it fills {parts} of the message that lists what was not repaired.",
     "text": "the OBS process roles"
@@ -10335,6 +10447,14 @@
   "setup.theObsUpdateLock": {
     "context": "Part of ReplayKit named in the update window when an update could not repair it; it fills {parts} of the message that lists what was not repaired.",
     "text": "the OBS update lock"
+  },
+  "setup.theObsVersionListCouldNotBeRead": {
+    "context": "Error message shown when an installer step fails in the installer and uninstaller.",
+    "text": "The list of supported OBS versions in this setup could not be read."
+  },
+  "setup.theObsVersionListIsInvalid": {
+    "context": "Error message shown when an installer step fails in the installer and uninstaller.",
+    "text": "The list of supported OBS versions in this setup is invalid."
   },
   "setup.theOldReplaykitHelperCouldNot": {
     "context": "Error message shown when an installer step fails in the installer and uninstaller.",
@@ -10344,9 +10464,29 @@
     "context": "Error message shown when an installer step fails in the installer and uninstaller.",
     "text": "The original OBS backup failed verification."
   },
+  "setup.thePresetsInTheSetupHaveNoFile": {
+    "context": "Error message shown when an installer step fails in the installer and uninstaller. {file} is a file name.",
+    "text": "The overlay presets in this setup have no {file}."
+  },
   "setup.thePreviousUpdateFilesCouldNotBeCleared": {
     "context": "Error message shown when an installer step fails in the installer and uninstaller.",
     "text": "The files kept from the previous ReplayKit update could not be cleared."
+  },
+  "setup.theProcessHostListDoesNotMatchObs": {
+    "context": "Error message shown when an installer step fails in the installer and uninstaller. {version} is an OBS version number.",
+    "text": "The file list of the OBS process host does not match OBS {version}."
+  },
+  "setup.theProcessHostListHasABadFile": {
+    "context": "Error message shown when an installer step fails in the installer and uninstaller. {path} is a file or folder path.",
+    "text": "The file list of the OBS process host has an invalid file: {path}"
+  },
+  "setup.theProcessHostListHasABadOriginal": {
+    "context": "Error message shown when an installer step fails in the installer and uninstaller. {path} is a file or folder path.",
+    "text": "The file list of the OBS process host has an invalid original file: {path}"
+  },
+  "setup.theProcessHostUpdateAndRollbackFailed": {
+    "context": "Error message shown when an installer step fails in the installer and uninstaller. {path} is a file or folder path.",
+    "text": "The OBS process host update and its rollback both failed. The recovery files were kept in {path}"
   },
   "setup.theProcessRoleBackupIsMissing": {
     "context": "Error message shown when an installer step fails in the installer and uninstaller.",
@@ -10360,6 +10500,14 @@
     "context": "Error message shown when an installer step fails in the installer and uninstaller.",
     "text": "The running ReplayKit helper does not support graceful-only shutdown."
   },
+  "setup.theSceneInTheSetupHasNoFilter": {
+    "context": "Error message shown when an installer step fails in the installer and uninstaller. {filter} is the name of an OBS filter.",
+    "text": "The scene file in this setup has no {filter} filter."
+  },
+  "setup.theSceneInTheSetupIsMissing": {
+    "context": "Error message shown when an installer step fails in the installer and uninstaller. {path} is a file or folder path.",
+    "text": "The scene file in this setup is missing: {path}"
+  },
   "setup.theSetupWindowCouldNotStart": {
     "context": "Message the helper shows when an action fails or finishes in the installer and uninstaller. Keep {error} as written.",
     "text": "The setup window could not start.\n\n{error}"
@@ -10368,9 +10516,17 @@
     "context": "Part of ReplayKit named in the update window when an update could not repair it; it fills {parts} of the message that lists what was not repaired.",
     "text": "the Share Preview window"
   },
+  "setup.theStreamableSignInFolderIsALink": {
+    "context": "Error message shown when an installer step fails in the installer and uninstaller.",
+    "text": "The Streamable sign-in folder is a link or junction, so it was left alone."
+  },
   "setup.theUninstallWindowCouldNotStart": {
     "context": "Message the helper shows when an action fails or finishes in the installer and uninstaller. Keep {error} as written.",
     "text": "The uninstall window could not start.\n\n{error}"
+  },
+  "setup.theUnpackedWebview2LoaderDoesNotMatch": {
+    "context": "Error message shown when an installer step fails in the installer and uninstaller.",
+    "text": "The unpacked WebView2Loader.dll does not match the one in this setup."
   },
   "setup.theUpdateFailedAndCouldNotRollBack": {
     "context": "Error message shown when an installer step fails in the installer and uninstaller. {error} is why the update failed and {rollbackError} why undoing it failed, as the system gives them.",
@@ -10416,6 +10572,10 @@
     "context": "Title or description of an installer step in the installer and uninstaller.",
     "text": "Turns on the defaults this version ships with."
   },
+  "setup.twoObsConfigRestoresTargetOnePlace": {
+    "context": "Error message shown when an installer step fails in the installer and uninstaller. {path} is a file or folder path.",
+    "text": "Two files of the OBS settings restore would go to the same place: {path}"
+  },
   "setup.uninstallFailed": {
     "context": "Title in the installer window. Also used in the uninstall window.",
     "text": "Uninstall failed"
@@ -10444,6 +10604,10 @@
     "context": "Text in a ReplayKit window, sent by the background helper. Also used in the installer and uninstaller, the installer window, the uninstall window.",
     "text": "unknown error"
   },
+  "setup.unknownRecordingPreset": {
+    "context": "Error message shown when an installer step fails in the installer and uninstaller. {name} is the internal name of a recording quality preset.",
+    "text": "ReplayKit does not know the recording quality {name}."
+  },
   "setup.update": {
     "context": "Text in the installer window.",
     "text": "Update"
@@ -10471,6 +10635,10 @@
   "setup.verifyUpdateFiles": {
     "context": "First progress step in the setup window for a local update. Setup checks its bundled files before closing OBS.",
     "text": "Verify update files"
+  },
+  "setup.webview2LoaderHasNoFunction": {
+    "context": "Error message shown when an installer step fails in the installer and uninstaller. {name} is the name of a function in the dll.",
+    "text": "WebView2Loader.dll has no {name} function."
   },
   "setup.windowsProgramFilesWasNotFound": {
     "context": "Error message shown when an installer step fails in the installer and uninstaller.",

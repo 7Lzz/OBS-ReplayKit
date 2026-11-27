@@ -21,7 +21,7 @@ namespace ReplayKitSetup
                 if (include != null && !include(relative)) continue;
                 var parts = relative.Split('/');
                 if (parts.Any(p => p.Length == 0 || p == "." || p == ".." || p.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0))
-                    throw new InvalidDataException("Unsafe bundled archive path: " + name);
+                    throw SetupLocale.Error("setup.anArchiveEntryIsOutsideItsFolder", m => new InvalidDataException(m), "path", name);
                 string target = Path.GetFullPath(Path.Combine(directory, Path.Combine(parts)));
                 if (!target.StartsWith(directory, StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException(SetupLocale.Message("setup.bundledFileEscapesItsInstallDirectory"));
                 files.Add((entry, relative, target));

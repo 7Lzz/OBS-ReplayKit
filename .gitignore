@@ -19,6 +19,7 @@ ReplayKit/publish_tmp/
 /ReplayKit/plugins/replaykit/src/core/shared_values.hpp
 /ReplayKit/apps/share-window/protocol/share_window_values.hpp
 /ReplayKit/apps/process-host/obs_audio_group.hpp
+/ReplayKit/apps/process-host/replaykit_folder.hpp
 /ReplayKit/lua/shared_values.lua
 /ReplayKit/ui/helper-endpoint.js
 

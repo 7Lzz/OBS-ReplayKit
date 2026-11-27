@@ -10,6 +10,7 @@
 #include <metahost.h>
 
 #include "obs_audio_group.hpp"
+#include "replaykit_folder.hpp"
 #include <wrl/client.h>
 
 #include <filesystem>
@@ -86,7 +87,7 @@ int Helper()
         CoTaskMemFree(roaming);
     }
     if (!root.is_absolute()) throw std::runtime_error("The application data directory must be absolute.");
-    fs::path assembly = root / L"obs-studio" / L"obs-replayKit" / L"scripts" / L"helper" / L"OBSReplayKit.exe";
+    fs::path assembly = root / L"obs-studio" / kReplayKitFolder / kHelperExe;
     if (!fs::is_regular_file(assembly)) throw std::runtime_error("The ReplayKit helper assembly is missing.");
     if (!SetDefaultDllDirectories(LOAD_LIBRARY_SEARCH_DEFAULT_DIRS) || !AddDllDirectory(assembly.parent_path().c_str()))
         throw std::runtime_error("Cannot configure the helper library directory.");

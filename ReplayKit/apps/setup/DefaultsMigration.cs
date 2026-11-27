@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using ReplayKitShared;
 
 namespace ReplayKitSetup
 {
@@ -108,8 +109,8 @@ namespace ReplayKitSetup
         {
             if (!File.Exists(UserIniPath)) return true;
             string text = Config.ReadTextFileFlexible(UserIniPath);
-            string next = Transform.SetIniValue(text, "BasicWindow", "ShowListboxToolbars", "false");
-            next = Transform.SetIniValue(next, "BasicWindow", "ShowStatusBar", "false");
+            string next = ObsIni.Set(text, "BasicWindow", "ShowListboxToolbars", "false");
+            next = ObsIni.Set(next, "BasicWindow", "ShowStatusBar", "false");
             if (!string.Equals(text, next, StringComparison.Ordinal)) WriteText(UserIniPath, next);
             return true;
         }
@@ -140,7 +141,7 @@ namespace ReplayKitSetup
             if (File.Exists(BasicIniPath))
             {
                 string text = Config.ReadTextFileFlexible(BasicIniPath);
-                string next = Transform.SetIniValue(text, "AdvOut", "RecTracks", "15");
+                string next = ObsIni.Set(text, "AdvOut", "RecTracks", "15");
                 if (!string.Equals(text, next, StringComparison.Ordinal)) WriteText(BasicIniPath, next);
             }
             return EditScene(data =>
@@ -183,7 +184,7 @@ namespace ReplayKitSetup
         private static JObject BundledNoiseFilter()
         {
             string bundled = Path.Combine(Config.OBS_ASSETS_DIR, "basic", "scenes", "Untitled.json");
-            if (!File.Exists(bundled)) throw new FileNotFoundException("The bundled scene is missing: " + bundled);
+            if (!File.Exists(bundled)) throw SetupLocale.Error("setup.theSceneInTheSetupIsMissing", m => new FileNotFoundException(m), "path", bundled);
             var data = JObject.Parse(Config.ReadTextFileFlexible(bundled));
             foreach (var token in data["sources"] as JArray ?? new JArray())
             {
@@ -193,7 +194,7 @@ namespace ReplayKitSetup
                     if (filter is JObject f && f.Value<string>("name") == NoiseFilterName) return f;
                 }
             }
-            throw new InvalidDataException("The bundled scene has no " + NoiseFilterName + " filter.");
+            throw SetupLocale.Error("setup.theSceneInTheSetupHasNoFilter", m => new InvalidDataException(m), "filter", NoiseFilterName);
         }
 
         // runs the edit on the scene collection of replaykit and saves it when the edit says it changed something; no scene file means there is nothing to edit

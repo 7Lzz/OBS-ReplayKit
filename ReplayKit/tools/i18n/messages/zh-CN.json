@@ -9617,6 +9617,58 @@
     "source": "3c19c475dff15930",
     "text": "复制的文件与源文件不一致：{path}"
   },
+  "setup.aFileIsMissingFromThisSetup": {
+    "source": "029bb2b88108fd44",
+    "text": "此安装程序中缺少 {file}。"
+  },
+  "setup.anArchiveEntryIsOutsideItsFolder": {
+    "source": "5c34af0b62166c8e",
+    "text": "此安装程序中的一个压缩包里有会解压到其文件夹之外的文件：{path}"
+  },
+  "setup.anObsConfigBackupEntryDoesNotMatchItsList": {
+    "source": "a47f69c2d0079109",
+    "text": "OBS 设置备份中的一个文件与其文件列表不一致。"
+  },
+  "setup.anObsConfigBackupEntryIsTooLarge": {
+    "source": "c6201bd3f7680d6d",
+    "text": "OBS 设置备份中的一个文件比预期大：{path}"
+  },
+  "setup.anObsConfigBackupFileFailedItsCheck": {
+    "source": "0283e4b420e625a1",
+    "text": "OBS 设置备份中的一个文件未通过检查：{path}"
+  },
+  "setup.anObsConfigBackupFileIsAFolder": {
+    "source": "0aa3b0a1eb390153",
+    "text": "OBS 设置备份中的一个文件实际上是文件夹。"
+  },
+  "setup.anObsConfigBackupFolderCouldNotBeOpened": {
+    "source": "6b2e91eb8a333830",
+    "text": "无法打开 OBS 设置备份的一个文件夹：{path}"
+  },
+  "setup.anObsConfigBackupNameIsInvalid": {
+    "source": "a40cbdc360689ed9",
+    "text": "OBS 设置备份的名称无效。"
+  },
+  "setup.anObsConfigFileNameIsInvalid": {
+    "source": "2dbb0101151a6fb1",
+    "text": "OBS 设置中一个文件的名称无效。"
+  },
+  "setup.anObsConfigPathShouldBeAFile": {
+    "source": "617a453dec602e16",
+    "text": "OBS 设置中的此项应为文件：{path}"
+  },
+  "setup.anObsConfigPathShouldBeAFolder": {
+    "source": "9f6851e6bcce9f28",
+    "text": "OBS 设置中的此项应为文件夹：{path}"
+  },
+  "setup.anObsHostFileChangedOutsideReplaykit": {
+    "source": "5b79cce98daeac44",
+    "text": "OBS 进程宿主的一个文件在 ReplayKit 之外被更改：{path}"
+  },
+  "setup.aPreparedObsConfigFileFailedItsCheck": {
+    "source": "c623c081e7a2e13f",
+    "text": "为恢复 OBS 设置准备的一个文件未通过检查：{path}"
+  },
   "setup.aProcessHostPathEscapesIts": {
     "source": "330500722fa73ec0",
     "text": "进程宿主路径超出了其文件夹。"
@@ -9660,6 +9712,10 @@
   "setup.applyDefaultSettings": {
     "source": "b8bbb12c63ba3d4c",
     "text": "应用默认设置"
+  },
+  "setup.aReadOnlyHardLinkWasNotRemoved": {
+    "source": "b4035bd58e3e17a6",
+    "text": "一个只读文件通过硬链接与另一个文件共享属性，因此未将其删除。"
   },
   "setup.aReplaykitFileChangedOutsideTheUpdate": {
     "source": "ca32ecd29bec6cb9",
@@ -9845,6 +9901,10 @@
     "source": "c7751b11fea2a62b",
     "text": "无法安装或验证 FFmpeg 和 FFprobe。请检查网络连接，然后重新运行安装程序，以修复裁剪和压缩功能。"
   },
+  "setup.finishTheInterruptedProcessHostUpdate": {
+    "source": "03e941324b66dbe9",
+    "text": "请先用启动该更新的 ReplayKit 安装程序完成中断的 OBS 进程宿主更新，然后重试。"
+  },
   "setup.hotkeyKeyMustBeAString": {
     "source": "e87973a990e24bc9",
     "text": "快捷键必须是字符串。"
@@ -9961,6 +10021,14 @@
     "source": "66627ff5b476d1d5",
     "text": "无法安装 Microsoft .NET Framework 4.8。\n\n选择“确定”以打开 Microsoft 下载页面。请从该页面安装 .NET Framework 4.8，如果其安装程序要求重启电脑，请先重启，然后重新运行此安装程序。"
   },
+  "setup.obsConfigBackupsCannotFollowALink": {
+    "source": "bc3d6e06a1863f30",
+    "text": "OBS 设置备份不能经过链接或目录联接：{path}"
+  },
+  "setup.obsConfigBackupsCannotUseAHardLink": {
+    "source": "005dd2534419785e",
+    "text": "OBS 设置备份不能使用硬链接的文件：{path}"
+  },
   "setup.obsCouldNotBeInstalledAutomatically": {
     "source": "b9ec5649ef71e37c",
     "text": "无法自动安装 OBS Studio。请从 obsproject.com 安装 OBS，然后重新运行此安装程序。"
@@ -10056,6 +10124,10 @@
   "setup.processHostCopyVerificationFailed": {
     "source": "af2ae4d213a9e9ac",
     "text": "进程宿主副本校验失败。"
+  },
+  "setup.processHostFilesCannotUseALink": {
+    "source": "588400af68e3f220",
+    "text": "OBS 进程宿主的文件不能经过链接或目录联接：{path}"
   },
   "setup.reInstall": {
     "source": "c7ef1e068d271587",
@@ -10311,6 +10383,18 @@
     "source": "d3360f80cf319e32",
     "text": "默认设置标记没有有效的步骤列表。"
   },
+  "setup.theDeletedHistoryFolderIsInvalid": {
+    "source": "a9d515b17215f856",
+    "text": "已删除剪辑历史的文件夹无效。"
+  },
+  "setup.theDeletedHistoryPathIsInvalid": {
+    "source": "bafd7fdf3d1f3744",
+    "text": "已删除剪辑历史的路径无效。"
+  },
+  "setup.theDeletedHistoryRunsThroughALink": {
+    "source": "9fc298bd98ecee2e",
+    "text": "已删除剪辑历史经过了链接或目录联接：{path}"
+  },
   "setup.theDesktopAudioPlugin": {
     "source": "4352d805a2e7d2f1",
     "text": "桌面音频插件"
@@ -10323,6 +10407,34 @@
     "source": "ec9eee00d7a677ce",
     "text": "动态模糊插件"
   },
+  "setup.theObsConfigBackupChangedWhileChecked": {
+    "source": "1f74401061fc2247",
+    "text": "OBS 设置备份在检查过程中发生了变化。"
+  },
+  "setup.theObsConfigBackupHasABadEntry": {
+    "source": "cbb917c945ab0177",
+    "text": "OBS 设置备份中有无效或重复的文件。"
+  },
+  "setup.theObsConfigBackupListHasABadSkippedFile": {
+    "source": "c9d170b8de71a9ec",
+    "text": "OBS 设置备份的文件列表以无效的方式标记了跳过的文件。"
+  },
+  "setup.theObsConfigBackupListHasExtraData": {
+    "source": "58cb642f3944ab7f",
+    "text": "OBS 设置备份的文件列表之后有意外的数据。"
+  },
+  "setup.theObsConfigBackupListIsInvalid": {
+    "source": "9a864b90e352dda0",
+    "text": "OBS 设置备份的文件列表无效。"
+  },
+  "setup.theObsConfigBackupListIsMissing": {
+    "source": "e74a3207dced7939",
+    "text": "OBS 设置备份的文件列表缺失或过大。"
+  },
+  "setup.theObsConfigRestoreFolderWasReplaced": {
+    "source": "baa292aa6ada68ff",
+    "text": "用于恢复 OBS 设置的文件夹在使用中被替换了。"
+  },
   "setup.theObsProcessRoles": {
     "source": "7418924bad768581",
     "text": "OBS 进程角色"
@@ -10330,6 +10442,14 @@
   "setup.theObsUpdateLock": {
     "source": "34824a33ff9d5f00",
     "text": "OBS 更新锁定"
+  },
+  "setup.theObsVersionListCouldNotBeRead": {
+    "source": "18271e01b4fdb836",
+    "text": "无法读取此安装程序中支持的 OBS 版本列表。"
+  },
+  "setup.theObsVersionListIsInvalid": {
+    "source": "cd37c006c83e89ea",
+    "text": "此安装程序中支持的 OBS 版本列表无效。"
   },
   "setup.theOldReplaykitHelperCouldNot": {
     "source": "99cc371f39d82ad5",
@@ -10339,9 +10459,29 @@
     "source": "48b46e260aa0edf2",
     "text": "原始 OBS 备份未通过校验。"
   },
+  "setup.thePresetsInTheSetupHaveNoFile": {
+    "source": "6d6e5590cb5fe8c4",
+    "text": "此安装程序中的叠加层预设没有 {file}。"
+  },
   "setup.thePreviousUpdateFilesCouldNotBeCleared": {
     "source": "58db83cc918b521f",
     "text": "无法清除上一次 ReplayKit 更新留下的文件。"
+  },
+  "setup.theProcessHostListDoesNotMatchObs": {
+    "source": "bd389237dbe2f78a",
+    "text": "OBS 进程宿主的文件列表与 OBS {version} 不匹配。"
+  },
+  "setup.theProcessHostListHasABadFile": {
+    "source": "c40350f742eaf8c8",
+    "text": "OBS 进程宿主的文件列表中有无效的文件：{path}"
+  },
+  "setup.theProcessHostListHasABadOriginal": {
+    "source": "4458f87a8dcf2f47",
+    "text": "OBS 进程宿主的文件列表中有无效的原始文件：{path}"
+  },
+  "setup.theProcessHostUpdateAndRollbackFailed": {
+    "source": "fe22b39f1b99dbe7",
+    "text": "OBS 进程宿主的更新及其回滚都失败了。恢复文件保留在 {path}"
   },
   "setup.theProcessRoleBackupIsMissing": {
     "source": "6c07b88b1b03685a",
@@ -10355,6 +10495,14 @@
     "source": "8a9fc69bb15fb743",
     "text": "正在运行的 ReplayKit 辅助程序不支持仅优雅关闭。"
   },
+  "setup.theSceneInTheSetupHasNoFilter": {
+    "source": "e90d5470ca142e52",
+    "text": "此安装程序中的场景文件没有 {filter} 滤镜。"
+  },
+  "setup.theSceneInTheSetupIsMissing": {
+    "source": "bb93e9c930c6826c",
+    "text": "此安装程序中的场景文件缺失：{path}"
+  },
   "setup.theSetupWindowCouldNotStart": {
     "source": "e7c9f6e2b0ee0d7b",
     "text": "无法启动安装窗口。\n\n{error}"
@@ -10363,9 +10511,17 @@
     "source": "b65bf65a5f38add6",
     "text": "Share Preview 窗口"
   },
+  "setup.theStreamableSignInFolderIsALink": {
+    "source": "b057cc516d8adc03",
+    "text": "Streamable 登录文件夹是链接或目录联接，因此未做改动。"
+  },
   "setup.theUninstallWindowCouldNotStart": {
     "source": "55ebd1d805547641",
     "text": "无法启动卸载窗口。\n\n{error}"
+  },
+  "setup.theUnpackedWebview2LoaderDoesNotMatch": {
+    "source": "782d4160a9a1170c",
+    "text": "解压出的 WebView2Loader.dll 与此安装程序中的不一致。"
   },
   "setup.theUpdateFailedAndCouldNotRollBack": {
     "source": "4e502eb60596cfe9",
@@ -10411,6 +10567,10 @@
     "source": "6ad1da665e140849",
     "text": "启用此版本附带的默认设置。"
   },
+  "setup.twoObsConfigRestoresTargetOnePlace": {
+    "source": "039d2876d012733a",
+    "text": "OBS 设置恢复中有两个文件会写到同一位置：{path}"
+  },
   "setup.uninstallFailed": {
     "source": "c5aca41f97b2ec12",
     "text": "卸载失败"
@@ -10439,6 +10599,10 @@
     "source": "bca45daa794e5072",
     "text": "未知错误"
   },
+  "setup.unknownRecordingPreset": {
+    "source": "720b8eebedf6a4a9",
+    "text": "ReplayKit 不认识录制质量 {name}。"
+  },
   "setup.update": {
     "source": "71060b462f3d44a6",
     "text": "更新"
@@ -10466,6 +10630,10 @@
   "setup.verifyUpdateFiles": {
     "source": "e5aa889b3d9cef79",
     "text": "验证更新文件"
+  },
+  "setup.webview2LoaderHasNoFunction": {
+    "source": "c6071353d21dc2ad",
+    "text": "WebView2Loader.dll 没有 {name} 函数。"
   },
   "setup.windowsProgramFilesWasNotFound": {
     "source": "ae428fc60ddcbf2c",

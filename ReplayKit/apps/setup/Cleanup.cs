@@ -156,15 +156,15 @@ namespace ReplayKitSetup
                 {
                     var value = (prop.Value as JObject)?["stored"];
                     if (value?.Type != JTokenType.String || !NetCompat.IsPathFullyQualified((string)value))
-                        throw new InvalidDataException("invalid deleted history path");
+                        throw new InvalidDataException(SetupLocale.Message("setup.theDeletedHistoryPathIsInvalid"));
                     string stored = Path.GetFullPath((string)value);
                     string folder = Path.GetDirectoryName(stored);
                     if (!string.Equals(Path.GetFileName(folder), ".replaykit-deleted", StringComparison.OrdinalIgnoreCase))
-                        throw new InvalidDataException("invalid deleted history folder");
+                        throw new InvalidDataException(SetupLocale.Message("setup.theDeletedHistoryFolderIsInvalid"));
                     for (string parent = stored; parent != null; parent = Path.GetDirectoryName(parent))
                     {
                         if ((File.GetAttributes(parent) & FileAttributes.ReparsePoint) != 0)
-                            throw new IOException("deleted history uses a reparse point: " + parent);
+                            throw SetupLocale.Error("setup.theDeletedHistoryRunsThroughALink", m => new IOException(m), "path", parent);
                     }
                     File.Delete(stored);
                     folders.Add(folder);
@@ -292,7 +292,7 @@ namespace ReplayKitSetup
                 try
                 {
                     if ((File.GetAttributes(credentials) & FileAttributes.ReparsePoint) != 0)
-                        throw new IOException("the Streamable credential folder is a reparse point");
+                        throw new IOException(SetupLocale.Message("setup.theStreamableSignInFolderIsALink"));
                     File.Delete(Path.Combine(credentials, StateLayout.StreamableCredentialsFile));
                     File.Delete(Path.Combine(credentials, StateLayout.StreamableLegacyCookieFile));
                 }

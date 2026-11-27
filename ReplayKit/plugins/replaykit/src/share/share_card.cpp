@@ -2,6 +2,7 @@
 #include "prelude.hpp"
 #include "share/share_card.hpp"
 #include "core/draw_util.hpp"
+#include "core/state_files.hpp"
 #include "core/ui_font.hpp"
 
 #include <QFileInfo>
@@ -141,7 +142,7 @@ bool RenderShareCard(const std::string &json)
 
 	// only ever the card file in the replaykit folder, whatever the request names
 	const QString out = QDir::cleanPath(request.value(QStringLiteral("out")).toString());
-	const QString root = QDir::cleanPath(qEnvironmentVariable("APPDATA") + QStringLiteral("/obs-studio/obs-replayKit")) + QStringLiteral("/");
+	const QString root = QDir::cleanPath(ReplayKitRootPath()) + QStringLiteral("/");
 	if (!out.startsWith(root, Qt::CaseInsensitive) || !out.endsWith(QStringLiteral("/share_cover_card.png"), Qt::CaseInsensitive))
 		return Refuse("the card path is outside the replaykit folder");
 	const int width = request.value(QStringLiteral("width")).toInt();

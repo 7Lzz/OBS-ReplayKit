@@ -175,7 +175,7 @@ namespace ReplayKitHelper
         }
 
         // shared with anything else that wants a small disk cache next to the rest of replaykits config -- not just release lookups.
-        private static string ReplayKitCacheDir() => Path.Combine(Constants.OBS_CONFIG_DIR, "obs-replayKit", "cache");
+        private static string ReplayKitCacheDir() => Path.Combine(Constants.OBS_CONFIG_DIR, ReplayKitShared.ReplayKitFolder.Name, "cache");
         private static string ReleaseCachePath(string version) => Path.Combine(ReplayKitCacheDir(), "update-" + version + ".txt");
 
         // looks the installed version up as its own release, for a users own "what did I just install" -- separate from GetLatestRelease, which only ever answers for the newest tag. a published releases notes never change once tagged, so the result is cached to disk per-version instead of hitting github again on every open of the notifications panel; tries a v-prefixed tag first (this repos own convention) then the bare version, since a tag scheme is not something worth hard failing over.

@@ -12,7 +12,7 @@ namespace ReplayKitSetup
     // the share window (ReplayKitShare.exe) keeps running while obs and replaykit update, so discord keeps streaming its window, unless the update changes the window itself: then it is ended for the copy and the helper opens the new one once obs is back. uninstall and the share preview audio removal end it
     internal static class ShareWindowInstall
     {
-        public static string FolderRel => Path.Combine("obs-replayKit", ShareWindowLayout.Folder);
+        public static string FolderRel => Path.Combine(ReplayKitFolder.Name, ShareWindowLayout.Folder);
         private static string Folder => Path.Combine(Config.REPLAYKIT_CONFIG, ShareWindowLayout.Folder);
         private static string Target => Path.Combine(Folder, ShareWindowLayout.ExeName);
 

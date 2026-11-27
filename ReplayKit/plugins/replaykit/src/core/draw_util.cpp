@@ -2,11 +2,13 @@
 #include "prelude.hpp"
 #include "core/draw_util.hpp"
 
+#include "core/state_files.hpp"
+
 namespace rk {
 
 QString IconPath(const QString &name)
 {
-	return qEnvironmentVariable("APPDATA") + QStringLiteral("/obs-studio/obs-replayKit/icons/") + name;
+	return ReplayKitRootPath() + QStringLiteral("/icons/") + name;
 }
 
 // renders an svg into a pixmap and recolours every painted pixel, since QSvgRenderer has no css context for currentColor and the shell chrome follows the theme text colour instead of the fixed white the caption glyphs use. the pixmap carries the device ratio, so drawing it at a logical position stays sharp on scaled displays

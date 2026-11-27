@@ -257,7 +257,7 @@ namespace ReplayKitSetup
                 byte[] bytes;
                 using (var resource = Assembly.GetExecutingAssembly().GetManifestResourceStream(LoaderResource))
                 {
-                    if (resource == null) throw new FileNotFoundException("WebView2Loader.dll is missing from the setup build.");
+                    if (resource == null) throw SetupLocale.Error("setup.aFileIsMissingFromThisSetup", m => new FileNotFoundException(m), "file", "WebView2Loader.dll");
                     using var copy = new MemoryStream();
                     resource.CopyTo(copy);
                     bytes = copy.ToArray();
@@ -284,7 +284,7 @@ namespace ReplayKitSetup
                 {
                     using var read = new MemoryStream();
                     held.CopyTo(read);
-                    if (Sha256Hex(read.ToArray()) != hash) throw new InvalidDataException("The unpacked WebView2Loader.dll does not match the one in the setup.");
+                    if (Sha256Hex(read.ToArray()) != hash) throw new InvalidDataException(SetupLocale.Message("setup.theUnpackedWebview2LoaderDoesNotMatch"));
                     IntPtr module = LoadLibraryW(path);
                     if (module == IntPtr.Zero) throw new Win32Exception(Marshal.GetLastWin32Error());
                     getBrowserVersion = Export<GetBrowserVersionString>(module, "GetAvailableCoreWebView2BrowserVersionString");
@@ -296,7 +296,7 @@ namespace ReplayKitSetup
         private static T Export<T>(IntPtr module, string name) where T : class
         {
             IntPtr address = GetProcAddress(module, name);
-            if (address == IntPtr.Zero) throw new EntryPointNotFoundException("WebView2Loader.dll has no " + name + ".");
+            if (address == IntPtr.Zero) throw SetupLocale.Error("setup.webview2LoaderHasNoFunction", m => new EntryPointNotFoundException(m), "name", name);
             return Marshal.GetDelegateForFunctionPointer<T>(address);
         }
 

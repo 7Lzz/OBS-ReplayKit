@@ -84,7 +84,7 @@ namespace ReplayKitSetup
         public static RecordingPreset GetPreset(string name)
         {
             var preset = PRESETS.FirstOrDefault(p => p.Name == name);
-            if (preset == null) throw new ArgumentException($"Unknown recording preset: '{name}'");
+            if (preset == null) throw SetupLocale.Error("setup.unknownRecordingPreset", m => new ArgumentException(m), "name", name);
             return preset;
         }
     }

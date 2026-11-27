@@ -44,62 +44,13 @@ namespace ReplayKitHelper
             {
                 string path = Path.Combine(GetObsConfigRoot(), "user.ini");
                 if (!File.Exists(path)) return null;
-                bool inSection = false;
-                foreach (var line in File.ReadAllLines(path))
-                {
-                    var sectionMatch = Regex.Match(line, @"^\s*\[(.+?)\]\s*$");
-                    if (sectionMatch.Success)
-                    {
-                        inSection = string.Equals(sectionMatch.Groups[1].Value, "BasicWindow", StringComparison.OrdinalIgnoreCase);
-                        continue;
-                    }
-                    if (!inSection) continue;
-                    var valueMatch = Regex.Match(line, @"^\s*SysTrayWhenStarted\s*=\s*(\w+)\s*$");
-                    if (valueMatch.Success) return string.Equals(valueMatch.Groups[1].Value, "true", StringComparison.OrdinalIgnoreCase);
-                }
+                string value = ObsIni.Get(File.ReadAllText(path), "BasicWindow", "SysTrayWhenStarted");
+                if (value != null) return string.Equals(value.Trim(), "true", StringComparison.OrdinalIgnoreCase);
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException)
             {
             }
             return null;
-        }
-
-        internal static string SetIniValue(string text, string section, string key, string value)
-        {
-            text = text ?? "";
-            var lines = string.IsNullOrEmpty(text) ? new string[0] : Regex.Split(text, @"\r?\n");
-            var outLines = new List<string>();
-            bool inSection = false, sectionSeen = false, keySet = false;
-            string keyPattern = @"^\s*" + Regex.Escape(key) + @"\s*=";
-
-            foreach (var line in lines)
-            {
-                var sectionMatch = Regex.Match(line, @"^\s*\[(.+?)\]\s*$");
-                if (sectionMatch.Success)
-                {
-                    if (inSection && !keySet) { outLines.Add(key + "=" + value); keySet = true; }
-                    inSection = string.Equals(sectionMatch.Groups[1].Value, section, StringComparison.OrdinalIgnoreCase);
-                    if (inSection) sectionSeen = true;
-                    outLines.Add(line);
-                    continue;
-                }
-                if (inSection && Regex.IsMatch(line, keyPattern))
-                {
-                    if (!keySet) { outLines.Add(key + "=" + value); keySet = true; }
-                    continue;
-                }
-                outLines.Add(line);
-            }
-
-            if (inSection && !keySet) outLines.Add(key + "=" + value);
-            if (!sectionSeen)
-            {
-                if (outLines.Count > 0 && outLines[outLines.Count - 1] != "") outLines.Add("");
-                outLines.Add("[" + section + "]");
-                outLines.Add(key + "=" + value);
-            }
-
-            return string.Join("\r\n", outLines).TrimEnd() + "\r\n";
         }
 
         internal static JObject SetObsCloseWarningConfig(bool disabled)
@@ -122,7 +73,7 @@ namespace ReplayKitHelper
                 foreach (var path in paths)
                 {
                     string text = File.Exists(path) ? File.ReadAllText(path) : "";
-                    string next = SetIniValue(text, "General", "ConfirmOnExit", confirmOnExit);
+                    string next = ObsIni.Set(text, "General", "ConfirmOnExit", confirmOnExit);
                     if (next != text)
                     {
                         AppConfig.WriteUtf8(path, next);

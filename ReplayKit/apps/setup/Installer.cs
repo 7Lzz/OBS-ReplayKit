@@ -125,7 +125,7 @@ namespace ReplayKitSetup
         public static void PrepareObsTheme(Action<string> log = null)
         {
             string helper = Config.HELPER_EXE;
-            VerifyFile(Path.Combine(GetRuntimeAssetsDir(), Config.HELPER_EXE_REL), helper);
+            VerifyFile(Path.Combine(GetRuntimeAssetsDir(), ReplayKitFolder.HelperExe), helper);
             var start = new System.Diagnostics.ProcessStartInfo(helper, "--prepare-theme")
             {
                 UseShellExecute = false, CreateNoWindow = true, RedirectStandardError = true,
@@ -178,43 +178,43 @@ namespace ReplayKitSetup
 
         private static readonly HashSet<string> RuntimePreserveRels = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
-            Path.Combine("obs-replayKit", StateLayout.SettingsFile),
-            Path.Combine("obs-replayKit", StateLayout.ClipsDbFile),
-            Path.Combine("obs-replayKit", StateLayout.ClipsIndexFile),
-            Path.Combine("obs-replayKit", StateLayout.CompressionHistoryFile),
+            Path.Combine(ReplayKitFolder.Name, StateLayout.SettingsFile),
+            Path.Combine(ReplayKitFolder.Name, StateLayout.ClipsDbFile),
+            Path.Combine(ReplayKitFolder.Name, StateLayout.ClipsIndexFile),
+            Path.Combine(ReplayKitFolder.Name, StateLayout.CompressionHistoryFile),
         };
 
         private static readonly string[] RuntimeDeleteRels =
         {
-            Path.Combine("obs-replayKit", "scripts", "replay_buffer", "replay_buffer_saved.mp3"),
-            Path.Combine("obs-replayKit", "scripts", "replay_buffer", "obs-replaykit.ico"),
-            Path.Combine("obs-replayKit", "scripts", "audio", "auto_pick_monitor_device.lua"),
-            Path.Combine("obs-replayKit", "scripts", "helper", "replaykit_update_bootstrap.ps1"),
-            Path.Combine("obs-replayKit", "scripts", "helper", "helper_endpoint.lua"),
+            Path.Combine(ReplayKitFolder.Name, "scripts", "replay_buffer", "replay_buffer_saved.mp3"),
+            Path.Combine(ReplayKitFolder.Name, "scripts", "replay_buffer", "obs-replaykit.ico"),
+            Path.Combine(ReplayKitFolder.Name, "scripts", "audio", "auto_pick_monitor_device.lua"),
+            Path.Combine(ReplayKitFolder.Name, "scripts", "helper", "replaykit_update_bootstrap.ps1"),
+            Path.Combine(ReplayKitFolder.Name, "scripts", "helper", "helper_endpoint.lua"),
             // the script jobs that moved into the helper, the plugin and lua itself
-            Path.Combine("obs-replayKit", "scripts", "helper", "restart_obs.ps1"),
-            Path.Combine("obs-replayKit", "scripts", "hevc_compat", "fix_hevc_tag.ps1"),
-            Path.Combine("obs-replayKit", "scripts", "hevc_compat", "auto_fix_hevc_tag.lua"),
-            Path.Combine("obs-replayKit", "scripts", "replay_buffer", "clip_saved_notification.ps1"),
-            Path.Combine("obs-replayKit", "scripts", "replay_buffer", "clip_saved_notification.lua"),
-            Path.Combine("obs-replayKit", "scripts", "obs_elevation", "hidden_relauncher.vbs"),
-            Path.Combine("obs-replayKit", "icons", "nav", "tab-general.svg"),
+            Path.Combine(ReplayKitFolder.Name, "scripts", "helper", "restart_obs.ps1"),
+            Path.Combine(ReplayKitFolder.Name, "scripts", "hevc_compat", "fix_hevc_tag.ps1"),
+            Path.Combine(ReplayKitFolder.Name, "scripts", "hevc_compat", "auto_fix_hevc_tag.lua"),
+            Path.Combine(ReplayKitFolder.Name, "scripts", "replay_buffer", "clip_saved_notification.ps1"),
+            Path.Combine(ReplayKitFolder.Name, "scripts", "replay_buffer", "clip_saved_notification.lua"),
+            Path.Combine(ReplayKitFolder.Name, "scripts", "obs_elevation", "hidden_relauncher.vbs"),
+            Path.Combine(ReplayKitFolder.Name, "icons", "nav", "tab-general.svg"),
             // shipped as opus now, and the helper keeps its own wav of it in user-data
-            Path.Combine("obs-replayKit", "sounds", "share-card-default.wav"),
+            Path.Combine(ReplayKitFolder.Name, "sounds", "share-card-default.wav"),
             // copies of preset files the overlay preview reads from input-overlay-presets
-            Path.Combine("obs-replayKit", "obs-custom-dock", "overlay-preview", "wasd", "wasd.png"),
-            Path.Combine("obs-replayKit", "obs-custom-dock", "overlay-preview", "wasd", "wasd-minimal.json"),
-            Path.Combine("obs-replayKit", "obs-custom-dock", "overlay-preview", "mouse", "mouse.png"),
-            Path.Combine("obs-replayKit", "obs-custom-dock", "overlay-preview", "mouse", "mouse-no-movement.json"),
+            Path.Combine(ReplayKitFolder.Name, "obs-custom-dock", "overlay-preview", "wasd", "wasd.png"),
+            Path.Combine(ReplayKitFolder.Name, "obs-custom-dock", "overlay-preview", "wasd", "wasd-minimal.json"),
+            Path.Combine(ReplayKitFolder.Name, "obs-custom-dock", "overlay-preview", "mouse", "mouse.png"),
+            Path.Combine(ReplayKitFolder.Name, "obs-custom-dock", "overlay-preview", "mouse", "mouse-no-movement.json"),
         };
 
         // installs made before the streamable/ -> helper/ rename: source name (in the old directory) -> new relative path.
-        private static readonly string LegacyStreamableDirRel = Path.Combine("obs-replayKit", "scripts", "streamable");
+        private static readonly string LegacyStreamableDirRel = Path.Combine(ReplayKitFolder.Name, "scripts", "streamable");
         private static readonly Dictionary<string, string> LegacyStreamableStateRels = new Dictionary<string, string>
         {
-            [StateLayout.ClipsDbFile] = Path.Combine("obs-replayKit", StateLayout.ClipsDbFile),
-            [StateLayout.ClipsIndexFile] = Path.Combine("obs-replayKit", StateLayout.ClipsIndexFile),
-            [StateLayout.HelperConfigFile] = Path.Combine("obs-replayKit", StateLayout.HelperConfigFile),
+            [StateLayout.ClipsDbFile] = Path.Combine(ReplayKitFolder.Name, StateLayout.ClipsDbFile),
+            [StateLayout.ClipsIndexFile] = Path.Combine(ReplayKitFolder.Name, StateLayout.ClipsIndexFile),
+            [StateLayout.HelperConfigFile] = Path.Combine(ReplayKitFolder.Name, StateLayout.HelperConfigFile),
         };
 
         internal static string LegacyStreamableStatePath(string root, string file) =>
@@ -270,8 +270,7 @@ namespace ReplayKitSetup
                 }
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
                 {
-                    var reason = SetupLocale.Pair("setup.olderStateCouldNotBeMoved", "file", kv.Key);
-                    throw new IOException(reason.Shown, ex).WithEnglish(reason);
+                    throw SetupLocale.Error("setup.olderStateCouldNotBeMoved", m => new IOException(m, ex), "file", kv.Key);
                 }
             }
             if (!canRemove) return;
@@ -467,10 +466,7 @@ namespace ReplayKitSetup
             if (text == null) File.Copy(src, staged, true);
             else File.WriteAllBytes(staged, text);
             if (!FileMatches(staged, length, hash))
-            {
-                var reason = SetupLocale.Pair("setup.aStagedFileDoesNotMatchTheBundle", "path", staged);
-                throw new IOException(reason.Shown).WithEnglish(reason);
-            }
+                throw SetupLocale.Error("setup.aStagedFileDoesNotMatchTheBundle", m => new IOException(m), "path", staged);
             return true;
         }
 
@@ -502,10 +498,7 @@ namespace ReplayKitSetup
         internal static void VerifyFile(string expected, string actual)
         {
             if (!FilesMatch(expected, actual))
-            {
-                var reason = SetupLocale.Pair("setup.aCopiedFileDoesNotMatchItsSource", "path", actual);
-                throw new IOException(reason.Shown).WithEnglish(reason);
-            }
+                throw SetupLocale.Error("setup.aCopiedFileDoesNotMatchItsSource", m => new IOException(m), "path", actual);
         }
 
         internal static void FlushFile(string path)
@@ -545,14 +538,14 @@ namespace ReplayKitSetup
         }
 
         // the runtime tree an update installs from. exposed so the updater can preflight it before it closes obs, against the same path InstallReplaykitRuntimeUpdate walks.
-        public static string GetRuntimeAssetsDir() => Path.Combine(Config.OBS_ASSETS_DIR, "obs-replayKit");
+        public static string GetRuntimeAssetsDir() => Path.Combine(Config.OBS_ASSETS_DIR, ReplayKitFolder.Name);
 
         public static string ValidateRuntimeAssets()
         {
             string runtimeSrc = GetRuntimeAssetsDir();
             if (!Directory.Exists(runtimeSrc))
                 throw new DirectoryNotFoundException(SetupLocale.Message("setup.thisSetupHasNoReplaykitFiles"));
-            string helperSource = Path.Combine(runtimeSrc, Config.HELPER_EXE_REL);
+            string helperSource = Path.Combine(runtimeSrc, ReplayKitFolder.HelperExe);
             if (!File.Exists(helperSource) || new FileInfo(helperSource).Length < 256 * 1024)
                 throw new InvalidDataException(SetupLocale.Message("setup.theBundledReplaykitHelperIsMissing"));
             return runtimeSrc;
@@ -617,7 +610,7 @@ namespace ReplayKitSetup
             foreach (string src in files)
             {
                 string fileRel = NetCompat.GetRelativePath(runtimeSrc, src);
-                string rel = Path.Combine("obs-replayKit", fileRel);
+                string rel = Path.Combine(ReplayKitFolder.Name, fileRel);
                 // the share window has its own update path because it can outlive obs
                 if (ShareWindowInstall.IsShareWindowFile(rel) || string.Equals(fileRel, RuntimeVersionFile, StringComparison.OrdinalIgnoreCase)) continue;
                 if (PreservesRuntimeFile(rel))
@@ -647,7 +640,7 @@ namespace ReplayKitSetup
             foreach (string relative in stagedFiles.Concat(stagedState))
             {
                 ReplaceFile(transaction.Stage(relative), transaction.Target(relative), transactionId);
-                log?.Invoke("-> obs-replayKit/" + relative.Replace('\\', '/'));
+                log?.Invoke("-> " + ReplayKitFolder.Name + "/" + relative.Replace('\\', '/'));
             }
 
             log?.Invoke($"{unchanged} runtime file(s) were already current");
@@ -704,15 +697,15 @@ namespace ReplayKitSetup
         {
             string userIni = Path.Combine(Config.OBS_CONFIG, "user.ini");
             string userText = IsMissingOrEmpty(userIni) ? null : ReadTextFile(userIni);
-            string activeProfile = userText == null ? null : Transform.GetIniValue(userText, "Basic", "ProfileDir");
-            string activeCollection = userText == null ? null : Transform.GetIniValue(userText, "Basic", "SceneCollectionFile");
+            string activeProfile = userText == null ? null : ObsIni.Get(userText, "Basic", "ProfileDir");
+            string activeCollection = userText == null ? null : ObsIni.Get(userText, "Basic", "SceneCollectionFile");
             int seeded = 0;
             foreach (var src in Directory.EnumerateFiles(Config.OBS_ASSETS_DIR, "*", SearchOption.AllDirectories))
             {
                 string rel = NetCompat.GetRelativePath(Config.OBS_ASSETS_DIR, src);
                 var parts = rel.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
                 // the runtime copy owns the replaykit folder
-                if (parts.Length > 1 && string.Equals(parts[0], "obs-replayKit", StringComparison.OrdinalIgnoreCase)) continue;
+                if (parts.Length > 1 && string.Equals(parts[0], ReplayKitFolder.Name, StringComparison.OrdinalIgnoreCase)) continue;
                 bool profileFile = parts.Length >= 4 && string.Equals(parts[0], "basic", StringComparison.OrdinalIgnoreCase) && string.Equals(parts[1], "profiles", StringComparison.OrdinalIgnoreCase);
                 bool sceneFile = parts.Length == 3 && string.Equals(parts[0], "basic", StringComparison.OrdinalIgnoreCase) && string.Equals(parts[1], "scenes", StringComparison.OrdinalIgnoreCase);
                 if (userText != null && profileFile && !string.Equals(parts[2], activeProfile, StringComparison.OrdinalIgnoreCase)) continue;
@@ -772,7 +765,7 @@ namespace ReplayKitSetup
             {
                 string userIni = Path.Combine(Config.OBS_CONFIG, "user.ini");
                 if (IsMissingOrEmpty(userIni)) return true;
-                string profile = Transform.GetIniValue(ReadTextFile(userIni), "Basic", "ProfileDir");
+                string profile = ObsIni.Get(ReadTextFile(userIni), "Basic", "ProfileDir");
                 if (string.IsNullOrWhiteSpace(profile) || profile == "." || profile == ".." || profile.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0) return true;
                 string basicIni = Path.Combine(Config.OBS_CONFIG, "basic", "profiles", profile, "basic.ini");
                 if (IsMissingOrEmpty(basicIni)) return true;
@@ -936,7 +929,7 @@ namespace ReplayKitSetup
         // the bundled helper was there when the bundle was unpacked (ValidateRuntimeAssets checked it), so one that is gone a few steps later was most likely quarantined by antivirus as a fresh unsigned exe; helper_bootstrap.lua has nothing to fall back on without it
         public static bool EnsureLauncherBuilt(Action<string> log = null)
         {
-            string launcherPath = Path.Combine(GetRuntimeAssetsDir(), Config.HELPER_EXE_REL);
+            string launcherPath = Path.Combine(GetRuntimeAssetsDir(), ReplayKitFolder.HelperExe);
             if (File.Exists(launcherPath)) return true;
             log?.Invoke($"warn: helper launcher missing at {launcherPath} -- your antivirus likely quarantined it right after install. check its quarantine or history (Windows Security > Protection History for Defender), restore or exclude the ReplayKit temp folder, then reinstall.");
             return false;

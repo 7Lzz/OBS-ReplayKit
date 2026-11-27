@@ -9623,6 +9623,58 @@
     "source": "3c19c475dff15930",
     "text": "Um arquivo copiado não corresponde à sua origem: {path}"
   },
+  "setup.aFileIsMissingFromThisSetup": {
+    "source": "029bb2b88108fd44",
+    "text": "{file} está ausente deste instalador."
+  },
+  "setup.anArchiveEntryIsOutsideItsFolder": {
+    "source": "5c34af0b62166c8e",
+    "text": "Um arquivo compactado deste instalador tem um arquivo que ficaria fora da própria pasta: {path}"
+  },
+  "setup.anObsConfigBackupEntryDoesNotMatchItsList": {
+    "source": "a47f69c2d0079109",
+    "text": "Um arquivo do backup das configurações do OBS não corresponde à sua lista de arquivos."
+  },
+  "setup.anObsConfigBackupEntryIsTooLarge": {
+    "source": "c6201bd3f7680d6d",
+    "text": "Um arquivo do backup das configurações do OBS é maior do que o esperado: {path}"
+  },
+  "setup.anObsConfigBackupFileFailedItsCheck": {
+    "source": "0283e4b420e625a1",
+    "text": "Um arquivo do backup das configurações do OBS falhou na verificação: {path}"
+  },
+  "setup.anObsConfigBackupFileIsAFolder": {
+    "source": "0aa3b0a1eb390153",
+    "text": "Um arquivo dos backups das configurações do OBS acabou sendo uma pasta."
+  },
+  "setup.anObsConfigBackupFolderCouldNotBeOpened": {
+    "source": "6b2e91eb8a333830",
+    "text": "Não foi possível abrir uma pasta dos backups das configurações do OBS: {path}"
+  },
+  "setup.anObsConfigBackupNameIsInvalid": {
+    "source": "a40cbdc360689ed9",
+    "text": "O nome de um backup das configurações do OBS é inválido."
+  },
+  "setup.anObsConfigFileNameIsInvalid": {
+    "source": "2dbb0101151a6fb1",
+    "text": "O nome de um arquivo das configurações do OBS é inválido."
+  },
+  "setup.anObsConfigPathShouldBeAFile": {
+    "source": "617a453dec602e16",
+    "text": "Isto deveria ser um arquivo nas configurações do OBS: {path}"
+  },
+  "setup.anObsConfigPathShouldBeAFolder": {
+    "source": "9f6851e6bcce9f28",
+    "text": "Isto deveria ser uma pasta nas configurações do OBS: {path}"
+  },
+  "setup.anObsHostFileChangedOutsideReplaykit": {
+    "source": "5b79cce98daeac44",
+    "text": "Um arquivo do host de processos do OBS foi alterado fora do ReplayKit: {path}"
+  },
+  "setup.aPreparedObsConfigFileFailedItsCheck": {
+    "source": "c623c081e7a2e13f",
+    "text": "Um arquivo preparado para restaurar as configurações do OBS falhou na verificação: {path}"
+  },
   "setup.aProcessHostPathEscapesIts": {
     "source": "330500722fa73ec0",
     "text": "Um caminho do host de processos sai da própria pasta."
@@ -9666,6 +9718,10 @@
   "setup.applyDefaultSettings": {
     "source": "b8bbb12c63ba3d4c",
     "text": "Aplicar configurações padrão"
+  },
+  "setup.aReadOnlyHardLinkWasNotRemoved": {
+    "source": "b4035bd58e3e17a6",
+    "text": "Um arquivo somente leitura compartilha seus atributos com outro arquivo por um link físico, então não foi removido."
   },
   "setup.aReplaykitFileChangedOutsideTheUpdate": {
     "source": "ca32ecd29bec6cb9",
@@ -9851,6 +9907,10 @@
     "source": "c7751b11fea2a62b",
     "text": "Não foi possível instalar ou verificar o FFmpeg e o FFprobe. Verifique sua conexão e execute o instalador novamente para reparar o corte e a compactação."
   },
+  "setup.finishTheInterruptedProcessHostUpdate": {
+    "source": "03e941324b66dbe9",
+    "text": "Conclua a atualização interrompida do host de processos do OBS com o instalador do ReplayKit que a iniciou e tente novamente."
+  },
   "setup.hotkeyKeyMustBeAString": {
     "source": "e87973a990e24bc9",
     "text": "A tecla de atalho deve ser um texto."
@@ -9967,6 +10027,14 @@
     "source": "66627ff5b476d1d5",
     "text": "Não foi possível instalar o Microsoft .NET Framework 4.8.\n\nEscolha OK para abrir a página de download da Microsoft. Instale o .NET Framework 4.8 por lá, reinicie o PC se o instalador dele pedir e execute este instalador de novo."
   },
+  "setup.obsConfigBackupsCannotFollowALink": {
+    "source": "bc3d6e06a1863f30",
+    "text": "Os backups das configurações do OBS não podem passar por um link ou junção: {path}"
+  },
+  "setup.obsConfigBackupsCannotUseAHardLink": {
+    "source": "005dd2534419785e",
+    "text": "Os backups das configurações do OBS não podem usar um arquivo com link físico: {path}"
+  },
   "setup.obsCouldNotBeInstalledAutomatically": {
     "source": "b9ec5649ef71e37c",
     "text": "Não foi possível instalar o OBS Studio automaticamente. Instale o OBS pelo obsproject.com e execute este instalador de novo."
@@ -10062,6 +10130,10 @@
   "setup.processHostCopyVerificationFailed": {
     "source": "af2ae4d213a9e9ac",
     "text": "Falha na verificação da cópia do host de processos."
+  },
+  "setup.processHostFilesCannotUseALink": {
+    "source": "588400af68e3f220",
+    "text": "Os arquivos do host de processos do OBS não podem passar por um link ou junção: {path}"
   },
   "setup.reInstall": {
     "source": "c7ef1e068d271587",
@@ -10319,6 +10391,18 @@
     "source": "d3360f80cf319e32",
     "text": "O marcador de padrões não tem uma lista válida de etapas."
   },
+  "setup.theDeletedHistoryFolderIsInvalid": {
+    "source": "a9d515b17215f856",
+    "text": "A pasta do histórico de clipes excluídos é inválida."
+  },
+  "setup.theDeletedHistoryPathIsInvalid": {
+    "source": "bafd7fdf3d1f3744",
+    "text": "O caminho do histórico de clipes excluídos é inválido."
+  },
+  "setup.theDeletedHistoryRunsThroughALink": {
+    "source": "9fc298bd98ecee2e",
+    "text": "O histórico de clipes excluídos passa por um link ou junção: {path}"
+  },
   "setup.theDesktopAudioPlugin": {
     "source": "4352d805a2e7d2f1",
     "text": "o plugin de áudio da área de trabalho"
@@ -10331,6 +10415,34 @@
     "source": "ec9eee00d7a677ce",
     "text": "o plugin de desfoque de movimento"
   },
+  "setup.theObsConfigBackupChangedWhileChecked": {
+    "source": "1f74401061fc2247",
+    "text": "O backup das configurações do OBS mudou enquanto era verificado."
+  },
+  "setup.theObsConfigBackupHasABadEntry": {
+    "source": "cbb917c945ab0177",
+    "text": "O backup das configurações do OBS tem um arquivo inválido ou repetido."
+  },
+  "setup.theObsConfigBackupListHasABadSkippedFile": {
+    "source": "c9d170b8de71a9ec",
+    "text": "A lista de arquivos do backup das configurações do OBS marca um arquivo omitido de forma inválida."
+  },
+  "setup.theObsConfigBackupListHasExtraData": {
+    "source": "58cb642f3944ab7f",
+    "text": "A lista de arquivos do backup das configurações do OBS é seguida de dados inesperados."
+  },
+  "setup.theObsConfigBackupListIsInvalid": {
+    "source": "9a864b90e352dda0",
+    "text": "A lista de arquivos do backup das configurações do OBS é inválida."
+  },
+  "setup.theObsConfigBackupListIsMissing": {
+    "source": "e74a3207dced7939",
+    "text": "A lista de arquivos do backup das configurações do OBS está ausente ou é grande demais."
+  },
+  "setup.theObsConfigRestoreFolderWasReplaced": {
+    "source": "baa292aa6ada68ff",
+    "text": "A pasta usada para restaurar as configurações do OBS foi substituída enquanto estava em uso."
+  },
   "setup.theObsProcessRoles": {
     "source": "7418924bad768581",
     "text": "as funções de processo do OBS"
@@ -10338,6 +10450,14 @@
   "setup.theObsUpdateLock": {
     "source": "34824a33ff9d5f00",
     "text": "o bloqueio de atualizações do OBS"
+  },
+  "setup.theObsVersionListCouldNotBeRead": {
+    "source": "18271e01b4fdb836",
+    "text": "Não foi possível ler a lista de versões do OBS compatíveis deste instalador."
+  },
+  "setup.theObsVersionListIsInvalid": {
+    "source": "cd37c006c83e89ea",
+    "text": "A lista de versões do OBS compatíveis deste instalador é inválida."
   },
   "setup.theOldReplaykitHelperCouldNot": {
     "source": "99cc371f39d82ad5",
@@ -10347,9 +10467,29 @@
     "source": "48b46e260aa0edf2",
     "text": "A verificação do backup original do OBS falhou."
   },
+  "setup.thePresetsInTheSetupHaveNoFile": {
+    "source": "6d6e5590cb5fe8c4",
+    "text": "Os modelos de sobreposição deste instalador não têm {file}."
+  },
   "setup.thePreviousUpdateFilesCouldNotBeCleared": {
     "source": "58db83cc918b521f",
     "text": "Não foi possível limpar os arquivos que sobraram da atualização anterior do ReplayKit."
+  },
+  "setup.theProcessHostListDoesNotMatchObs": {
+    "source": "bd389237dbe2f78a",
+    "text": "A lista de arquivos do host de processos do OBS não corresponde ao OBS {version}."
+  },
+  "setup.theProcessHostListHasABadFile": {
+    "source": "c40350f742eaf8c8",
+    "text": "A lista de arquivos do host de processos do OBS tem um arquivo inválido: {path}"
+  },
+  "setup.theProcessHostListHasABadOriginal": {
+    "source": "4458f87a8dcf2f47",
+    "text": "A lista de arquivos do host de processos do OBS tem um arquivo original inválido: {path}"
+  },
+  "setup.theProcessHostUpdateAndRollbackFailed": {
+    "source": "fe22b39f1b99dbe7",
+    "text": "A atualização do host de processos do OBS e a sua reversão falharam. Os arquivos de recuperação foram mantidos em {path}"
   },
   "setup.theProcessRoleBackupIsMissing": {
     "source": "6c07b88b1b03685a",
@@ -10363,6 +10503,14 @@
     "source": "8a9fc69bb15fb743",
     "text": "O auxiliar do ReplayKit em execução não oferece suporte a encerramento somente gracioso."
   },
+  "setup.theSceneInTheSetupHasNoFilter": {
+    "source": "e90d5470ca142e52",
+    "text": "O arquivo de cena deste instalador não tem o filtro {filter}."
+  },
+  "setup.theSceneInTheSetupIsMissing": {
+    "source": "bb93e9c930c6826c",
+    "text": "O arquivo de cena deste instalador está ausente: {path}"
+  },
   "setup.theSetupWindowCouldNotStart": {
     "source": "e7c9f6e2b0ee0d7b",
     "text": "A janela de instalação não pôde iniciar.\n\n{error}"
@@ -10371,9 +10519,17 @@
     "source": "b65bf65a5f38add6",
     "text": "a janela do Share Preview"
   },
+  "setup.theStreamableSignInFolderIsALink": {
+    "source": "b057cc516d8adc03",
+    "text": "A pasta de login do Streamable é um link ou junção, então não foi mexida."
+  },
   "setup.theUninstallWindowCouldNotStart": {
     "source": "55ebd1d805547641",
     "text": "A janela de desinstalação não pôde iniciar.\n\n{error}"
+  },
+  "setup.theUnpackedWebview2LoaderDoesNotMatch": {
+    "source": "782d4160a9a1170c",
+    "text": "O WebView2Loader.dll extraído não corresponde ao deste instalador."
   },
   "setup.theUpdateFailedAndCouldNotRollBack": {
     "source": "4e502eb60596cfe9",
@@ -10419,6 +10575,10 @@
     "source": "6ad1da665e140849",
     "text": "Ativa os padrões que esta versão traz."
   },
+  "setup.twoObsConfigRestoresTargetOnePlace": {
+    "source": "039d2876d012733a",
+    "text": "Dois arquivos da restauração das configurações do OBS iriam para o mesmo lugar: {path}"
+  },
   "setup.uninstallFailed": {
     "source": "c5aca41f97b2ec12",
     "text": "Falha na desinstalação"
@@ -10447,6 +10607,10 @@
     "source": "bca45daa794e5072",
     "text": "erro desconhecido"
   },
+  "setup.unknownRecordingPreset": {
+    "source": "720b8eebedf6a4a9",
+    "text": "O ReplayKit não conhece a qualidade de gravação {name}."
+  },
   "setup.update": {
     "source": "71060b462f3d44a6",
     "text": "Atualizar"
@@ -10474,6 +10638,10 @@
   "setup.verifyUpdateFiles": {
     "source": "e5aa889b3d9cef79",
     "text": "Verificar os arquivos da atualização"
+  },
+  "setup.webview2LoaderHasNoFunction": {
+    "source": "c6071353d21dc2ad",
+    "text": "O WebView2Loader.dll não tem a função {name}."
   },
   "setup.windowsProgramFilesWasNotFound": {
     "source": "ae428fc60ddcbf2c",

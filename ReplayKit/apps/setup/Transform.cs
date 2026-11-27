@@ -14,60 +14,6 @@ namespace ReplayKitSetup
     // splice user prefs into bundled obs config files (basic.ini, recordencoder.json, scenes json, user.ini, global.ini)
     public static class Transform
     {
-        // targeted regex over configparser becuase obss basic.ini has formatting we want byte-identical (no spaces around =, blank lines, base64 blobs in geometry=).
-
-        // set [section] key=value, preserving formatting. value is treated literally. it works line by line since a hotkey value is json with [ in it, which a regex over the whole text took for the next section header
-        public static string SetIniValue(string text, string section, string key, string value)
-        {
-            var lines = new List<string>(text.Split('\n'));
-            string header = "[" + section + "]";
-            int start = lines.FindIndex(l => l.TrimEnd('\r').Trim() == header);
-
-            // section missing entirely -> append a fresh one at end of file.
-            if (start < 0)
-            {
-                string sep = text.EndsWith("\n") ? "" : "\n";
-                return $"{text}{sep}\n[{section}]\n{key}={value}\n";
-            }
-
-            int end = start + 1;
-            while (end < lines.Count && !IsIniHeader(lines[end])) end++;
-
-            // both section and key present -> replace value in place.
-            for (int i = start + 1; i < end; i++)
-            {
-                if (!lines[i].StartsWith(key + "=", StringComparison.Ordinal)) continue;
-                lines[i] = key + "=" + value + (lines[i].EndsWith("\r") ? "\r" : "");
-                return string.Join("\n", lines);
-            }
-
-            // section present, key missing -> insert after its last line, before the blank lines that lead to the next header.
-            int at = end;
-            while (at > start + 1 && lines[at - 1].TrimEnd('\r').Trim() == "") at--;
-            lines.Insert(at, key + "=" + value + (lines[start].EndsWith("\r") ? "\r" : ""));
-            return string.Join("\n", lines);
-        }
-
-        // [section] key value, or null, read by the same line rule as SetIniValue
-        public static string GetIniValue(string text, string section, string key)
-        {
-            var lines = text.Split('\n');
-            string header = "[" + section + "]";
-            int start = Array.FindIndex(lines, l => l.TrimEnd('\r').Trim() == header);
-            if (start < 0) return null;
-            for (int i = start + 1; i < lines.Length && !IsIniHeader(lines[i]); i++)
-            {
-                if (lines[i].StartsWith(key + "=", StringComparison.Ordinal)) return lines[i].TrimEnd('\r').Substring(key.Length + 1);
-            }
-            return null;
-        }
-
-        private static bool IsIniHeader(string line)
-        {
-            string trimmed = line.TrimEnd('\r').Trim();
-            return trimmed.StartsWith("[") && trimmed.EndsWith("]");
-        }
-
         // memoised so ApplyBasicIni and ApplyRecordEncoderJson agree on which encoder got picked.
         private static (string CodecPreference, string RecordingPreset, string CompressionMode, EncoderChoice Choice)? _encoderCache;
 
@@ -145,40 +91,40 @@ namespace ReplayKitSetup
             foreach (var kv in preset.BasicIni)
             {
                 var items = kv.Key == "Video" ? PresetVideoIni(prefs) : kv.Value;
-                foreach (var item in items) text = SetIniValue(text, kv.Key, item.Key, item.Value);
+                foreach (var item in items) text = ObsIni.Set(text, kv.Key, item.Key, item.Value);
             }
 
-            text = SetIniValue(text, "AdvOut", "RecTracks", RuntimeFlag("recordingSeparateAudioTracks", Prefs.DEFAULT_SEPARATE_AUDIO_TRACKS) ? "15" : "1");
+            text = ObsIni.Set(text, "AdvOut", "RecTracks", RuntimeFlag("recordingSeparateAudioTracks", Prefs.DEFAULT_SEPARATE_AUDIO_TRACKS) ? "15" : "1");
 
             // advout.recencoder must match the encoder whose settings we write into recordencoder.json.
             var encoder = ResolveEncoder(prefs);
-            text = SetIniValue(text, "AdvOut", "RecEncoder", encoder.ObsEncoderId);
+            text = ObsIni.Set(text, "AdvOut", "RecEncoder", encoder.ObsEncoderId);
 
-            text = SetIniValue(text, "AdvOut", "RecRB", "true");
-            text = SetIniValue(text, "AdvOut", "RecRBTime", prefs.ReplayBufferSeconds.ToString());
-            text = SetIniValue(text, "AdvOut", "RecRBSize", ScaledRbSizeMb(preset, prefs).ToString());
+            text = ObsIni.Set(text, "AdvOut", "RecRB", "true");
+            text = ObsIni.Set(text, "AdvOut", "RecRBTime", prefs.ReplayBufferSeconds.ToString());
+            text = ObsIni.Set(text, "AdvOut", "RecRBSize", ScaledRbSizeMb(preset, prefs).ToString());
 
             // forward slashes -- obs accepts them in ini values and skips escaping.
             string recPath = prefs.RecordingPath.Replace("\\", "/");
-            text = SetIniValue(text, "SimpleOutput", "FilePath", recPath);
-            text = SetIniValue(text, "AdvOut", "RecFilePath", recPath);
-            text = SetIniValue(text, "AdvOut", "FFFilePath", recPath);
+            text = ObsIni.Set(text, "SimpleOutput", "FilePath", recPath);
+            text = ObsIni.Set(text, "AdvOut", "RecFilePath", recPath);
+            text = ObsIni.Set(text, "AdvOut", "FFFilePath", recPath);
 
             // the wizard sets the clip and recording keys; the extra bindings, a stop key of its own and the screenshot key come from the settings file, since the helper reads every hotkey back out of obs and would save an empty one over the setting
             var clipExtra = RuntimeKeybind("clipKeybindExtra");
-            text = SetIniValue(text, "Hotkeys", "ReplayBuffer", Keybind.ToBasicIniValue(prefs.ClipKeybind, clipExtra));
-            text = SetIniValue(text, "Hotkeys", "OBSBasic.SaveReplayBuffer", Keybind.ToObsHotkeyValue(prefs.ClipKeybind, clipExtra));
+            text = ObsIni.Set(text, "Hotkeys", "ReplayBuffer", Keybind.ToBasicIniValue(prefs.ClipKeybind, clipExtra));
+            text = ObsIni.Set(text, "Hotkeys", "OBSBasic.SaveReplayBuffer", Keybind.ToObsHotkeyValue(prefs.ClipKeybind, clipExtra));
             if (prefs.RecordingKeybind != null && prefs.RecordingKeybind.Count > 0)
             {
                 string recordingHotkey = Keybind.ToObsHotkeyValue(prefs.RecordingKeybind, RuntimeKeybind("recordingKeybindExtra"));
                 var stop = RuntimeKeybind("recordingStopKeybind");
-                text = SetIniValue(text, "Hotkeys", "OBSBasic.StartRecording", recordingHotkey);
-                text = SetIniValue(text, "Hotkeys", "OBSBasic.StopRecording", stop != null ? Keybind.ToObsHotkeyValue(stop, RuntimeKeybind("recordingStopKeybindExtra")) : recordingHotkey);
+                text = ObsIni.Set(text, "Hotkeys", "OBSBasic.StartRecording", recordingHotkey);
+                text = ObsIni.Set(text, "Hotkeys", "OBSBasic.StopRecording", stop != null ? Keybind.ToObsHotkeyValue(stop, RuntimeKeybind("recordingStopKeybindExtra")) : recordingHotkey);
             }
             var screenshot = RuntimeKeybind("screenshotKeybind");
             var screenshotExtra = RuntimeKeybind("screenshotKeybindExtra");
             if (screenshot != null || screenshotExtra != null)
-                text = SetIniValue(text, "Hotkeys", "OBSBasic.Screenshot", Keybind.ToObsHotkeyValue(screenshot, screenshotExtra));
+                text = ObsIni.Set(text, "Hotkeys", "OBSBasic.Screenshot", Keybind.ToObsHotkeyValue(screenshot, screenshotExtra));
 
             return ApplyShareCableMonitoring(text);
         }
@@ -188,8 +134,8 @@ namespace ReplayKitSetup
         {
             var monitor = FindObsStreamAudioRenderEndpoint();
             if (monitor == null) return text;
-            text = SetIniValue(text, "Audio", "MonitoringDeviceId", monitor.Value.DeviceId);
-            return SetIniValue(text, "Audio", "MonitoringDeviceName", monitor.Value.Name);
+            text = ObsIni.Set(text, "Audio", "MonitoringDeviceId", monitor.Value.DeviceId);
+            return ObsIni.Set(text, "Audio", "MonitoringDeviceName", monitor.Value.Name);
         }
 
         private static (string DeviceId, string Name)? FindObsStreamAudioRenderEndpoint()
@@ -333,7 +279,7 @@ namespace ReplayKitSetup
             {
                 return null;
             }
-            return GetIniValue(liveText, section, key);
+            return ObsIni.Get(liveText, section, key);
         }
 
         // basicwindow toggles that only ever take the bundled seed on a genuine fresh install (no live user.ini yet) -- a later run of this (an update, a repair, re-running setup) leaves whatever the user has now alone, same idea as ExtraBrowserDocks below; covers the View menu Toolbars + Status Bar checkboxes, off by default for a cleaner first look, and a user who turns either back on keeps that. DockState and geometry belong here too: the bundle carries the dock layout and window position of the machine it was made on, and the plugin folds the scenes, sources and mixer panels away only once per layout (layoutDocksApplied in window_state.ini), so a bundled DockState put back over a live one left those panels showing under the clean shell. -- SysTrayWhenStarted is here too since replaykit mirrors it as the start minimized setting, so an update must not put the bundled value back over the one the user chose set for a clean re-install, which is meant to behave like a first install: the two view toggles then take the bundled off state again, while DockState and geometry still stay with the live window so the plugin layout marker keeps matching
@@ -347,27 +293,27 @@ namespace ReplayKitSetup
             if (!CleanReinstall)
             {
                 string theme = ReadLiveUserIniValue("Theme", "Appearance");
-                if (theme != null) text = SetIniValue(text, "Appearance", "Theme", theme);
+                if (theme != null) text = ObsIni.Set(text, "Appearance", "Theme", theme);
             }
-            string seed = GetIniValue(text, "BasicWindow", "ExtraBrowserDocks");
+            string seed = ObsIni.Get(text, "BasicWindow", "ExtraBrowserDocks");
             if (seed != null)
             {
                 // fold the live ini into the bundle seed so user-added docks are preserved.
                 string liveValue = ReadLiveUserIniValue("ExtraBrowserDocks") ?? "";
                 if (liveValue.Length > 0 && liveValue != seed) seed = CombineExtraBrowserDocks(seed, liveValue);
-                text = SetIniValue(text, "BasicWindow", "ExtraBrowserDocks", MergeExtraBrowserDocksValue(seed));
+                text = ObsIni.Set(text, "BasicWindow", "ExtraBrowserDocks", MergeExtraBrowserDocksValue(seed));
             }
             else
             {
-                text = SetIniValue(text, "BasicWindow", "ExtraBrowserDocks", ExtraBrowserDocksValue());
+                text = ObsIni.Set(text, "BasicWindow", "ExtraBrowserDocks", ExtraBrowserDocksValue());
             }
             foreach (string key in FreshInstallOnlyBasicWindowKeys)
             {
                 if (CleanReinstall && (key == "ShowListboxToolbars" || key == "ShowStatusBar")) continue;
                 string live = ReadLiveUserIniValue(key);
-                if (live != null) text = SetIniValue(text, "BasicWindow", key, live);
+                if (live != null) text = ObsIni.Set(text, "BasicWindow", key, live);
             }
-            return SetIniValue(text, "General", "ConfirmOnExit", ConfirmOnExitValue(prefs));
+            return ObsIni.Set(text, "General", "ConfirmOnExit", ConfirmOnExitValue(prefs));
         }
 
         // concat bundle + live extrabrowserdocks arrays, dedupe by json serialisation. obs-custom-dock duplicates are collapsed in the downstream merge.
@@ -442,8 +388,8 @@ namespace ReplayKitSetup
                 @base = text; // fresh install -- start from the bundled defaults.
             }
 
-            foreach (var (section, key, value) in EnforcedGlobalIni) @base = SetIniValue(@base, section, key, value);
-            @base = SetIniValue(@base, "General", "ConfirmOnExit", ConfirmOnExitValue(prefs));
+            foreach (var (section, key, value) in EnforcedGlobalIni) @base = ObsIni.Set(@base, section, key, value);
+            @base = ObsIni.Set(@base, "General", "ConfirmOnExit", ConfirmOnExitValue(prefs));
             return @base;
         }
 
@@ -482,7 +428,7 @@ namespace ReplayKitSetup
         private const int ObsBoundsScaleInner = 2; // libobs obs_bounds_type from scene-item-properties.cpp -- fit inside bounds, preserve aspect.
 
         // single obs-visible script entry; feature scripts are loaded inside replaykit.lua to keep tools->scripts uncluttered.
-        private const string ReplaykitScriptRelpath = "obs-replayKit/scripts/replaykit.lua";
+        private const string ReplaykitScriptRelpath = ReplayKitFolder.Name + "/scripts/replaykit.lua";
 
         // forward-slashed, lowercased ~/videos -- matches Prefs.DefaultRecordingPath, the helper clip-dir fallback, and the lua/ps fallbacks.
         private static string DefaultClipDirNorm() => ClipFolder.Default().Replace('\\', '/').TrimEnd('/').ToLowerInvariant();
@@ -1152,7 +1098,7 @@ namespace ReplayKitSetup
                 ZipArchiveEntry Find(string relative) => entries.TryGetValue(BundleLayout.PresetsZipRoot + relative, out var entry) ? entry : null;
                 string Read(string relative)
                 {
-                    var entry = Find(relative) ?? throw new FileNotFoundException("The presets zip has no " + relative);
+                    var entry = Find(relative) ?? throw SetupLocale.Error("setup.thePresetsInTheSetupHaveNoFile", m => new FileNotFoundException(m), "file", relative);
                     using (var reader = new StreamReader(entry.Open())) return reader.ReadToEnd();
                 }
                 return InputOverlayLayout.Pick(layout.Json, layout.Sheet, Read, relative => Find(relative) != null);
@@ -1543,7 +1489,7 @@ namespace ReplayKitSetup
         {
             ["basic/profiles/Untitled/basic.ini"] = ApplyBasicIni,
             ["basic/profiles/Untitled/recordEncoder.json"] = ApplyRecordEncoderJson,
-            ["obs-replayKit/replaykit_settings.json"] = ApplyReplaykitSettingsJson,
+            [ReplayKitFolder.Name + "/replaykit_settings.json"] = ApplyReplaykitSettingsJson,
             ["user.ini"] = ApplyUserIni,
             ["global.ini"] = ApplyGlobalIni,
         };

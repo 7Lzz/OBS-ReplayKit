@@ -105,7 +105,7 @@ namespace ReplayKitHelper
             return entries;
         }
 
-        private static string SeenPath() => System.IO.Path.Combine(Constants.OBS_CONFIG_DIR, "obs-replayKit", "cache", "audio_apps_seen.json");
+        private static string SeenPath() => System.IO.Path.Combine(Constants.OBS_CONFIG_DIR, ReplayKitShared.ReplayKitFolder.Name, "cache", "audio_apps_seen.json");
 
         private static Dictionary<string, SeenApp> LoadSeenLocked()
         {

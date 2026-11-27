@@ -12,7 +12,7 @@ namespace rk {
 
 QString ReplayKitRootPath()
 {
-	return qEnvironmentVariable("APPDATA") + QStringLiteral("/obs-studio/obs-replayKit");
+	return qEnvironmentVariable("APPDATA") + QStringLiteral("/obs-studio/") + QString::fromLatin1(kReplayKitFolder);
 }
 
 QString StateFilePath(const QString &name)

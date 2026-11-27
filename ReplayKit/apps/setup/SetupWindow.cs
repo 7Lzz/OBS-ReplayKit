@@ -337,14 +337,14 @@ namespace ReplayKitSetup
             string html;
             using (var stream = asm.GetManifestResourceStream("ReplayKitSetup.setup_installer.html"))
             {
-                if (stream == null) throw new InvalidOperationException("setup_installer.html resource is missing from the build.");
+                if (stream == null) throw SetupLocale.Error("setup.aFileIsMissingFromThisSetup", m => new InvalidOperationException(m), "file", "setup_installer.html");
                 using var reader = new StreamReader(stream, Encoding.UTF8);
                 html = reader.ReadToEnd();
             }
             // the hero art + brand icon are the same files the update window fetches over http; there is no helper here, so pull them straight out of the embedded asset bundle and inline them as data uris.
-            html = html.Replace("{{HERO_ART}}", BundledDataUri("obs-studio/obs-replayKit/obs-custom-dock/update-art.png", "image/png"));
-            html = html.Replace("{{BRAND_ICON}}", BundledDataUri("obs-studio/obs-replayKit/scripts/helper/obs-replaykit.ico", "image/x-icon"));
-            html = html.Replace("{{SETUP_CHECK}}", BundledDataUri("obs-studio/obs-replayKit/icons/action/check.svg", "image/svg+xml"));
+            html = html.Replace("{{HERO_ART}}", BundledDataUri("obs-studio/" + ReplayKitShared.ReplayKitFolder.Name + "/obs-custom-dock/update-art.png", "image/png"));
+            html = html.Replace("{{BRAND_ICON}}", BundledDataUri("obs-studio/" + ReplayKitShared.ReplayKitFolder.Name + "/scripts/helper/obs-replaykit.ico", "image/x-icon"));
+            html = html.Replace("{{SETUP_CHECK}}", BundledDataUri("obs-studio/" + ReplayKitShared.ReplayKitFolder.Name + "/icons/action/check.svg", "image/svg+xml"));
             html = html.Replace("{{SETUP_STATE}}", DetectSetupState());
             return html;
         }
