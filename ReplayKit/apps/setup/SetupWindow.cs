@@ -42,7 +42,7 @@ namespace ReplayKitSetup
 
         public int RunModal()
         {
-            _scale = SafeDpiScale();
+            _scale = BuiltinPage.DpiScale();
             _theme = WindowTheme.Load();
             _html = _theme.ApplyTo(SetupLocale.Inject(LoadHtml()));
             _brushBg = Native.CreateSolidBrush((uint)WindowTheme.ColorRef(_theme.Window));
@@ -71,7 +71,7 @@ namespace ReplayKitSetup
             if (_hwnd == IntPtr.Zero) throw new InvalidOperationException(SetupLocale.Message("setup.couldNotCreateTheSetupWindow"));
 
             ApplyTitleBarTheme();
-            SetIconFromExe();
+            BuiltinPage.SetIconFromExe(_hwnd);
             Native.ShowWindow(_hwnd, 5);
             Native.UpdateWindow(_hwnd);
 
@@ -116,7 +116,7 @@ namespace ReplayKitSetup
             }
             catch (Exception ex)
             {
-                WriteErrorLog(ex);
+                BuiltinPage.WriteErrorLog(ex);
                 InstallerApp.ShowFatalError(SetupLocale.Message("setup.theSetupWindowCouldNotStart", "error", ex.Message), null);
                 Native.DestroyWindow(_hwnd);
             }
@@ -172,7 +172,7 @@ namespace ReplayKitSetup
                 }
                 catch (Exception ex)
                 {
-                    WriteErrorLog(ex);
+                    BuiltinPage.WriteErrorLog(ex);
                     SetupLog.Line("=== install flow FAILED: " + ex.Message + " ===");
                     Enqueue(() => OnFlowFailed(ex.Message));
                 }
@@ -202,19 +202,14 @@ namespace ReplayKitSetup
                 SetupLog.Line("=== uninstall flow start (keepSettings=" + keepUserSettings + ", removeObs=" + removeObs + ") ===");
                 try
                 {
-                    Cleanup.RunCleanup(progress, keepUserSettings, removeObs);
-                    if (!removeObs)
-                    {
-                        try { Obs.LaunchObs(progress.LogLine); }
-                        catch (Exception ex) { progress.LogLine("warn: could not relaunch OBS: " + ex.Message); }
-                    }
+                    Cleanup.RunUninstall(progress, keepUserSettings, removeObs);
                     code = 0;
                     SetupLog.Line("=== uninstall flow complete ===");
                     Enqueue(() => OnUninstallSucceeded(removeObs));
                 }
                 catch (Exception ex)
                 {
-                    WriteErrorLog(ex);
+                    BuiltinPage.WriteErrorLog(ex);
                     SetupLog.Line("=== uninstall flow FAILED: " + ex.Message + " ===");
                     Enqueue(() => OnFlowFailed(ex.Message));
                 }
@@ -257,8 +252,6 @@ namespace ReplayKitSetup
             string shown = SetupLocale.Message("setup.messageLogPath", "message", message ?? SetupLocale.Message("setup.unknownError"), "path", SetupLog.Path);
             PostToPage(new JObject { ["type"] = "failed", ["message"] = shown });
         }
-
-        // ---- page <-> host ----
 
         internal void PostToPage(JObject payload)
         {
@@ -329,22 +322,10 @@ namespace ReplayKitSetup
             catch (Exception) { }
         }
 
-        // ---- helpers ----
-
         private static string LoadHtml()
         {
-            var asm = Assembly.GetExecutingAssembly();
-            string html;
-            using (var stream = asm.GetManifestResourceStream("ReplayKitSetup.setup_installer.html"))
-            {
-                if (stream == null) throw SetupLocale.Error("setup.aFileIsMissingFromThisSetup", m => new InvalidOperationException(m), "file", "setup_installer.html");
-                using var reader = new StreamReader(stream, Encoding.UTF8);
-                html = reader.ReadToEnd();
-            }
-            // the hero art + brand icon are the same files the update window fetches over http; there is no helper here, so pull them straight out of the embedded asset bundle and inline them as data uris.
-            html = html.Replace("{{HERO_ART}}", BundledDataUri("obs-studio/" + ReplayKitShared.ReplayKitFolder.Name + "/obs-custom-dock/update-art.png", "image/png"));
-            html = html.Replace("{{BRAND_ICON}}", BundledDataUri("obs-studio/" + ReplayKitShared.ReplayKitFolder.Name + "/scripts/helper/obs-replaykit.ico", "image/x-icon"));
-            html = html.Replace("{{SETUP_CHECK}}", BundledDataUri("obs-studio/" + ReplayKitShared.ReplayKitFolder.Name + "/icons/action/check.svg", "image/svg+xml"));
+            string html = BuiltinPage.Read("setup_installer.html", "setup_installer.html");
+            html = html.Replace("{{SETUP_CHECK}}", BuiltinPage.BundledDataUri("obs-studio/" + ReplayKitShared.ReplayKitFolder.Name + "/icons/action/check.svg", "image/svg+xml"));
             html = html.Replace("{{SETUP_STATE}}", DetectSetupState());
             return html;
         }
@@ -365,38 +346,7 @@ namespace ReplayKitSetup
             return new JObject { ["installed"] = installed, ["cable"] = cable, ["screenshare"] = screenshare }.ToString(Formatting.None);
         }
 
-        private static string BundledDataUri(string entryPath, string mime)
-        {
-            try
-            {
-                using var res = Assembly.GetExecutingAssembly().GetManifestResourceStream("ReplayKitSetup.assets.bundle.zip");
-                if (res == null) return "";
-                using var zip = new System.IO.Compression.ZipArchive(res, System.IO.Compression.ZipArchiveMode.Read);
-                var entry = zip.GetEntry(entryPath);
-                if (entry == null) return "";
-                using var es = entry.Open();
-                using var ms = new MemoryStream();
-                es.CopyTo(ms);
-                return "data:" + mime + ";base64," + Convert.ToBase64String(ms.ToArray());
-            }
-            catch (Exception)
-            {
-                return "";
-            }
-        }
-
         private int S(int px) => (int)Math.Round(px * _scale);
-
-        private static double SafeDpiScale()
-        {
-            try
-            {
-                uint dpi = Native.GetDpiForSystem();
-                if (dpi >= 72 && dpi <= 480) return dpi / 96.0;
-            }
-            catch (Exception) { }
-            return 1.0;
-        }
 
         // the treatment the helper gives its own windows (Clips, Settings): a caption in the panel colour of the theme, a touch lighter than the window body, with its line colour as the border -- otherwise win11 draws a plain system title bar on top of the themed webview content.
         private void ApplyTitleBarTheme()
@@ -412,32 +362,6 @@ namespace ReplayKitSetup
                 DwmSetWindowAttribute(_hwnd, DWMWA_BORDER_COLOR, ref border, sizeof(int));
                 int text = WindowTheme.ColorRef(_theme.Text);
                 DwmSetWindowAttribute(_hwnd, DWMWA_TEXT_COLOR, ref text, sizeof(int));
-            }
-            catch (Exception) { }
-        }
-
-        private void SetIconFromExe()
-        {
-            try
-            {
-                string exe = NetCompat.ProcessPath ?? "";
-                if (string.IsNullOrEmpty(exe)) return;
-                IntPtr hIcon = Native.ExtractIconW(Native.GetModuleHandleW(null), exe, 0);
-                if (hIcon != IntPtr.Zero && hIcon != (IntPtr)1)
-                {
-                    Native.SendMessageW(_hwnd, 0x0080, (IntPtr)1, hIcon);
-                    Native.SendMessageW(_hwnd, 0x0080, IntPtr.Zero, hIcon);
-                }
-            }
-            catch (Exception) { }
-        }
-
-        private static void WriteErrorLog(Exception ex)
-        {
-            try
-            {
-                string path = Path.Combine(AppContext.BaseDirectory, "OBSReplayKit-error.log");
-                File.WriteAllText(path, ex.ToString(), new UTF8Encoding(false));
             }
             catch (Exception) { }
         }

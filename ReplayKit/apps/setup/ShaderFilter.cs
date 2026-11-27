@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Security.Cryptography;
 
 namespace ReplayKitSetup
@@ -11,9 +13,12 @@ namespace ReplayKitSetup
         private const string PluginPdbRel = "obs-plugins/64bit/obs-shaderfilter.pdb";
         private const string PluginDataRel = "data/obs-plugins/obs-shaderfilter";
 
-        private static readonly string PluginDll = Path.Combine(Config.PROGRAMFILES_OBS_DIR, "obs-plugins", "64bit", "obs-shaderfilter.dll");
-        private static readonly string PluginData = Path.Combine(Config.PROGRAMFILES_OBS_DIR, "data", "obs-plugins", "obs-shaderfilter");
-        private static readonly string MotionBlurShader = Path.Combine(PluginData, "examples", "motion_blur.shader");
+        private static string InObs(string relative) => Path.Combine(Config.PROGRAMFILES_OBS_DIR, relative.Replace('/', Path.DirectorySeparatorChar));
+
+        private static readonly string PluginDll = InObs(PluginDllRel);
+        private static readonly string PluginData = InObs(PluginDataRel);
+        // the shader the motion blur filter of the scene points at
+        internal static readonly string MotionBlurShader = Path.Combine(PluginData, "examples", "motion_blur.shader");
 
         private static readonly string[] CompositeBlurTargets =
         {
@@ -22,6 +27,9 @@ namespace ReplayKitSetup
             Path.Combine(Config.PROGRAMFILES_OBS_DIR, "data", "obs-plugins", "obs-composite-blur"),
             Path.Combine(Config.PROGRAMDATA, "obs-studio", "plugins", "obs-composite-blur"),
         };
+
+        // what this plugin and the composite blur it replaced put into obs, which an uninstall takes away
+        internal static IEnumerable<string> InstalledPaths => new[] { PluginDll, InObs(PluginPdbRel), PluginData }.Concat(CompositeBlurTargets);
 
         private static bool AllowedArchiveMember(string relText)
         {

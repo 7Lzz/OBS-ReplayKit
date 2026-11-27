@@ -10012,6 +10012,14 @@
     "source": "d21a9a94574f4ff7",
     "text": "Für OBS {version} ist kein gemeinsamer Prozess-Host enthalten. Installiere zuerst eine unterstützte OBS-Version."
   },
+  "setup.theSteamCopyOfObsIsVersion": {
+    "source": "fb0ec773c77886b7",
+    "text": "Die Steam-Version von OBS ist {installed}, ReplayKit braucht aber OBS {target}. Steam bestimmt, welche Version läuft, also installiere OBS {target} stattdessen von obsproject.com."
+  },
+  "setup.obsIsNewerThanTheVersionReplaykitSupports": {
+    "source": "e6c5ea8f1b5de4d5",
+    "text": "OBS {installed} ist neuer als OBS {target}, die Version, die dieses ReplayKit unterstützt. Installiere OBS {target} von obsproject.com und starte dann den ReplayKit-Installer erneut."
+  },
   "setup.netFrameworkInstallPrompt": {
     "source": "451227b9398ebce4",
     "text": "OBS ReplayKit benötigt Microsoft .NET Framework 4.8, das auf diesem PC nicht installiert ist.\n\nWähle OK, um das Installationsprogramm von .NET Framework 4.8 bei Microsoft herunterzuladen und zu öffnen. Sobald es fertig ist, startet dieses Installationsprogramm von selbst erneut."

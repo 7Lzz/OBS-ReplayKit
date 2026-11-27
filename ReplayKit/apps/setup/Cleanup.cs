@@ -30,15 +30,16 @@ namespace ReplayKitSetup
         public static bool StopObsAndHelpers(Action<string> log = null)
         {
             Obs.CloseObs(log, forceCloseRemaining: true);
-            StopLegacyEncoder(log);
+            StopEncoder(log);
             if (!ShareWindowInstall.Stop(log))
                 throw new IOException(SetupLocale.Message("screenshare.theShareWindowDidNotClose"));
             return true;
         }
 
-        private static void StopLegacyEncoder(Action<string> log)
+        // an encode the helper started keeps running through its ffmpeg link after the helper is gone, and holds the files the removal deletes
+        private static void StopEncoder(Action<string> log)
         {
-            string target = Path.GetFullPath(Path.Combine(Config.REPLAYKIT_CONFIG, "scripts", "helper", "OBSReplayKit-Encoder.exe"));
+            string target = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(Config.HELPER_EXE), VideoTools.EncoderAlias));
             foreach (var process in Process.GetProcessesByName(Path.GetFileNameWithoutExtension(target)))
             {
                 using (process)
@@ -49,15 +50,15 @@ namespace ReplayKitSetup
                         // hold the process handle from the image check through termination and the exit wait
                         _ = process.Handle;
                         string image = process.MainModule?.FileName;
-                        if (image == null) throw new IOException("could not verify the legacy encoder image path");
+                        if (image == null) throw new IOException("could not verify the encoder image path");
                         if (!string.Equals(Path.GetFullPath(image), target, StringComparison.OrdinalIgnoreCase)) continue;
                         process.Kill();
-                        if (!process.WaitForExit(3000)) throw new IOException("the legacy encoder did not exit in time");
+                        if (!process.WaitForExit(3000)) throw new IOException("the encoder did not exit in time");
                     }
                     catch (Exception ex) when ((ex is InvalidOperationException || ex is System.ComponentModel.Win32Exception) && process.HasExited) { }
                     catch (Exception ex) when (ex is InvalidOperationException || ex is System.ComponentModel.Win32Exception || ex is IOException)
                     {
-                        log?.Invoke("warn: legacy encoder stop failed for pid " + process.Id + ": " + ex.Message);
+                        log?.Invoke("warn: encoder stop failed for pid " + process.Id + ": " + ex.Message);
                         throw new IOException(SetupLocale.Message("setup.obsOrItsHelperBrowserProcesses"), ex);
                     }
                 }
@@ -66,30 +67,12 @@ namespace ReplayKitSetup
 
         public static bool RemoveReplaykitPlugins(Action<string> log = null)
         {
-            string obsRoot = Config.PROGRAMFILES_OBS_DIR;
-            var targets = new[]
-            {
-                Path.Combine(obsRoot, "obs-plugins", "64bit", "win-capture-audio.dll"),
-                Path.Combine(obsRoot, "obs-plugins", "64bit", "win-capture-audio.pdb"),
-                Path.Combine(obsRoot, "data", "obs-plugins", "win-capture-audio"),
-                Path.Combine(obsRoot, "obs-plugins", "64bit", "input-overlay.dll"),
-                Path.Combine(obsRoot, "obs-plugins", "64bit", "SDL2.dll"),
-                Path.Combine(obsRoot, "data", "obs-plugins", "input-overlay"),
-                Path.Combine(Config.PROGRAMDATA, "obs-studio", "plugins", "input-overlay"),
-                Path.Combine(obsRoot, "obs-plugins", "64bit", "bongobs-cat.dll"),
-                Path.Combine(obsRoot, "bin", "64bit", "Bango Cat"),
-                Path.Combine(obsRoot, "data", "obs-plugins", OverlayScene.LegacyBongoSourceKind),
-                Path.Combine(obsRoot, "obs-plugins", "64bit", "obs-composite-blur.dll"),
-                Path.Combine(obsRoot, "obs-plugins", "64bit", "obs-composite-blur.pdb"),
-                Path.Combine(obsRoot, "data", "obs-plugins", "obs-composite-blur"),
-                Path.Combine(Config.PROGRAMDATA, "obs-studio", "plugins", "obs-composite-blur"),
-                Path.Combine(obsRoot, "obs-plugins", "64bit", "obs-shaderfilter.dll"),
-                Path.Combine(obsRoot, "obs-plugins", "64bit", "obs-shaderfilter.pdb"),
-                Path.Combine(obsRoot, "data", "obs-plugins", "obs-shaderfilter"),
-                Config.REPLAYKIT_PLUGIN_DIR,
+            var targets = WinCapture.InstalledPaths
+                .Concat(InputOverlay.InstalledPaths)
+                .Concat(BongoCat.InstalledPaths)
+                .Concat(ShaderFilter.InstalledPaths)
                 // the obs updater comes back with replaykit gone
-                ObsUpdateLock.MarkerPath,
-            };
+                .Concat(new[] { Config.REPLAYKIT_PLUGIN_DIR, ObsUpdateLock.MarkerPath });
             bool ok = true;
             foreach (var target in targets)
             {
@@ -159,7 +142,7 @@ namespace ReplayKitSetup
                         throw new InvalidDataException(SetupLocale.Message("setup.theDeletedHistoryPathIsInvalid"));
                     string stored = Path.GetFullPath((string)value);
                     string folder = Path.GetDirectoryName(stored);
-                    if (!string.Equals(Path.GetFileName(folder), ".replaykit-deleted", StringComparison.OrdinalIgnoreCase))
+                    if (!string.Equals(Path.GetFileName(folder), StateLayout.DeletedHistoryFolder, StringComparison.OrdinalIgnoreCase))
                         throw new InvalidDataException(SetupLocale.Message("setup.theDeletedHistoryFolderIsInvalid"));
                     for (string parent = stored; parent != null; parent = Path.GetDirectoryName(parent))
                     {
@@ -308,7 +291,7 @@ namespace ReplayKitSetup
             if (!Directory.Exists(cacheDir)) return ok;
 
             // the streamable sign-in webview2 profile -- nothing reads it after an uninstall and no other step touches it
-            string streamable = Path.Combine(cacheDir, "StreamableProfile");
+            string streamable = Path.Combine(cacheDir, ReplayKitFolder.StreamableProfileFolder);
             if (Directory.Exists(streamable))
             {
                 try { Directory.Delete(streamable, true); log?.Invoke("removed " + streamable); }
@@ -317,7 +300,7 @@ namespace ReplayKitSetup
             }
 
             // the speech engine and model of auto subtitles, fetched by the helper the first time they were used
-            string speech = Path.Combine(cacheDir, "speech");
+            string speech = Path.Combine(cacheDir, ReplayKitFolder.SpeechFolder);
             if (Directory.Exists(speech))
             {
                 try { Directory.Delete(speech, true); log?.Invoke("removed " + speech); }
@@ -386,7 +369,7 @@ namespace ReplayKitSetup
             string name = src.Value<string>("name") ?? "";
             if (string.Equals(id, "input-overlay", StringComparison.OrdinalIgnoreCase)) return true;
             if (IsFocusCard(src)) return true;
-            if (name == "Desktop Audio (excl. Discord)" || name == "Discord Audio (record only)") return true;
+            if (name == OverlayScene.DesktopAudioSourceName || name == OverlayScene.DiscordAudioSourceName) return true;
             var settings = src["settings"];
             return settings != null &&
                    settings.ToString(Formatting.None).IndexOf("obs-replaykit", StringComparison.OrdinalIgnoreCase) >= 0;
@@ -404,7 +387,7 @@ namespace ReplayKitSetup
 
                 JObject root;
                 try { root = JObject.Parse(File.ReadAllText(path)); }
-                catch (Exception ex) when (ex is IOException || ex is JsonException)
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is JsonException)
                 {
                     log?.Invoke("warn: could not read " + Path.GetFileName(path) + ": " + ex.Message);
                     continue;
@@ -416,7 +399,7 @@ namespace ReplayKitSetup
                 var removedSources = new List<string>();
                 bool changed = false;
 
-                // 1. drop the replaykit.lua entry from the scripts-tool module
+                // drop the replaykit.lua entry from the scripts-tool module
                 if (root["modules"]?["scripts-tool"] is JArray scriptsTool)
                 {
                     var kept = new JArray(scriptsTool.Where(s =>
@@ -424,7 +407,7 @@ namespace ReplayKitSetup
                     if (kept.Count != scriptsTool.Count) { root["modules"]["scripts-tool"] = kept; changed = true; }
                 }
 
-                // 2. remove ReplayKits scene(s); keep the first shell in case the collection ends up empty
+                // remove the scenes of replaykit, keeping the first as a shell in case the collection ends up empty
                 JObject shell = null;
                 var rkItemNames = new HashSet<string>(StringComparer.Ordinal);
                 foreach (var scene in sources.OfType<JObject>()
@@ -441,13 +424,13 @@ namespace ReplayKitSetup
                 if (root["scene_order"] is JArray order && removedScenes.Count > 0)
                     root["scene_order"] = new JArray(order.Where(o => !removedScenes.Contains(o?["name"]?.Value<string>() ?? "")));
 
-                // 3. names the surviving SCENES still list (a doomed group must not shield its children, so groups are not counted yet)
+                // names the surviving scenes still list (a doomed group must not shield its children, so groups are not counted yet)
                 var sceneRefs = new HashSet<string>(StringComparer.Ordinal);
                 foreach (var scene in sources.OfType<JObject>().Where(s => (s.Value<string>("id") ?? "") == "scene"))
                     foreach (var it in (scene["settings"]?["items"] as JArray ?? new JArray()))
                     { var n = it?["name"]?.Value<string>(); if (!string.IsNullOrEmpty(n)) sceneRefs.Add(n); }
 
-                // 3b. drop ReplayKit groups first -- one no surviving scene lists and that is ReplayKits or came from the removed scene
+                // drop the groups of replaykit first -- one no surviving scene lists and that is replaykits own or came from the removed scene
                 foreach (var g in groups.OfType<JObject>().ToList())
                 {
                     string name = g.Value<string>("name") ?? "";
@@ -458,13 +441,13 @@ namespace ReplayKitSetup
                     changed = true;
                 }
 
-                // 3c. now the reference set = surviving scenes + the groups that survived
+                // now the reference set is the surviving scenes plus the groups that survived
                 var referenced = new HashSet<string>(sceneRefs, StringComparer.Ordinal);
                 foreach (var g in groups.OfType<JObject>())
                     foreach (var it in (g["settings"]?["items"] as JArray ?? new JArray()))
                     { var n = it?["name"]?.Value<string>(); if (!string.IsNullOrEmpty(n)) referenced.Add(n); }
 
-                // 4. remove ReplayKit sources + whatever the removed scene held that nothing kept still uses
+                // remove the replaykit sources and whatever the removed scene held that nothing kept still uses
                 foreach (var src in sources.OfType<JObject>().Where(s => (s.Value<string>("id") ?? "") != "scene").ToList())
                 {
                     string name = src.Value<string>("name") ?? "";
@@ -475,7 +458,7 @@ namespace ReplayKitSetup
                     changed = true;
                 }
 
-                // 5. drop now-dangling items from the scenes/groups that survived
+                // drop now-dangling items from the scenes and groups that survived
                 var known = new HashSet<string>(sources.Concat(groups).OfType<JObject>()
                     .Select(s => s.Value<string>("name") ?? "").Where(n => n.Length > 0), StringComparer.Ordinal);
                 foreach (var container in sources.Concat(groups).OfType<JObject>())
@@ -485,7 +468,7 @@ namespace ReplayKitSetup
                         if (pruned.Count != items.Count) { container["settings"]["items"] = pruned; changed = true; }
                     }
 
-                // 6. never leave the collection with zero scenes
+                // never leave the collection with zero scenes
                 if (!sources.OfType<JObject>().Any(s => (s.Value<string>("id") ?? "") == "scene") && shell != null)
                 {
                     shell["name"] = "Scene";
@@ -496,7 +479,7 @@ namespace ReplayKitSetup
                     log?.Invoke("scrubbed " + Path.GetFileName(path) + ": collection was entirely ReplayKit, left a blank \"Scene\"");
                 }
 
-                // 7. repoint the active scene if it named something removed
+                // repoint the active scene if it named something removed
                 string firstScene = (root["scene_order"] as JArray)?.FirstOrDefault()?["name"]?.Value<string>()
                     ?? sources.OfType<JObject>().FirstOrDefault(s => (s.Value<string>("id") ?? "") == "scene")?.Value<string>("name");
                 foreach (string key in new[] { "current_scene", "current_program_scene" })
@@ -531,23 +514,26 @@ namespace ReplayKitSetup
                 if (!File.Exists(path)) continue;
 
                 string text;
-                try { text = File.ReadAllText(path); }
-                catch (IOException ex) { ok = false; log?.Invoke("warn: read " + name + ": " + ex.Message); continue; }
+                try { text = Config.ReadTextFileFlexible(path); }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { ok = false; log?.Invoke("warn: read " + name + ": " + ex.Message); continue; }
                 string original = text;
 
                 // [BasicWindow] ExtraBrowserDocks -- pull the Custom Controls entry, keep every other dock
-                text = Regex.Replace(text, @"(\[BasicWindow\][^\[]*?\r?\nExtraBrowserDocks=)([^\r\n]*)",
-                    m => m.Groups[1].Value + StripReplaykitDock(m.Groups[2].Value), RegexOptions.Singleline);
+                string docks = ObsIni.Get(text, "BasicWindow", "ExtraBrowserDocks");
+                if (docks != null)
+                {
+                    string kept = StripReplaykitDock(docks);
+                    if (kept != docks) text = ObsIni.Set(text, "BasicWindow", "ExtraBrowserDocks", kept);
+                }
 
                 // [BasicWindow] DockState -- the native plugin hid OBSs native "Controls" dock and OBS persisted that into this blob. it is an opaque QMainWindow::saveState() so there is no clean way to flip one dock; drop the whole line and OBS rebuilds its default layout (Controls dock visible) on next launch.
-                text = Regex.Replace(text, @"(\[BasicWindow\][^\[]*?\r?\n)DockState=[^\r\n]*\r?\n",
-                    "$1", RegexOptions.Singleline);
+                if (ObsIni.Get(text, "BasicWindow", "DockState") != null) text = ObsIni.Remove(text, "BasicWindow", "DockState");
 
                 // [Appearance] Theme= / [General] CurrentTheme= pointing at a generated ReplayKit theme -- drop the line, obs falls back to its default
-                text = Regex.Replace(text, @"(\[Appearance\][^\[]*?\r?\n)Theme=com\.replaykit\.theme\.[^\r\n]*\r?\n",
-                    "$1", RegexOptions.Singleline | RegexOptions.IgnoreCase);
-                text = Regex.Replace(text, @"(\[General\][^\[]*?\r?\n)CurrentTheme=com\.replaykit[^\r\n]*\r?\n",
-                    "$1", RegexOptions.Singleline | RegexOptions.IgnoreCase);
+                if ((ObsIni.Get(text, "Appearance", "Theme") ?? "").StartsWith(ThemeSheet.ObsThemeIdPrefix, StringComparison.OrdinalIgnoreCase))
+                    text = ObsIni.Remove(text, "Appearance", "Theme");
+                if ((ObsIni.Get(text, "General", "CurrentTheme") ?? "").StartsWith(ThemeSheet.ObsThemeIdPrefix, StringComparison.OrdinalIgnoreCase))
+                    text = ObsIni.Remove(text, "General", "CurrentTheme");
 
                 if (text == original) continue;
                 try
@@ -573,14 +559,12 @@ namespace ReplayKitSetup
             return JsonConvert.SerializeObject(kept).Replace("\\", "\\\\");
         }
 
+        // the managed dock as Transform knows it, and any other dock page of the replaykit folder or the helper
         private static bool IsReplaykitDock(JToken item)
         {
-            if (!(item is JObject o)) return false;
-            string title = (o.Value<string>("title") ?? "").Trim().ToLowerInvariant();
-            string url = (o.Value<string>("url") ?? "").Replace("\\", "/").ToLowerInvariant();
-            string uuid = (o.Value<string>("uuid") ?? "").Replace("-", "").ToLowerInvariant();
-            return uuid == "a59ce0ef5d6f4a4f91d9c7c3c1d4e2b0" || title == "custom controls"
-                || url.Contains("obs-replaykit/obs-custom-dock/") || url.Contains("controls_app.html");
+            if (Transform.IsObsReplaykitDock(item)) return true;
+            string url = ((item as JObject)?.Value<string>("url") ?? "").Replace("\\", "/").ToLowerInvariant();
+            return url.Contains("obs-replaykit/obs-custom-dock/") || url.Contains("controls_app.html");
         }
 
         private static bool RemoveGeneratedObsThemes(Action<string> log)
@@ -589,7 +573,7 @@ namespace ReplayKitSetup
             string themesDir = Path.Combine(Config.OBS_CONFIG, "themes");
             if (Directory.Exists(themesDir))
             {
-                foreach (string f in Directory.GetFiles(themesDir, "rk_*.ovt"))
+                foreach (string f in Directory.GetFiles(themesDir, ThemeSheet.ObsThemeFilePrefix + "*.ovt"))
                 {
                     try { File.Delete(f); log?.Invoke("removed generated theme " + Path.GetFileName(f)); }
                     catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
@@ -790,6 +774,15 @@ namespace ReplayKitSetup
             }
             int space = command.IndexOf(' ');
             return space < 0 ? (command, "") : (command.Substring(0, space), command.Substring(space + 1).Trim());
+        }
+
+        // the removal behind the uninstall window and the Uninstall button of the setup window, which starts obs again afterwards unless obs itself went too
+        public static void RunUninstall(IInstallProgress progress, bool keepUserSettings, bool removeObs)
+        {
+            RunCleanup(progress, keepUserSettings, removeObs);
+            if (removeObs) return;
+            try { Obs.LaunchObs(progress.LogLine); }
+            catch (Exception ex) { progress.LogLine("warn: could not relaunch OBS: " + ex.Message); }
         }
 
         public static List<string> RunCleanup(IInstallProgress progress, bool keepUserSettings = true, bool removeObs = false)

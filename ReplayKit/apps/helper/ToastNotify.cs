@@ -10,7 +10,7 @@ namespace ReplayKitHelper
     // real windows notifications (persist in the action center, carry an app name + icon) instead of a Shell_NotifyIcon balloon (transient on win11, generic (i) + exe name). identity is three cooperating pieces: a start-menu shortcut carrying an AppUserModelID (the documented way an unpackaged desktop app gets recognised -- this is what resolves the display name), an HKCU\...\AppUserModelId\<aumid> key with IconUri (what actually paints the tiny header icon -- the shortcut icon alone does not), and an appLogoOverride <image> baked into each toast (the big icon left of the text, the one thing that renders regardless). the toast itself is ToastNotificationManager, reached from net48 by CLR winrt projection (Type.GetType("... , ContentType=WindowsRuntime") + dynamic), no nuget/winmd.
     internal static class ToastNotify
     {
-        internal const string Aumid = "OBS.ReplayKit.Clips";
+        internal const string Aumid = ReplayKitShared.ToastIdentity.AppId;
         private const string DisplayName = "OBS ReplayKit";
         // earlier versions dropped a distinct "OBS ReplayKit" Start Menu entry here just to carry the AUMID; it now rides on OBS Studios own shortcut instead, and this name is only kept so the migration can delete the old one.
         private const string LegacyShortcutName = "OBS ReplayKit.lnk";

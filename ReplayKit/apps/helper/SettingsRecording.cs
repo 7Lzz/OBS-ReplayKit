@@ -226,8 +226,8 @@ namespace ReplayKitHelper
             }
         }
 
-        internal const string BongoInactiveName = "Bongo Cat Overlay (Inactive)";
-        internal const string BongoSwitchingName = "Bongo Cat Overlay (Switching)";
+        internal const string BongoInactiveName = OverlayScene.BongoInactiveSourceName;
+        internal const string BongoSwitchingName = OverlayScene.BongoSwitchingSourceName;
 
         // the bongo input in the live scene. one an older install left as the opengl bongobs-cat is hidden and renamed out of the way, never removed: that plugin keeps its keyboard hook running on freed state once its source is destroyed, and the next key press takes obs down. SetOverlaySceneFile and the installer drop it while obs is not running
         internal static JObject SelectBongoInput(string sceneName, JArray items, JObject inputSettings, List<string> warnings, bool refresh)

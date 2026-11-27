@@ -38,7 +38,6 @@ namespace ReplayKitSetup
         [JsonProperty("pin_obs_tray_icon")] public bool PinObsTrayIcon { get; set; } = Prefs.DEFAULT_PIN_OBS_TRAY_ICON;
         [JsonProperty("clip_notification_enabled")] public bool ClipNotificationEnabled { get; set; } = Prefs.DEFAULT_CLIP_NOTIFICATION;
         [JsonProperty("recording_notification_enabled")] public bool RecordingNotificationEnabled { get; set; } = Prefs.DEFAULT_RECORDING_NOTIFICATION;
-        [JsonProperty("trim_precise_default")] public bool TrimPreciseDefault { get; set; } = Prefs.DEFAULT_TRIM_PRECISE;
         [JsonProperty("debug_logging_enabled")] public bool DebugLoggingEnabled { get; set; } = Prefs.DEFAULT_DEBUG_LOGGING_ENABLED;
         [JsonProperty("clip_sound_volume")] public int ClipSoundVolume { get; set; } = Prefs.DEFAULT_CLIP_SOUND_VOLUME;
         [JsonProperty("recording_sound_volume")] public int RecordingSoundVolume { get; set; } = Prefs.DEFAULT_RECORDING_SOUND_VOLUME;
@@ -81,7 +80,7 @@ namespace ReplayKitSetup
         public static readonly string PREFS_DIR = PrefsDir();
         public static readonly string PREFS_FILE = Path.Combine(PREFS_DIR, "prefs.json");
         public static readonly string SETUP_CACHE_PREFS_FILE = Path.Combine(Config.REPLAYKIT_SETUP_CACHE, "prefs.json");
-        // the settings file of the helper: straight in the replaykit folder, or in scripts while an install from before that move has not been migrated yet
+        // the settings file of the helper: in user-data, or in an older place while an install from before that move has not been migrated yet (StateLayout.Resolve)
         public static string RUNTIME_SETTINGS_FILE => StateLayout.Resolve(Config.REPLAYKIT_CONFIG, StateLayout.SettingsFile);
 
         // the values come from shared/SettingDefaults.cs, the same ones the helper schema starts from
@@ -111,7 +110,6 @@ namespace ReplayKitSetup
         public const bool DEFAULT_DEBUG_LOGGING_ENABLED = SettingDefaults.DebugLoggingEnabled;
         public const bool DEFAULT_CLIP_NOTIFICATION = SettingDefaults.ClipNotificationEnabled;
         public const bool DEFAULT_RECORDING_NOTIFICATION = SettingDefaults.RecordingNotificationEnabled;
-        public const bool DEFAULT_TRIM_PRECISE = SettingDefaults.TrimPreciseDefault;
         public const bool DEFAULT_SEPARATE_AUDIO_TRACKS = SettingDefaults.RecordingSeparateAudioTracks;
         public const int DEFAULT_CLIP_SOUND_VOLUME = SettingDefaults.ClipSoundVolume;
         public const int DEFAULT_RECORDING_SOUND_VOLUME = SettingDefaults.RecordingSoundVolume;
@@ -287,7 +285,7 @@ namespace ReplayKitSetup
             return result;
         }
 
-        // maps the live in-obs custom controls settings json onto Preferences field names.
+        // maps the settings file of the helper onto Preferences field names.
         private static readonly Dictionary<string, string> RuntimeKeyMap = new Dictionary<string, string>
         {
             ["recordingPreset"] = "recording_preset",
@@ -311,7 +309,6 @@ namespace ReplayKitSetup
             ["pinObsTrayIcon"] = "pin_obs_tray_icon",
             ["clipNotificationEnabled"] = "clip_notification_enabled",
             ["recordingNotificationEnabled"] = "recording_notification_enabled",
-            ["trimPreciseDefault"] = "trim_precise_default",
             ["debugLoggingEnabled"] = "debug_logging_enabled",
             ["clipSoundVolume"] = "clip_sound_volume",
             ["recordingSoundVolume"] = "recording_sound_volume",
@@ -340,7 +337,7 @@ namespace ReplayKitSetup
             ["motionBlurStrength"] = "motion_blur_strength",
         };
 
-        // import settings changed from the in-obs custom controls window.
+        // the settings changed since the last setup run, from the settings file of the helper.
         private static Dictionary<string, object> RuntimeSettingsOverlay()
         {
             var mapped = new Dictionary<string, object>();
@@ -485,7 +482,6 @@ namespace ReplayKitSetup
                 PinObsTrayIcon = CoerceBool(Get("pin_obs_tray_icon"), DEFAULT_PIN_OBS_TRAY_ICON),
                 ClipNotificationEnabled = CoerceBool(Get("clip_notification_enabled"), DEFAULT_CLIP_NOTIFICATION),
                 RecordingNotificationEnabled = CoerceBool(Get("recording_notification_enabled"), DEFAULT_RECORDING_NOTIFICATION),
-                TrimPreciseDefault = DEFAULT_TRIM_PRECISE,
                 DebugLoggingEnabled = CoerceBool(Get("debug_logging_enabled"), DEFAULT_DEBUG_LOGGING_ENABLED),
                 ClipSoundVolume = CoerceIntRange(Get("clip_sound_volume"), DEFAULT_CLIP_SOUND_VOLUME, SettingLimits.SoundVolumeMin, SettingLimits.SoundVolumeMax),
                 RecordingSoundVolume = CoerceIntRange(Get("recording_sound_volume"), DEFAULT_RECORDING_SOUND_VOLUME, SettingLimits.SoundVolumeMin, SettingLimits.SoundVolumeMax),

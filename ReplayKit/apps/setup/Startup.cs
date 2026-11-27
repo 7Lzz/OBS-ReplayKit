@@ -5,7 +5,7 @@ using System.Runtime.InteropServices;
 
 namespace ReplayKitSetup
 {
-    // windows startup integration for launching obs with replaykit; any script it runs is a plain temp .ps1 started with -File, since the base64 -EncodedCommand shape is what av heuristics flag
+    // windows startup integration for launching obs with replaykit: a shortcut in the startup folder of the user, written in-process thru com with no script or shell started for it, since that shape is what av heuristics flag
     public static class Startup
     {
         private const string ValueName = "OBS ReplayKit";
@@ -70,7 +70,6 @@ namespace ReplayKitSetup
                 return false;
             }
 
-            // builds the .lnk directly thru the same WScript.Shell COM object powershell used underneath -- in-process, no powershell.exe subprocess, no -ExecutionPolicy Bypass, and no temp script dropped to disk first. writing a script to temp then running it with the execution policy forced off is exactly the shape av heuristics flag; this does the identical shortcut creation without any of that.
             object shell = null;
             object shortcut = null;
             try

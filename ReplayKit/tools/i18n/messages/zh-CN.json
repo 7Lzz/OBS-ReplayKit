@@ -10009,6 +10009,14 @@
     "source": "d21a9a94574f4ff7",
     "text": "未附带适用于 OBS {version} 的共享进程宿主。请先安装受支持的 OBS 版本。"
   },
+  "setup.theSteamCopyOfObsIsVersion": {
+    "source": "fb0ec773c77886b7",
+    "text": "Steam 版 OBS 的版本为 {installed}，而 ReplayKit 需要 OBS {target}。运行哪个版本由 Steam 决定，请改为从 obsproject.com 安装 OBS {target}。"
+  },
+  "setup.obsIsNewerThanTheVersionReplaykitSupports": {
+    "source": "e6c5ea8f1b5de4d5",
+    "text": "OBS {installed} 比此 ReplayKit 支持的版本 OBS {target} 更新。请从 obsproject.com 安装 OBS {target}，然后重新运行 ReplayKit 安装程序。"
+  },
   "setup.netFrameworkInstallPrompt": {
     "source": "451227b9398ebce4",
     "text": "OBS ReplayKit 需要 Microsoft .NET Framework 4.8，但此电脑尚未安装。\n\n选择“确定”以从 Microsoft 下载并打开 .NET Framework 4.8 安装程序。安装完成后，此安装程序会自动重新启动。"

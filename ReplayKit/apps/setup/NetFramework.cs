@@ -67,10 +67,10 @@ namespace ReplayKitSetup
                 string installer = Path.Combine(workDir, "ndp48-web.exe");
                 using (var client = new HttpClient { Timeout = TimeSpan.FromMinutes(5) })
                 {
-                    client.DefaultRequestHeaders.Add("User-Agent", "OBSReplayKit/1.0 (+https://github.com/7Lzz/OBS-ReplayKit)");
+                    client.DefaultRequestHeaders.Add("User-Agent", Download.UserAgent);
                     Download.Save(client, InstallerUrl, installer, MaxInstallerBytes, TimeSpan.FromMinutes(5));
                 }
-                if (!InputOverlay.IsMicrosoftSigned(installer, SetupLog.Line)) return -1;
+                if (!Authenticode.IsMicrosoftSigned(installer, SetupLog.Line)) return -1;
                 // no switches, so it shows its own window and the user goes thru it as with any download; the setup is already elevated, so it asks for nothing more
                 using var process = Process.Start(new ProcessStartInfo(installer) { UseShellExecute = false, WorkingDirectory = workDir });
                 process.WaitForExit();

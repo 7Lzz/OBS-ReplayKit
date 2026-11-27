@@ -10,6 +10,10 @@ namespace ReplayKitShared
     public static class OverlayScene
     {
         public const string BongoSourceName = "Bongo Cat Overlay";
+        public const string BongoSourceUuid = "c93f3934-0dfd-4f4f-96e4-0abf45423f0f";
+        // the stand-in copies older releases parked beside the bongo cat while its style switched, which the installer and the helper both clear out
+        public const string BongoInactiveSourceName = BongoSourceName + " (Inactive)";
+        public const string BongoSwitchingSourceName = BongoSourceName + " (Switching)";
         public const string BongoSourceKind = "replaykit-bongo";
         // the opengl plugin older installs used, still matched so its leftovers get converted or dropped
         public const string LegacyBongoSourceKind = "bongobs-cat";
@@ -28,6 +32,11 @@ namespace ReplayKitShared
         public const string DisplayCaptureSourceName = "Display Capture";
         public const string GameCaptureSourceName = "Game Capture";
         public const string WindowCaptureSourceName = "Window Capture";
+        public const string WindowCaptureSourceUuid = "edb2d9d4-7b53-4f3a-a760-61cd03ce9b6c";
+        // the three audio sources of the scene collection: the pc audio without discord, discord on its own for the recording only, and the microphone
+        public const string DesktopAudioSourceName = "Desktop Audio (excl. Discord)";
+        public const string DiscordAudioSourceName = "Discord Audio (record only)";
+        public const string MicSourceName = "Audio Input Capture";
         // the card the capture switch script shows over the captures while a game of the auto game list is open but not in front; the plugin registers its kind and puts it into every scene with a capture, and scripts/sync_shared.ps1 writes both names out for the plugin and lua
         public const string FocusCardSourceName = "Game Out of Focus";
         public const string FocusCardSourceKind = "replaykit-focus-card";
@@ -36,7 +45,7 @@ namespace ReplayKitShared
         private const double BongoRefHeight = 1080.0;
         private const double BongoScaleX = 0.4892578125;
         private const double BongoScaleY = 0.48828125;
-        private const double InputOverlayGroupRefHeight = 1440.0;
+        public const double InputOverlayGroupRefHeight = 1440.0;
         private const double CornerRefHeight = 1080.0;
         private const double CornerLeft = 15.0;
         private const double CornerBottom = 16.0;

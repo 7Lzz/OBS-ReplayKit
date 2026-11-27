@@ -3,7 +3,7 @@ using System.IO;
 
 namespace ReplayKitSetup
 {
-    // installs the bundled ReplayKit plugin (window chrome, tray menu, notifications, hotkeys) -- unlike the other obs plugins here, this one is first-party: compiled from source at release time and bundled straight into assets/, nothing to download or extract.
+    // installs the bundled ReplayKit plugin (window chrome, tray menu, notifications, hotkeys) -- unlike the other obs plugins here, this one is first-party: compiled from source at release time and packed into the setup bundle, nothing to download.
     public static class NativePlugin
     {
         // true when this build carries a plugin to install

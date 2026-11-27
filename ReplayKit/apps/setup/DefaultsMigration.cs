@@ -17,7 +17,7 @@ namespace ReplayKitSetup
         private const string NoiseStep = "mic-noise-suppression-v1";
         private const string OpenClipsKeyStep = "open-clips-alt-z-v1";
 
-        private const string MicSourceName = "Audio Input Capture";
+        private const string MicSourceName = OverlayScene.MicSourceName;
         private const string NoiseFilterName = "ReplayKit Noise Suppression";
         private const string NoiseFilterKindPrefix = "noise_suppress_filter";
 
@@ -121,7 +121,7 @@ namespace ReplayKitSetup
             if (!File.Exists(Prefs.RUNTIME_SETTINGS_FILE)) return true;
             var settings = JObject.Parse(File.ReadAllText(Prefs.RUNTIME_SETTINGS_FILE));
             if (settings.Property("openClipsKeybind") != null) return true;
-            settings["openClipsKeybind"] = new JObject { ["alt"] = true, ["key"] = "OBS_KEY_Z" };
+            settings["openClipsKeybind"] = new JObject { [SettingDefaults.OpenClipsModifier] = true, ["key"] = SettingDefaults.OpenClipsKey };
             WriteText(Prefs.RUNTIME_SETTINGS_FILE, settings.ToString(Formatting.Indented) + "\n");
             return true;
         }

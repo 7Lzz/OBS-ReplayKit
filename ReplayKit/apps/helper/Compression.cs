@@ -59,7 +59,7 @@ namespace ReplayKitHelper
         public static string EnsureFfmpegAlias(string ffmpegPath)
         {
             if (string.IsNullOrEmpty(ffmpegPath) || !File.Exists(ffmpegPath)) return ffmpegPath;
-            string aliasPath = Path.Combine(Path.GetDirectoryName(ffmpegPath), "OBSReplayKit-Encoder.exe");
+            string aliasPath = Path.Combine(Path.GetDirectoryName(ffmpegPath), ReplayKitShared.VideoTools.EncoderAlias);
             lock (FfmpegAliasLock)
             {
                 try

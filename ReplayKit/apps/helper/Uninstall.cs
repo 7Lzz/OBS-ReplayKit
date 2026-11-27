@@ -9,14 +9,9 @@ namespace ReplayKitHelper
     // starts the windowed --uninstall mode of the setup exe from the settings uninstall button; that window (twin of the setup window) removes everything, then boots OBS back up
     internal static class Uninstall
     {
-        public static string GetSetupCacheDir()
-        {
-            string localAppData = Environment.GetEnvironmentVariable("LOCALAPPDATA");
-            if (!string.IsNullOrEmpty(localAppData)) return Path.Combine(localAppData, "OBS ReplayKit");
-            return Path.Combine(AppConfig.GetUserProfile(), "AppData", "Local", "OBS ReplayKit");
-        }
+        public static string GetSetupCacheDir() => AppConfig.GetReplayKitUserStateDir();
 
-        public static string GetSetupExecutable() => Path.Combine(GetSetupCacheDir(), "OBSReplayKitSetup.exe");
+        public static string GetSetupExecutable() => Path.Combine(GetSetupCacheDir(), ReplayKitShared.ReplayKitFolder.SetupExe);
 
         public static JObject StartCleanupFromSettings(string body)
         {

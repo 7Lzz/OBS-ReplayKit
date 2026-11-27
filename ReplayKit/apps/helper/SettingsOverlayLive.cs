@@ -531,10 +531,10 @@ namespace ReplayKitHelper
                 {
                     string name = source["name"]?.Value<string>() ?? "";
                     string uuid = source["uuid"]?.Value<string>() ?? "";
-                    if (name == OverlayScene.WindowCaptureSourceName || uuid == "edb2d9d4-7b53-4f3a-a760-61cd03ce9b6c") { windowCaptureSource = (JObject)source; break; }
+                    if (name == OverlayScene.WindowCaptureSourceName || uuid == OverlayScene.WindowCaptureSourceUuid) { windowCaptureSource = (JObject)source; break; }
                 }
                 string windowCaptureUuid = windowCaptureSource?["uuid"]?.Value<string>() ?? "";
-                if (string.IsNullOrWhiteSpace(windowCaptureUuid)) windowCaptureUuid = "edb2d9d4-7b53-4f3a-a760-61cd03ce9b6c";
+                if (string.IsNullOrWhiteSpace(windowCaptureUuid)) windowCaptureUuid = OverlayScene.WindowCaptureSourceUuid;
 
                 if (useInputOverlay)
                 {

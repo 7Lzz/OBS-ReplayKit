@@ -166,17 +166,8 @@ namespace ReplayKitSetup
                 using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
                 using (var reader = new StreamReader(fs, Encoding.UTF8, true))
                     text = reader.ReadToEnd();
-                bool general = false;
-                foreach (string raw in text.Split('\n'))
-                {
-                    string line = raw.Trim();
-                    if (line.StartsWith("[", StringComparison.Ordinal)) { general = string.Equals(line, "[General]", StringComparison.OrdinalIgnoreCase); continue; }
-                    if (!general) continue;
-                    int eq = line.IndexOf('=');
-                    if (eq <= 0 || !string.Equals(line.Substring(0, eq).Trim(), "Language", StringComparison.OrdinalIgnoreCase)) continue;
-                    string value = line.Substring(eq + 1).Trim();
-                    return LanguageMatch.IsCode(value) ? value : null;
-                }
+                string value = ObsIni.Get(text, "General", "Language")?.Trim();
+                return value != null && LanguageMatch.IsCode(value) ? value : null;
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
             return null;

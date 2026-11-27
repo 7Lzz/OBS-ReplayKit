@@ -132,58 +132,10 @@ namespace ReplayKitSetup
         // obs monitors to the share cable, which is how Share Preview carries desktop audio; a basic.ini is left as it is when the cable is not on the machine
         public static string ApplyShareCableMonitoring(string text)
         {
-            var monitor = FindObsStreamAudioRenderEndpoint();
+            var monitor = Audio.FindShareCableEndpoint();
             if (monitor == null) return text;
             text = ObsIni.Set(text, "Audio", "MonitoringDeviceId", monitor.Value.DeviceId);
             return ObsIni.Set(text, "Audio", "MonitoringDeviceName", monitor.Value.Name);
-        }
-
-        private static (string DeviceId, string Name)? FindObsStreamAudioRenderEndpoint()
-        {
-            const string rootPath = @"SOFTWARE\Microsoft\Windows\CurrentVersion\MMDevices\Audio\Render";
-            const string friendlyKey = "{a45c254e-df1c-4efd-8020-67d146a850e0},2";
-            var candidates = new List<(int Rank, string DisplayName, string DeviceId)>();
-
-            using (var root = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(rootPath))
-            {
-                if (root == null) return null;
-                foreach (var guid in root.GetSubKeyNames())
-                {
-                    string displayName;
-                    try
-                    {
-                        using (var endpoint = root.OpenSubKey(guid))
-                        {
-                            var stateValue = endpoint?.GetValue("DeviceState");
-                            if (stateValue == null) continue;
-                            if ((Convert.ToInt32(stateValue) & 0x1) == 0) continue;
-                        }
-                        using (var props = root.OpenSubKey(guid + @"\Properties"))
-                        {
-                            var name = props?.GetValue(friendlyKey) as string;
-                            if (name == null) continue;
-                            displayName = name.Trim();
-                        }
-                    }
-                    catch (Exception ex) when (ex is System.Security.SecurityException || ex is System.IO.IOException)
-                    {
-                        continue;
-                    }
-
-                    string canonical = Regex.Replace(displayName, @"^\s*\d+\s*-\s*", "").Trim().ToLowerInvariant();
-                    if (Regex.IsMatch(canonical, "surround|16ch|loopback|do not select")) continue;
-                    int rank = 999;
-                    if (canonical == "obs stream audio") rank = 0;
-                    else if (canonical.StartsWith("obs stream audio")) rank = 1;
-                    else if (canonical.StartsWith("cable input")) rank = 2;
-                    if (rank == 999) continue;
-                    candidates.Add((rank, displayName, "{0.0.0.00000000}." + guid));
-                }
-            }
-
-            if (candidates.Count == 0) return null;
-            var best = candidates.OrderBy(c => c.Rank).ThenBy(c => c.DisplayName.ToLowerInvariant(), StringComparer.Ordinal).First();
-            return (best.DeviceId, best.DisplayName);
         }
 
         // replace recordencoder.json with the gpu-aware encoder config picked in Encoder.cs.
@@ -194,9 +146,9 @@ namespace ReplayKitSetup
         }
 
         // stable uuid for our custom controls dock entry. repeat applies update the same row instead of stacking duplicates.
-        private const string CustomControlsDockUuid = "a59ce0ef-5d6f-4a4f-91d9-c7c3c1d4e2b0";
+        internal const string CustomControlsDockUuid = "a59ce0ef-5d6f-4a4f-91d9-c7c3c1d4e2b0";
 
-        // the controls page must have the helpers loopback origin. A file:// dock cannot call the protected local API after CEFs local-resource policy is applied, which leaves every control in its offline state.
+        // the controls page must have the helpers loopback origin. a file:// dock cannot call the protected local API after CEFs local-resource policy is applied, which leaves every control in its offline state.
         private static string DockUrl() => HelperEndpoint.Origin + "/controls_app.html";
 
         private static JObject ManagedDockEntry() => new JObject
@@ -214,7 +166,7 @@ namespace ReplayKitSetup
         }
 
         // match the managed obs replaykit dock entry.
-        private static bool IsObsReplaykitDock(JToken item)
+        internal static bool IsObsReplaykitDock(JToken item)
         {
             if (!(item is JObject obj)) return false;
             string title = (obj.Value<string>("title") ?? "").Trim().ToLowerInvariant();
@@ -282,9 +234,10 @@ namespace ReplayKitSetup
             return ObsIni.Get(liveText, section, key);
         }
 
-        // basicwindow toggles that only ever take the bundled seed on a genuine fresh install (no live user.ini yet) -- a later run of this (an update, a repair, re-running setup) leaves whatever the user has now alone, same idea as ExtraBrowserDocks below; covers the View menu Toolbars + Status Bar checkboxes, off by default for a cleaner first look, and a user who turns either back on keeps that. DockState and geometry belong here too: the bundle carries the dock layout and window position of the machine it was made on, and the plugin folds the scenes, sources and mixer panels away only once per layout (layoutDocksApplied in window_state.ini), so a bundled DockState put back over a live one left those panels showing under the clean shell. -- SysTrayWhenStarted is here too since replaykit mirrors it as the start minimized setting, so an update must not put the bundled value back over the one the user chose set for a clean re-install, which is meant to behave like a first install: the two view toggles then take the bundled off state again, while DockState and geometry still stay with the live window so the plugin layout marker keeps matching
+        // a clean re-install is meant to behave like a first install: the two view toggles then take the bundled off state again, while DockState and geometry still stay with the live window so the plugin layout marker keeps matching
         public static bool CleanReinstall;
 
+        // basicwindow toggles that only ever take the bundled seed on a genuine fresh install (no live user.ini yet) -- a later run of this (an update, a repair, re-running setup) leaves whatever the user has now alone, same idea as ExtraBrowserDocks below; covers the View menu Toolbars + Status Bar checkboxes, off by default for a cleaner first look, and a user who turns either back on keeps that. DockState and geometry belong here too: the bundle carries the dock layout and window position of the machine it was made on, and the plugin folds the scenes, sources and mixer panels away only once per layout (layoutDocksApplied in window_state.ini), so a bundled DockState put back over a live one left those panels showing under the clean shell. SysTrayWhenStarted is here too since replaykit mirrors it as the start minimized setting, so an update must not put the bundled value back over the one the user chose
         private static readonly string[] FreshInstallOnlyBasicWindowKeys = { "ShowListboxToolbars", "ShowStatusBar", "DockState", "geometry", "SysTrayWhenStarted" };
 
         // write one canonical custom controls dock entry and reset stale dock layout state.
@@ -365,7 +318,7 @@ namespace ReplayKitSetup
             return token;
         }
 
-        // global.ini is merged not overwritten -- preserve installguid, [crashhandler], [locations], and any input-overlay plugin settings; only force-set the perf/ux toggles below.
+        // the perf and ux toggles ApplyGlobalIni forces
         private static readonly (string Section, string Key, string Value)[] EnforcedGlobalIni =
         {
             ("General", "BrowserHWAccel", "true"),
@@ -403,7 +356,7 @@ namespace ReplayKitSetup
         private const string BongoCatSourceId = OverlayScene.BongoSourceKind;
         private const string LegacyBongoCatSourceId = OverlayScene.LegacyBongoSourceKind;
         private const string BongoCatSourceName = OverlayScene.BongoSourceName;
-        private const string BongoCatSourceUuid = "c93f3934-0dfd-4f4f-96e4-0abf45423f0f";
+        private const string BongoCatSourceUuid = OverlayScene.BongoSourceUuid;
         private const double BongoCatSourceW = OverlayScene.BongoSourceWidth;
         private const double BongoCatSourceH = OverlayScene.BongoSourceHeight;
         private const int BongoCatItemId = 13;
@@ -417,8 +370,8 @@ namespace ReplayKitSetup
         private const int GameCaptureHookRateFast = 2;
         private const string WindowCaptureSourceId = "window_capture";
         private const string WindowCaptureSourceName = OverlayScene.WindowCaptureSourceName;
-        private const string WindowCaptureSourceUuid = "edb2d9d4-7b53-4f3a-a760-61cd03ce9b6c";
-        private const string DesktopAudioSourceName = "Desktop Audio (excl. Discord)";
+        private const string WindowCaptureSourceUuid = OverlayScene.WindowCaptureSourceUuid;
+        private const string DesktopAudioSourceName = OverlayScene.DesktopAudioSourceName;
         private static readonly IReadOnlyDictionary<string, string> MotionBlurSourceUuids = OverlayScene.MotionBlurFilterUuids;
         private static readonly IReadOnlyDictionary<string, string> OverlayOpacityFilterUuids = OverlayScene.OpacityFilterUuids;
 
@@ -430,14 +383,18 @@ namespace ReplayKitSetup
         // single obs-visible script entry; feature scripts are loaded inside replaykit.lua to keep tools->scripts uncluttered.
         private const string ReplaykitScriptRelpath = ReplayKitFolder.Name + "/scripts/replaykit.lua";
 
-        // forward-slashed, lowercased ~/videos -- matches Prefs.DefaultRecordingPath, the helper clip-dir fallback, and the lua/ps fallbacks.
-        private static string DefaultClipDirNorm() => ClipFolder.Default().Replace('\\', '/').TrimEnd('/').ToLowerInvariant();
+        // the clip folder as the settings and the script entry keep it: empty for the default folder (the videos known folder, which Prefs.DefaultRecordingPath and the helper fall back to), else forward-slashed
+        private static string ClipDirSetting(Preferences prefs)
+        {
+            string recDirNorm = prefs.RecordingPath.Replace("\\", "/").TrimEnd('/').ToLowerInvariant();
+            string defaultNorm = ClipFolder.Default().Replace('\\', '/').TrimEnd('/').ToLowerInvariant();
+            return recDirNorm == defaultNorm ? "" : prefs.RecordingPath.Replace("\\", "/");
+        }
 
         // inject replaykit runtime settings into the managed obs script entry.
         private static void ApplyReplaykitRuntimeSettings(JObject settings, Preferences prefs)
         {
-            string recDirNorm = prefs.RecordingPath.Replace("\\", "/").TrimEnd('/').ToLowerInvariant();
-            settings["clip_dir"] = recDirNorm == DefaultClipDirNorm() ? "" : prefs.RecordingPath.Replace("\\", "/");
+            settings["clip_dir"] = ClipDirSetting(prefs);
             settings["clip_notification_enabled"] = prefs.ClipNotificationEnabled;
             settings["recording_notification_enabled"] = prefs.RecordingNotificationEnabled;
             settings["clip_notification_seconds"] = prefs.ReplayBufferSeconds;
@@ -448,18 +405,18 @@ namespace ReplayKitSetup
         // write the runtime settings consumed by the obs dock helper. _text is the bundled template being mirrored in, not the users live file -- merging onto that would still lose every setting the wizard has no field for (openClipsKeybind and anything added since this list was last touched), which is exactly what was happening on Update: the live file has real user values, gets replaced by this transforms own from-scratch object, and anything not listed below reverts as if never set. merging onto whatever is actually live on disk instead means only a genuine first install (no live file yet) starts empty.
         public static string ApplyReplaykitSettingsJson(string _text, Preferences prefs)
         {
+            // a file that does not parse starts over from the wizard fields, while one that cannot be read right now (a lock, a scanner) fails the step, since writing over it would drop every setting the wizard has no field for
             JObject obj;
             try
             {
                 obj = File.Exists(Prefs.RUNTIME_SETTINGS_FILE) ? JObject.Parse(File.ReadAllText(Prefs.RUNTIME_SETTINGS_FILE)) : new JObject();
             }
-            catch (Exception ex) when (ex is JsonException || ex is IOException || ex is UnauthorizedAccessException)
+            catch (JsonException)
             {
                 obj = new JObject();
             }
 
-            string recDirNorm = prefs.RecordingPath.Replace("\\", "/").TrimEnd('/').ToLowerInvariant();
-            string clipDir = recDirNorm == DefaultClipDirNorm() ? "" : prefs.RecordingPath.Replace("\\", "/");
+            string clipDir = ClipDirSetting(prefs);
             obj["recordingPreset"] = prefs.RecordingPreset;
             obj["compressionMode"] = prefs.CompressionMode;
             obj["codecPreference"] = prefs.CodecPreference;
@@ -483,7 +440,6 @@ namespace ReplayKitSetup
             obj["allowSleepWhileActive"] = prefs.AllowSleepWhileActive;
             obj["clipNotificationEnabled"] = prefs.ClipNotificationEnabled;
             obj["recordingNotificationEnabled"] = prefs.RecordingNotificationEnabled;
-            obj["trimPreciseDefault"] = prefs.TrimPreciseDefault;
             obj["debugLoggingEnabled"] = prefs.DebugLoggingEnabled;
             obj["clipSoundVolume"] = prefs.ClipSoundVolume;
             obj["recordingSoundVolume"] = prefs.RecordingSoundVolume;
@@ -688,7 +644,7 @@ namespace ReplayKitSetup
             RemoveSourcesByUuidOrId(sources, new HashSet<string> { BongoCatSourceUuid }, LegacyBongoCatSourceId);
         }
 
-        private static string MotionBlurShaderPath() => System.IO.Path.Combine(Config.PROGRAMFILES_OBS_DIR, "data", "obs-plugins", "obs-shaderfilter", "examples", "motion_blur.shader").Replace('\\', '/');
+        private static string MotionBlurShaderPath() => ShaderFilter.MotionBlurShader.Replace('\\', '/');
 
         private static JObject NewMotionBlurFilter(string sourceName, bool enabled, double strength)
         {
@@ -843,7 +799,7 @@ namespace ReplayKitSetup
                 if (!File.Exists(Prefs.RUNTIME_SETTINGS_FILE)) return fallback;
                 return JObject.Parse(File.ReadAllText(Prefs.RUNTIME_SETTINGS_FILE))[key]?.Value<bool>() ?? fallback;
             }
-            catch (Exception exc) when (exc is IOException || exc is UnauthorizedAccessException || exc is Newtonsoft.Json.JsonException)
+            catch (Exception exc) when (exc is IOException || exc is UnauthorizedAccessException || exc is Newtonsoft.Json.JsonException || exc is InvalidCastException || exc is FormatException)
             {
                 return fallback;
             }
@@ -863,8 +819,8 @@ namespace ReplayKitSetup
             switch (source.Value<string>("name"))
             {
                 case DesktopAudioSourceName: mixers = 1 | 2; break;
-                case "Discord Audio (record only)": mixers = 1 | 4; break;
-                case "Audio Input Capture": mixers = 1 | 8; break;
+                case OverlayScene.DiscordAudioSourceName: mixers = 1 | 4; break;
+                case OverlayScene.MicSourceName: mixers = 1 | 8; break;
                 default: return false;
             }
             bool changed = source.Value<int?>("mixers") != mixers;
@@ -1128,7 +1084,7 @@ namespace ReplayKitSetup
             item["pos"] = new JObject { ["x"] = x, ["y"] = y };
             item["pos_rel"] = SceneRelPos(x, y, canvasW, canvasH);
             item["scale"] = new JObject { ["x"] = scaleX, ["y"] = scaleY };
-            item["scale_rel"] = new JObject { ["x"] = scaleX * 1440.0 / canvasH, ["y"] = scaleY * 1440.0 / canvasH };
+            item["scale_rel"] = new JObject { ["x"] = scaleX * OverlayScene.InputOverlayGroupRefHeight / canvasH, ["y"] = scaleY * OverlayScene.InputOverlayGroupRefHeight / canvasH };
             item["scale_ref"] = new JObject { ["x"] = sourceW, ["y"] = sourceH };
             item["bounds"] = new JObject { ["x"] = 0.0, ["y"] = 0.0 };
             item["bounds_rel"] = new JObject { ["x"] = 0.0, ["y"] = 0.0 };
@@ -1276,7 +1232,7 @@ namespace ReplayKitSetup
             if (!(data["groups"] is JArray groups)) { groups = new JArray(); data["groups"] = groups; }
 
             var standby = sources.OfType<JObject>().Where(source =>
-                (source.Value<string>("name") == "Bongo Cat Overlay (Inactive)" || source.Value<string>("name") == "Bongo Cat Overlay (Switching)") &&
+                (source.Value<string>("name") == OverlayScene.BongoInactiveSourceName || source.Value<string>("name") == OverlayScene.BongoSwitchingSourceName) &&
                 (source.Value<string>("id") == BongoCatSourceId || source.Value<string>("id") == LegacyBongoCatSourceId)).ToList();
             foreach (var source in standby)
             {
@@ -1484,7 +1440,7 @@ namespace ReplayKitSetup
             return sb.ToString();
         }
 
-        // (rel_path within assets/obs-studio) -> transformer
+        // the path of a file within the bundled obs config -> its transformer
         private static readonly Dictionary<string, Func<string, Preferences, string>> Dispatch = new Dictionary<string, Func<string, Preferences, string>>
         {
             ["basic/profiles/Untitled/basic.ini"] = ApplyBasicIni,

@@ -4,5 +4,8 @@ namespace ReplayKitShared
     public static class ThemeSheet
     {
         public const string FileName = "rk-theme.css";
+        // the obs theme the helper generates for a replaykit theme: its id in user.ini and its file in the themes folder of obs, which an uninstall takes away
+        public const string ObsThemeIdPrefix = "com.replaykit.theme.";
+        public const string ObsThemeFilePrefix = "rk_";
     }
 }

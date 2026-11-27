@@ -294,10 +294,10 @@ namespace ReplayKitSetup
                 ["settings.hook_rate"] = 2,
                 ["settings.limit_framerate"] = true,
             },
-            ["Audio Input Capture"] = new Dictionary<string, object> { ["monitoring_type"] = 0, ["monitoring_enabled"] = false },
+            [OverlayScene.MicSourceName] = new Dictionary<string, object> { ["monitoring_type"] = 0, ["monitoring_enabled"] = false },
             // listed for the volume repair only, with no fields: it is monitored while Share Preview is on, and the virtual camera script sets its monitoring for the saved Share Preview state each time obs starts, so turning it off here only made that script switch it back on after every update, which also cleared a mute
-            ["Desktop Audio (excl. Discord)"] = new Dictionary<string, object>(),
-            ["Discord Audio (record only)"] = new Dictionary<string, object> { ["monitoring_type"] = 0, ["monitoring_enabled"] = false },
+            [OverlayScene.DesktopAudioSourceName] = new Dictionary<string, object>(),
+            [OverlayScene.DiscordAudioSourceName] = new Dictionary<string, object> { ["monitoring_type"] = 0, ["monitoring_enabled"] = false },
         };
 
         // remove ReplayKit-managed files that were renamed or retired.

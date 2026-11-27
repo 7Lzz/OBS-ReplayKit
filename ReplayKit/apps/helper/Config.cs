@@ -198,8 +198,8 @@ namespace ReplayKitHelper
         public static string GetReplayKitUserStateDir()
         {
             string local = Environment.GetEnvironmentVariable("LOCALAPPDATA");
-            if (!string.IsNullOrEmpty(local)) return Path.Combine(local, "OBS ReplayKit");
-            return Path.Combine(GetUserProfile(), "AppData", "Local", "OBS ReplayKit");
+            if (!string.IsNullOrEmpty(local)) return Path.Combine(local, ReplayKitFolder.LocalName);
+            return Path.Combine(GetUserProfile(), "AppData", "Local", ReplayKitFolder.LocalName);
         }
         public static string GetClipUiStatePath() => Path.Combine(GetReplayKitUserStateDir(), "clips_state.json");
 

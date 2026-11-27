@@ -503,7 +503,7 @@ namespace ReplayKitHelper
             item["pos"] = new JObject { ["x"] = posX, ["y"] = posY };
             item["pos_rel"] = new JObject { ["x"] = (posX - canvasW / 2.0) / (canvasH / 2.0), ["y"] = (posY - canvasH / 2.0) / (canvasH / 2.0) };
             item["scale"] = new JObject { ["x"] = scaleX, ["y"] = scaleY };
-            item["scale_rel"] = new JObject { ["x"] = scaleX * 1440.0 / canvasH, ["y"] = scaleY * 1440.0 / canvasH };
+            item["scale_rel"] = new JObject { ["x"] = scaleX * OverlayScene.InputOverlayGroupRefHeight / canvasH, ["y"] = scaleY * OverlayScene.InputOverlayGroupRefHeight / canvasH };
             item["group_item_backup"] = groupBackup;
         }
 

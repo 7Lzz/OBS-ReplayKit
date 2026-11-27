@@ -4,20 +4,18 @@ using System.Linq;
 
 namespace ReplayKitSetup
 {
-    // recording presets -- resolution + fps + cqp target tier. the actual encoder json is built per-machine in Encoder.cs from the detected gpu + codec preference, so the same preset works on nvidia/amd/intel/software.
+    // recording presets (performance 720p30, balanced 1080p60, quality 1080p60 at a higher target) -- resolution + fps + cqp target tier. the actual encoder json is built per-machine in Encoder.cs from the detected gpu + codec preference, so the same preset works on nvidia/amd/intel/software.
     public sealed class RecordingPreset
     {
         public string Name { get; }
-        public string Label { get; }
-        public string Description { get; }
         // section -> key -> value overrides for basic.ini.
         public Dictionary<string, Dictionary<string, string>> BasicIni { get; }
         // on the nvenc scale (0-51, lower = higher quality); Encoder.cs translates to whatever scale the chosen encoder uses.
         public int CqpTarget { get; }
 
-        public RecordingPreset(string name, string label, string description, Dictionary<string, Dictionary<string, string>> basicIni, int cqpTarget)
+        public RecordingPreset(string name, Dictionary<string, Dictionary<string, string>> basicIni, int cqpTarget)
         {
-            Name = name; Label = label; Description = description; BasicIni = basicIni; CqpTarget = cqpTarget;
+            Name = name; BasicIni = basicIni; CqpTarget = cqpTarget;
         }
     }
 
@@ -27,8 +25,6 @@ namespace ReplayKitSetup
         {
             new RecordingPreset(
                 name: "performance",
-                label: "Performance",
-                description: "720p30 - low GPU/CPU cost, smaller files. Works on any PC.",
                 basicIni: new Dictionary<string, Dictionary<string, string>>
                 {
                     ["Output"] = new Dictionary<string, string> { ["Mode"] = "Advanced" },
@@ -45,8 +41,6 @@ namespace ReplayKitSetup
 
             new RecordingPreset(
                 name: "balanced",
-                label: "Balanced (recommended)",
-                description: "Native canvas -> 1080p60, high-quality target - good on most modern PCs.",
                 basicIni: new Dictionary<string, Dictionary<string, string>>
                 {
                     ["Output"] = new Dictionary<string, string> { ["Mode"] = "Advanced" },
@@ -63,8 +57,6 @@ namespace ReplayKitSetup
 
             new RecordingPreset(
                 name: "quality",
-                label: "Quality (high-end PCs)",
-                description: "Very high quality target. Best for replay clips.",
                 basicIni: new Dictionary<string, Dictionary<string, string>>
                 {
                     ["Output"] = new Dictionary<string, string> { ["Mode"] = "Advanced" },

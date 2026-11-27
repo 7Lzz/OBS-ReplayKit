@@ -11,19 +11,8 @@ namespace ReplayKitSetup
         public bool IsPrimary { get; set; }
         public string Adapter { get; set; } // e.g. \\.\display1 -- the gdi adapter device name
         public string DeviceId { get; set; } // e.g. \\?\display#msi3cd7#5&...#{guid} -- obss monitor_id
-        public string FriendlyName { get; set; } // what windows tells us (often "generic pnp monitor")
         public int Width { get; set; }
         public int Height { get; set; }
-
-        // edid model code from DeviceId (e.g. "MSI3CD7").
-        public string EdidModel
-        {
-            get
-            {
-                var parts = (DeviceId ?? "").Split('#');
-                return parts.Length > 1 ? parts[1] : "?";
-            }
-        }
     }
 
     public static class Display
@@ -70,7 +59,6 @@ namespace ReplayKitSetup
                     IsPrimary = monitor.Primary,
                     Adapter = monitor.Device,
                     DeviceId = identified && !string.IsNullOrWhiteSpace(dd.DeviceID) ? dd.DeviceID : monitor.Device,
-                    FriendlyName = identified && !string.IsNullOrWhiteSpace(dd.DeviceString) ? dd.DeviceString : monitor.Device,
                     Width = monitor.Bounds.Width,
                     Height = monitor.Bounds.Height,
                 });

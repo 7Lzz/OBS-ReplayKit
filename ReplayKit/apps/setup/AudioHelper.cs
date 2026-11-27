@@ -3,7 +3,7 @@ using System.Runtime.InteropServices;
 
 namespace ReplayKitSetup
 {
-    // native port of the com-interop helper VbCable.cs used to shell out to a fresh powershell process for (Add-Type-compiling this exact same class at runtime). undocumented shell audio apis -- IPolicyConfigVistaClient/IMMDeviceEnumerator -- used to switch/rename default audio endpoints. same guids and interface layouts as the powershell version, just compiled in-process instead of spawned per call.
+    // the undocumented shell audio apis (IPolicyConfigVistaClient, IPolicyConfigClient) and IMMDeviceEnumerator, which VbCable uses to read and set the default audio endpoints and to rename and hide the cable endpoints
     [ComImport, Guid("BCDE0395-E52F-467C-8E3D-C4579291692E")]
     internal class MMDeviceEnumerator { }
 

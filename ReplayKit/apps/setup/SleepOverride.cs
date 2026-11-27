@@ -12,7 +12,7 @@ namespace ReplayKitSetup
         private const string ObsExeName = ReplayKitShared.SleepOverrideRequest.Process;
         private static readonly string[] RequestFlags = ReplayKitShared.SleepOverrideRequest.Requests;
 
-        // subprocess.run wrapper with our standard timeout + create_no_window flags. null on win32exception/timeout.
+        // runs powercfg hidden with a 10 s timeout; null when it could not start or timed out
         private static (int ExitCode, string Stdout, string Stderr)? RunPowercfg(string arguments, Action<string> log = null)
         {
             try

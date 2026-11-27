@@ -3,7 +3,7 @@ using System.Runtime.InteropServices;
 
 namespace ReplayKitSetup
 {
-    // windows entry for the normal (non-headless) run: ensure the evergreen webview2 runtime (WebView2Runtime.Ensure downloads it when missing), then hand off to SetupWindow. Native below is the win32 p/invoke surface SetupWindow builds its raw window on, kept in one file so nothing else has to carry window plumbing.
+    // windows entry for the normal (non-headless) run: ensure the evergreen webview2 runtime (WebView2Runtime.Ensure downloads it when missing), then hand off to SetupWindow.
     internal static class InstallerApp
     {
         public static int Run()
@@ -34,7 +34,7 @@ namespace ReplayKitSetup
         }
     }
 
-    // p/invoke surface for the setup window. kept in this file so nothing else has to carry win32 window plumbing.
+    // the win32 p/invoke surface the setup and uninstall windows build their raw windows on, kept in this file so nothing else has to carry window plumbing.
     internal static class Native
     {
         public delegate IntPtr WndProc(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);

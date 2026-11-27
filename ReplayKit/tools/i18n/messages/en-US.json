@@ -10013,6 +10013,14 @@
     "context": "Reason a step of the installer stopped, shown in the installer window. Keep {version} as written; it is an OBS version.",
     "text": "No shared process host is bundled for OBS {version}. Install a supported OBS version first."
   },
+  "setup.theSteamCopyOfObsIsVersion": {
+    "context": "Reason an update stopped before anything was changed, shown in the update result and the installer window. Keep {installed} and {target} as written; they are OBS versions. obsproject.com is a website and stays as it is.",
+    "text": "The Steam copy of OBS is version {installed} and ReplayKit needs OBS {target}. Steam decides which version it runs, so install OBS {target} from obsproject.com instead."
+  },
+  "setup.obsIsNewerThanTheVersionReplaykitSupports": {
+    "context": "Reason an update stopped before anything was changed, shown in the update result and the installer window. Keep {installed} and {target} as written; they are OBS versions. obsproject.com is a website and stays as it is.",
+    "text": "OBS {installed} is newer than OBS {target}, the version this ReplayKit supports. Install OBS {target} from obsproject.com, then run the ReplayKit installer again."
+  },
   "setup.netFrameworkInstallPrompt": {
     "context": "Windows dialog the installer shows first, before anything else, when Microsoft .NET Framework 4.8 is missing. OK downloads the .NET Framework 4.8 installer from Microsoft and opens it; use the label Windows gives the OK button in your language. Keep product names as written.",
     "text": "OBS ReplayKit needs Microsoft .NET Framework 4.8, which is not installed on this PC.\n\nChoose OK to download the .NET Framework 4.8 installer from Microsoft and open it. Once it has finished, this installer starts again by itself."

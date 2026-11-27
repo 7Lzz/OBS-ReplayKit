@@ -12,8 +12,6 @@ namespace ReplayKitSetup
     // fetch the official OBS Studio installer of the newest version obs-versions.json supports, check its hash and signature and run it silently. called when OBS is missing or older than that version -- the setup exe is already elevated (app.manifest), so the nsis installer needs no extra prompt. nothing is bundled; there is no offline path.
     public static class ObsDownloader
     {
-        private const string UserAgent = "OBSReplayKit/1.0 (+https://github.com/7Lzz/OBS-ReplayKit)";
-
         // obss windows installer is ~150 mb; the cap only exists so a hijacked url cannot fill the disk.
         private const long MaxInstallerBytes = 500L * 1024 * 1024;
         private const int InstallTimeoutMs = 10 * 60 * 1000;
@@ -74,7 +72,7 @@ namespace ReplayKitSetup
             return false;
         }
 
-        // why the installed obs can never be put on the supported version by this installer, or null: steam decides the version of its own copy, and going back across majors can break the settings of obs
+        // why the installed obs can never be put on the supported version by this installer, in the language of the setup, or null: steam decides the version of its own copy, and going back across majors can break the settings of obs
         public static string UnreachableObs()
         {
             var target = ObsVersions.Install.Tested;
@@ -83,9 +81,9 @@ namespace ReplayKitSetup
             var installed = ObsVersions.InstalledVersion();
             if (installed == target) return null;
             if (exe.IndexOf(@"\steamapps\", StringComparison.OrdinalIgnoreCase) >= 0)
-                return "The Steam copy of OBS is version " + (installed?.ToString() ?? "(unknown)") + " and ReplayKit needs OBS " + target + ". Steam decides which version it runs, so install OBS " + target + " from obsproject.com instead.";
+                return SetupLocale.Message("setup.theSteamCopyOfObsIsVersion", "installed", installed?.ToString() ?? "?", "target", target.ToString());
             if (installed != null && installed.Major > target.Major)
-                return "OBS " + installed + " is newer than OBS " + target + ", the version this ReplayKit supports. Install OBS " + target + " from obsproject.com, then run the ReplayKit installer again.";
+                return SetupLocale.Message("setup.obsIsNewerThanTheVersionReplaykitSupports", "installed", installed.ToString(), "target", target.ToString());
             return null;
         }
 
@@ -104,7 +102,7 @@ namespace ReplayKitSetup
 
                 workDir = NetCompat.CreateTempSubdirectory("ReplayKit-obs-setup-").FullName;
                 installer = Path.Combine(workDir, assetName);
-                if (!DownloadInstaller(download.Url, installer, 0, progress))
+                if (!DownloadInstaller(download.Url, installer, progress))
                     return false;
 
                 string actual;
@@ -115,7 +113,7 @@ namespace ReplayKitSetup
                     return false;
                 }
 
-                if (!IsObsSigned(installer, log))
+                if (!Authenticode.IsObsSigned(installer, log))
                 {
                     log("The downloaded OBS installer is not validly signed by OBS Project. Install OBS yourself from obsproject.com, then re-run this installer.");
                     return false;
@@ -155,15 +153,14 @@ namespace ReplayKitSetup
             }
         }
 
-
-        private static bool DownloadInstaller(string url, string dst, long expectedLen, IInstallProgress progress)
+        private static bool DownloadInstaller(string url, string dst, IInstallProgress progress)
         {
             Action<string> log = progress.LogLine;
             using (var client = new HttpClient { Timeout = TimeSpan.FromMinutes(15) })
             {
-                client.DefaultRequestHeaders.Add("User-Agent", UserAgent);
+                client.DefaultRequestHeaders.Add("User-Agent", Download.UserAgent);
                 DateTime lastTick = DateTime.UtcNow;
-                Download.Save(client, url, dst, MaxInstallerBytes, TimeSpan.FromMinutes(15), expectedLen, (done, total) =>
+                Download.Save(client, url, dst, MaxInstallerBytes, TimeSpan.FromMinutes(15), 0, (done, total) =>
                 {
                     DateTime now = DateTime.UtcNow;
                     if ((now - lastTick).TotalMilliseconds < 250) return;
@@ -229,17 +226,6 @@ namespace ReplayKitSetup
             }
             catch (IOException) { return true; }
             catch (UnauthorizedAccessException) { return true; }
-        }
-
-        // "Valid" means the authenticode signature is intact and chains to a trusted root; the subject check is a sanity guard so a differently-signed exe swapped in over a hijacked link still gets rejected
-        private static bool IsObsSigned(string path, Action<string> log)
-        {
-            var signature = Authenticode.Check(path);
-            bool ok = signature.Valid &&
-                      (signature.Subject.IndexOf("OBS", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                       signature.Subject.IndexOf("Hugh Bailey", StringComparison.OrdinalIgnoreCase) >= 0);
-            if (!ok) log($"OBS installer signature rejected: status={signature.Status} subject={signature.Subject}");
-            return ok;
         }
 
         private static bool RunSilentInstaller(string installer, Action<string> log)

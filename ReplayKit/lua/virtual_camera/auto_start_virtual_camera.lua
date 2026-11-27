@@ -6,9 +6,9 @@ obs = obslua
 local OBS_MONITORING_TYPE_NONE              = 0
 local OBS_MONITORING_TYPE_MONITOR_AND_OUTPUT = 2
 
-local MIC_SOURCE_NAME           = "Audio Input Capture"
-local DESKTOP_AUDIO_SOURCE_NAME = "Desktop Audio (excl. Discord)"
-local DISCORD_AUDIO_SOURCE_NAME = "Discord Audio (record only)"
+local MIC_SOURCE_NAME           = replaykit_shared.audio_sources.mic
+local DESKTOP_AUDIO_SOURCE_NAME = replaykit_shared.audio_sources.desktop
+local DISCORD_AUDIO_SOURCE_NAME = replaykit_shared.audio_sources.discord
 local MODE_PROJECTOR            = "projector"
 local MODE_SHARE_BRIDGE         = "share_bridge"
 local MODE_VCAM_LEGACY          = "virtual_camera_legacy"

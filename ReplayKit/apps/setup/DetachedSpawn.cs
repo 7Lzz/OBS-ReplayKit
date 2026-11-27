@@ -5,7 +5,7 @@ using System.Text;
 
 namespace ReplayKitSetup
 {
-    // relaunches this exe as a process with no console and no job-object membership, so the install cannot be torn down by whatever happens to OBS. the helper that starts an update dies moments after the installer taskkills obs, and anything the installer inherited from it -- a console it shares, a job it was created inside -- takes the installer down with it. both of those are decided at CreateProcess time and cannot be shed afterwards, which is why this is a relaunch rather than a flag.
+    // relaunches this exe as a process with no console and no job-object membership, so the install cannot be torn down by whatever happens to OBS. the helper that starts an update goes away moments after the installer closes obs, and anything the installer inherited from it -- a console it shares, a job it was created inside -- takes the installer down with it. both of those are decided at CreateProcess time and cannot be shed afterwards, which is why this is a relaunch rather than a flag.
     internal static class DetachedSpawn
     {
         [StructLayout(LayoutKind.Sequential)]
@@ -43,7 +43,6 @@ namespace ReplayKitSetup
 
         // the helper watches the detached worker, which may outlive the launcher.
         public static void WritePid(int pid, string attemptId)
-
         {
             try
             {

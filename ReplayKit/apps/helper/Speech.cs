@@ -87,7 +87,7 @@ namespace ReplayKitHelper
 
         private static readonly Dictionary<string, Job> Jobs = new Dictionary<string, Job>();
 
-        private static string Root => Path.Combine(AppConfig.GetReplayKitUserStateDir(), "speech");
+        private static string Root => Path.Combine(AppConfig.GetReplayKitUserStateDir(), ReplayKitShared.ReplayKitFolder.SpeechFolder);
         private static string EngineDir => Path.Combine(Root, "whisper-" + EngineTag);
         private static string EngineArchive => EngineDir + ".zip";
         private static string ModelPath(Model model) => Path.Combine(Root, model.Name);

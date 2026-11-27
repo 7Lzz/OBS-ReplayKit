@@ -21,9 +21,7 @@ namespace ReplayKitHelper
         private static bool _windowOpen;
         private static string _lastError = "";
         private static IntPtr _formHandle = IntPtr.Zero;
-        private static readonly string ProfileDirectory = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "OBS ReplayKit", "StreamableProfile");
+        private static readonly string ProfileDirectory = Path.Combine(AppConfig.GetReplayKitUserStateDir(), ReplayKitShared.ReplayKitFolder.StreamableProfileFolder);
 
         public static JObject OpenOrGetStatus()
         {

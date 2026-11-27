@@ -34,7 +34,7 @@ namespace ReplayKitSetup
                 workDir = NetCompat.CreateTempSubdirectory("ReplayKit-webview2-").FullName;
                 string bootstrapper = Path.Combine(workDir, "MicrosoftEdgeWebview2Setup.exe");
                 if (!Download(BootstrapperUrl, bootstrapper, Log)) return false;
-                if (!InputOverlay.IsMicrosoftSigned(bootstrapper, Log)) return false;
+                if (!Authenticode.IsMicrosoftSigned(bootstrapper, Log)) return false;
                 if (!RunSilent(bootstrapper, Log)) return false;
                 bool ok = IsAvailable();
                 Log(ok ? "WebView2 runtime installed." : "WebView2 runtime install finished but the runtime is still not detected.");
@@ -55,7 +55,7 @@ namespace ReplayKitSetup
         private static bool Download(string url, string dst, Action<string> log)
         {
             using var client = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
-            client.DefaultRequestHeaders.Add("User-Agent", "OBSReplayKit/1.0 (+https://github.com/7Lzz/OBS-ReplayKit)");
+            client.DefaultRequestHeaders.Add("User-Agent", ReplayKitSetup.Download.UserAgent);
             ReplayKitSetup.Download.Save(client, url, dst, MaxBootstrapperBytes, TimeSpan.FromMinutes(5));
             long done = new FileInfo(dst).Length;
             log("WebView2 bootstrapper downloaded (" + (done / 1024) + " KB).");

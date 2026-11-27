@@ -1,7 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Security.Cryptography;
+using ReplayKitShared;
 
 namespace ReplayKitSetup
 {
@@ -9,6 +11,13 @@ namespace ReplayKitSetup
     public static class WinCapture
     {
         private static string DllPath() => Path.Combine(Config.PROGRAMFILES_OBS_DIR, Config.WIN_CAPTURE_AUDIO_DLL_REL.Replace('/', Path.DirectorySeparatorChar));
+
+        // the dll, its symbols and its data folder in obs, which an uninstall takes away
+        internal static IEnumerable<string> InstalledPaths => new[]
+        {
+            DllPath(), Path.ChangeExtension(DllPath(), ".pdb"),
+            Path.Combine(Config.PROGRAMFILES_OBS_DIR, BundleLayout.WinCaptureAudioDataDir.TrimEnd('/').Replace('/', Path.DirectorySeparatorChar)),
+        };
 
         // true iff the win-capture-audio dll is installed for obs.
         private static bool IsInstalled() => File.Exists(DllPath());
@@ -100,7 +109,6 @@ namespace ReplayKitSetup
             catch (UnauthorizedAccessException exc)
             {
                 log?.Invoke($"permission denied writing to {Config.PROGRAMFILES_OBS_DIR}: {exc.Message}");
-                log?.Invoke("(this script must run elevated -- the installer .exe self-elevates)");
                 return false;
             }
             catch (Exception exc)

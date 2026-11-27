@@ -680,10 +680,9 @@ namespace ReplayKitHelper
 
         // microphone input and its OBS filters.
 
-        internal const string MicInputName = "Audio Input Capture";
+        internal const string MicInputName = OverlayScene.MicSourceName;
         internal const string MicNoiseFilterName = "ReplayKit Noise Suppression";
         internal const string NoiseSuppressFilterKind = "noise_suppress_filter_v2";
-        internal const string HelperExeName = "OBSReplayKit.exe";
         internal const string MicGateFilterName = "ReplayKit Noise Gate";
         internal const string NoiseGateFilterKind = "noise_gate_filter";
         internal const double NoiseGateDefaultOpenDb = -26.0;
@@ -691,9 +690,9 @@ namespace ReplayKitHelper
         internal const double GateHysteresisDb = 5.0;
         // nonzero levels use a named gain filter; zero also silences the input fader without changing its mute state.
         internal const string GainFilterKind = "gain_filter";
-        internal const string MicGainFilterName = "ReplayKit Mic Volume";
-        internal const string DesktopGainFilterName = "ReplayKit Desktop Volume";
-        internal const string DiscordGainFilterName = "ReplayKit Discord Volume";
+        internal const string MicGainFilterName = AudioVolume.MicFilterName;
+        internal const string DesktopGainFilterName = AudioVolume.DesktopFilterName;
+        internal const string DiscordGainFilterName = AudioVolume.DiscordFilterName;
         internal static readonly string[] MicSettingKeys = { "micDeviceId", "micVolume", "micNoiseSuppression", "micInputSensitivity" };
         internal static readonly string[] AudioVolumeKeys = { "desktopAudioVolume", "discordAudioVolume" };
 
@@ -1138,8 +1137,8 @@ namespace ReplayKitHelper
             applied.Add("microphone input sensitivity");
         }
 
-        internal const string DesktopAudioInputName = "Desktop Audio (excl. Discord)";
-        internal const string DiscordAudioInputName = "Discord Audio (record only)";
+        internal const string DesktopAudioInputName = OverlayScene.DesktopAudioSourceName;
+        internal const string DiscordAudioInputName = OverlayScene.DiscordAudioSourceName;
 
         internal static JObject ApplyAudioVolumesLive(JObject settings)
         {

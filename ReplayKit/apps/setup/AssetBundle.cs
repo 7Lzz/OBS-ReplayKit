@@ -25,7 +25,7 @@ namespace ReplayKitSetup
                     using var resource = Assembly.GetExecutingAssembly().GetManifestResourceStream(ResourceName);
                     if (resource == null) return null;
 
-                    // rebuilt releases can share a version. Each process owns fresh files instead of trusting a reusable temp directory and completion marker.
+                    // rebuilt releases can share a version. each process owns fresh files instead of trusting a reusable temp directory and completion marker.
                     destination = NetCompat.CreateTempSubdirectory("OBSReplayKit-bundle-").FullName;
                     string prefix = destination.TrimEnd('\\', '/') + Path.DirectorySeparatorChar;
                     using var archive = new ZipArchive(resource, ZipArchiveMode.Read);

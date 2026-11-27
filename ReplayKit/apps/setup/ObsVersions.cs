@@ -65,7 +65,7 @@ namespace ReplayKitSetup
         // the version of the obs64.exe of the obs install, as major.minor.patch
         public static Version InstalledVersion()
         {
-            string exe = Path.Combine(Config.PROGRAMFILES_OBS_DIR, "bin", "64bit", "obs64.exe");
+            string exe = Config.ObsExeFromRoot(Config.PROGRAMFILES_OBS_DIR);
             if (!File.Exists(exe)) return null;
             try { return Parse(FileVersionInfo.GetVersionInfo(exe).FileVersion, allowRevision: true); }
             catch (Exception ex) when (ex is IOException || ex is FormatException) { return null; }

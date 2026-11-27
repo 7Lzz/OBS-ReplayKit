@@ -405,8 +405,8 @@ namespace ReplayKitHelper
                 {
                     var t = Resolve(settings);
                     string slug = Slug(id);
-                    obsId = "com.replaykit.theme." + slug;
-                    File.WriteAllText(Path.Combine(themesDir, "rk_" + slug + ".ovt"), BuildOvt(t, obsId, PresetLabel(id)), new UTF8Encoding(false));
+                    obsId = ReplayKitShared.ThemeSheet.ObsThemeIdPrefix + slug;
+                    File.WriteAllText(Path.Combine(themesDir, ReplayKitShared.ThemeSheet.ObsThemeFilePrefix + slug + ".ovt"), BuildOvt(t, obsId, PresetLabel(id)), new UTF8Encoding(false));
                 }
                 SetObsThemeKey(obsId);   // covers the force-kill relaunch path (no exit-save)
                 try { File.WriteAllText(PendingThemeMarker, obsId, new UTF8Encoding(false)); }
@@ -436,7 +436,7 @@ namespace ReplayKitHelper
             string id = settings?["theme"]?.Value<string>() ?? "default";
             string ini = Path.Combine(Constants.OBS_CONFIG_DIR, "user.ini");
             string current = ReadObsThemeKey(ini);
-            if (id == "default" && (current == null || !current.StartsWith("com.replaykit.theme.", StringComparison.Ordinal)))
+            if (id == "default" && (current == null || !current.StartsWith(ReplayKitShared.ThemeSheet.ObsThemeIdPrefix, StringComparison.Ordinal)))
             {
                 if (File.Exists(PendingThemeMarker)) File.Delete(PendingThemeMarker);
                 WriteDockThemeCss(settings);
@@ -444,7 +444,7 @@ namespace ReplayKitHelper
             }
             if (ApplyToObs(settings) != "theme") throw new IOException(Locales.Message("settings.couldNotPrepareTheSelectedObs"));
             ApplyPendingTheme();
-            string expected = id == "default" ? "" : "com.replaykit.theme." + Slug(id);
+            string expected = id == "default" ? "" : ReplayKitShared.ThemeSheet.ObsThemeIdPrefix + Slug(id);
             if (File.Exists(PendingThemeMarker) || (ReadObsThemeKey(ini) ?? "") != expected)
                 throw new IOException(Locales.Message("settings.theSelectedObsThemeCouldNot"));
         }
@@ -460,11 +460,11 @@ namespace ReplayKitHelper
                 string cur = ReadObsThemeKey(ini);
                 if (id == "default")
                 {
-                    if (cur != null && cur.StartsWith("com.replaykit.theme.", StringComparison.Ordinal)) SetObsThemeKey("");
+                    if (cur != null && cur.StartsWith(ReplayKitShared.ThemeSheet.ObsThemeIdPrefix, StringComparison.Ordinal)) SetObsThemeKey("");
                     return;
                 }
-                string obsId = "com.replaykit.theme." + Slug(id);
-                string ovt = Path.Combine(Constants.OBS_CONFIG_DIR, "themes", "rk_" + Slug(id) + ".ovt");
+                string obsId = ReplayKitShared.ThemeSheet.ObsThemeIdPrefix + Slug(id);
+                string ovt = Path.Combine(Constants.OBS_CONFIG_DIR, "themes", ReplayKitShared.ThemeSheet.ObsThemeFilePrefix + Slug(id) + ".ovt");
                 if (cur != obsId || !File.Exists(ovt)) { ApplyToObs(settings); return; }
                 // an updated helper may build the file differently, and obs reads it again at its next start
                 string want = BuildOvt(Resolve(settings), obsId, PresetLabel(id));

@@ -1,19 +1,20 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 using Microsoft.Win32;
 using ReplayKitShared;
 
 namespace ReplayKitSetup
 {
-    // enumerate windows audio devices. obs stores endpoint ids in mmdevice format -- {0.0.1.00000000}.<endpoint-guid> for capture, {0.0.0.00000000}.<endpoint-guid> for render. friendly names live under each endpoints properties subkey.
+    // the windows audio endpoints as the registry lists them. obs stores endpoint ids in mmdevice format -- {0.0.1.00000000}.<endpoint-guid> for capture, {0.0.0.00000000}.<endpoint-guid> for render. friendly names live under each endpoints properties subkey.
     public static class Audio
     {
-        // pkey_device_friendlyname in the mmdevices property store.
-        private const string PkeyFriendlyName = "{a45c254e-df1c-4efd-8020-67d146a850e0},2";
+        // pkey_device_friendlyname in the mmdevices property store, as the registry names its value
+        internal const string FriendlyNameValue = "{a45c254e-df1c-4efd-8020-67d146a850e0},2";
 
-        private const string CaptureKey = @"SOFTWARE\Microsoft\Windows\CurrentVersion\MMDevices\Audio\Capture";
-        private const string RenderKey = @"SOFTWARE\Microsoft\Windows\CurrentVersion\MMDevices\Audio\Render";
+        internal const string CaptureKey = @"SOFTWARE\Microsoft\Windows\CurrentVersion\MMDevices\Audio\Capture";
+        internal const string RenderKey = @"SOFTWARE\Microsoft\Windows\CurrentVersion\MMDevices\Audio\Render";
 
         // devicestate bits. only the low nibble carries the documented mmdevice states; some virtual-audio drivers (voicemeeter etc.) set extra high bits.
         private const int StateActive = 0x1;
@@ -22,119 +23,51 @@ namespace ReplayKitSetup
         public const string DEFAULT_DEVICE_ID = SettingDefaults.MicDeviceId;
         public const string DEFAULT_DEVICE_NAME = "Default (system)";
 
-        public sealed class AudioDevice
+        // the render endpoint of the share cable obs monitors to, before or after the rename VbCable gives it, as obs names it in basic.ini; null when the cable is not on the machine
+        public static (string DeviceId, string Name)? FindShareCableEndpoint()
         {
-            public string DeviceId { get; }
-            public string Name { get; }
+            var candidates = new List<(int Rank, string DisplayName, string DeviceId)>();
 
-            public AudioDevice(string deviceId, string name)
+            using (var root = Registry.LocalMachine.OpenSubKey(RenderKey))
             {
-                DeviceId = deviceId;
-                Name = name;
-            }
-        }
-
-        private static string ToObsId(string endpointGuid) => "{0.0.1.00000000}." + endpointGuid;
-        private static string ToRenderObsId(string endpointGuid) => "{0.0.0.00000000}." + endpointGuid;
-
-        private static IEnumerable<(string Endpoint, string Name)> ActiveEndpoints(string rootKeyPath)
-        {
-            using (var root = Registry.LocalMachine.OpenSubKey(rootKeyPath))
-            {
-                if (root == null) yield break;
-
-                foreach (var endpoint in root.GetSubKeyNames())
+                if (root == null) return null;
+                foreach (var guid in root.GetSubKeyNames())
                 {
-                    int state;
-                    using (var ep = root.OpenSubKey(endpoint))
+                    string displayName;
+                    try
                     {
-                        if (ep == null) continue;
-                        var stateValue = ep.GetValue("DeviceState");
-                        if (stateValue == null) continue;
-                        state = Convert.ToInt32(stateValue);
+                        using (var endpoint = root.OpenSubKey(guid))
+                        {
+                            var stateValue = endpoint?.GetValue("DeviceState");
+                            if (stateValue == null) continue;
+                            if ((Convert.ToInt32(stateValue) & StateActive) == 0) continue;
+                        }
+                        using (var props = root.OpenSubKey(guid + @"\Properties"))
+                        {
+                            var name = props?.GetValue(FriendlyNameValue) as string;
+                            if (name == null) continue;
+                            displayName = name.Trim();
+                        }
                     }
-                    if ((state & StateActive) == 0) continue;
-
-                    string name = endpoint;
-                    using (var props = root.OpenSubKey(endpoint + @"\Properties"))
+                    catch (Exception ex) when (ex is System.Security.SecurityException || ex is System.IO.IOException)
                     {
-                        var nameValue = props?.GetValue(PkeyFriendlyName) as string;
-                        if (!string.IsNullOrEmpty(nameValue)) name = nameValue;
+                        continue;
                     }
 
-                    yield return (endpoint, name);
+                    string canonical = Regex.Replace(displayName, @"^\s*\d+\s*-\s*", "").Trim().ToLowerInvariant();
+                    if (Regex.IsMatch(canonical, "surround|16ch|loopback|do not select")) continue;
+                    int rank = 999;
+                    if (canonical == "obs stream audio") rank = 0;
+                    else if (canonical.StartsWith("obs stream audio")) rank = 1;
+                    else if (canonical.StartsWith("cable input")) rank = 2;
+                    if (rank == 999) continue;
+                    candidates.Add((rank, displayName, "{0.0.0.00000000}." + guid));
                 }
             }
-        }
 
-        // obs-format render device id matching friendlyName (case-insensitive exact). used to write the fresh obs stream audio id straight into basic.ini so obs picks the right monitoring sink on first launch. unlike ActiveEndpoints, an endpoint whose friendly name cant be read is skipped rather than matched by its raw guid.
-        public static string FindRenderEndpoint(string friendlyName)
-        {
-            string needle = friendlyName.ToLowerInvariant();
-            using (var render = Registry.LocalMachine.OpenSubKey(RenderKey))
-            {
-                if (render == null) return null;
-
-                foreach (var endpoint in render.GetSubKeyNames())
-                {
-                    using (var ep = render.OpenSubKey(endpoint))
-                    {
-                        var stateValue = ep?.GetValue("DeviceState");
-                        if (stateValue == null) continue;
-                        if ((Convert.ToInt32(stateValue) & StateActive) == 0) continue;
-                    }
-
-                    using (var props = render.OpenSubKey(endpoint + @"\Properties"))
-                    {
-                        var name = props?.GetValue(PkeyFriendlyName) as string;
-                        if (name == null) continue;
-                        if (string.Equals(name, needle, StringComparison.OrdinalIgnoreCase)) return ToRenderObsId(endpoint);
-                    }
-                }
-            }
-            return null;
-        }
-
-        private static List<AudioDevice> ListRenderEndpoints()
-        {
-            return ActiveEndpoints(RenderKey).Select(e => new AudioDevice(ToRenderObsId(e.Endpoint), e.Name)).ToList();
-        }
-
-        // rank only the replaykit/vb-cable render sink; never match normal speakers.
-        private static int? ReplaykitMonitorRank(string name)
-        {
-            string lower = name.Trim().ToLowerInvariant();
-            if (lower.Contains("surround") || lower.Contains("16ch")) return null;
-            if (lower == "obs stream audio") return 0;
-            if (lower.StartsWith("obs stream audio") && !lower.Contains("loopback")) return 10;
-            if (lower.StartsWith("cable input")) return 20;
-            return null;
-        }
-
-        // best active render endpoint for obs monitoring, before or after replaykits vb-cable rename.
-        public static AudioDevice FindReplaykitMonitoringEndpoint()
-        {
-            var candidates = new List<(int Rank, string LowerName, AudioDevice Device)>();
-            foreach (var device in ListRenderEndpoints())
-            {
-                var rank = ReplaykitMonitorRank(device.Name);
-                if (rank.HasValue) candidates.Add((rank.Value, device.Name.ToLowerInvariant(), device));
-            }
             if (candidates.Count == 0) return null;
-            candidates.Sort((a, b) =>
-            {
-                int cmp = a.Rank.CompareTo(b.Rank);
-                return cmp != 0 ? cmp : string.CompareOrdinal(a.LowerName, b.LowerName);
-            });
-            return candidates[0].Device;
-        }
-
-        // active capture devices known to windows, alphabetized.
-        public static List<AudioDevice> ListMicrophones()
-        {
-            var devices = ActiveEndpoints(CaptureKey).Select(e => new AudioDevice(ToObsId(e.Endpoint), e.Name)).ToList();
-            devices.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
-            return devices;
+            var best = candidates.OrderBy(c => c.Rank).ThenBy(c => c.DisplayName.ToLowerInvariant(), StringComparer.Ordinal).First();
+            return (best.DeviceId, best.DisplayName);
         }
     }
 }

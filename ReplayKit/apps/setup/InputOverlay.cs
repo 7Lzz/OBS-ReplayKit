@@ -22,11 +22,13 @@ namespace ReplayKitSetup
         // the plugin folder under programdata, which every supported obs reads in the layout of its line
         private static readonly string PluginDir = Path.Combine(Config.PROGRAMDATA, "obs-studio", "plugins", "input-overlay");
 
+        // the plugin folder and the copy older setups put into the obs folder, which an uninstall takes away
+        internal static IEnumerable<string> InstalledPaths => new[] { LegacyDll, LegacySdl2, LegacyData, PluginDir };
+
         private const string MouseLayoutRel = "mouse/mouse-no-movement.json";
         private const int MouseLayoutWidth = 285;
         private const int MouseLayoutHeight = 421;
 
-        // same safe zip-walk shape as BongoCat.cs -- bounds-checks every entry against the folder it extracts into before writing, so a malformed archive path can never escape the install root.
         private const string PluginZipRoot = BundleLayout.InputOverlayZipRoot;
 
         // vc++ 2015-2022 (x64) redistributable -- prerequisite for input-overlay.dll. downloaded from microsoft only when missing.
@@ -86,17 +88,6 @@ namespace ReplayKitSetup
             }
         }
 
-        // the downloaded installer runs only when windows confirms it is intact and microsoft signed it
-        internal static bool IsMicrosoftSigned(string path, Action<string> log = null)
-        {
-            var signature = Authenticode.Check(path);
-            bool ok = signature.Valid && signature.Subject.Contains("Microsoft Corporation") && signature.Issuer.Contains("Microsoft");
-            if (!ok) log?.Invoke($"Microsoft installer signature rejected: status={signature.Status} subject={Truncate(signature.Subject, 80)}");
-            return ok;
-        }
-
-        private static string Truncate(string s, int max) => s.Length > max ? s.Substring(0, max) : s;
-
         // download + run the vc++ redist if missing. without it the plugin dlls msvcp140/vcruntime140 imports fail and obs reports "plugin load error".
         public static bool InstallVcppRedist(Action<string> log = null)
         {
@@ -109,7 +100,7 @@ namespace ReplayKitSetup
             log?.Invoke("VC++ redist missing; downloading latest x64 package from Microsoft...");
             string redist = DownloadVcppRedist(log);
             if (redist == null) return false;
-            if (!IsMicrosoftSigned(redist, log))
+            if (!Authenticode.IsMicrosoftSigned(redist, log))
             {
                 try { Directory.Delete(Path.GetDirectoryName(redist), true); } catch (IOException) { }
                 return false;

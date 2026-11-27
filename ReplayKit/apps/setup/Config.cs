@@ -31,7 +31,7 @@ namespace ReplayKitSetup
         // the helper exe of the live install
         public static string HELPER_EXE => Path.Combine(REPLAYKIT_CONFIG, ReplayKitFolder.HelperExe);
 
-        public static readonly string[] OBS_PROCESSES = { "obs64.exe", "obs32.exe", "obs.exe" };
+        public static readonly string[] OBS_PROCESSES = ObsExit.ProcessNames.Select(name => name + ".exe").ToArray();
 
         private static readonly string _DEFAULT_OBS_DIR;
 
@@ -52,7 +52,7 @@ namespace ReplayKitSetup
         public const long VCPP_REDIST_DOWNLOAD_MAX_BYTES = 64 * 1024 * 1024;
 
         // bundled virtual audio driver -- creates the obs stream audio render endpoint and matching loopback capture endpoint used by discord. still shipped via installers.zips VBCABLE_Driver_Pack45.zip and its own setup exe.
-        public static string INPUT_OVERLAY_INSTALLERS_ZIP => Path.Combine(ASSETS_DIR, BundleLayout.InstallersZip);
+        public static string INSTALLERS_ZIP => Path.Combine(ASSETS_DIR, BundleLayout.InstallersZip);
         public const string VBCABLE_DRIVER_PACK_NAME = BundleLayout.VbCablePack;
         public const string VBCABLE_SETUP_EXE_NAME = "VBCABLE_Setup_x64.exe";
 
@@ -79,7 +79,7 @@ namespace ReplayKitSetup
         public static readonly string REPLAYKIT_TRAY_LEGACY_PLUGIN_DIR;
         public static readonly string REPLAYKIT_TRAY_LEGACY_DLL_IN_CURRENT_DIR;
 
-        // file extensions the installer treats as text (PathRewrite + Prefs.ApplyPreferences).
+        // file extensions the installer treats as text (PathRewrite + Transform.ApplyPreferences).
         public static readonly HashSet<string> TEXT_EXTS = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             ".ini", ".json", ".bak", ".lua", ".ps1", ".txt",
@@ -95,8 +95,8 @@ namespace ReplayKitSetup
 
             OBS_CONFIG = Path.Combine(APPDATA, "obs-studio");
             REPLAYKIT_CONFIG = Path.Combine(OBS_CONFIG, ReplayKitFolder.Name);
-            REPLAYKIT_SETUP_CACHE = Path.Combine(LOCALAPPDATA, "OBS ReplayKit");
-            REPLAYKIT_SETUP_EXE = Path.Combine(REPLAYKIT_SETUP_CACHE, "OBSReplayKitSetup.exe");
+            REPLAYKIT_SETUP_CACHE = Path.Combine(LOCALAPPDATA, ReplayKitFolder.LocalName);
+            REPLAYKIT_SETUP_EXE = Path.Combine(REPLAYKIT_SETUP_CACHE, ReplayKitFolder.SetupExe);
             REPLAYKIT_USER_STATE_CACHE = Path.Combine(REPLAYKIT_SETUP_CACHE, "state");
             DOCK_TARGET = Path.Combine(REPLAYKIT_CONFIG, "obs-custom-dock");
 
@@ -136,7 +136,7 @@ namespace ReplayKitSetup
             if (string.IsNullOrEmpty(path)) return false;
             string name = Path.GetFileName(path).ToLowerInvariant();
             // the obs64.exe copy in bin\64bit\replaykit-host runs the browser pages and the helper so they show as obs, but it is never obs itself
-            if (string.Equals(Path.GetFileName(Path.GetDirectoryName(path) ?? ""), "replaykit-host", StringComparison.OrdinalIgnoreCase)) return false;
+            if (string.Equals(Path.GetFileName(Path.GetDirectoryName(path) ?? ""), ObsExit.RoleHostFolder, StringComparison.OrdinalIgnoreCase)) return false;
             return OBS_PROCESSES.Contains(name) && File.Exists(path);
         }
 
@@ -175,7 +175,7 @@ namespace ReplayKitSetup
             return result;
         }
 
-        // full exe path of any running obs process. was a Win32_Process wmi query; it walks the process list directly so the setup carries no System.Management. this setup exe runs elevated (app.manifest), so MainModule is readable even for an elevated obs.
+        // full exe path of any running obs process, from the process list so the setup carries no System.Management. this setup exe runs elevated (app.manifest), so MainModule is readable even for an elevated obs.
         private static IEnumerable<string> RunningObsCandidates()
         {
             var result = new List<string>();

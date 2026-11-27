@@ -15,6 +15,8 @@ namespace ReplayKitSetup
         private const string ManifestName = "manifest.json";
         private const string PendingManifestName = "manifest.pending.json";
         private static string Root => Config.PROGRAMFILES_OBS_DIR;
+        // the role host obs64.exe, relative to the obs folder as the manifest lists it
+        private const string LauncherRel = "bin/64bit/" + ReplayKitShared.ObsExit.RoleHostFolder + "/obs64.exe";
         private static string Backup => PathAt(Root, "bin/64bit/replaykit-host-backup");
 
         private static string PathAt(string root, string relative)
@@ -50,7 +52,7 @@ namespace ReplayKitSetup
             var line = ObsVersions.Lines.SingleOrDefault(item => item.Tested.ToString(3) == version)
                 ?? throw new IOException(SetupLocale.Message("setup.noProcessHostForObs", "version", version)).WithEnglish(SetupLocale.Pair("setup.noProcessHostForObs", "version", version));
             string browser = line.ModernPlugins ? "core/obs-browser/" : "obs-plugins/64bit/";
-            var paths = new[] { "bin/64bit/replaykit-host/obs64.exe", browser + "obs-browser.dll", browser + "obs-browser-role.dll" };
+            var paths = new[] { LauncherRel, browser + "obs-browser.dll", browser + "obs-browser-role.dll" };
             if ((string)manifest["ObsVersion"] != version || !(manifest["Files"] is JArray files) || files.Count != paths.Length)
                 throw SetupLocale.Error("setup.theProcessHostListDoesNotMatchObs", m => new InvalidDataException(m), "version", version);
             foreach (string path in paths)
@@ -250,7 +252,7 @@ namespace ReplayKitSetup
             else if (interrupted != null) manifest = interrupted;
             else
             {
-                string launcher = PathAt(Root, "bin/64bit/replaykit-host/obs64.exe");
+                string launcher = PathAt(Root, LauncherRel);
                 if (!File.Exists(launcher)) return true;
                 if (!ObsVersions.Lines.Any(line => line.Tested.ToString(3) == version)) return RemoveStale(version, log);
                 manifest = Bundle().Manifest;
@@ -288,7 +290,7 @@ namespace ReplayKitSetup
         private static bool RemoveStale(string version, Action<string> log)
         {
             RequireClosed();
-            string launcher = PathAt(Root, "bin/64bit/replaykit-host/obs64.exe");
+            string launcher = PathAt(Root, LauncherRel);
             string launcherHash = Hash(launcher);
             foreach (var line in ObsVersions.Lines.Where(item => item.Tested.ToString(3) != version))
             {
@@ -298,7 +300,7 @@ namespace ReplayKitSetup
                 if (!File.Exists(record)) continue;
                 var manifest = Read(folder, older);
                 var files = ((JArray)manifest["Files"]).OfType<JObject>().ToArray();
-                if (files.Single(file => (string)file["Path"] == "bin/64bit/replaykit-host/obs64.exe")["Sha256"].Value<string>() != launcherHash)
+                if (files.Single(file => (string)file["Path"] == LauncherRel)["Sha256"].Value<string>() != launcherHash)
                     continue;
                 foreach (var file in files)
                 {

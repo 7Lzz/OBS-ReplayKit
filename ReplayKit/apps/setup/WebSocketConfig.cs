@@ -20,11 +20,11 @@ namespace ReplayKitSetup
             ["first_load"] = false,
             ["server_enabled"] = true,
             ["server_password"] = "",
-            ["server_port"] = 6455,
+            ["server_port"] = ReplayKitShared.ObsWebSocketPort.Default,
         };
 
         // tried in order after the currently-configured port fails; spread 10000 apart so one exclusion block (seen up to ~100 ports wide in practice) cant catch more than one candidate.
-        private static readonly int[] PortFallbacks = { 6455, 16455, 26455, 36455, 46455, 12455, 22455 };
+        private static readonly int[] PortFallbacks = { ReplayKitShared.ObsWebSocketPort.Default, 16455, 26455, 36455, 46455, 12455, 22455 };
 
         // true if a loopback listener can actually take this port right now.
         private static bool PortIsBindable(int port)
@@ -83,7 +83,7 @@ namespace ReplayKitSetup
             if (string.IsNullOrWhiteSpace(merged.Value<string>("server_password")))
                 merged["server_password"] = Convert.ToBase64String(NetCompat.RandomBytes(32));
 
-            int wantedPort = merged.Value<int?>("server_port") ?? 6455;
+            int wantedPort = merged.Value<int?>("server_port") ?? ReplayKitShared.ObsWebSocketPort.Default;
             if (!PortIsBindable(wantedPort))
             {
                 var found = PickWorkingPort(wantedPort);

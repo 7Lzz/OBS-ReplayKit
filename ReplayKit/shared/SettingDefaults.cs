@@ -32,6 +32,10 @@ namespace ReplayKitShared
         public const int ClipSoundVolume = 25;
         public const int RecordingSoundVolume = 25;
         public const string MicDeviceId = "default";
+        // the clip hotkey the bundled basic.ini ships with, and the open clips hotkey alt + z
+        public const string ClipKey = "OBS_KEY_F8";
+        public const string OpenClipsKey = "OBS_KEY_Z";
+        public const string OpenClipsModifier = "alt";
         public const string ShareMode = "projector";
         public const bool DiscordScreenshareEnabled = false;
         public const string DiscordOutputMode = "projector";

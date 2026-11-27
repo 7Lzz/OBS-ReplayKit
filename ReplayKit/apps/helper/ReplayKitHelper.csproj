@@ -72,6 +72,8 @@
     <Compile Include="..\..\shared\DesktopAudioExclusions.cs" Link="DesktopAudioExclusions.cs" />
     <Compile Include="..\..\shared\ShellLaunch.cs" Link="ShellLaunch.cs" />
     <Compile Include="..\..\shared\ClipFolder.cs" Link="ClipFolder.cs" />
+    <Compile Include="..\..\shared\ToastIdentity.cs" Link="ToastIdentity.cs" />
+    <Compile Include="..\..\shared\ObsWebSocketPort.cs" Link="ObsWebSocketPort.cs" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />

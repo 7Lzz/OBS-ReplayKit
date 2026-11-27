@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
@@ -14,12 +15,15 @@ namespace ReplayKitSetup
     public static class BongoCat
     {
         private const string ZipRoot = BundleLayout.BangoCatZipRoot;
-        private static readonly string PluginData = Path.Combine(Config.PROGRAMFILES_OBS_DIR, "bin", "64bit", "Bango Cat");
+        private static readonly string PluginData = Path.Combine(Config.PROGRAMFILES_OBS_DIR, BundleLayout.BangoCatPluginDir.TrimEnd('/').Replace('/', Path.DirectorySeparatorChar));
         private static readonly string[] LegacyPlugin =
         {
             Path.Combine(Config.PROGRAMFILES_OBS_DIR, "obs-plugins", "64bit", "bongobs-cat.dll"),
             Path.Combine(Config.PROGRAMFILES_OBS_DIR, "data", "obs-plugins", OverlayScene.LegacyBongoSourceKind),
         };
+
+        // the Bango Cat folder and the old opengl plugin, which an uninstall takes away
+        internal static IEnumerable<string> InstalledPaths => new[] { PluginData }.Concat(LegacyPlugin);
 
         private static bool IsSafeRelative(string[] parts)
         {

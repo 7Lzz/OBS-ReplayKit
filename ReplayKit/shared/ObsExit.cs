@@ -12,6 +12,11 @@ namespace ReplayKitShared
         internal const int ForceWaitMs = 10000;
         internal const int SetupGateWaitMs = 5000;
 
+        // the names obs runs under; the role host shares obs64, so a caller that needs obs itself checks for its folder too
+        internal static readonly string[] ProcessNames = { "obs64", "obs32", "obs" };
+        // the folder beside obs64.exe that holds the role host, the obs64.exe copy the helper and the browser pages run under so they show as obs
+        internal const string RoleHostFolder = "replaykit-host";
+
         internal static string GateName(int pid) => @"Local\OBSReplayKit-close-" + pid.ToString(CultureInfo.InvariantCulture);
 
         // setup keeps this through file replacement, and a detached restart keeps it through relaunch

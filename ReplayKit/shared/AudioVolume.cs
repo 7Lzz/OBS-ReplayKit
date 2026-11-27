@@ -7,6 +7,10 @@ namespace ReplayKitShared
     {
         public const int Max = 200;
         public const string SavedLevel = "volume_before_zero";
+        // the gain filter that carries the volume of each audio source of the scene collection
+        public const string MicFilterName = "ReplayKit Mic Volume";
+        public const string DesktopFilterName = "ReplayKit Desktop Volume";
+        public const string DiscordFilterName = "ReplayKit Discord Volume";
 
         public static double ToDb(int percent)
         {
@@ -64,9 +68,9 @@ namespace ReplayKitShared
             string filterName;
             switch (source.Value<string>("name"))
             {
-                case "Audio Input Capture": filterName = "ReplayKit Mic Volume"; break;
-                case "Desktop Audio (excl. Discord)": filterName = "ReplayKit Desktop Volume"; break;
-                case "Discord Audio (record only)": filterName = "ReplayKit Discord Volume"; break;
+                case OverlayScene.MicSourceName: filterName = MicFilterName; break;
+                case OverlayScene.DesktopAudioSourceName: filterName = DesktopFilterName; break;
+                case OverlayScene.DiscordAudioSourceName: filterName = DiscordFilterName; break;
                 default: return false;
             }
             foreach (var token in source["filters"] as JArray ?? new JArray())

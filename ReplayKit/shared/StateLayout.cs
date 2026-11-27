@@ -23,6 +23,8 @@ namespace ReplayKitShared
         public const string GameMappingsFile = "game_mappings.json";
         public const string ProfilePictureFile = "profile_picture.png";
         public const string DeletedHistoryFile = "deleted_history.json";
+        // the hidden folder in each clip folder the deleted items wait in; a name no game folder can be adopted by, since the files in it go by ids the clips db does not know
+        public const string DeletedHistoryFolder = ".replaykit-deleted";
         public const string EditDraftsFile = "edit_drafts.json";
         public const string EditorPresetsFile = "editor_presets.json";
         public const string NotificationsFile = "notifications.json";

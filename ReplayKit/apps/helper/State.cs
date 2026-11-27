@@ -130,7 +130,7 @@ namespace ReplayKitHelper
 
         // the obs64.exe copy in bin\64bit\replaykit-host runs this helper and the browser pages so they show as obs, but it is never obs itself
         internal static bool IsRoleHost(string path) =>
-            string.Equals(Path.GetFileName(Path.GetDirectoryName(path ?? "") ?? ""), "replaykit-host", StringComparison.OrdinalIgnoreCase);
+            string.Equals(Path.GetFileName(Path.GetDirectoryName(path ?? "") ?? ""), ReplayKitShared.ObsExit.RoleHostFolder, StringComparison.OrdinalIgnoreCase);
 
         internal static bool IsRoleHost(Process process)
         {
@@ -138,8 +138,8 @@ namespace ReplayKitHelper
             catch (Exception ex) when (ex is System.ComponentModel.Win32Exception || ex is InvalidOperationException) { return false; }
         }
 
-        // the names obs runs under; the role host shares obs64, so a caller that needs obs itself checks IsRoleHost too
-        internal static readonly string[] ObsProcessNames = { "obs64", "obs32", "obs" };
+        // the role host shares obs64, so a caller that needs obs itself checks IsRoleHost too
+        internal static readonly string[] ObsProcessNames = ReplayKitShared.ObsExit.ProcessNames;
 
         internal static bool IsObsProcessName(string name) =>
             Array.Exists(ObsProcessNames, obs => string.Equals(obs, name, StringComparison.OrdinalIgnoreCase));

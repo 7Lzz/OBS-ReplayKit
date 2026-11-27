@@ -5,5 +5,10 @@ namespace ReplayKitShared
     {
         public const string Name = "obs-replayKit";
         public const string HelperExe = @"scripts\helper\OBSReplayKit.exe";
+        // the folder under %LOCALAPPDATA% with the cached setup exe the in-app uninstall starts, the streamable sign-in profile and the speech engine of auto subtitles, which an uninstall clears
+        public const string LocalName = "OBS ReplayKit";
+        public const string SetupExe = "OBSReplayKitSetup.exe";
+        public const string StreamableProfileFolder = "StreamableProfile";
+        public const string SpeechFolder = "speech";
     }
 }

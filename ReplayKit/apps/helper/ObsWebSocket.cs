@@ -50,7 +50,7 @@ namespace ReplayKitHelper
             if ((cfg["auth_required"]?.Value<bool>() ?? false) && string.IsNullOrEmpty(password))
                 return new SettingsResult { Ok = false, Unavailable = true, Message = Locales.Message("helper.obsWebsocketPasswordIsMissing") };
 
-            int port = 6455;
+            int port = ReplayKitShared.ObsWebSocketPort.Default;
             var portToken = cfg["server_port"];
             if (portToken != null) int.TryParse(portToken.ToString(), out port);
             if (port <= 0 || port > 65535)

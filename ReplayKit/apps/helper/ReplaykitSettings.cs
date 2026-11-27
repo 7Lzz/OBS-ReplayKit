@@ -72,9 +72,9 @@ namespace ReplayKitHelper
                 ["storageCompressionType"] = "fast",
                 // the days a deleted clip or screenshot stays in Deleted before it is gone for good; 0 = deletes are final at once
                 ["deletedHistoryDays"] = 7,
-                ["clipKeybind"] = new JObject { ["key"] = "OBS_KEY_F8" },
+                ["clipKeybind"] = new JObject { ["key"] = SettingDefaults.ClipKey },
                 ["recordingKeybind"] = new JObject(),
-                ["openClipsKeybind"] = new JObject { ["alt"] = true, ["key"] = "OBS_KEY_Z" },
+                ["openClipsKeybind"] = new JObject { [SettingDefaults.OpenClipsModifier] = true, ["key"] = SettingDefaults.OpenClipsKey },
                 // the screenshot of the obs output, saved into the Screenshots folder of the clips; unbound until a key is picked, like recording
                 ["screenshotKeybind"] = new JObject(),
                 // the one extra binding each hotkey may have (the + of the hotkeys page)
@@ -342,13 +342,13 @@ namespace ReplayKitHelper
         }
 
         internal static JObject NormalizeClipKeybind(JToken value) =>
-            NormalizeHotkeyCombo(value, new JObject { ["key"] = "OBS_KEY_F8" }, "clip keybind");
+            NormalizeHotkeyCombo(value, new JObject { ["key"] = SettingDefaults.ClipKey }, "clip keybind");
 
         internal static JObject NormalizeRecordingKeybind(JToken value) =>
             NormalizeHotkeyCombo(value, new JObject(), "recording keybind");
 
         internal static JObject NormalizeOpenClipsKeybind(JToken value) =>
-            NormalizeHotkeyCombo(value, new JObject { ["alt"] = true, ["key"] = "OBS_KEY_Z" }, "open clips keybind");
+            NormalizeHotkeyCombo(value, new JObject { [SettingDefaults.OpenClipsModifier] = true, ["key"] = SettingDefaults.OpenClipsKey }, "open clips keybind");
 
         // a display that is unplugged right now still counts, so a choice survives the monitor being off; only the shape of an obs monitor_id is checked, the way obs itself writes it
         internal static string NormalizeCaptureDisplay(JToken value)

@@ -8,7 +8,7 @@ using System.Threading;
 
 namespace ReplayKitSetup
 {
-    // voicemeeter remote api helpers used to preserve hardware inputs. the vb-audio sdk header declares these functions __stdcall, not the .net-default cdecl, so every delegate below is explicitly StdCall
+    // a hardware input of voicemeeter as SnapshotVoicemeeterInputs saved it, so it can be put back after the audio driver install moved it
     public sealed class VoicemeeterDeviceChoice
     {
         public string Name { get; }
@@ -39,6 +39,7 @@ namespace ReplayKitSetup
 
     internal sealed class VoicemeeterNotRunningException : Exception { }
 
+    // the voicemeeter remote api; the vb-audio sdk header declares every function long, which is 32 bits on windows, and __stdcall
     internal sealed class VoicemeeterRemote : IDisposable
     {
         [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
@@ -50,20 +51,20 @@ namespace ReplayKitSetup
         [DllImport("kernel32.dll", SetLastError = true)]
         private static extern bool FreeLibrary(IntPtr hModule);
 
-        [UnmanagedFunctionPointer(CallingConvention.StdCall)] private delegate long LoginDelegate();
-        [UnmanagedFunctionPointer(CallingConvention.StdCall)] private delegate long LogoutDelegate();
-        [UnmanagedFunctionPointer(CallingConvention.StdCall)] private delegate long IsParametersDirtyDelegate();
-        [UnmanagedFunctionPointer(CallingConvention.StdCall)] private delegate long GetVoicemeeterTypeDelegate(out int type);
-        [UnmanagedFunctionPointer(CallingConvention.StdCall, CharSet = CharSet.Unicode)] private delegate long GetParameterStringWDelegate(byte[] paramName, StringBuilder value);
-        [UnmanagedFunctionPointer(CallingConvention.StdCall, CharSet = CharSet.Unicode)] private delegate long SetParameterStringWDelegate(byte[] paramName, string value);
-        [UnmanagedFunctionPointer(CallingConvention.StdCall)] private delegate long SetParameterFloatDelegate(byte[] paramName, float value);
-        [UnmanagedFunctionPointer(CallingConvention.StdCall)] private delegate long GetParameterFloatDelegate(byte[] paramName, out float value);
-        [UnmanagedFunctionPointer(CallingConvention.StdCall)] private delegate long InputGetDeviceNumberDelegate();
-        [UnmanagedFunctionPointer(CallingConvention.StdCall, CharSet = CharSet.Unicode)] private delegate long InputGetDeviceDescWDelegate(long index, out int deviceType, StringBuilder name, StringBuilder hardwareId);
+        [UnmanagedFunctionPointer(CallingConvention.StdCall)] private delegate int LoginDelegate();
+        [UnmanagedFunctionPointer(CallingConvention.StdCall)] private delegate int LogoutDelegate();
+        [UnmanagedFunctionPointer(CallingConvention.StdCall)] private delegate int IsParametersDirtyDelegate();
+        [UnmanagedFunctionPointer(CallingConvention.StdCall)] private delegate int GetVoicemeeterTypeDelegate(out int type);
+        [UnmanagedFunctionPointer(CallingConvention.StdCall, CharSet = CharSet.Unicode)] private delegate int GetParameterStringWDelegate(byte[] paramName, StringBuilder value);
+        [UnmanagedFunctionPointer(CallingConvention.StdCall, CharSet = CharSet.Unicode)] private delegate int SetParameterStringWDelegate(byte[] paramName, string value);
+        [UnmanagedFunctionPointer(CallingConvention.StdCall)] private delegate int SetParameterFloatDelegate(byte[] paramName, float value);
+        [UnmanagedFunctionPointer(CallingConvention.StdCall)] private delegate int GetParameterFloatDelegate(byte[] paramName, out float value);
+        [UnmanagedFunctionPointer(CallingConvention.StdCall)] private delegate int InputGetDeviceNumberDelegate();
+        [UnmanagedFunctionPointer(CallingConvention.StdCall, CharSet = CharSet.Unicode)] private delegate int InputGetDeviceDescWDelegate(int index, out int deviceType, StringBuilder name, StringBuilder hardwareId);
 
         private static readonly Dictionary<int, string> InputDeviceTypes = new Dictionary<int, string> { [1] = "mme", [3] = "wdm", [4] = "ks" };
         private static readonly Dictionary<string, int> DriverToDeviceType = new Dictionary<string, int> { ["mme"] = 1, ["wdm"] = 3, ["ks"] = 4 };
-        private static readonly string[] RestoreDriverOrder = { "wdm", "ks", "mme" };
+        internal static readonly string[] RestoreDriverOrder = { "wdm", "ks", "mme" };
         private const int PrefixMatchMinChars = 12;
 
         private readonly IntPtr _hModule;
@@ -108,7 +109,7 @@ namespace ReplayKitSetup
 
         public VoicemeeterRemote Login()
         {
-            long rc = _login();
+            int rc = _login();
             if (rc == 1) throw new VoicemeeterNotRunningException();
             if (rc != 0) throw new InvalidOperationException($"Voicemeeter is not running or not reachable (login={rc})");
             _loggedIn = true;
@@ -128,7 +129,7 @@ namespace ReplayKitSetup
 
         public int VoicemeeterType()
         {
-            long rc = _getVoicemeeterType(out int value);
+            int rc = _getVoicemeeterType(out int value);
             if (rc != 0) throw new InvalidOperationException($"Voicemeeter type query failed ({rc})");
             return value;
         }
@@ -138,26 +139,26 @@ namespace ReplayKitSetup
         public string GetStripDeviceName(int index)
         {
             var buf = new StringBuilder(512);
-            long rc = _getParameterStringW(AsciiParam($"Strip[{index}].device.name"), buf);
+            int rc = _getParameterStringW(AsciiParam($"Strip[{index}].device.name"), buf);
             return rc != 0 ? "" : buf.ToString().Trim();
         }
 
         public int GetStripDeviceType(int index)
         {
-            long rc = _getParameterFloat(AsciiParam($"Strip[{index}].device.type"), out float value);
+            int rc = _getParameterFloat(AsciiParam($"Strip[{index}].device.type"), out float value);
             return rc != 0 ? 0 : (int)value;
         }
 
         public Dictionary<string, HashSet<string>> InputDevicesByName()
         {
             var devices = new Dictionary<string, HashSet<string>>();
-            long count = _inputGetDeviceNumber();
+            int count = _inputGetDeviceNumber();
             if (count <= 0) return devices;
-            for (long index = 0; index < count; index++)
+            for (int index = 0; index < count; index++)
             {
                 var name = new StringBuilder(512);
                 var hardwareId = new StringBuilder(512);
-                long rc = _inputGetDeviceDescW(index, out int deviceType, name, hardwareId);
+                int rc = _inputGetDeviceDescW(index, out int deviceType, name, hardwareId);
                 if (rc != 0) continue;
                 if (!InputDeviceTypes.TryGetValue(deviceType, out var driver)) continue;
                 string cleanName = name.ToString().Trim();
@@ -176,7 +177,7 @@ namespace ReplayKitSetup
 
         public bool SetStripDeviceChoice(VoicemeeterStripDevice strip, VoicemeeterDeviceChoice choice)
         {
-            long rc = _setParameterStringW(AsciiParam($"Strip[{strip.Index}].Device.{choice.Driver}"), choice.Name);
+            int rc = _setParameterStringW(AsciiParam($"Strip[{strip.Index}].Device.{choice.Driver}"), choice.Name);
             return rc == 0;
         }
 
@@ -218,7 +219,7 @@ namespace ReplayKitSetup
 
         public bool RestartAudioEngine()
         {
-            long rc = _setParameterFloat(AsciiParam("Command.Restart"), 1.0f);
+            int rc = _setParameterFloat(AsciiParam("Command.Restart"), 1.0f);
             return rc == 0;
         }
 
@@ -299,7 +300,7 @@ namespace ReplayKitSetup
             return result;
         }
 
-        private static readonly string[] RestoreDriverOrder = { "wdm", "ks", "mme" };
+        private static readonly string[] RestoreDriverOrder = VoicemeeterRemote.RestoreDriverOrder;
 
         // capture voicemeeter physical input selections if voicemeeter is running.
         public static VoicemeeterSnapshot SnapshotVoicemeeterInputs(Action<string> log = null)

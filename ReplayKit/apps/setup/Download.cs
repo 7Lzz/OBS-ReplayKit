@@ -8,6 +8,9 @@ namespace ReplayKitSetup
 {
     internal static class Download
     {
+        // what every download of the setup names itself as
+        internal const string UserAgent = "OBSReplayKit/1.0 (+https://github.com/7Lzz/OBS-ReplayKit)";
+
         internal static void Save(HttpClient client, string url, string path, long limit, TimeSpan timeout,
             long expectedLength = 0, Action<long, long> progress = null, ISet<string> allowedHosts = null)
         {

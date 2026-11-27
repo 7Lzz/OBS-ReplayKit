@@ -32,7 +32,7 @@ namespace ReplayKitSetup
             "Discord.exe", "DiscordCanary.exe", "DiscordPTB.exe", "DiscordDevelopment.exe",
         };
 
-        // guid-form device id of the current defualt playback (render) endpoint, or null. was a [AudioHelper]::GetDefaultRender() call shelled out to a fresh powershell process; AudioHelper is now apps/setup/AudioHelper.cs, a straight in-process call.
+        // guid-form device id of the current defualt playback (render) endpoint, or null.
         private static string GetDefaultPlayback(Action<string> log = null)
         {
             try { return AudioHelper.GetDefaultRender(); }
@@ -61,8 +61,7 @@ namespace ReplayKitSetup
         // matches a leading index prefix some endpoint friendly names carry (e.g. "2 - Speakers" -> "Speakers") before matching against the rename table.
         private static readonly Regex LeadingIndexPrefix = new Regex(@"^\s*\d+\s*-\s*");
 
-        // the FriendlyName property under an endpoints Properties key, registry-value-name-encoded as "{fmtid},pid" -- same PKEY the old powershell Get-ItemProperty call read.
-        private const string FriendlyNameValue = "{a45c254e-df1c-4efd-8020-67d146a850e0},2";
+        private const string FriendlyNameValue = Audio.FriendlyNameValue;
         private const int HiddenStateFlag = 0x10000000;
 
         private static void TryAudioCall(Action action, string what, Action<string> log)
@@ -71,7 +70,7 @@ namespace ReplayKitSetup
             catch (COMException ex) { log?.Invoke($"warn: {what} failed: {ex.Message}"); }
         }
 
-        // rename the installed audio endpoints to obs stream audio names -- native registry walk over the same MMDevices keys the old powershell script read, calling straight into AudioHelper instead of Add-Type-compiling it per invocation.
+        // rename the installed audio endpoints to obs stream audio names and hide the surround ones
         private static void RenameEndpoints(Action<string> log = null)
         {
             var renameLookup = EndpointRenames.ToDictionary(r => r.Orig, r => r.New);
@@ -79,9 +78,7 @@ namespace ReplayKitSetup
 
             foreach (int dataFlow in new[] { 0, 1 })
             {
-                string root = dataFlow == 0
-                    ? @"SOFTWARE\Microsoft\Windows\CurrentVersion\MMDevices\Audio\Render"
-                    : @"SOFTWARE\Microsoft\Windows\CurrentVersion\MMDevices\Audio\Capture";
+                string root = dataFlow == 0 ? Audio.RenderKey : Audio.CaptureKey;
                 using (var rootKey = Registry.LocalMachine.OpenSubKey(root))
                 {
                     if (rootKey == null) continue;
@@ -189,9 +186,7 @@ namespace ReplayKitSetup
             int changes = 0;
             foreach (int dataFlow in new[] { 0, 1 })
             {
-                string root = dataFlow == 0
-                    ? @"SOFTWARE\Microsoft\Windows\CurrentVersion\MMDevices\Audio\Render"
-                    : @"SOFTWARE\Microsoft\Windows\CurrentVersion\MMDevices\Audio\Capture";
+                string root = dataFlow == 0 ? Audio.RenderKey : Audio.CaptureKey;
                 using (var rootKey = Registry.LocalMachine.OpenSubKey(root))
                 {
                     if (rootKey == null) continue;
@@ -224,7 +219,7 @@ namespace ReplayKitSetup
             if (changes > 0) BounceAudioServices(log);
         }
 
-        // native equivalent of the old Stop-Service AudioEndpointBuilder -Force / Start-Service pair -- -Force stops dependent services too, which ServiceController does not do automatically, so DependentServices is walked by hand.
+        // restarts AudioEndpointBuilder with the services that depend on it, so windows reads the new endpoint names; ServiceController does not stop dependents itself, so DependentServices is walked by hand.
         private static void BounceAudioServices(Action<string> log = null)
         {
             try
@@ -277,7 +272,7 @@ namespace ReplayKitSetup
         // sound/media device setup class; one NNNN subkey per installed audio driver, DriverDesc is the same string Win32_SoundDevice.Name returned.
         private const string MediaClassKey = @"SYSTEM\CurrentControlSet\Control\Class\{4d36e96c-e325-11ce-bfc1-08002be10318}";
 
-        // true iff the bundled virtual audio driver is registered. was a Win32_SoundDevice wmi query; it checks the media-class driver descriptions in the registry so the setup carries no System.Management.
+        // true iff the bundled virtual audio driver is registered, read from the media-class driver descriptions so the setup carries no System.Management.
         public static bool IsVbcableInstalled()
         {
             try
@@ -307,7 +302,7 @@ namespace ReplayKitSetup
             if (!IsVbcableInstalled()) return false;
             try
             {
-                using var root = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\MMDevices\Audio\Render");
+                using var root = Registry.LocalMachine.OpenSubKey(Audio.RenderKey);
                 if (root == null) return false;
                 foreach (string guid in root.GetSubKeyNames())
                 {
@@ -321,7 +316,7 @@ namespace ReplayKitSetup
             return false;
         }
 
-        // running discord processes as (pid, "Name.exe", exe path). was a Win32_Process wmi query; walks the process list directly now. Name keeps the .exe so DiscordRestartProcessNames still matches.
+        // running discord processes as (pid, "Name.exe", exe path); Name keeps the .exe so DiscordRestartProcessNames matches.
         private static List<(int Pid, string Name, string ExecutablePath)> QueryDiscordProcesses()
         {
             var results = new List<(int, string, string)>();
@@ -347,20 +342,20 @@ namespace ReplayKitSetup
         // unpack the bundled audio-driver installer into a temp directory.
         private static string ExtractDriverPack(Action<string> log = null)
         {
-            if (!File.Exists(Config.INPUT_OVERLAY_INSTALLERS_ZIP))
+            if (!File.Exists(Config.INSTALLERS_ZIP))
             {
-                log?.Invoke($"(no {Path.GetFileName(Config.INPUT_OVERLAY_INSTALLERS_ZIP)} bundled)");
+                log?.Invoke($"(no {Path.GetFileName(Config.INSTALLERS_ZIP)} bundled)");
                 return null;
             }
             string tmpdir = Path.Combine(Path.GetTempPath(), "obsreplaykit_vbcable_" + Guid.NewGuid().ToString("N"));
             try
             {
-                using (var outer = ZipFile.OpenRead(Config.INPUT_OVERLAY_INSTALLERS_ZIP))
+                using (var outer = ZipFile.OpenRead(Config.INSTALLERS_ZIP))
                 {
                     var packEntry = outer.Entries.FirstOrDefault(e => e.FullName == Config.VBCABLE_DRIVER_PACK_NAME);
                     if (packEntry == null)
                     {
-                        log?.Invoke("(OBS Stream Audio installer not in installers.zip - skipping)");
+                        log?.Invoke("(OBS Stream Audio installer not in " + Path.GetFileName(Config.INSTALLERS_ZIP) + " - skipping)");
                         return null;
                     }
                     Directory.CreateDirectory(tmpdir);
@@ -437,7 +432,6 @@ namespace ReplayKitSetup
                 {
                     try { proc.Kill(); } catch (InvalidOperationException) { }
                     log?.Invoke("OBS Stream Audio installer timed out after 300s");
-                    try { Directory.Delete(packDir, true); } catch (IOException) { }
                     return false;
                 }
                 stderr = stderrTask.GetAwaiter().GetResult();
@@ -445,7 +439,6 @@ namespace ReplayKitSetup
             catch (Exception exc) when (exc is System.ComponentModel.Win32Exception || exc is InvalidOperationException)
             {
                 log?.Invoke("OBS Stream Audio installer launch failed: " + exc.Message);
-                try { Directory.Delete(packDir, true); } catch (IOException) { }
                 return false;
             }
             finally
@@ -470,6 +463,15 @@ namespace ReplayKitSetup
             // rename before restoring defaults: both bounce audiosrv, so pay the audio-interrupt cost once.
             RenameEndpoints(log);
 
+            RestoreAudioDefaults(savedRender, savedCapture, voicemeeterSnapshot, log);
+
+            log?.Invoke("OBS Stream Audio device installed");
+            return true;
+        }
+
+        // the rename and the driver install both bounce the audio stack, which can move the windows defaults and the voicemeeter inputs, so what was saved before is put back
+        private static void RestoreAudioDefaults(string savedRender, string savedCapture, VoicemeeterSnapshot voicemeeterSnapshot, Action<string> log)
+        {
             if (savedRender != null)
             {
                 if (SetDefaultPlayback(savedRender, log)) log?.Invoke("restored default playback  -> " + savedRender);
@@ -480,11 +482,7 @@ namespace ReplayKitSetup
                 if (SetDefaultCapture(savedCapture, log)) log?.Invoke("restored default recording -> " + savedCapture);
                 else log?.Invoke("warn: failed to restore default recording - fix manually in Sound settings");
             }
-
             VoiceMeeter.RestoreVoicemeeterInputs(voicemeeterSnapshot, log);
-
-            log?.Invoke("OBS Stream Audio device installed");
-            return true;
         }
 
         // install obs stream audio if it is missing.
@@ -497,17 +495,7 @@ namespace ReplayKitSetup
                 string savedCapture = GetDefaultCapture(log);
                 var voicemeeterSnapshot = VoiceMeeter.SnapshotVoicemeeterInputs(log);
                 RenameEndpoints(log);
-                if (savedRender != null)
-                {
-                    if (SetDefaultPlayback(savedRender, log)) log?.Invoke("restored default playback  -> " + savedRender);
-                    else log?.Invoke("warn: failed to restore default playback - fix manually in Sound settings");
-                }
-                if (savedCapture != null)
-                {
-                    if (SetDefaultCapture(savedCapture, log)) log?.Invoke("restored default recording -> " + savedCapture);
-                    else log?.Invoke("warn: failed to restore default recording - fix manually in Sound settings");
-                }
-                VoiceMeeter.RestoreVoicemeeterInputs(voicemeeterSnapshot, log);
+                RestoreAudioDefaults(savedRender, savedCapture, voicemeeterSnapshot, log);
                 return true;
             }
             return InstallVbcable(log);
@@ -613,18 +601,15 @@ namespace ReplayKitSetup
                 {
                     try { proc.Kill(); } catch (InvalidOperationException) { }
                     log?.Invoke("OBS Stream Audio uninstaller timed out after 300s");
-                    try { Directory.Delete(packDir, true); } catch (IOException) { }
-                    RestartDiscordApps(restartApps, log);
                     return false;
                 }
             }
             catch (Exception exc) when (exc is System.ComponentModel.Win32Exception || exc is InvalidOperationException)
             {
                 log?.Invoke("OBS Stream Audio uninstaller launch failed: " + exc.Message);
-                try { Directory.Delete(packDir, true); } catch (IOException) { }
-                RestartDiscordApps(restartApps, log);
                 return false;
             }
+            // the one place the pack goes and discord comes back, however the uninstaller ended
             finally
             {
                 try { Directory.Delete(packDir, true); } catch (IOException) { }

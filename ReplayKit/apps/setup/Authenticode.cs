@@ -61,6 +61,28 @@ namespace ReplayKitSetup
             }
         }
 
+        // a downloaded microsoft installer runs only when windows confirms it is intact and microsoft signed it
+        internal static bool IsMicrosoftSigned(string path, Action<string> log = null)
+        {
+            var signature = Check(path);
+            bool ok = signature.Valid && signature.Subject.Contains("Microsoft Corporation") && signature.Issuer.Contains("Microsoft");
+            if (!ok) log?.Invoke($"Microsoft installer signature rejected: status={signature.Status} subject={Truncate(signature.Subject, 80)}");
+            return ok;
+        }
+
+        // valid means the signature is intact and chains to a trusted root; the subject check is a sanity guard so a differently-signed exe swapped in over a hijacked link still gets rejected
+        internal static bool IsObsSigned(string path, Action<string> log)
+        {
+            var signature = Check(path);
+            bool ok = signature.Valid &&
+                      (signature.Subject.IndexOf("OBS", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                       signature.Subject.IndexOf("Hugh Bailey", StringComparison.OrdinalIgnoreCase) >= 0);
+            if (!ok) log($"OBS installer signature rejected: status={signature.Status} subject={signature.Subject}");
+            return ok;
+        }
+
+        private static string Truncate(string s, int max) => s.Length > max ? s.Substring(0, max) : s;
+
         private static bool ReadSigner(IntPtr state, Result result)
         {
             IntPtr provider = state == IntPtr.Zero ? IntPtr.Zero : WTHelperProvDataFromStateData(state);

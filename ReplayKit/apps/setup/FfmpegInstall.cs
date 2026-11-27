@@ -12,7 +12,7 @@ namespace ReplayKitSetup
     // install ffmpeg.exe + ffprobe.exe into the helper dir
     public static class FfmpegInstall
     {
-        // next to OBSReplayKit.exe (the ReplayKitHelper server) under the consolidated obs-replayKit/ tree; Compression.FindToolInClipDirs probes Constants.HelperRoot first.
+        // next to the helper exe, where Compression.FindToolInClipDirs of the helper looks first (Constants.HelperRoot)
         private static readonly string HelperDir = Path.GetDirectoryName(Config.HELPER_EXE);
         private static readonly string FfmpegDst = Path.Combine(HelperDir, "ffmpeg.exe");
         private static readonly string FfprobeDst = Path.Combine(HelperDir, "ffprobe.exe");
@@ -85,7 +85,7 @@ namespace ReplayKitSetup
             {
                 using (var client = new HttpClient { Timeout = TimeSpan.FromSeconds(90) })
                 {
-                    client.DefaultRequestHeaders.Add("User-Agent", "OBSReplayKit/1.0 (+https://github.com/7Lzz/OBS-ReplayKit)");
+                    client.DefaultRequestHeaders.Add("User-Agent", Download.UserAgent);
                     Directory.CreateDirectory(HelperDir);
                     tmpPath = Path.Combine(HelperDir, "ffmpeg-tools." + Guid.NewGuid().ToString("N") + ".zip.download");
                     long nextLog = ProgressIntervalBytes;
@@ -173,7 +173,8 @@ namespace ReplayKitSetup
                             return false;
                         }
 
-                        if (name == "ffmpeg.exe") File.Delete(Path.Combine(HelperDir, "OBSReplayKit-Encoder.exe"));
+                        // the encoder alias is a hard link to the old ffmpeg, so it goes with it and the helper links the new one
+                        if (name == "ffmpeg.exe") File.Delete(Path.Combine(HelperDir, VideoTools.EncoderAlias));
                         NetCompat.MoveFile(tmp, dst, true);
                         tmpPaths.Remove(tmp);
                         log?.Invoke("installed -> " + dst);
@@ -232,16 +233,6 @@ namespace ReplayKitSetup
             }
         }
 
-        private static bool InstallTools(Action<string> log = null)
-        {
-            if (AlreadyInstalled())
-            {
-                LogExistingTools(log);
-                return true;
-            }
-            return DownloadAndExtractTools(log);
-        }
-
         // install ffmpeg.exe + ffprobe.exe next to the helper.
         public static bool InstallFfmpeg(Action<string> log = null)
         {
@@ -254,7 +245,7 @@ namespace ReplayKitSetup
             Directory.CreateDirectory(HelperDir);
             log?.Invoke("installing ffmpeg tools...");
 
-            bool ok = InstallTools(log);
+            bool ok = DownloadAndExtractTools(log);
             if (!ok)
             {
                 log?.Invoke("FFmpeg and FFprobe could not be installed or verified; trimming and compression are unavailable.");

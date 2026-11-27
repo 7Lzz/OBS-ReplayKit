@@ -55,7 +55,7 @@ namespace ReplayKitSetup
 
         public int RunModal()
         {
-            _scale = SafeDpiScale();
+            _scale = BuiltinPage.DpiScale();
             _theme = WindowTheme.Load();
             _html = _theme.ApplyTo(SetupLocale.Inject(LoadHtml()));
             _brushBg = Native.CreateSolidBrush((uint)WindowTheme.ColorRef(_theme.Window));
@@ -85,7 +85,7 @@ namespace ReplayKitSetup
             if (_hwnd == IntPtr.Zero) throw new InvalidOperationException(SetupLocale.Message("setup.couldNotCreateTheUninstallWindow"));
 
             ApplyBorderlessChrome();
-            SetIconFromExe();
+            BuiltinPage.SetIconFromExe(_hwnd);
             Native.ShowWindow(_hwnd, 5);
             Native.UpdateWindow(_hwnd);
 
@@ -126,7 +126,7 @@ namespace ReplayKitSetup
             }
             catch (Exception ex)
             {
-                WriteErrorLog(ex);
+                BuiltinPage.WriteErrorLog(ex);
                 InstallerApp.ShowFatalError(SetupLocale.Message("setup.theUninstallWindowCouldNotStart", "error", ex.Message), null);
                 Native.DestroyWindow(_hwnd);
             }
@@ -175,20 +175,14 @@ namespace ReplayKitSetup
                 SetupLog.Line("=== uninstall flow start (keepSettings=" + _keepUserSettings + ", removeObs=" + _removeObs + ") ===");
                 try
                 {
-                    Cleanup.RunCleanup(progress, _keepUserSettings, _removeObs);
-                    // boot obs back up once everything is removed (nothing to boot if obs itself was uninstalled).
-                    if (!_removeObs)
-                    {
-                        try { Obs.LaunchObs(progress.LogLine); }
-                        catch (Exception ex) { progress.LogLine("warn: could not relaunch OBS: " + ex.Message); }
-                    }
+                    Cleanup.RunUninstall(progress, _keepUserSettings, _removeObs);
                     code = 0;
                     SetupLog.Line("=== uninstall flow complete ===");
                     Enqueue(OnFlowSucceeded);
                 }
                 catch (Exception ex)
                 {
-                    WriteErrorLog(ex);
+                    BuiltinPage.WriteErrorLog(ex);
                     SetupLog.Line("=== uninstall flow FAILED: " + ex.Message + " ===");
                     Enqueue(() => OnFlowFailed(ex.Message));
                 }
@@ -220,8 +214,6 @@ namespace ReplayKitSetup
             string shown = SetupLocale.Message("setup.messageLogPath", "message", message ?? SetupLocale.Message("setup.unknownError"), "path", SetupLog.Path);
             PostToPage(new JObject { ["type"] = "failed", ["message"] = shown });
         }
-
-        // ---- page <-> host ----
 
         internal void PostToPage(JObject payload)
         {
@@ -318,56 +310,14 @@ namespace ReplayKitSetup
             catch (Exception) { }
         }
 
-        // ---- helpers ----
-
         private string LoadHtml()
         {
-            var asm = Assembly.GetExecutingAssembly();
-            string html;
-            using (var stream = asm.GetManifestResourceStream("ReplayKitSetup.uninstall_prompt.html"))
-            {
-                if (stream == null) throw SetupLocale.Error("setup.aFileIsMissingFromThisSetup", m => new InvalidOperationException(m), "file", "uninstall_prompt.html");
-                using var reader = new StreamReader(stream, Encoding.UTF8);
-                html = reader.ReadToEnd();
-            }
-            html = html.Replace("{{HERO_ART}}", BundledDataUri("obs-studio/" + ReplayKitShared.ReplayKitFolder.Name + "/obs-custom-dock/update-art.png", "image/png"));
-            html = html.Replace("{{BRAND_ICON}}", BundledDataUri("obs-studio/" + ReplayKitShared.ReplayKitFolder.Name + "/scripts/helper/obs-replaykit.ico", "image/x-icon"));
+            string html = BuiltinPage.Read("uninstall_prompt.html", "uninstall_prompt.html");
             html = html.Replace("{{UNINSTALL_STATE}}", new JObject { ["removeObs"] = _removeObs }.ToString(Formatting.None));
             return html;
         }
 
-        private static string BundledDataUri(string entryPath, string mime)
-        {
-            try
-            {
-                using var res = Assembly.GetExecutingAssembly().GetManifestResourceStream("ReplayKitSetup.assets.bundle.zip");
-                if (res == null) return "";
-                using var zip = new System.IO.Compression.ZipArchive(res, System.IO.Compression.ZipArchiveMode.Read);
-                var entry = zip.GetEntry(entryPath);
-                if (entry == null) return "";
-                using var es = entry.Open();
-                using var ms = new MemoryStream();
-                es.CopyTo(ms);
-                return "data:" + mime + ";base64," + Convert.ToBase64String(ms.ToArray());
-            }
-            catch (Exception)
-            {
-                return "";
-            }
-        }
-
         private int S(int px) => (int)Math.Round(px * _scale);
-
-        private static double SafeDpiScale()
-        {
-            try
-            {
-                uint dpi = Native.GetDpiForSystem();
-                if (dpi >= 72 && dpi <= 480) return dpi / 96.0;
-            }
-            catch (Exception) { }
-            return 1.0;
-        }
 
         // match UpdatePromptWindow.RoundedBorderlessForm: only round the corners via dwm. the immersive-dark-mode + border-colour calls that used to be here made dwm re-establish a standard frame (the title bar came back) with nothing re-running WM_NCCALCSIZE after -- so drop them and force one non-client recalc instead.
         private void ApplyBorderlessChrome()
@@ -378,32 +328,6 @@ namespace ReplayKitSetup
                 DwmSetWindowAttribute(_hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, ref round, sizeof(int));
                 // the winforms update window gets this free from the Size it sets in OnLoad; this raw window is created at final size, so ask for the frame recalc explicitly
                 Native.SetWindowPos(_hwnd, IntPtr.Zero, 0, 0, 0, 0, 0x0237); // SWP_NOSIZE|NOMOVE|NOZORDER|NOACTIVATE|FRAMECHANGED|NOOWNERZORDER
-            }
-            catch (Exception) { }
-        }
-
-        private void SetIconFromExe()
-        {
-            try
-            {
-                string exe = NetCompat.ProcessPath ?? "";
-                if (string.IsNullOrEmpty(exe)) return;
-                IntPtr hIcon = Native.ExtractIconW(Native.GetModuleHandleW(null), exe, 0);
-                if (hIcon != IntPtr.Zero && hIcon != (IntPtr)1)
-                {
-                    Native.SendMessageW(_hwnd, 0x0080, (IntPtr)1, hIcon);
-                    Native.SendMessageW(_hwnd, 0x0080, IntPtr.Zero, hIcon);
-                }
-            }
-            catch (Exception) { }
-        }
-
-        private static void WriteErrorLog(Exception ex)
-        {
-            try
-            {
-                string path = Path.Combine(AppContext.BaseDirectory, "OBSReplayKit-error.log");
-                File.WriteAllText(path, ex.ToString(), new UTF8Encoding(false));
             }
             catch (Exception) { }
         }
