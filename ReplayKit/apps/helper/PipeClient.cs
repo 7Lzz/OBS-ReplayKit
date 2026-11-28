@@ -15,8 +15,6 @@ namespace ReplayKitHelper
     // client half of the ipc pipe with the native plugin (core/ipc_pipe.cpp), which is the server because it outlives helper hot-swaps; this side just reconnects. newline-delimited utf8 text, one message per line: what goes out is the Send methods below, what comes in is the verbs Dispatch reads
     internal static class PipeClient
     {
-        private const string PipeName = "OBSReplayKitIpc";
-
         private static Thread _thread;
         private static volatile bool _stop;
         private static readonly object WriteLock = new object();
@@ -60,7 +58,7 @@ namespace ReplayKitHelper
             {
                 try
                 {
-                    using (var pipe = new NamedPipeClientStream(".", PipeName, PipeDirection.InOut, PipeOptions.Asynchronous))
+                    using (var pipe = new NamedPipeClientStream(".", ReplayKitShared.IpcPipe.Name, PipeDirection.InOut, PipeOptions.Asynchronous))
                     {
                         pipe.Connect(2000);
                         capturePeer = false;
@@ -353,8 +351,8 @@ namespace ReplayKitHelper
         // asks the plugin to draw a themed confirm over the whole dimmed obs window (a cef dock cannot paint past its own panel). the plugin runs the follow-up action itself on ok, so nothing comes back. kind is one short token, letters and dashes only.
         public static void SendUiConfirm(string kind) { if (!string.IsNullOrEmpty(kind)) TryWrite("CONFIRM " + kind); }
 
-        // the plugin drops the whole connection on a line past 64 KB of utf8, which cut every message after it until the reconnect, so such a line is refused here instead; a character outside ascii takes more than one of those bytes
-        internal const int MaxLineBytes = 60 * 1024;
+        // the plugin drops the whole connection on a line past this many utf8 bytes, which cut every message after it until the reconnect, so such a line is refused here instead; a character outside ascii takes more than one of those bytes
+        internal const int MaxLineBytes = ReplayKitShared.IpcPipe.MaxLineBytes;
 
         private static readonly Encoding LineEncoding = new UTF8Encoding(false);
 

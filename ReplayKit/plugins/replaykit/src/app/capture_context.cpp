@@ -1,3 +1,4 @@
+// samples which game a clip shows, from the captures of the current scene and the window in front, and queues it for the helper
 #include "prelude.hpp"
 #include "app/capture_context.hpp"
 
@@ -343,7 +344,7 @@ void Sample()
 		sourceCount = int(captures.size());
 		const Capture *chosen = Choose(captures, foreground, path);
 		const bool anyLive = std::any_of(captures.begin(), captures.end(), [](const Capture &c) { return c.kind != "unknown" && c.coverage > 0.01; });
-		captureReason = captures.empty() ? "no-visible-capture" : !anyLive ? "capture-not-live" : !chosen ? "multiple-captures" : !foreground || path.isEmpty() ? "foreground-unavailable" : "capture-not-live";
+		captureReason = captures.empty() ? "no-visible-capture" : !anyLive ? "capture-not-live" : !chosen ? "multiple-captures" : !foreground || IsIconic(foreground) || path.isEmpty() ? "foreground-unavailable" : "capture-not-live";
 		// a display capture records whatever its display shows, so the window judged is the focused one when it is on that display and else the one on top there
 		if (chosen && chosen->kind == "display") {
 			const Capture &capture = *chosen;

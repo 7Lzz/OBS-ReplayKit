@@ -3,6 +3,8 @@
 
 #include <shobjidl.h>
 
+#include "core/shared_values.hpp"
+
 namespace rk {
 
 namespace {
@@ -26,7 +28,7 @@ bool StartProcessGroup()
 		return false;
 	}
 	GetCurrentProcessExplicitAppUserModelID(&previousAppId);
-	const HRESULT identity = SetCurrentProcessExplicitAppUserModelID(L"OBS.ReplayKit.Clips");
+	const HRESULT identity = SetCurrentProcessExplicitAppUserModelID(kToastAppId);
 	if (FAILED(identity)) {
 		CoTaskMemFree(previousAppId);
 		previousAppId = nullptr;

@@ -41,7 +41,7 @@ void ShowLifecycleConfirm(const QString &title, const QString &body, const char 
 	box->activateWindow();
 }
 
-// the helper answers an action it could not start with {"ok":false,"message":...}. whoever pressed Set Up sees why nothing happened, since the confirm that started it is already gone
+// the helper answers an action it could not start with {"ok":false,"message":...}. whoever confirmed the action sees why nothing happened, since the confirm that started it is already gone
 void ReportActionFailure(const QString &title, const std::string &response)
 {
 	if (JsonBoolField(response, "ok", false))
@@ -95,7 +95,7 @@ void HandleConfirmRequest(const std::string &kind)
 	});
 }
 
-// share preview is off because the cable + hidden projector were never set up. offer to do it now -- same flow as the dock Install path; on ok the helper closes OBS, installs, and turns Share Preview on.
+// share preview is off because its audio cable was never set up. offer to do it now -- same flow as the dock Install path; on ok the helper runs the setup, which installs the cable and turns Share Preview on.
 void PromptInstallSharePreview()
 {
 	if (g_menuShownTimer.isValid() && g_menuShownTimer.elapsed() < kMenuClickDebounceMs)
@@ -103,7 +103,7 @@ void PromptInstallSharePreview()
 	HandleConfirmRequest("sharepreview-setup");
 }
 
-// posts to the same /share-preview route the dock uses so the projector/audio-monitoring logic stays in one place -- fire and forget, since aboutToShow re-reads the real state next open so a failed toggle just looks unchanged
+// posts to the same /share-preview route the dock uses so the share window and audio monitoring logic stays in one place -- fire and forget, since aboutToShow re-reads the real state next open so a failed toggle just looks unchanged
 void ToggleSharePreview(bool checked)
 {
 	if (g_menuShownTimer.isValid() && g_menuShownTimer.elapsed() < kMenuClickDebounceMs)
@@ -182,7 +182,7 @@ void GroupInputOverlay()
 		if (items[0] && items[1])
 			obs_scene_insert_group(scene, kInputOverlayGroupName, items, 2);
 		else
-			blog(LOG_WARNING, "[replaykit] input overlay group: WASD Overlay or Mouse Overlay is not in the current scene");
+			blog(LOG_WARNING, "[replaykit] input overlay group: %s or %s is not in the current scene", kWasdSourceName, kMouseSourceName);
 	}
 	obs_source_release(current);
 }

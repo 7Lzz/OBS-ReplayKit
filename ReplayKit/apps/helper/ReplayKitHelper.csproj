@@ -53,6 +53,7 @@
     <Compile Include="..\..\shared\HotkeyModifiers.cs" Link="HotkeyModifiers.cs" />
     <Compile Include="..\..\shared\WindowLayout.cs" Link="WindowLayout.cs" />
     <Compile Include="..\..\shared\HelperEndpoint.cs" Link="HelperEndpoint.cs" />
+    <Compile Include="..\..\shared\IpcPipe.cs" Link="IpcPipe.cs" />
     <Compile Include="..\..\shared\SystemPrograms.cs" Link="SystemPrograms.cs" />
     <Compile Include="..\..\shared\LanguageMatch.cs" Link="LanguageMatch.cs" />
     <Compile Include="..\..\shared\MessageCatalog.cs" Link="MessageCatalog.cs" />

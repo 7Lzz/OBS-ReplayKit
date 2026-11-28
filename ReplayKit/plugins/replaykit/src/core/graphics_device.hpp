@@ -1,3 +1,4 @@
+// the obs d3d11 device as replaykit sees it: lost or working, and since when
 #pragma once
 
 #include <cstdint>

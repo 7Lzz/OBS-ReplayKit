@@ -22,18 +22,18 @@ bool g_cefClosed = false;
 std::function<void()> g_afterCefPrewarm;
 constexpr int kPrewarmFallbackMs = 800;
 const char kPrewarmTitle[] = "rk-prewarm-painted";
-const char kWarmPage[] = R"HTML(<!doctype html><meta charset="utf-8"><body style="margin:0;background:#272a33;color:#fff;font:12px sans-serif">Paint<script>
+const std::string kWarmPage = std::string(R"HTML(<!doctype html><meta charset="utf-8"><body style="margin:0;background:#272a33;color:#fff;font:12px sans-serif">Paint<script>
 const paint = new PerformanceObserver(list => {
     if (!list.getEntries().some(entry => entry.name === "first-contentful-paint")) return;
     paint.disconnect();
-    document.title = "rk-prewarm-painted";
+    document.title = ")HTML") + kPrewarmTitle + R"HTML(";
 });
 paint.observe({type:"paint", buffered:true});
 </script>)HTML";
 
 // the page of a window that is warmed up says it is up by setting its title once two frames of it were drawn, or half a second after the load when no frame comes, since a page that is not drawing never gets to one
 const char kReadyTitle[] = "rk-ready";
-const char kReadyScript[] = "(function(){var done=false;function go(){if(done)return;done=true;document.title='rk-ready';}requestAnimationFrame(function(){requestAnimationFrame(go);});setTimeout(go,500);})();";
+const std::string kReadyScript = std::string("(function(){var done=false;function go(){if(done)return;done=true;document.title='") + kReadyTitle + "';}requestAnimationFrame(function(){requestAnimationFrame(go);});setTimeout(go,500);})();";
 
 bool WatchBrowserTitle(QCefWidget *browser, QWidget *owner, const char *title, std::function<void()> ready)
 {
@@ -121,7 +121,7 @@ void PrewarmCefBrowser()
 
 				QVBoxLayout *layout = new QVBoxLayout(warmWin);
 				layout->setContentsMargins(0, 0, 0, 0);
-				const std::string url = "data:text/html;base64," + QByteArray(kWarmPage).toBase64().toStdString();
+				const std::string url = "data:text/html;base64," + QByteArray::fromStdString(kWarmPage).toBase64().toStdString();
 				const QWindowList windowsBefore = QGuiApplication::allWindows();
 				QCefWidget *browser = g_cef->create_widget(warmWin, url, nullptr);
 				if (!browser) {
@@ -157,7 +157,7 @@ void AfterCefPrewarm(std::function<void()> ready)
 		return;
 	}
 	g_afterCefPrewarm = std::move(ready);
-	QTimer::singleShot(kPrewarmFallbackMs, g_callbacks, []() { FinishCefPrewarm("800 ms fallback"); });
+	QTimer::singleShot(kPrewarmFallbackMs, g_callbacks, []() { FinishCefPrewarm("the fallback timer ran out"); });
 }
 
 QPoint CefOutOfSight(const QWidget *beside)

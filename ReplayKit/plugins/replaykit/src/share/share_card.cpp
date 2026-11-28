@@ -2,6 +2,7 @@
 #include "prelude.hpp"
 #include "share/share_card.hpp"
 #include "core/draw_util.hpp"
+#include "core/shared_values.hpp"
 #include "core/state_files.hpp"
 #include "core/ui_font.hpp"
 
@@ -21,7 +22,6 @@ namespace rk {
 namespace {
 
 constexpr int kMaxSide = 8192;
-constexpr int kMaxTextLength = 80;
 
 bool Refuse(const char *why)
 {
@@ -143,14 +143,14 @@ bool RenderShareCard(const std::string &json)
 	// only ever the card file in the replaykit folder, whatever the request names
 	const QString out = QDir::cleanPath(request.value(QStringLiteral("out")).toString());
 	const QString root = QDir::cleanPath(ReplayKitRootPath()) + QStringLiteral("/");
-	if (!out.startsWith(root, Qt::CaseInsensitive) || !out.endsWith(QStringLiteral("/share_cover_card.png"), Qt::CaseInsensitive))
+	if (!out.startsWith(root, Qt::CaseInsensitive) || !out.endsWith(QLatin1Char('/') + QLatin1String(kShareCoverCardFile), Qt::CaseInsensitive))
 		return Refuse("the card path is outside the replaykit folder");
 	const int width = request.value(QStringLiteral("width")).toInt();
 	const int height = request.value(QStringLiteral("height")).toInt();
 	if (width < 16 || height < 16 || width > kMaxSide || height > kMaxSide)
 		return Refuse("the card size is out of range");
 	const QString background = request.value(QStringLiteral("background")).toString();
-	if (background != QStringLiteral("theme") && background != QStringLiteral("image") && background != QStringLiteral("video") && background != QStringLiteral("lastframe"))
+	if (std::none_of(std::begin(kShareCoverBackgrounds), std::end(kShareCoverBackgrounds), [&background](const char *known) { return background == QLatin1String(known); }))
 		return Refuse("unknown background");
 	// the window draws the moving theme ground, the last frame or the video under the card, so only a picked image card has a ground of its own
 	const bool ownGround = background == QStringLiteral("image");
@@ -158,7 +158,7 @@ bool RenderShareCard(const std::string &json)
 	const QColor ink(request.value(QStringLiteral("ink")).toString());
 	if (!ground.isValid() || !ink.isValid())
 		return Refuse("the theme colours are not valid colours");
-	const QString text = request.value(QStringLiteral("text")).toString().left(kMaxTextLength);
+	const QString text = request.value(QStringLiteral("text")).toString().left(kShareCoverTextMaxLength);
 	const bool icon = request.value(QStringLiteral("icon")).toBool();
 	const bool fill = request.value(QStringLiteral("fit")).toString() == QStringLiteral("fill");
 	const QJsonObject layout = request.value(QStringLiteral("layout")).toObject();

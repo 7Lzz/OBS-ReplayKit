@@ -9,6 +9,7 @@
 
 #include "core/async.hpp"
 #include "core/helper_client.hpp"
+#include "core/shared_values.hpp"
 
 namespace rk {
 
@@ -30,8 +31,8 @@ bool IsHevc(const std::string &id)
 // the hardware encoders replaykit sets up, best first: the codec of the missing one before the other, and x264 last
 std::string PickFallback(const std::string &missing)
 {
-	static const char *hevc[] = {"obs_nvenc_hevc_tex", "h265_texture_amf", "obs_qsv11_hevc"};
-	static const char *h264[] = {"obs_nvenc_h264_tex", "h264_texture_amf", "obs_qsv11_v2"};
+	static const char *hevc[] = {kEncoderNvencHevc, kEncoderAmfHevc, kEncoderQsvHevc};
+	static const char *h264[] = {kEncoderNvencH264, kEncoderAmfH264, kEncoderQsvH264};
 	std::vector<const char *> order;
 	if (IsHevc(missing))
 		order.insert(order.end(), std::begin(hevc), std::end(hevc));
@@ -41,7 +42,7 @@ std::string PickFallback(const std::string &missing)
 	for (const char *id : order)
 		if (id != missing && Registered(id))
 			return id;
-	return Registered("obs_x264") ? "obs_x264" : std::string();
+	return Registered(kEncoderX264) ? kEncoderX264 : std::string();
 }
 
 // constant-quality settings close to what the helper writes for each kind of encoder, so the first clips after the swap are not made at a default bitrate; the helper writes its own tuned ones the next time settings are applied
@@ -49,7 +50,7 @@ obs_data_t *FallbackSettings(const std::string &id)
 {
 	obs_data_t *data = obs_data_create();
 	obs_data_set_int(data, "keyint_sec", 2);
-	if (id == "obs_x264") {
+	if (id == kEncoderX264) {
 		obs_data_set_string(data, "rate_control", "CRF");
 		obs_data_set_int(data, "crf", 20);
 		obs_data_set_string(data, "preset", "veryfast");
@@ -133,12 +134,13 @@ void ReportEncoders()
 		{"fallback", QString::fromStdString(g_fallback)},
 	};
 	const std::string body = QJsonDocument(report).toJson(QJsonDocument::Compact).toStdString();
-	// the helper can still be starting, so the report is tried for a while
+	// the helper can still be starting, so the report is tried for a while; an obs that closes meanwhile ends the tries, since the unload waits for this worker
 	RunAsync([body]() {
-		for (int attempt = 0; attempt < 15; attempt++) {
+		for (int attempt = 0; attempt < 15 && !WorkersStopping(); attempt++) {
 			if (!HttpRequest("POST", "/encoders/report", body.c_str(), 3000).empty())
 				return;
-			std::this_thread::sleep_for(std::chrono::seconds(2));
+			for (int waited = 0; waited < 8 && !WorkersStopping(); waited++)
+				std::this_thread::sleep_for(std::chrono::milliseconds(250));
 		}
 	});
 }

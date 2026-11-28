@@ -4,14 +4,14 @@
 
 #include "app/ipc_commands.hpp"
 #include "app/capture_context.hpp"
+#include "core/shared_values.hpp"
 #include "shell/shell_done_popup.hpp"
 
 namespace rk {
 
 namespace {
 
-// ipc pipe: this plugin is the server, the helper connects as a client and reconnects on its own -- replaces the old scratch-file handoff. the gui thread fills g_mainWinValue; the pipe thread forwards it to the helper and applies inbound OPENCLIPS / ALLOWCLOSE / CONFIRM <kind> (see PipeDispatchLine for the full list).
-constexpr const wchar_t *kIpcPipeName = L"\\\\.\\pipe\\OBSReplayKitIpc";
+// ipc pipe: this plugin is the server (kIpcPipeName), the helper connects as a client and reconnects on its own. the gui thread fills g_mainWinValue; the pipe thread forwards it to the helper and hands each inbound line to PipeDispatchLine
 std::thread g_pipeThread;
 std::atomic<bool> g_pipeStop{false};
 std::mutex configRepliesLock;
@@ -89,17 +89,18 @@ void PipeServeClient(HANDLE pipe)
 			if (!ReadFile(pipe, buf, want, &got, nullptr) || got == 0)
 				return;
 			inbound.append(buf, got);
-			if (inbound.size() > 64 * 1024)
-				return;
 			avail -= got;
-		}
-		size_t nl;
-		while ((nl = inbound.find('\n')) != std::string::npos) {
-			std::string one = inbound.substr(0, nl);
-			if (!one.empty() && one.back() == '\r')
-				one.pop_back();
-			inbound.erase(0, nl + 1);
-			PipeDispatchLine(one);
+			size_t nl;
+			while ((nl = inbound.find('\n')) != std::string::npos) {
+				std::string one = inbound.substr(0, nl);
+				if (!one.empty() && one.back() == '\r')
+					one.pop_back();
+				inbound.erase(0, nl + 1);
+				PipeDispatchLine(one);
+			}
+			// the limit is for one line, so lines that arrive in the same pass never add up to it; only the line that has no end yet counts, with room for its carriage return
+			if (inbound.size() > size_t(kIpcMaxLineBytes) + 1)
+				return;
 		}
 
 		std::this_thread::sleep_for(std::chrono::milliseconds(40));

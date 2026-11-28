@@ -1,3 +1,4 @@
+// watches the obs d3d11 device for loss and recovery and lets replaykit drop its graphics before obs rebuilds
 #include "prelude.hpp"
 #include "core/graphics_device.hpp"
 

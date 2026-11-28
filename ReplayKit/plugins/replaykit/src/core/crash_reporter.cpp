@@ -155,6 +155,7 @@ void StartReplayKitCrashReporter()
 		nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
 	GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, (LPCWSTR)&StartReplayKitCrashReporter, &g_replayKitModule);
 	InterlockedExchange(&g_nativeFaultCount, 0);
+	InterlockedExchange(&g_nativeCrashWriting, 0);
 	StartSessionRecord(directory);
 	g_nativeCrashHandler = AddVectoredExceptionHandler(1, RecordReplayKitException);
 	if (g_nativeCrashLog == INVALID_HANDLE_VALUE || !g_nativeCrashHandler)
@@ -169,6 +170,9 @@ void StopReplayKitCrashReporter()
 		RemoveVectoredExceptionHandler(g_nativeCrashHandler);
 		g_nativeCrashHandler = nullptr;
 	}
+	// a fault on another thread can still be writing its record; taking the writing flag waits it out and keeps it held, so no record goes to the handle once it is closed
+	while (InterlockedCompareExchange(&g_nativeCrashWriting, 1, 0) != 0)
+		Sleep(1);
 	if (g_nativeCrashLog != INVALID_HANDLE_VALUE) {
 		CloseHandle(g_nativeCrashLog);
 		g_nativeCrashLog = INVALID_HANDLE_VALUE;

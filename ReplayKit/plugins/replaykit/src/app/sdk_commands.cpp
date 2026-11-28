@@ -100,7 +100,6 @@ QJsonObject UiState(const QJsonObject &)
 	out["warmUp"] = QJsonObject{{"panels", AnchoredPanel::WarmReport()}, {"storageCard", StorageModalWarmReport()}};
 	out["popupHost"] = PopupHost::Probe();
 	out["clipBuffer"] = ClipBufferProbe();
-	out["hostParked"] = false;
 	out["hostAsleep"] = ShellAsleep();
 	out["pageHostReady"] = g_hostReady;
 	out["setupPending"] = g_setupPending;
@@ -521,7 +520,7 @@ QJsonObject Commands(const QJsonObject &)
 
 void RegisterBuiltins()
 {
-    SdkRegister("capture.state", "reports capture attribution sampling without exposing process paths", [](const QJsonObject &) { auto out = CaptureContextProbe(); out["ok"] = true; return out; });
+	SdkRegister("capture.state", "reports capture attribution sampling without exposing process paths", [](const QJsonObject &) { auto out = CaptureContextProbe(); out["ok"] = true; return out; });
 	SdkRegister("commands", "the commands of the native plugin", Commands);
 	SdkRegister("share.state", "the share window link: attached window, texture, frames copied and skipped, and the audio relays", [](const QJsonObject &) { auto out = ShareLinkProbe(); out["ok"] = true; return out; });
 	SdkRegister("ui.state", "the view, the window, the preview and its lock, the storage card and how many menus are open", UiState);
@@ -604,7 +603,7 @@ bool SdkEnabled()
 void SdkDispatch(const std::string &rest)
 {
 	std::call_once(g_builtinsOnce, []() { RegisterBuiltins(); });
-	// an id of up to nine digits, then the name, then the arguments
+	// an id of up to nine digits, then the name, then the arguments, which the line limit of the pipe already bounds
 	const size_t first = rest.find(' ');
 	if (first == std::string::npos || first == 0 || first > 9)
 		return;
@@ -616,7 +615,7 @@ void SdkDispatch(const std::string &rest)
 	const size_t second = rest.find(' ', first + 1);
 	const std::string name = rest.substr(first + 1, second == std::string::npos ? std::string::npos : second - first - 1);
 	const std::string argsText = second == std::string::npos ? std::string("{}") : rest.substr(second + 1);
-	if (name.empty() || name.size() > 64 || argsText.size() > 8192) {
+	if (name.empty() || name.size() > 64) {
 		Reply(id, Fail(QStringLiteral("Bad command.")));
 		return;
 	}

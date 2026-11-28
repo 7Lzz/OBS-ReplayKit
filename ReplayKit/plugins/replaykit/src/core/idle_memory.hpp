@@ -1,3 +1,4 @@
+// gives back the memory of obs and its browser processes while the window is hidden, or shown and left idle
 #pragma once
 
 #include <QJsonObject>

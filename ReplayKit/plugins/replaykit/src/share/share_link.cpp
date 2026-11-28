@@ -410,21 +410,21 @@ QJsonObject ShareLinkProbe()
 {
 	QJsonObject out;
 	{
-	std::lock_guard<std::mutex> guard(g_lock);
-	out["attached"] = bool(g_attachment);
-	out["windowPid"] = qint64(g_attachment ? g_attachment->pid : 0);
-	out["serial"] = qint64(g_serial);
-	out["closing"] = g_closing.load();
-	out["adapterLuid"] = QString::number(qulonglong(g_adapterLuid), 16);
-	out["framesCopied"] = qint64(g_copied.load());
-	out["framesSkippedBusy"] = qint64(g_busy.load());
-	out["framesSkippedSize"] = qint64(g_sizeMismatch.load());
-	if (g_attachment) {
-		const auto *state = g_attachment->view.state;
-		out["generation"] = qint64(state->textureSeq.load() / 2);
-		out["texture"] = QString("%1x%2").arg(state->textureWidth).arg(state->textureHeight);
-		out["framesWritten"] = qint64(state->framesWritten.load());
-	}
+		std::lock_guard<std::mutex> guard(g_lock);
+		out["attached"] = bool(g_attachment);
+		out["windowPid"] = qint64(g_attachment ? g_attachment->pid : 0);
+		out["serial"] = qint64(g_serial);
+		out["closing"] = g_closing.load();
+		out["adapterLuid"] = QString::number(qulonglong(g_adapterLuid), 16);
+		out["framesCopied"] = qint64(g_copied.load());
+		out["framesSkippedBusy"] = qint64(g_busy.load());
+		out["framesSkippedSize"] = qint64(g_sizeMismatch.load());
+		if (g_attachment) {
+			const auto *state = g_attachment->view.state;
+			out["generation"] = qint64(state->textureSeq.load() / 2);
+			out["texture"] = QString("%1x%2").arg(state->textureWidth).arg(state->textureHeight);
+			out["framesWritten"] = qint64(state->framesWritten.load());
+		}
 	}
 	// after the link lock is let go, since the relay takes its own lock first and the link lock second
 	out["audio"] = ShareAudioProbe();

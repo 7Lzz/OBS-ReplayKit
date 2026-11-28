@@ -7,6 +7,7 @@
 #include <QSaveFile>
 
 #include "core/main_window.hpp"
+#include "core/shared_values.hpp"
 #include "core/state.hpp"
 #include "core/state_files.hpp"
 #include "core/theme.hpp"
@@ -33,7 +34,7 @@ UiLayout LayoutFromString(const QString &value)
 // the frame is chosen before the helper starts, so read the developer override from disk
 UiLayout ReadLayoutFromSettingsFile()
 {
-	QFile f(StateFilePath(QStringLiteral("replaykit_settings.json")));
+	QFile f(StateFilePath(QString::fromLatin1(kSettingsFile)));
 	if (!f.open(QIODevice::ReadOnly) || f.size() > 4 * 1024 * 1024)
 		return UiLayout::Clean;
 	const auto settings = QJsonDocument::fromJson(f.readAll()).object();

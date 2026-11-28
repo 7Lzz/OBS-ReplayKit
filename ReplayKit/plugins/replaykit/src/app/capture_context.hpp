@@ -1,3 +1,4 @@
+// samples which game a clip shows, from the captures of the current scene and the window in front, and queues it for the helper
 #pragma once
 
 #include <string>

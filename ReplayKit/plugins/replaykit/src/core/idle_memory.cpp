@@ -1,3 +1,4 @@
+// gives back the memory of obs and its browser processes while the window is hidden, or shown and left idle
 #include "prelude.hpp"
 #include "core/idle_memory.hpp"
 
@@ -25,10 +26,7 @@ bool hidden = false;
 bool stateKnown = false;
 constexpr DWORD kHiddenDelayMs = 30000;
 constexpr DWORD kVisibleCheckMs = 30000;
-#ifndef RK_VISIBLE_IDLE_MS
-#define RK_VISIBLE_IDLE_MS 120000
-#endif
-constexpr DWORD kVisibleIdleMs = RK_VISIBLE_IDLE_MS;
+constexpr DWORD kVisibleIdleMs = 120000;
 constexpr DWORD kMaxIdleMs = 0x7fffffff;
 std::atomic<unsigned> generation{0};
 std::atomic<bool> running{false}, stopping{false};

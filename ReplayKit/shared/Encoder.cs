@@ -25,6 +25,20 @@ namespace ReplayKitShared
         }
     }
 
+    // the ids obs registers its video encoders under, since a name obs does not know makes recording fail to start; scripts/sync_shared.ps1 writes them into shared_values.hpp for the plugin, which falls back to them when the profile names an encoder that did not load
+    public static class EncoderIds
+    {
+        public const string NvencH264 = "obs_nvenc_h264_tex";
+        public const string NvencHevc = "obs_nvenc_hevc_tex";
+        // the amd encoders of obs-ffmpeg texture-amf
+        public const string AmfH264 = "h264_texture_amf";
+        public const string AmfHevc = "h265_texture_amf";
+        // the h.264 quick sync encoder of obs is registered as obs_qsv11_v2
+        public const string QsvH264 = "obs_qsv11_v2";
+        public const string QsvHevc = "obs_qsv11_hevc";
+        public const string X264 = "obs_x264";
+    }
+
     // resolved encoder selection for this machine.
     public sealed class EncoderChoice
     {
@@ -241,7 +255,7 @@ namespace ReplayKitShared
             {
                 ["h264"] = new Candidate
                 {
-                    ObsEncoderId = "obs_nvenc_h264_tex",
+                    ObsEncoderId = EncoderIds.NvencH264,
                     Codec = "h264",
                     Backend = "nvenc",
                     Label = "NVENC H.264",
@@ -252,7 +266,7 @@ namespace ReplayKitShared
             {
                 av["h265"] = new Candidate
                 {
-                    ObsEncoderId = "obs_nvenc_hevc_tex",
+                    ObsEncoderId = EncoderIds.NvencHevc,
                     Codec = "h265",
                     Backend = "nvenc",
                     Label = $"NVENC HEVC / H.265 ({GenLabel(genStr)})",
@@ -269,8 +283,7 @@ namespace ReplayKitShared
             {
                 ["h264"] = new Candidate
                 {
-                    // the ids obs registers for its amd encoders (obs-ffmpeg texture-amf); a name obs does not know makes recording fail to start
-                    ObsEncoderId = "h264_texture_amf",
+                    ObsEncoderId = EncoderIds.AmfH264,
                     Codec = "h264",
                     Backend = "amf",
                     Label = "AMF H.264",
@@ -281,7 +294,7 @@ namespace ReplayKitShared
             {
                 av["h265"] = new Candidate
                 {
-                    ObsEncoderId = "h265_texture_amf",
+                    ObsEncoderId = EncoderIds.AmfHevc,
                     Codec = "h265",
                     Backend = "amf",
                     Label = $"AMF HEVC / H.265 ({genStr.ToUpperInvariant()})",
@@ -298,8 +311,7 @@ namespace ReplayKitShared
             {
                 ["h264"] = new Candidate
                 {
-                    // the h.264 quick sync encoder of obs is registered as obs_qsv11_v2
-                    ObsEncoderId = "obs_qsv11_v2",
+                    ObsEncoderId = EncoderIds.QsvH264,
                     Codec = "h264",
                     Backend = "qsv",
                     Label = "Quick Sync H.264",
@@ -310,7 +322,7 @@ namespace ReplayKitShared
             {
                 av["h265"] = new Candidate
                 {
-                    ObsEncoderId = "obs_qsv11_hevc",
+                    ObsEncoderId = EncoderIds.QsvHevc,
                     Codec = "h265",
                     Backend = "qsv",
                     Label = $"Quick Sync HEVC / H.265 ({GenLabel(genStr)})",
@@ -324,7 +336,7 @@ namespace ReplayKitShared
         {
             return new Candidate
             {
-                ObsEncoderId = "obs_x264",
+                ObsEncoderId = EncoderIds.X264,
                 Codec = "h264",
                 Backend = "x264",
                 Label = "x264 (software)",

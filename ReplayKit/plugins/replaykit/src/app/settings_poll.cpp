@@ -54,7 +54,7 @@ bool g_startMinLastObs = false;
 // set from the moment the switch was flipped in obs until the helper shows the same value
 bool g_startMinPushing = false;
 
-// the bells follow the appearance theme: --grey5 / --grey3 come back on the same /settings body the hotkey poll already fetches, so this costs no extra request and lands within a second of a theme change.
+// the native chrome, menus and bells follow the appearance theme: menuColors comes back on the same settings poll, so this costs no extra request and lands within a second of a theme change
 void ApplyNotifyThemeColors(const std::string &settingsBody)
 {
 	std::string menuColors = ExtractJsonObjectField(settingsBody, "menuColors");
@@ -80,6 +80,7 @@ void ApplyNotifyThemeColors(const std::string &settingsBody)
 		(mField.isValid() && mField != g_menuField) ||
 		(mFieldHover.isValid() && mFieldHover != g_menuFieldHover) ||
 		(mBorderStrong.isValid() && mBorderStrong != g_menuBorderStrong) ||
+		(mDanger.isValid() && mDanger != g_menuDanger) ||
 		(mMuted.isValid() && mMuted != g_menuMuted);
 	if (accent.isValid()) g_menuAccent = accent;
 	if (accentLight.isValid()) g_menuAccentLight = accentLight;
@@ -94,7 +95,10 @@ void ApplyNotifyThemeColors(const std::string &settingsBody)
 	QColor chromeBar(QString::fromStdString(ExtractJsonStringField(menuColors, "bar")));
 	QColor chromeSuccess(QString::fromStdString(ExtractJsonStringField(menuColors, "success")));
 	QColor chromeWarning(QString::fromStdString(ExtractJsonStringField(menuColors, "warning")));
-	if (chromeWarning.isValid()) g_chromeWarning = chromeWarning;
+	if (chromeWarning.isValid() && chromeWarning != g_chromeWarning) {
+		g_chromeWarning = chromeWarning;
+		changed = true;
+	}
 	if (chromeBg.isValid() && chromeBg != g_chromeBg) {
 		g_chromeBg = chromeBg;
 		changed = true;
