@@ -1,6 +1,7 @@
 // the popup of a finished job, built like the notification reader: a window of its own over the dimmed obs window, since the preview of the projector view is a native window that covers anything the page of the shell draws
 #include "prelude.hpp"
 #include "shell/shell_done_popup.hpp"
+#include "core/ipc_pipe.hpp"
 
 #include "core/cef_host.hpp"
 #include "core/helper_client.hpp"
@@ -46,9 +47,12 @@ void DonePopupRequest(const std::string &id)
 	const bool accepted = g_shellOn && CefOpen() && WindowOnScreen() && !ShellSetupLocked() && !Card().IsOpen();
 	if (accepted)
 		DonePopupOpen(id);
-	std::lock_guard<std::mutex> guard(g_doneAckLock);
-	if (g_doneAcks.size() < 64)
-		g_doneAcks.push_back("DONEPOPUP_ACK " + id + (accepted ? " 1" : " 0"));
+	{
+		std::lock_guard<std::mutex> guard(g_doneAckLock);
+		if (g_doneAcks.size() < 64)
+			g_doneAcks.push_back("DONEPOPUP_ACK " + id + (accepted ? " 1" : " 0"));
+	}
+	PipeWake();
 }
 
 std::vector<std::string> TakeDonePopupAcks()

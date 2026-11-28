@@ -6,9 +6,12 @@
 #include "app/frontend_events.hpp"
 #include "app/main_window_filter.hpp"
 #include "app/sdk_commands.hpp"
+#include "app/tools_actions.hpp"
 #include "core/async.hpp"
 #include "core/crash_reporter.hpp"
+#include "core/elevation.hpp"
 #include "core/graphics_device.hpp"
+#include "core/helper_launcher.hpp"
 #include "core/ipc_pipe.hpp"
 #include "core/idle_memory.hpp"
 #include "core/locale.hpp"
@@ -20,6 +23,7 @@
 #include "core/state.hpp"
 #include "core/window_state.hpp"
 #include "layout/ui_layout.hpp"
+#include "notify/clip_sound.hpp"
 #include "notify/clip_toast.hpp"
 #include "notify/notify_tip.hpp"
 #include "overlays/bongo.hpp"
@@ -33,6 +37,8 @@ OBS_DECLARE_MODULE()
 bool obs_module_load(void)
 {
 	using namespace rk;
+	// before anything starts, since a relaunch with administrator rights ends this copy at once
+	ElevateIfAsked();
 	LocaleLoad();
 	OptOutOfPowerThrottling();
 	GroupAudioWithHost();
@@ -48,7 +54,8 @@ bool obs_module_load(void)
 	StartPipeServer();
 	StartGraphicsWatch(*g_callbacks, ReleaseShareGraphics, ClipBufferGraphicsChanged);
 	ShareLinkStart();
-	ShareAudioRegisterHold();
+	ToolsActionsRegister();
+	HelperLauncherStart();
 	return true;
 }
 
@@ -80,6 +87,8 @@ void obs_module_unload(void)
 	ClipBufferShutdown();
 	ClipToastDestroy();
 	NotifyTipDestroy();
+	ClipSoundStop();
+	ToolsActionsUnregister();
 	// destroy queued callbacks before their code is unloaded with this module.
 	delete g_callbacks;
 	g_callbacks = nullptr;

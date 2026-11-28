@@ -55,7 +55,7 @@ namespace ReplayKitHelper
 
         public static SizeResult GetObsCanvasSize()
         {
-            var videoSettings = ObsWebSocket.InvokeRequest("GetVideoSettings", null, 3000);
+            var videoSettings = ObsRequest.Invoke("GetVideoSettings", null, 3000);
             if (!videoSettings.Ok) return new SizeResult { Ok = false, Message = Locales.Message("screenshare.obsVideoSettingsUnavailableError", "error", videoSettings.Message) };
 
             int baseWidth = GetObjectInt(videoSettings.Data, "baseWidth");

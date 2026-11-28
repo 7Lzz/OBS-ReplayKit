@@ -30,7 +30,7 @@ namespace ReplayKitHelper
             bool QFlag(string key) => r.QFlag(key);
 
 
-            // the plugin, which owns the disk clip buffer, says whether it runs; once on every change and again with each settings poll, so a helper that restarted learns it within a second
+            // the plugin, which owns the disk clip buffer, says whether it runs; once on every change and again with each settings read, so a helper that restarted learns it as soon as it connects to the pipe
             if (path == "/clip-buffer/state")
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
@@ -83,7 +83,7 @@ namespace ReplayKitHelper
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
                 try
                 {
-                    var result = ObsWebSocket.SaveReplayBuffer();
+                    var result = ObsRequest.SaveReplayBuffer();
                     int code = result.Ok ? 200 : result.Unavailable ? 503 : 409;
                     HttpResponse.SendJson(stream, code, ObsResultToJson(result));
                 }
@@ -99,7 +99,7 @@ namespace ReplayKitHelper
                 if (want != "" && want != "on" && want != "off") { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("helper.replayBufferStateMustBeOnOrOff") }); return false; }
                 try
                 {
-                    var status = ObsWebSocket.InvokeRequest("GetReplayBufferStatus");
+                    var status = ObsRequest.Invoke("GetReplayBufferStatus");
                     bool active = status.Ok && (status.Data?["outputActive"]?.Value<bool>() ?? false);
                     bool cancelDiskRecovery = want == "off" && ClipBuffer.EffectiveMode(ReplaykitSettings.ReadSettings()) == ClipBuffer.Disk;
                     if (want != "" && status.Ok && active == (want == "on") && !cancelDiskRecovery)
@@ -108,7 +108,7 @@ namespace ReplayKitHelper
                         return false;
                     }
                     if (want == "on" || (want == "" && status.Ok && !active)) PipeClient.ReleaseObsOutputsAndWait(1500);
-                    var res = ObsWebSocket.InvokeRequest(want == "on" ? "StartReplayBuffer" : want == "off" ? "StopReplayBuffer" : "ToggleReplayBuffer");
+                    var res = ObsRequest.Invoke(want == "on" ? "StartReplayBuffer" : want == "off" ? "StopReplayBuffer" : "ToggleReplayBuffer");
                     var body = ObsResultToJson(res);
                     if (res.Ok && want != "")
                     {
@@ -119,7 +119,7 @@ namespace ReplayKitHelper
                         var rbUntil = DateTime.UtcNow.AddMilliseconds(3000);
                         while (true)
                         {
-                            var rbNow = ObsWebSocket.InvokeRequest("GetReplayBufferStatus");
+                            var rbNow = ObsRequest.Invoke("GetReplayBufferStatus");
                             if (rbNow.Ok) rbObserved = rbNow.Data?["outputActive"]?.Value<bool>() ?? rbObserved;
                             if (rbNow.Ok && rbObserved == rbWantOn) { rbReached = true; break; }
                             if (DateTime.UtcNow >= rbUntil) break;
@@ -147,9 +147,9 @@ namespace ReplayKitHelper
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
                 try
                 {
-                    var recordStatus = ObsWebSocket.InvokeRequest("GetRecordStatus");
+                    var recordStatus = ObsRequest.Invoke("GetRecordStatus");
                     if (recordStatus.Ok && !(recordStatus.Data?["outputActive"]?.Value<bool>() ?? false)) PipeClient.ReleaseObsOutputsAndWait(1500);
-                    var res = ObsWebSocket.InvokeRequest("ToggleRecord");
+                    var res = ObsRequest.Invoke("ToggleRecord");
                     var body = ObsResultToJson(res);
                     if (res.Ok) body["active"] = res.Data?["outputActive"]?.Value<bool>() ?? false;
                     HttpResponse.SendJson(stream, res.Ok ? 200 : res.Unavailable ? 503 : 409, body);

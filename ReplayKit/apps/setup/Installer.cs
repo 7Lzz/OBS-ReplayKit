@@ -206,6 +206,21 @@ namespace ReplayKitSetup
             Path.Combine(ReplayKitFolder.Name, "obs-custom-dock", "overlay-preview", "wasd", "wasd-minimal.json"),
             Path.Combine(ReplayKitFolder.Name, "obs-custom-dock", "overlay-preview", "mouse", "mouse.png"),
             Path.Combine(ReplayKitFolder.Name, "obs-custom-dock", "overlay-preview", "mouse", "mouse-no-movement.json"),
+            // the lua scripts, which the plugin took over, and the sounds that sat beside one of them
+            Path.Combine(ReplayKitFolder.Name, "scripts", "replaykit.lua"),
+            Path.Combine(ReplayKitFolder.Name, "scripts", "shared_values.lua"),
+            Path.Combine(ReplayKitFolder.Name, "scripts", "capture", "auto_capture_switch.lua"),
+            Path.Combine(ReplayKitFolder.Name, "scripts", "helper", "helper_bootstrap.lua"),
+            Path.Combine(ReplayKitFolder.Name, "scripts", "helper", "helper_config.json"),
+            Path.Combine(ReplayKitFolder.Name, "scripts", "obs_elevation", "auto_elevate_obs.lua"),
+            Path.Combine(ReplayKitFolder.Name, "scripts", "popup_shield", "popup_capture_shield.lua"),
+            Path.Combine(ReplayKitFolder.Name, "scripts", "recording", "recording_hotkey.lua"),
+            Path.Combine(ReplayKitFolder.Name, "scripts", "replay_buffer", "auto_start_replay_buffer.lua"),
+            Path.Combine(ReplayKitFolder.Name, "scripts", "replay_buffer", "replay_buffer_save_beep.lua"),
+            Path.Combine(ReplayKitFolder.Name, "scripts", "replay_buffer", "clipping_saved.mp3"),
+            Path.Combine(ReplayKitFolder.Name, "scripts", "replay_buffer", "recording_ended_saved.mp3"),
+            Path.Combine(ReplayKitFolder.Name, "scripts", "replay_buffer", "recording_start_saved.mp3"),
+            Path.Combine(ReplayKitFolder.Name, "scripts", "virtual_camera", "auto_start_virtual_camera.lua"),
         };
 
         // installs made before the streamable/ -> helper/ rename: source name (in the old directory) -> new relative path.
@@ -659,7 +674,8 @@ namespace ReplayKitSetup
             {
                 int patched = ApplyScenePatches(log);
                 if (patched > 0) log?.Invoke($"scene patches applied: {patched}");
-                if (EnsureReplaykitScript(log)) log?.Invoke("replaykit script entry repaired");
+                int retired = RetireReplaykitScript(log);
+                if (retired > 0) log?.Invoke($"replaykit.lua script entry removed from {retired} scene collection(s)");
             }
             catch (Exception ex)
             {
@@ -668,21 +684,26 @@ namespace ReplayKitSetup
             }
         }
 
-        // the scene collection replaykit installs loads replaykit.lua through its script entry; one that lost the entry, or kept the path of a renamed user folder, loads none of replaykit. the full setup used to rebuild the whole scene file to put it back; this touches only that entry
-        private static bool EnsureReplaykitScript(Action<string> log)
+        // the plugin does everything replaykit.lua did, so every scene collection loses the entry obs would load it through, which would otherwise name a file that is gone; a collection that cannot be read now is left for the next update
+        private static int RetireReplaykitScript(Action<string> log)
         {
-            string scenePath = Path.Combine(Config.OBS_CONFIG, UserSceneRel);
-            if (!File.Exists(scenePath)) return false;
-            JObject data;
-            try { data = JObject.Parse(File.ReadAllText(scenePath, System.Text.Encoding.UTF8)); }
-            catch (Exception ex) when (ex is IOException || ex is JsonException)
+            string scenes = Path.Combine(Config.OBS_CONFIG, "basic", "scenes");
+            if (!Directory.Exists(scenes)) return 0;
+            int retired = 0;
+            foreach (string scenePath in Directory.GetFiles(scenes, "*.json"))
             {
-                log?.Invoke($"warn: cannot parse scene file for the script entry: {ex.Message}");
-                return false;
+                JObject data;
+                try { data = JObject.Parse(File.ReadAllText(scenePath, System.Text.Encoding.UTF8)); }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is JsonException)
+                {
+                    log?.Invoke($"warn: cannot read {Path.GetFileName(scenePath)} for the script entry: {ex.Message}");
+                    continue;
+                }
+                if (!Transform.RetireReplaykitScriptEntry(data)) continue;
+                WriteWithRetry(() => File.WriteAllText(scenePath, data.ToString(Formatting.Indented) + "\n", new System.Text.UTF8Encoding(false)));
+                retired++;
             }
-            if (!Transform.EnsureReplaykitScriptEntry(data, Prefs.LoadPrefs())) return false;
-            WriteWithRetry(() => File.WriteAllText(scenePath, data.ToString(Formatting.Indented) + "\n", new System.Text.UTF8Encoding(false)));
-            return true;
+            return retired;
         }
 
         // an empty file counts as gone: obs leaves one behind when a write is cut off, and it cannot read it either. a file that cannot be read right now is never counted, so it is never written over
@@ -885,9 +906,6 @@ namespace ReplayKitSetup
         // download + drop ffmpeg.exe and ffprobe.exe next to the helper. obs ships only obs-ffmpeg-mux.exe; compress/trim need the full pair. idempotent.
         public static bool InstallObsFfmpeg(Action<string> log = null) => FfmpegInstall.InstallFfmpeg(log);
 
-        // configure authenticated OBS WebSocket access for the helper.
-        public static bool ConfigureObsWebsocket(Action<string> log = null) => WebSocketConfig.InstallWebsocketConfig(log);
-
         // clip-ready toasts (from the helper) need some Start Menu shortcut carrying the apps AppUserModelID -- the windows rule for an unpackaged app. instead of a separate "OBS ReplayKit" entry, stamp that id onto OBS Studios own shortcut (this runs elevated so the all-users .lnk is writable); fall back to a same-named user-scope copy only if OBSs is missing. also removes the old distinct "OBS ReplayKit.lnk" from earlier versions.
         public static bool RegisterClipNotificationShortcut(Action<string> log = null)
         {
@@ -926,7 +944,7 @@ namespace ReplayKitSetup
         public static bool InstallObsSleepOverride(bool allowSleep = true, Action<string> log = null) =>
             allowSleep ? SleepOverride.InstallSleepOverride(log) : SleepOverride.RemoveSleepOverride(log);
 
-        // the bundled helper was there when the bundle was unpacked (ValidateRuntimeAssets checked it), so one that is gone a few steps later was most likely quarantined by antivirus as a fresh unsigned exe; helper_bootstrap.lua has nothing to fall back on without it
+        // the bundled helper was there when the bundle was unpacked (ValidateRuntimeAssets checked it), so one that is gone a few steps later was most likely quarantined by antivirus as a fresh unsigned exe; the launcher of the plugin has nothing to fall back on without it
         public static bool EnsureLauncherBuilt(Action<string> log = null)
         {
             string launcherPath = Path.Combine(GetRuntimeAssetsDir(), ReplayKitFolder.HelperExe);

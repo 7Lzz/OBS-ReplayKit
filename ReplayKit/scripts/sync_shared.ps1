@@ -1,4 +1,4 @@
-# writes the values shared/ owns out for the native plugin, the lua scripts, the controls dock and the setup csproj: the helper address from shared/HelperEndpoint.cs, the replaykit folder and its helper exe from shared/ReplayKitFolder.cs, the folder of the saved state from shared/StateLayout.cs and the plugin zip names from shared/BundleLayout.cs. build.bat runs it before every build, and a file is only rewritten when its text changes so the plugin build can still tell it is up to date
+# writes the values shared/ owns out for the native plugin, the controls dock and the setup csproj: the helper address from shared/HelperEndpoint.cs, the replaykit folder and its helper exe from shared/ReplayKitFolder.cs, the folder of the saved state from shared/StateLayout.cs and the plugin zip names from shared/BundleLayout.cs. build.bat runs it before every build, and a file is only rewritten when its text changes so the plugin build can still tell it is up to date
 $ErrorActionPreference = "Stop"
 
 . (Join-Path $PSScriptRoot 'build_layout.ps1')
@@ -57,23 +57,31 @@ foreach ($name in $tempFolder, $tempScratch, $tempClipBuffer) { if ($name -notma
 $origin = "http://${helperHost}:$port"
 # the game out of focus card, whose source the plugin registers and adds to the scenes and the capture switch script shows
 $focusCardName = Read-Constant 'shared\OverlayScene.cs' 'const\s+string\s+FocusCardSourceName\s*=\s*"([^"]+)"\s*;' 'the focus card source name'
+$sceneModuleKey = Read-Constant 'shared\OverlayScene.cs' 'const\s+string\s+SceneModuleKey\s*=\s*"([^"]+)"\s*;' 'the scene module key'
+$uploadHotkeyKey = Read-Constant 'shared\OverlayScene.cs' 'const\s+string\s+UploadHotkeyKey\s*=\s*"([^"]+)"\s*;' 'the upload hotkey key'
 $focusCardKind = Read-Constant 'shared\OverlayScene.cs' 'const\s+string\s+FocusCardSourceKind\s*=\s*"([^"]+)"\s*;' 'the focus card source kind'
 if ($focusCardName -notmatch '^[A-Za-z0-9][A-Za-z0-9 ._-]{0,63}$') { throw "Focus card source name has an unexpected shape: '$focusCardName'" }
 if ($focusCardKind -notmatch '^[a-z0-9][a-z0-9_-]{0,63}$') { throw "Focus card source kind has an unexpected shape: '$focusCardKind'" }
-# the three captures the capture switch script shows one at a time and the focus card covers
+# the three captures the capture switch of the plugin shows one at a time and the focus card covers
 $captures = [ordered]@{}
 foreach ($kind in 'Display', 'Game', 'Window') {
     $value = Read-Constant 'shared\OverlayScene.cs' ('const\s+string\s+' + $kind + 'CaptureSourceName\s*=\s*"([^"]+)"\s*;') "the $kind capture source name"
     if ($value -notmatch '^[A-Za-z0-9][A-Za-z0-9 ._-]{0,63}$') { throw "$kind capture source name has an unexpected shape: '$value'" }
     $captures[$kind] = $value
 }
-# the three audio sources of the scene collection that the virtual camera script keeps the monitoring of
+# the three audio sources of the scene collection whose monitoring and program lists the plugin keeps
 $audioSources = [ordered]@{}
 foreach ($kind in 'Mic', 'DesktopAudio', 'DiscordAudio') {
     $value = Read-Constant 'shared\OverlayScene.cs' ('const\s+string\s+' + $kind + 'SourceName\s*=\s*"([^"]+)"\s*;') "the $kind source name"
     if ($value -notmatch '^[A-Za-z0-9][A-Za-z0-9 ._()-]{0,63}$') { throw "$kind source name has an unexpected shape: '$value'" }
     $audioSources[$kind] = $value
 }
+# every discord build, which the plugin keeps in the program lists of the desktop and discord audio sources
+$discordList = Read-Constant 'shared\DesktopAudioExclusions.cs' 'DiscordPrograms\s*=\s*\{([^}]*)\}' 'the discord programs'
+$discordPrograms = @([regex]::Matches($discordList, '"([^"]+)"') | ForEach-Object { $_.Groups[1].Value })
+if ($discordPrograms.Count -eq 0) { throw "shared\DesktopAudioExclusions.cs names no discord program" }
+foreach ($program in $discordPrograms) { if ($program -notmatch '^[A-Za-z0-9][A-Za-z0-9._-]{0,63}\.exe$') { throw "Discord program has an unexpected shape: '$program'" } }
+$cppDiscordPrograms = ($discordPrograms | ForEach-Object { '"' + $_ + '"' }) -join ', '
 # the input overlay sources the plugin groups and hides together, their group, and the source kind of the bongo cat it registers
 $overlayNames = [ordered]@{}
 foreach ($name in 'WasdSourceName', 'MouseSourceName', 'InputOverlayGroupName', 'BongoSourceKind') {
@@ -106,6 +114,7 @@ foreach ($name in 'NvencH264', 'NvencHevc', 'AmfH264', 'AmfHevc', 'QsvH264', 'Qs
 $cppEncoders = ($encoders.Keys | ForEach-Object { "inline constexpr char kEncoder$_[] = `"$($encoders[$_])`";" }) -join "`n"
 # the settings file the plugin reads before the helper is up, and the card the plugin draws for the share window with what the card may hold
 $settingsFile = Read-Constant 'shared\StateLayout.cs' 'const\s+string\s+SettingsFile\s*=\s*"([^"]+)"\s*;' 'the settings file'
+$helperConfigFile = Read-Constant 'shared\StateLayout.cs' 'const\s+string\s+HelperConfigFile\s*=\s*"([^"]+)"\s*;' 'the helper config file'
 $shareCardFile = Read-Constant 'shared\StateLayout.cs' 'const\s+string\s+ShareCoverCardFile\s*=\s*"([^"]+)"\s*;' 'the share card file'
 $profilePictureFile = Read-Constant 'shared\StateLayout.cs' 'const\s+string\s+ProfilePictureFile\s*=\s*"([^"]+)"\s*;' 'the profile picture file'
 $windowStateFile = Read-Constant 'shared\StateLayout.cs' 'const\s+string\s+WindowStateFile\s*=\s*"([^"]+)"\s*;' 'the window state file'
@@ -130,13 +139,7 @@ $cppBackgrounds = ($shareBackgrounds | ForEach-Object { '"' + $_ + '"' }) -join 
 $toastAppId = Read-Constant 'shared\ToastIdentity.cs' 'const\s+string\s+AppId\s*=\s*"([^"]+)"\s*;' 'the toast app id'
 if ($toastAppId -notmatch '^[A-Za-z0-9][A-Za-z0-9.]{0,127}$') { throw "Toast app id has an unexpected shape: '$toastAppId'" }
 $cppWindows = ($windows.Keys | ForEach-Object { "inline constexpr char k${_}WindowTitle[] = `"$($windows[$_].Title)`";`ninline constexpr int k${_}WindowMinWidth = $($windows[$_].Width);`ninline constexpr int k${_}WindowMinHeight = $($windows[$_].Height);" }) -join "`n"
-# what the capture switch script does while the settings file has no word yet on the game out of focus card or on keeping the game in front
-$autoGameDefaults = [ordered]@{}
-foreach ($name in 'ScreenshareAutoGameOutOfFocus', 'ScreenshareAutoGameKeepFocused') {
-    $autoGameDefaults[$name] = (Read-Constant 'shared\SettingDefaults.cs' ('const\s+bool\s+' + $name + '\s*=\s*(true|false)\s*;') "the default of $name").ToLowerInvariant()
-}
-
-# the old places of each state file, from the table of shared/StateLayout.cs, so lua and the plugin look where the helper and the installer look
+# the old places of each state file, from the table of shared/StateLayout.cs, so the plugin looks where the helper and the installer look
 $stateText = Get-Content -LiteralPath (Join-Path $repoRoot 'shared\StateLayout.cs') -Raw
 $stateNames = @{}; foreach ($m in [regex]::Matches($stateText, 'const\s+string\s+(\w+File)\s*=\s*"([^"]+)"\s*;')) { $stateNames[$m.Groups[1].Value] = $m.Groups[2].Value }
 $stateFolders = @{}; foreach ($m in [regex]::Matches($stateText, 'static\s+readonly\s+string\s+(\w+)\s*=\s*@?"([^"]*)"\s*;')) { $stateFolders[$m.Groups[1].Value] = $m.Groups[2].Value.Replace('\', '/') }
@@ -154,7 +157,6 @@ foreach ($m in [regex]::Matches($stateText, 'new\s+Entry\s*\{\s*File\s*=\s*(\w+)
     $oldPlaces[$file] = $places
 }
 if ($oldPlaces.Count -lt 1) { throw 'Could not read the entries of shared/StateLayout.cs' }
-$luaPlaces = ($oldPlaces.Keys | ForEach-Object { '["' + $_ + '"] = { ' + (($oldPlaces[$_] | ForEach-Object { '"' + $_ + '"' }) -join ', ') + ' }' }) -join ', '
 $cppPlaces = ($oldPlaces.Keys | ForEach-Object { $list = @($oldPlaces[$_] | ForEach-Object { '"' + $_ + '"' }); while ($list.Count -lt 3) { $list += 'nullptr' }; "`t{`"" + $_ + '", {' + ($list -join ', ') + '}},' }) -join "`n"
 function Write-Generated([string]$relativePath, [string]$text) {
     $path = Join-Path $ReplayKitGenerated $relativePath
@@ -202,7 +204,7 @@ inline constexpr wchar_t kRoleHostStoppedFile[] = L"$roleHostStopped";
 "@
 
 Write-Generated "core\shared_values.hpp" @"
-// generated by scripts/sync_shared.ps1 from shared/HelperEndpoint.cs, shared/IpcPipe.cs, shared/ReplayKitFolder.cs, shared/StateLayout.cs, shared/TempLayout.cs, shared/OverlayScene.cs, shared/WindowLayout.cs, shared/Encoder.cs, shared/SettingLimits.cs, shared/ToastIdentity.cs, shared/ControlsDock.cs and shared/ReplayKitRepo.cs, with the share window names from share_window_values.hpp -- edit those files, not this one
+// generated by scripts/sync_shared.ps1 from shared/HelperEndpoint.cs, shared/IpcPipe.cs, shared/ReplayKitFolder.cs, shared/StateLayout.cs, shared/TempLayout.cs, shared/OverlayScene.cs, shared/DesktopAudioExclusions.cs, shared/ObsLaunch.cs, shared/WindowLayout.cs, shared/Encoder.cs, shared/SettingLimits.cs, shared/ToastIdentity.cs, shared/ControlsDock.cs and shared/ReplayKitRepo.cs, with the share window names from share_window_values.hpp -- edit those files, not this one
 #pragma once
 
 #include "share_window_values.hpp"
@@ -214,6 +216,7 @@ inline constexpr int kHelperPort = $port;
 inline constexpr wchar_t kIpcPipeName[] = L"\\\\.\\pipe\\$ipcPipe";
 inline constexpr int kIpcMaxLineBytes = $ipcLineBytes;
 inline constexpr char kSettingsFile[] = "$settingsFile";
+inline constexpr char kHelperConfigFile[] = "$helperConfigFile";
 inline constexpr char kShareCoverCardFile[] = "$shareCardFile";
 inline constexpr char kProfilePictureFile[] = "$profilePictureFile";
 inline constexpr char kWindowStateFile[] = "$windowStateFile";
@@ -231,10 +234,17 @@ inline constexpr char kTempScratchFolder[] = "$tempScratch";
 inline constexpr char kTempClipBufferFolder[] = "$tempClipBuffer";
 inline constexpr const char *kSupportedLocales[] = {$cppLocales};
 inline constexpr char kFocusCardSourceName[] = "$focusCardName";
+inline constexpr char kSceneModuleKey[] = "$sceneModuleKey";
+inline constexpr char kUploadHotkeyKey[] = "$uploadHotkeyKey";
 inline constexpr char kFocusCardSourceKind[] = "$focusCardKind";
 inline constexpr char kDisplayCaptureSourceName[] = "$($captures['Display'])";
 inline constexpr char kGameCaptureSourceName[] = "$($captures['Game'])";
 inline constexpr char kWindowCaptureSourceName[] = "$($captures['Window'])";
+inline constexpr char kObsLaunchArgs[] = "$obsArgs";
+inline constexpr char kMicSourceName[] = "$($audioSources['Mic'])";
+inline constexpr char kDesktopAudioSourceName[] = "$($audioSources['DesktopAudio'])";
+inline constexpr char kDiscordAudioSourceName[] = "$($audioSources['DiscordAudio'])";
+inline constexpr const char *kDiscordPrograms[] = {$cppDiscordPrograms};
 inline constexpr char kWasdSourceName[] = "$($overlayNames['WasdSourceName'])";
 inline constexpr char kMouseSourceName[] = "$($overlayNames['MouseSourceName'])";
 inline constexpr char kInputOverlayGroupName[] = "$($overlayNames['InputOverlayGroupName'])";
@@ -251,12 +261,6 @@ $cppPlaces
 };
 
 } // namespace rk
-
-"@
-
-Write-Generated "shared_values.lua" @"
--- generated by scripts/sync_shared.ps1 from shared/HelperEndpoint.cs, shared/StateLayout.cs, shared/ObsLaunch.cs, shared/OverlayScene.cs, shared/ShareWindowLayout.cs and shared/SettingDefaults.cs -- edit those files, not this one
-return { host = "$helperHost", port = $port, origin = "$origin", state_folder = "$stateFolder", obs_args = "$obsArgs", share_window_exe = "$($share['ExeName'])", focus_card_source = "$focusCardName", capture_sources = { display = "$($captures['Display'])", game = "$($captures['Game'])", window = "$($captures['Window'])" }, audio_sources = { mic = "$($audioSources['Mic'])", desktop = "$($audioSources['DesktopAudio'])", discord = "$($audioSources['DiscordAudio'])" }, auto_game_defaults = { out_of_focus = $($autoGameDefaults['ScreenshareAutoGameOutOfFocus']), keep_focused = $($autoGameDefaults['ScreenshareAutoGameKeepFocused']) }, old_places = { $luaPlaces } }
 
 "@
 

@@ -43,6 +43,7 @@ namespace ReplayKitHelper
             string path = StorePath();
             Directory.CreateDirectory(Path.GetDirectoryName(path));
             AppConfig.WriteUtf8(path, new JObject { ["items"] = items }.ToString(Formatting.Indented));
+            PipeClient.SendNotificationsChanged();
         }
 
         private static JObject Snapshot(JArray items)

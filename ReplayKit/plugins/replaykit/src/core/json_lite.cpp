@@ -2,6 +2,8 @@
 #include "prelude.hpp"
 #include "core/json_lite.hpp"
 
+#include <QJsonDocument>
+
 namespace rk {
 
 bool JsonBoolField(const std::string &body, const char *field, bool defaultValue)
@@ -120,6 +122,14 @@ double JsonDoubleField(const std::string &body, const char *field, double defaul
 	char *end = nullptr;
 	double value = std::strtod(start, &end);
 	return end == start ? defaultValue : value;
+}
+
+QJsonObject JsonBodyObject(const std::string &response)
+{
+	const size_t bodyAt = response.find("\r\n\r\n");
+	if (bodyAt == std::string::npos)
+		return {};
+	return QJsonDocument::fromJson(QByteArray::fromStdString(response.substr(bodyAt + 4))).object();
 }
 
 } // namespace rk

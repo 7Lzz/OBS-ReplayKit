@@ -249,6 +249,8 @@ namespace ReplayKitHelper
             {
                 base.OnHandleCreated(e);
                 try { Native.EnableDwmRounding(Handle); } catch { }
+                // the update prompt stays out of discord style screenshare pickers and desktop captures
+                if (!Native.ExcludeFromCapture(Handle)) Log.Write("update window: could not exclude it from capture (error " + System.Runtime.InteropServices.Marshal.GetLastWin32Error() + ")");
             }
 
             protected override void OnLoad(EventArgs e)

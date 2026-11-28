@@ -32,6 +32,7 @@ namespace ReplayKitHelper
         private static bool _retainedDiskPieces;
         private static long _diskStateAt;
         private static ulong _diskStateStamp;
+        private static bool _diskStateKnown;
         private static readonly long DiskStateTimeout = 5 * Stopwatch.Frequency;
         // the save that runs or the last one that ended, so a clips page that opens or comes back while a clip is saved still shows its card, and learns the name of the clip it waits for; the plugin numbers its saves, so a start that arrives after its save already ended cannot open it again
         private static long _saveId = -1;
@@ -68,7 +69,7 @@ namespace ReplayKitHelper
                 new JObject { ["value"] = Memory, ["label"] = Locales.Message("wizard.memory"), ["blurb"] = Locales.Message("settings.bufferMemoryBlurb") });
         }
 
-        // the plugin says whenever its disk buffer starts or stops, and again on every settings poll
+        // the plugin says whenever its disk buffer starts, stops or stalls, and with every settings read
         public static void ReportDiskState(bool active, bool retained, string stamp)
         {
             ulong sample = 0;
@@ -81,29 +82,44 @@ namespace ReplayKitHelper
                 _retainedDiskPieces = retained;
                 _diskStateStamp = sample;
                 _diskStateAt = now;
+                _diskStateKnown = true;
             }
         }
 
-        // the replay buffer requests the helper sends to obs-websocket; null when obs should answer them itself
-        public static ObsWebSocketResult TryInvoke(string requestType)
+        // the state came from the plugin on the other end of the pipe, so it means nothing once that end is gone, and the next obs numbers its reports from the start again
+        public static void ForgetDiskState()
+        {
+            lock (StateGate)
+            {
+                _diskStateKnown = false;
+                _diskStateStamp = 0;
+                _diskStateAt = 0;
+            }
+        }
+
+        // the replay buffer requests the helper sends to obs; null when obs should answer them itself
+        public static ObsResult TryInvoke(string requestType)
         {
             if (requestType != "GetReplayBufferStatus" && requestType != "StartReplayBuffer" && requestType != "StopReplayBuffer" && requestType != "ToggleReplayBuffer" && requestType != "SaveReplayBuffer")
                 return null;
             if (EffectiveMode(ReplaykitSettings.ReadSettings()) != Disk)
             {
                 if (requestType != "SaveReplayBuffer") return null;
-                var status = ObsWebSocket.InvokeRequest("GetReplayBufferStatus");
+                var status = ObsRequest.Invoke("GetReplayBufferStatus");
                 if (!status.Ok) { status.RequestType = requestType; return status; }
-                if (status.Data?["outputActive"]?.Value<bool>() != true) return new ObsWebSocketResult { Ok = false, RequestType = requestType, Code = 501, Message = Locales.Message("clips.clippingIsOff") };
+                if (status.Data?["outputActive"]?.Value<bool>() != true) return new ObsResult { Ok = false, RequestType = requestType, Code = 501, Message = Locales.Message("clips.clippingIsOff") };
                 if (PipeClient.SendClipSave()) return Answer(requestType, true);
                 Log.Write("Native capture tagging unavailable; OBS handles the replay save directly.");
                 return null;
             }
             bool active;
             bool canSave;
+            bool connected;
+            lock (Server.State.IpcLock) connected = Server.State.IpcClientConnected;
             lock (StateGate)
             {
-                bool stateFresh = Stopwatch.GetTimestamp() - _diskStateAt < DiskStateTimeout;
+                // the plugin reports every change itself, so what it said holds for as long as it is connected
+                bool stateFresh = connected && _diskStateKnown;
                 active = stateFresh && _diskActive;
                 canSave = stateFresh && (_diskActive || _retainedDiskPieces);
             }
@@ -118,16 +134,16 @@ namespace ReplayKitHelper
                 case "ToggleReplayBuffer":
                     return PipeClient.SendClipBuffer("toggle") ? Answer(requestType, !active) : PluginGone(requestType);
                 default:
-                    if (!canSave) return new ObsWebSocketResult { Ok = false, RequestType = requestType, Code = 501, Message = Locales.Message("clips.clippingIsOff") };
+                    if (!canSave) return new ObsResult { Ok = false, RequestType = requestType, Code = 501, Message = Locales.Message("clips.clippingIsOff") };
                     return PipeClient.SendClipSave() ? Answer(requestType, active) : PluginGone(requestType);
             }
         }
 
-        private static ObsWebSocketResult Answer(string requestType, bool active) =>
-            new ObsWebSocketResult { Ok = true, RequestType = requestType, Code = 100, Data = new JObject { ["outputActive"] = active } };
+        private static ObsResult Answer(string requestType, bool active) =>
+            new ObsResult { Ok = true, RequestType = requestType, Code = 100, Data = new JObject { ["outputActive"] = active } };
 
-        private static ObsWebSocketResult PluginGone(string requestType) =>
-            new ObsWebSocketResult { Ok = false, Unavailable = true, RequestType = requestType, Message = Locales.Message("clips.replaykitSObsPluginIsNot") };
+        private static ObsResult PluginGone(string requestType) =>
+            new ObsResult { Ok = false, Unavailable = true, RequestType = requestType, Message = Locales.Message("clips.replaykitSObsPluginIsNot") };
 
         private static JObject Fail(string message) => new JObject { ["ok"] = false, ["message"] = message };
 

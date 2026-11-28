@@ -28,7 +28,7 @@ $inputs = @($sourceFiles.FullName) + $linkedFiles + @(
     $PSCommandPath,
     $BuildLayoutFile,
     (Join-Path $ReplayKitGenerated 'Version.props'),
-    (Join-Path $repoRoot 'lua\helper\obs-replaykit.ico')
+    (Join-Path $repoRoot 'apps\helper\obs-replaykit.ico')
 )
 $outputs = @($requiredFiles | ForEach-Object { Join-Path $outDir $_ })
 $inputHash = Fingerprint $inputs

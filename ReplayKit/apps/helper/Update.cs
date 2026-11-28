@@ -302,6 +302,14 @@ namespace ReplayKitHelper
         // the version the periodic check found while obs was open, for the badge of the title bar; empty when there is none
         private static volatile string readyVersion = "";
 
+        // the plugin reads the badge with the settings, and reads them only when told
+        private static void SetReady(string version)
+        {
+            if (version == readyVersion) return;
+            readyVersion = version;
+            PipeClient.SendPollSettings();
+        }
+
         public static string ReadyVersion => readyVersion;
 
         // sdk mode shows the badge for a version of its own choosing, to see how it looks, or takes it away with an empty one; the next periodic check puts the real state back
@@ -309,7 +317,7 @@ namespace ReplayKitHelper
         {
             version = (version ?? "").Trim();
             if (version.Length > 0 && !Regex.IsMatch(version, @"^[0-9A-Za-z.\-]{1,32}$")) return new JObject { ["ok"] = false, ["message"] = Locales.Message("update.badVersion") };
-            readyVersion = version;
+            SetReady(version);
             WriteUpdateDebug("sdk: badge " + (version.Length > 0 ? "shows " + version : "cleared"));
             return new JObject { ["ok"] = true, ["updateReady"] = version };
         }
@@ -321,7 +329,7 @@ namespace ReplayKitHelper
             bool ready = status["updateAvailable"]?.Value<bool>() == true || status["repairRequired"]?.Value<bool>() == true;
             string version = ready ? status["latestVersion"]?.Value<string>() ?? "" : "";
             if (version != readyVersion) WriteUpdateDebug("update check: badge " + (version.Length > 0 ? "shows " + version : "cleared"));
-            readyVersion = version;
+            SetReady(version);
         }
 
         public static void StartPolling()

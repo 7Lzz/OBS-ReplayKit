@@ -27,6 +27,8 @@ set(REPLAYKIT_SOURCES
     src/app/obs_menu.cpp
     src/app/sdk_commands.cpp
     src/app/settings_poll.cpp
+    src/app/tools_actions.cpp
+    src/app/obs_requests.cpp
     src/app/single_instance.cpp
 
     src/chrome/caption_track_filter.cpp
@@ -48,6 +50,9 @@ set(REPLAYKIT_SOURCES
     src/core/keybind_label.cpp
     src/core/main_window.cpp
     src/core/open_clips_hotkey.cpp
+    src/core/native_hotkeys.cpp
+    src/core/elevation.cpp
+    src/core/helper_launcher.cpp
     src/core/power_throttling.cpp
     src/core/audio_group.cpp
     src/core/process_group.cpp
@@ -96,6 +101,9 @@ set(REPLAYKIT_SOURCES
     src/share/share_audio.cpp
     src/share/share_card.cpp
     src/share/share_link.cpp
+    src/share/share_monitoring.cpp
+    src/notify/clip_sound.cpp
+    src/capture/capture_switch.cpp
 
     src/tray/tray_menu.cpp
 
@@ -136,6 +144,7 @@ target_link_libraries(replaykit PRIVATE
     dwmapi
     iphlpapi
     psapi
+    winmm
     "${OBS_IMPLIB_DIR}/obs.lib"
     "${OBS_IMPLIB_DIR}/obs-frontend-api.lib"
 )

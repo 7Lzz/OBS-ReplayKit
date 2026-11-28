@@ -68,12 +68,20 @@ namespace ReplayKitHelper
         internal static JObject themePreviewColors;
         internal static DateTime themePreviewUntil = DateTime.MinValue;
         internal static readonly object ThemePreviewGate = new object();
+        private static readonly TimeSpan ThemePreviewLasts = TimeSpan.FromMinutes(10);
+        private static System.Threading.Timer themePreviewLapse;
 
         public static void SetThemePreview(JObject candidate)
         {
             var colors = ThemeMenuColors(candidate);
-            lock (ThemePreviewGate) { themePreviewColors = colors; themePreviewUntil = DateTime.UtcNow.AddMinutes(10); }
-            // the plugin reads the colours on a one second poll, this makes the change land at once
+            lock (ThemePreviewGate)
+            {
+                themePreviewColors = colors;
+                themePreviewUntil = DateTime.UtcNow.Add(ThemePreviewLasts);
+                // the plugin reads the colours only when told, so it is told again once the preview has lapsed
+                themePreviewLapse?.Dispose();
+                themePreviewLapse = new System.Threading.Timer(_ => PipeClient.SendPollSettings(), null, ThemePreviewLasts + TimeSpan.FromSeconds(1), System.Threading.Timeout.InfiniteTimeSpan);
+            }
             PipeClient.SendPollSettings();
         }
 
@@ -86,7 +94,7 @@ namespace ReplayKitHelper
             return ThemeMenuColors(settings);
         }
 
-        // what the plugin reads on its one second poll: the saved settings and the menu colours, without the reads from obs that GetSettingsPayload makes (hotkeys, clip length, mic, volumes, overlay opacity; about ten websocket requests each time). the plugin asks for the full payload once the obs settings dialog closes or the profile changes, which is when those can differ from the file
+        // what the plugin reads each time the helper pushes a change: the saved settings and the menu colours, without the reads from obs that GetSettingsPayload makes (hotkeys, clip length, mic, volumes, overlay opacity; about ten obs requests each time). the plugin asks for the full payload once the obs settings dialog closes or the profile changes, which is when those can differ from the file
         public static JObject GetNativeSettingsPayload()
         {
             lock (SettingsStore.Gate)
@@ -338,7 +346,7 @@ namespace ReplayKitHelper
             });
         }
 
-        // self-heal: obss recording folder (SimpleOutput.FilePath / AdvOut.RecFilePath) can drift off the RESOLVED clip dir (custom, or the ~/Videos default) -- a reset profile, an obs update, a mid-session force-kill -- and then new replay clips land where nothing is looking. runs deferred (obs websocket needs a moment) and only writes on an actual mismatch.
+        // self-heal: obss recording folder (SimpleOutput.FilePath / AdvOut.RecFilePath) can drift off the RESOLVED clip dir (custom, or the ~/Videos default) -- a reset profile, an obs update, a mid-session force-kill -- and then new replay clips land where nothing is looking. runs deferred (the plugin answers a moment after obs starts) and only writes on an actual mismatch.
         public static void EnsureObsRecordingFolderAtStartup()
         {
             Task.Run(() =>
@@ -375,13 +383,13 @@ namespace ReplayKitHelper
                                 }
                                 if (!changed) return;
                                 // the already-running Replay Buffer output caches its dir from init -- update it live too.
-                                var rb = ObsWebSocket.InvokeRequest("GetOutputSettings", new JObject { ["outputName"] = ReplayBufferOutputName }, 3000);
+                                var rb = ObsRequest.Invoke("GetOutputSettings", new JObject { ["outputName"] = ReplayBufferOutputName }, 3000);
                                 if (rb.Ok && rb.Data?["outputSettings"] is JObject rbSettings)
                                 {
                                     var next = (JObject)rbSettings.DeepClone();
                                     next["directory"] = resolved;
                                     next["path"] = resolved;
-                                    ObsWebSocket.InvokeRequest("SetOutputSettings", new JObject { ["outputName"] = ReplayBufferOutputName, ["outputSettings"] = next }, 5000);
+                                    ObsRequest.Invoke("SetOutputSettings", new JObject { ["outputName"] = ReplayBufferOutputName, ["outputSettings"] = next }, 5000);
                                 }
                             }
                             return;
@@ -413,7 +421,7 @@ namespace ReplayKitHelper
         internal static void ReconcileRecordingAudioPrograms()
         {
             var early = ReadSettings();
-            ObsWebSocketResult current = null;
+            ObsResult current = null;
             for (int i = 0; i < 45; i++)
             {
                 current = GetDesktopAudioCaptureSettings();
@@ -461,17 +469,17 @@ namespace ReplayKitHelper
 
         internal static void ReconcileObsVideoWithSettings()
         {
-            // obs answers its websocket a beat after it starts and the script load starts the replay buffer, so wait for both -- the stop, reset and start below then never land while obs is still starting up
+            // obs answers its requests a beat after it starts and the script load starts the replay buffer, so wait for both -- the stop, reset and start below then never land while obs is still starting up
             bool answered = false;
             for (int i = 0; i < 45 && !answered; i++)
             {
-                answered = ObsWebSocket.InvokeRequest("GetVideoSettings", null, 3000).Ok;
+                answered = ObsRequest.Invoke("GetVideoSettings", null, 3000).Ok;
                 if (!answered) Thread.Sleep(1000);
             }
             if (!answered) { Log.Write("EnsureObsVideoMatchesSettings: OBS did not answer in time, nothing checked."); return; }
             for (int i = 0; i < 15; i++)
             {
-                var buffer = ObsWebSocket.InvokeRequest("GetReplayBufferStatus", null, 3000);
+                var buffer = ObsRequest.Invoke("GetReplayBufferStatus", null, 3000);
                 if (buffer.Ok && (buffer.Data?["outputActive"]?.Value<bool>() ?? false)) break;
                 Thread.Sleep(1000);
             }
@@ -485,7 +493,7 @@ namespace ReplayKitHelper
                 var wantedFps = GetPresetSpec(presetName, settings)["video"];
                 int fpsNumerator = wantedFps["fpsNumerator"].Value<int>(), fpsDenominator = wantedFps["fpsDenominator"].Value<int>();
 
-                var now = ObsWebSocket.InvokeRequest("GetVideoSettings", null, 3000);
+                var now = ObsRequest.Invoke("GetVideoSettings", null, 3000);
                 if (!now.Ok || !(now.Data is JObject live)) { Log.Write("EnsureObsVideoMatchesSettings: could not read the OBS video settings: " + now.Message); return; }
                 int baseWidth = live["baseWidth"]?.Value<int>() ?? 0, baseHeight = live["baseHeight"]?.Value<int>() ?? 0;
                 if (baseWidth < 2 || baseHeight < 2) { Log.Write("EnsureObsVideoMatchesSettings: OBS reported no base canvas size, nothing changed."); return; }
@@ -513,8 +521,8 @@ namespace ReplayKitHelper
                 if (!videoDiffers && !bufferDiffers) return;
 
                 // fail closed: if obs cannot say whether it is recording or streaming, leave it alone
-                var record = ObsWebSocket.InvokeRequest("GetRecordStatus", null, 3000);
-                var stream = ObsWebSocket.InvokeRequest("GetStreamStatus", null, 3000);
+                var record = ObsRequest.Invoke("GetRecordStatus", null, 3000);
+                var stream = ObsRequest.Invoke("GetStreamStatus", null, 3000);
                 if (!record.Ok || !stream.Ok) { Log.Write("EnsureObsVideoMatchesSettings: could not tell whether OBS is recording or streaming, left alone."); return; }
                 if ((record.Data?["outputActive"]?.Value<bool>() ?? false) || (stream.Data?["outputActive"]?.Value<bool>() ?? false))
                 {
@@ -540,10 +548,10 @@ namespace ReplayKitHelper
                 var applied = ApplyRuntimeOutputsLive(settings, wanted, restartObs: false, applyVideoSettings: videoDiffers, applyReplayBufferOutput: true);
                 foreach (var warning in applied["warnings"] as JArray ?? new JArray()) Log.Write("EnsureObsVideoMatchesSettings: " + warning);
 
-                var after = ObsWebSocket.InvokeRequest("GetVideoSettings", null, 3000);
+                var after = ObsRequest.Invoke("GetVideoSettings", null, 3000);
                 bool videoMatches = after.Ok && after.Data is JObject result && result["outputWidth"]?.Value<int>() == outputWidth && result["outputHeight"]?.Value<int>() == outputHeight &&
                     result["fpsNumerator"]?.Value<int>() == fpsNumerator && result["fpsDenominator"]?.Value<int>() == fpsDenominator;
-                var bufferAfter = ObsWebSocket.InvokeRequest("GetOutputSettings", new JObject { ["outputName"] = ReplayBufferOutputName }, 3000);
+                var bufferAfter = ObsRequest.Invoke("GetOutputSettings", new JObject { ["outputName"] = ReplayBufferOutputName }, 3000);
                 Log.Write("EnsureObsVideoMatchesSettings: " + (videoMatches ? "OBS now records at " + outputWidth + "x" + outputHeight + " " + fpsNumerator + "/" + fpsDenominator + "." : "OBS did not take the saved video settings.") +
                     " The replay buffer cap is " + (bufferAfter.Ok ? bufferAfter.Data?["outputSettings"]?["max_size_mb"]?.ToString() : "unknown") + " MB.");
             }
@@ -565,18 +573,18 @@ namespace ReplayKitHelper
         {
             var settings = ReadSettings();
             if (settings["overlayStyle"]?.Value<string>() != "bongo_cat") { Notifications.DismissKey(BongoCatNoticeKey); return; }
-            // obs answers its websocket a beat after it starts
-            ObsWebSocketResult kinds = null;
+            // obs answers its requests a beat after it starts
+            ObsResult kinds = null;
             for (int i = 0; i < 45; i++)
             {
-                kinds = ObsWebSocket.InvokeRequest("GetInputKindList", new JObject { ["unversioned"] = true }, 3000);
+                kinds = ObsRequest.Invoke("GetInputKindList", new JObject { ["unversioned"] = true }, 3000);
                 if (kinds.Ok) break;
                 Thread.Sleep(1000);
             }
             if (kinds == null || !kinds.Ok) { Log.Write("CheckBongoCat: OBS did not answer in time, nothing checked."); return; }
 
             bool loaded = (kinds.Data?["inputKinds"] as JArray ?? new JArray()).Any(k => k.Value<string>() == BongoInputKind);
-            var input = ObsWebSocket.InvokeRequest("GetInputSettings", new JObject { ["inputName"] = OverlayScene.BongoSourceName }, 3000);
+            var input = ObsRequest.Invoke("GetInputSettings", new JObject { ["inputName"] = OverlayScene.BongoSourceName }, 3000);
             bool sourceCurrent = input.Ok && input.Data?["inputKind"]?.Value<string>() == BongoInputKind;
             // replaykit.dll draws the Bango Cat folder beside obs64.exe with the models ReplayKit baked from it, and a missing folder or bake leaves the cat silently empty
             string root = GetObsInstallRoot();
@@ -594,7 +602,7 @@ namespace ReplayKitHelper
                         var bindings = BongoSourceBindings(settings);
                         if (!JToken.DeepEquals(input.Data?["inputSettings"]?["key_bindings"], bindings))
                         {
-                            var update = ObsWebSocket.InvokeRequest("SetInputSettings", new JObject
+                            var update = ObsRequest.Invoke("SetInputSettings", new JObject
                             {
                                 ["inputName"] = OverlayScene.BongoSourceName,
                                 ["inputSettings"] = new JObject { ["key_bindings"] = bindings },

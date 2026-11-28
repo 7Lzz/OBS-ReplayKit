@@ -5738,53 +5738,13 @@
     "source": "2b2976e894c7b252",
     "text": "OBS wird geschlossen."
   },
+  "helper.obsDidNotAnswer": {
+    "source": "72846df69e4d4c09",
+    "text": "OBS hat nicht rechtzeitig geantwortet."
+  },
   "helper.obsIsRestarting": {
     "source": "ce94acd699eee3b2",
     "text": "OBS wird neu gestartet."
-  },
-  "helper.obsWebsocketAuthenticationDataIsMissing": {
-    "source": "ad88371c6f38b712",
-    "text": "Authentifizierungsdaten für OBS WebSocket fehlen."
-  },
-  "helper.obsWebsocketClosedTheConnection": {
-    "source": "b6d10dfaa8ec8557",
-    "text": "OBS WebSocket hat die Verbindung geschlossen."
-  },
-  "helper.obsWebsocketConfigIsNotValid": {
-    "source": "63cf53a74f0c9f73",
-    "text": "Die OBS-WebSocket-Konfiguration ist kein gültiges JSON."
-  },
-  "helper.obsWebsocketConfigNotFound": {
-    "source": "810d8be8f82ab134",
-    "text": "OBS-WebSocket-Konfiguration nicht gefunden."
-  },
-  "helper.obsWebsocketDidNotIdentifyThis": {
-    "source": "0d39b22022def615",
-    "text": "OBS WebSocket hat diesen Client nicht identifiziert."
-  },
-  "helper.obsWebsocketDidNotSendHello": {
-    "source": "8e7f8a034a0b80c9",
-    "text": "OBS WebSocket hat kein Hello gesendet."
-  },
-  "helper.obsWebsocketIsNotReachable": {
-    "source": "21e605926bb4690f",
-    "text": "OBS WebSocket ist nicht erreichbar."
-  },
-  "helper.obsWebsocketMessageIsInvalidOr": {
-    "source": "ef3a9ab8b463cf1e",
-    "text": "OBS-WebSocket-Nachricht ist ungültig oder zu groß."
-  },
-  "helper.obsWebsocketPasswordIsMissing": {
-    "source": "ca3108cd1ae8367a",
-    "text": "OBS-WebSocket-Passwort fehlt."
-  },
-  "helper.obsWebsocketPortIsInvalid": {
-    "source": "926972e9d41ca85b",
-    "text": "OBS-WebSocket-Port ist ungültig."
-  },
-  "helper.obsWebsocketServerIsDisabled": {
-    "source": "79a751d8c6886abc",
-    "text": "Der OBS-WebSocket-Server ist deaktiviert."
   },
   "helper.obsWillRestartWithAClean": {
     "source": "a9c589e48111d22f",
@@ -5985,14 +5945,6 @@
   "lua.hotkeyUploadLatestClip": {
     "source": "df8745d476ae558d",
     "text": "Neuesten Clip auf Streamable hochladen"
-  },
-  "lua.scriptAbout": {
-    "source": "207194ba04314859",
-    "text": "Das einzige Skript, das OBS von ReplayKit sieht. Es startet die Aufnahme für Clips, hält das Monitoring von OBS aus, wechselt die Aufnahmequellen für Vollbildspiele, öffnet und parkt den Discord-Projektor, spielt den Ton beim Speichern eines Clips, kümmert sich um die Rechte von OBS, gleicht die Aufnahme-Tastenkürzel ab und startet den ReplayKit-Helfer."
-  },
-  "lua.scriptLayout": {
-    "source": "78887b020556073a",
-    "text": "Der Code bleibt in interne Dateien je Funktion aufgeteilt, damit das Skriptfenster von OBS übersichtlich bleibt, ohne dass alles in einer riesigen Datei landet."
   },
   "lua.toolsOpenClipFolder": {
     "source": "6e4124d40abd2bef",
@@ -9876,21 +9828,9 @@
     "source": "2c3f50eac8b41589",
     "text": "Bildschirmfreigabe für Discord aktivieren"
   },
-  "setup.enableObsWebsocket": {
-    "source": "850789894cbc103d",
-    "text": "OBS WebSocket aktivieren"
-  },
-  "setup.enablesTheLocalObsWebsocket": {
-    "source": "e227276dc144d45d",
-    "text": "Aktiviert das lokale OBS WebSocket."
-  },
   "setup.everythingElseIsSetUpIn": {
     "source": "6f70e3680891e028",
     "text": "Alles Weitere wird im Assistenten eingerichtet, der beim ersten Start von OBS geöffnet wird."
-  },
-  "setup.existingObsWebsocketConfigurationCouldNot": {
-    "source": "31761a1ac2d37234",
-    "text": "Die vorhandene OBS-WebSocket-Konfiguration konnte nicht gelesen werden; sie wurde nicht geändert."
   },
   "setup.ffmpegAndFfprobe": {
     "source": "9f76541248f43be2",

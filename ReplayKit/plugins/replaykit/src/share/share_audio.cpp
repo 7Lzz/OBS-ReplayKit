@@ -36,11 +36,6 @@ bool Held()
 	return GetTickCount64() < g_heldUntil.load();
 }
 
-void HeldProc(void *, calldata_t *data)
-{
-	calldata_set_bool(data, "held", Held());
-}
-
 void OnAudio(void *param, obs_source_t *source, const struct audio_data *data, bool)
 {
 	// mute is left alone and only a source shown in the program plays, the way the obs monitor does it
@@ -220,9 +215,9 @@ void ShareAudioSetHeld(bool held)
 	g_heldUntil.store(held ? GetTickCount64() + kHoldMs : 0);
 }
 
-void ShareAudioRegisterHold()
+bool ShareAudioHeld()
 {
-	proc_handler_add(obs_get_proc_handler(), "void replaykit_share_audio_held(out bool held)", HeldProc, nullptr);
+	return Held();
 }
 
 } // namespace rk

@@ -89,6 +89,9 @@ namespace ReplayKitHelper
                             SendSetIconDot(norm["appIconRecordingDot"]?.Value<bool>() ?? true);
                         }
                         catch (Exception ex) { Log.Write("IPC SETICON on connect: " + ex.Message); }
+                        // the plugin reads the settings and the unread count only when told, and a plugin that just (re)loaded or a helper that just started has missed every change before
+                        SendPollSettings();
+                        SendNotificationsChanged();
 
                         // first connect of this helper: run the update check, then open the first-run wizard if nothing is waiting to install. the dock-side triggers only fire once the obs window is on screen, so a launch straight to the tray would otherwise show neither.
                         if (!_setupWizardKicked)
@@ -117,6 +120,7 @@ namespace ReplayKitHelper
                     obsLocale = null;
                     lock (WriteLock) { _stream = null; _writer = null; }
                     lock (Server.State.IpcLock) Server.State.IpcClientConnected = false;
+                    ClipBuffer.ForgetDiskState();
                 }
                 if (!_stop && !Server.State.Shutdown) Thread.Sleep(1000);
             }
@@ -277,6 +281,9 @@ namespace ReplayKitHelper
         // a command of the local command channel for the plugin: an id to match its answer to, the name without the plugin prefix, and the arguments as one line of json
         public static bool SendSdk(int id, string command, string argsJson) => TryWrite("SDK " + id + " " + command + " " + argsJson);
 
+        // one request of ObsRequest, answered on /obs/reply
+        public static bool SendObsRequest(string id, string requestType, string requestJson) => TryWrite("OBSREQ " + id + " " + requestType + " " + requestJson);
+
         // one of the obs menu bar menus (File, Edit, ...) by its position, dropped open at the pointer
         public static void SendObsMenu(int index) { if (index >= 0 && index < 20) TryWrite("OBSMENU " + index); }
 
@@ -291,10 +298,10 @@ namespace ReplayKitHelper
         // a pick of the quick action menu, for the view it was made in; both parts are checked by the route before they get here
         public static bool SendQuickAction(string view, string id) => TryWrite("QUICKACTION " + view + " " + id);
 
-        // whether discord streams something else with its sound, which the plugin answers the lua monitoring sync with (DiscordStreamWorker)
+        // whether discord streams something else with its sound, which the plugin keeps desktop audio unmonitored for (DiscordStreamWorker)
         public static bool SendShareAudioHold(bool held) => TryWrite("SHAREAUDIOHOLD " + (held ? "1" : "0"));
 
-        // the plugin groups WASD Overlay + Mouse Overlay of the current scene into Group, which obs-websocket cannot do
+        // the plugin groups WASD Overlay + Mouse Overlay of the current scene into Group, which no request of ObsRequest can do
         public static void SendGroupInputOverlay() => TryWrite("GROUPINPUTOVERLAY");
 
         // opens the plugin-owned first-run setup wizard window. fired once per helper process on the first pipe connect when setupWizardPending is set (works even if obs launched to the tray), and again by the dock once the obs window is on screen -- ShowSetup is a singleton so the second call just focuses it.
@@ -345,8 +352,11 @@ namespace ReplayKitHelper
         // the replaykit settings were just saved: an obs settings dialog the plugin has kept built and parked holds what obs held before, so the plugin drops it
         public static void SendSettingsApplied() => TryWrite("SETTINGSAPPLIED");
 
-        // the plugin reads the theme colours on a one second poll; this makes it read them now, for a theme being previewed
+        // makes the plugin read the settings now; sent on every settings write, every change of an update badge and every pipe connect, since the plugin has no timer of its own for them
         public static void SendPollSettings() => TryWrite("POLLSETTINGS");
+
+        // makes the plugin read the unread count of the bell now; sent on every write of the notifications and every pipe connect
+        public static void SendNotificationsChanged() => TryWrite("NOTIFY");
 
         // asks the plugin to draw a themed confirm over the whole dimmed obs window (a cef dock cannot paint past its own panel). the plugin runs the follow-up action itself on ok, so nothing comes back. kind is one short token, letters and dashes only.
         public static void SendUiConfirm(string kind) { if (!string.IsNullOrEmpty(kind)) TryWrite("CONFIRM " + kind); }

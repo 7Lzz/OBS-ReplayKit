@@ -12,7 +12,7 @@ using ReplayKitShared;
 
 namespace ReplayKitHelper
 {
-    // whether discord streams something other than the share window with its sound: a whole screen or another window already carries the sound obs monitors for the share window, so viewers would hear it twice. discord has no api for its own go live, so this reads the voice engine log every discord client keeps in its logs folder, which writes each stream start and stop, the process whose sound the stream takes (pid 1 for a whole screen) and the stats of the stream every 10 s; while that holds, the plugin answers the lua monitoring sync that the share audio is held and desktop audio is not monitored. anything this cannot read or no longer sees holds nothing, which keeps share preview as it was
+    // whether discord streams something other than the share window with its sound: a whole screen or another window already carries the sound obs monitors for the share window, so viewers would hear it twice. discord has no api for its own go live, so this reads the voice engine log every discord client keeps in its logs folder, which writes each stream start and stop, the process whose sound the stream takes (pid 1 for a whole screen) and the stats of the stream every 10 s; while that holds, the plugin keeps desktop audio unmonitored. anything this cannot read or no longer sees holds nothing, which keeps share preview as it was
     internal static class DiscordStreamWorker
     {
         private const int PollMs = 2000;
@@ -60,7 +60,7 @@ namespace ReplayKitHelper
             new Thread(Loop) { Name = "discord-stream", IsBackground = true }.Start();
         }
 
-        // whether the share audio is held now, read by the monitoring the helper repairs so it agrees with the lua sync
+        // whether the share audio is held now, read by the monitoring the helper repairs so it agrees with the plugin
         public static bool Held
         {
             get { lock (Gate) return held; }

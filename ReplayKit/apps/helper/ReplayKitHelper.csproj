@@ -6,13 +6,13 @@
     <TargetFramework>net48</TargetFramework>
     <LangVersion>latest</LangVersion>
     <RootNamespace>ReplayKitHelper</RootNamespace>
-    <!-- must stay OBSReplayKit: helper_bootstrap.lua launches scripts\helper\OBSReplayKit.exe by that exact name -->
+    <!-- must stay OBSReplayKit: the plugin (helper_launcher.cpp) launches scripts\helper\OBSReplayKit.exe by that exact name -->
     <AssemblyName>OBSReplayKit</AssemblyName>
     <Nullable>disable</Nullable>
     <!-- runs at whatever privilege obs itself launched at; never elevate. this is also why the http listener is a raw TcpListener, not HttpListener/http.sys, which needs a urlacl reservation or admin rights to bind even loopback-only. -->
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <!-- embed the win32 icon so the exe itself carries it. the update window runs as this exe directly (the update-window mode), so its taskbar button and jump list need an icon even before form.Icon applies. -->
-    <ApplicationIcon>..\..\lua\helper\obs-replaykit.ico</ApplicationIcon>
+    <ApplicationIcon>obs-replaykit.ico</ApplicationIcon>
     <Platforms>x64</Platforms>
     <PlatformTarget>x64</PlatformTarget>
     <!-- Product metadata for the helper. -->
@@ -75,7 +75,6 @@
     <Compile Include="..\..\shared\ShellLaunch.cs" Link="ShellLaunch.cs" />
     <Compile Include="..\..\shared\ClipFolder.cs" Link="ClipFolder.cs" />
     <Compile Include="..\..\shared\ToastIdentity.cs" Link="ToastIdentity.cs" />
-    <Compile Include="..\..\shared\ObsWebSocketPort.cs" Link="ObsWebSocketPort.cs" />
     <Compile Include="..\..\shared\VbCableDriver.cs" Link="VbCableDriver.cs" />
     <Compile Include="..\..\shared\AudioEndpoints.cs" Link="AudioEndpoints.cs" />
   </ItemGroup>

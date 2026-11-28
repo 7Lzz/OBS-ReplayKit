@@ -5739,53 +5739,13 @@
     "context": "Message the helper shows when an action fails or finishes in a ReplayKit window, sent by the background helper.",
     "text": "OBS is closing."
   },
+  "helper.obsDidNotAnswer": {
+    "context": "Message the helper shows when an action fails because OBS did not answer a request in time, sent by the background helper.",
+    "text": "OBS did not answer in time."
+  },
   "helper.obsIsRestarting": {
     "context": "Message the helper shows when an action fails or finishes in a ReplayKit window, sent by the background helper.",
     "text": "OBS is restarting."
-  },
-  "helper.obsWebsocketAuthenticationDataIsMissing": {
-    "context": "Error message in a ReplayKit window, sent by the background helper.",
-    "text": "OBS websocket authentication data is missing."
-  },
-  "helper.obsWebsocketClosedTheConnection": {
-    "context": "Error message in a ReplayKit window, sent by the background helper.",
-    "text": "OBS websocket closed the connection."
-  },
-  "helper.obsWebsocketConfigIsNotValid": {
-    "context": "Message the helper shows when an action fails or finishes in a ReplayKit window, sent by the background helper.",
-    "text": "OBS websocket config is not valid JSON."
-  },
-  "helper.obsWebsocketConfigNotFound": {
-    "context": "Message the helper shows when an action fails or finishes in a ReplayKit window, sent by the background helper.",
-    "text": "OBS websocket config not found."
-  },
-  "helper.obsWebsocketDidNotIdentifyThis": {
-    "context": "Error message in a ReplayKit window, sent by the background helper.",
-    "text": "OBS websocket did not identify this client."
-  },
-  "helper.obsWebsocketDidNotSendHello": {
-    "context": "Error message in a ReplayKit window, sent by the background helper.",
-    "text": "OBS websocket did not send Hello."
-  },
-  "helper.obsWebsocketIsNotReachable": {
-    "context": "Error message in a ReplayKit window, sent by the background helper.",
-    "text": "OBS websocket is not reachable."
-  },
-  "helper.obsWebsocketMessageIsInvalidOr": {
-    "context": "Error message in a ReplayKit window, sent by the background helper.",
-    "text": "OBS websocket message is invalid or too large."
-  },
-  "helper.obsWebsocketPasswordIsMissing": {
-    "context": "Message the helper shows when an action fails or finishes in a ReplayKit window, sent by the background helper.",
-    "text": "OBS websocket password is missing."
-  },
-  "helper.obsWebsocketPortIsInvalid": {
-    "context": "Message the helper shows when an action fails or finishes in a ReplayKit window, sent by the background helper.",
-    "text": "OBS websocket port is invalid."
-  },
-  "helper.obsWebsocketServerIsDisabled": {
-    "context": "Message the helper shows when an action fails or finishes in a ReplayKit window, sent by the background helper.",
-    "text": "OBS websocket server is disabled."
   },
   "helper.obsWillRestartWithAClean": {
     "context": "Message the helper shows when an action fails or finishes in a ReplayKit window, sent by the background helper.",
@@ -5986,14 +5946,6 @@
   "lua.hotkeyUploadLatestClip": {
     "context": "Name of a hotkey in the OBS Settings > Hotkeys list.",
     "text": "Upload Latest Clip to Streamable"
-  },
-  "lua.scriptAbout": {
-    "context": "Description of the ReplayKit script in the OBS Tools > Scripts window.",
-    "text": "Single OBS-facing script for the ReplayKit setup. It starts clipping capture, keeps OBS monitoring off, switches capture sources for fullscreen games, opens and parks the Discord projector, plays the clip-saved sound, handles OBS elevation, syncs recording hotkeys, and launches the ReplayKit helper."
-  },
-  "lua.scriptLayout": {
-    "context": "Description of the ReplayKit script in the OBS Tools > Scripts window.",
-    "text": "The implementation stays split into internal feature files so the OBS Scripts panel stays clean without turning the codebase into one giant file."
   },
   "lua.toolsOpenClipFolder": {
     "context": "Item in the OBS Tools menu.",
@@ -9877,21 +9829,9 @@
     "context": "Text in the installer window.",
     "text": "Enable Screenshare for Discord"
   },
-  "setup.enableObsWebsocket": {
-    "context": "Title or description of an installer step in the installer and uninstaller.",
-    "text": "Enable OBS WebSocket"
-  },
-  "setup.enablesTheLocalObsWebsocket": {
-    "context": "Title or description of an installer step in the installer and uninstaller.",
-    "text": "Enables the local OBS WebSocket."
-  },
   "setup.everythingElseIsSetUpIn": {
     "context": "Text in the installer window.",
     "text": "Everything else is set up in the wizard that opens the first time OBS launches."
-  },
-  "setup.existingObsWebsocketConfigurationCouldNot": {
-    "context": "Error message shown when an installer step fails in the installer and uninstaller.",
-    "text": "Existing OBS websocket configuration could not be read; it was not changed."
   },
   "setup.ffmpegAndFfprobe": {
     "context": "Title or description of an installer step in the installer and uninstaller.",

@@ -2,6 +2,7 @@
 #include "prelude.hpp"
 #include "shell/shell_obs_settings.hpp"
 
+#include "app/settings_poll.hpp"
 #include "core/main_window.hpp"
 #include "core/state.hpp"
 #include "core/theme.hpp"
@@ -75,6 +76,8 @@ protected:
 			g_obsSettingsPainted = false;
 			g_obsSettingsDialog = nullptr;
 			ObsSettingsGuard(false);
+			// the dialog sits inside the window, so its close moves no focus between windows for the settings read to follow
+			RequestFullSettingsSync();
 			if (g_shellView == ShellView::ObsSettings)
 				ShellActivate(ShellView::Home);
 		});

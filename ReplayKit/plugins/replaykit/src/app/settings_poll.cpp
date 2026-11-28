@@ -1,11 +1,13 @@
-// applies the one second settings poll from the helper
+// reads the settings from the helper whenever it pushes a change, and applies them
 #include "prelude.hpp"
 #include "app/settings_poll.hpp"
 
 #include <QApplication>
+#include <optional>
 
 #include "app/always_on_top.hpp"
 #include "app/capture_context.hpp"
+#include "capture/capture_switch.hpp"
 #include "app/clip_buffer.hpp"
 #include "app/sdk_commands.hpp"
 #include "chrome/title_keybind_badge.hpp"
@@ -13,11 +15,13 @@
 #include "core/dev_log.hpp"
 #include "core/helper_client.hpp"
 #include "core/json_lite.hpp"
+#include "core/native_hotkeys.hpp"
 #include "core/open_clips_hotkey.hpp"
 #include "core/state.hpp"
 #include "core/theme.hpp"
 #include "core/ui_font.hpp"
 #include "core/window_state.hpp"
+#include "notify/clip_sound.hpp"
 #include "notify/clip_toast.hpp"
 #include "notify/notify_button.hpp"
 #include "notify/notify_panel.hpp"
@@ -26,6 +30,7 @@
 #include "shell/shell.hpp"
 #include "shell/shell_state.hpp"
 #include "shell/shell_layout.hpp"
+#include "share/share_monitoring.hpp"
 #include "shell/shell_sleep.hpp"
 #include "windows/setup_window.hpp"
 
@@ -34,7 +39,9 @@ namespace rk {
 namespace {
 
 bool g_openClipsHotkeyRequestInFlight = false;
-// the full settings read obs over its websocket about ten times, so the poll takes the saved file alone and asks for the full read only when obs may hold something newer: at the start, after the obs settings dialog closes, after a profile change
+// a read asked for while one was in flight, which runs once that one has answered so nothing the helper pushed is missed
+bool g_readAgain = false;
+// the full settings ask obs about ten things through the plugin, so a read takes the saved file alone and asks for the full read only when obs may hold something newer: at the start, after the obs settings dialog closes, after a profile change
 bool g_fullSyncDue = true;
 bool g_obsSettingsWasOpen = false;
 
@@ -54,7 +61,7 @@ bool g_startMinLastObs = false;
 // set from the moment the switch was flipped in obs until the helper shows the same value
 bool g_startMinPushing = false;
 
-// the native chrome, menus and bells follow the appearance theme: menuColors comes back on the same settings poll, so this costs no extra request and lands within a second of a theme change
+// the native chrome, menus and bells follow the appearance theme: menuColors comes back on the same settings read, so this costs no extra request and lands as soon as the helper pushes the change
 void ApplyNotifyThemeColors(const std::string &settingsBody)
 {
 	std::string menuColors = ExtractJsonObjectField(settingsBody, "menuColors");
@@ -183,21 +190,49 @@ void SyncStartMinimized(const std::string &settingsBody)
 		WriteObsStartMinimized(config, setting);
 }
 
+// obs asks before it exits unless replaykit turned that off; set only when the setting changes, so a flip made in the settings of obs holds until replaykit changes it again
+std::optional<bool> g_closeWarningOff;
+
+void SyncCloseWarning(const std::string &settingsBody)
+{
+	const auto off = JsonBoolIfPresent(settingsBody, "disableObsCloseWarning");
+	if (!off || off == g_closeWarningOff)
+		return;
+	g_closeWarningOff = off;
+	for (config_t *config : {obs_frontend_get_user_config(), obs_frontend_get_app_config()})
+		if (config)
+			config_set_bool(config, "General", "ConfirmOnExit", !*off);
+}
+
 } // namespace
 
 void RequestFullSettingsSync()
 {
 	g_fullSyncDue = true;
+	g_obsSettingsWasOpen = ObsSettingsOpen();
+	PollHelperSettings();
+}
+
+void SettingsPollStart()
+{
+	// the settings of obs can only change while its dialog is open, and closing it hands the focus back to a window, so the full read follows that instead of a timer
+	QObject::connect(qApp, &QGuiApplication::focusWindowChanged, g_callbacks, [](QWindow *) {
+		const bool open = ObsSettingsOpen();
+		const bool closed = g_obsSettingsWasOpen && !open;
+		g_obsSettingsWasOpen = open;
+		if (closed)
+			RequestFullSettingsSync();
+	});
+	PollHelperSettings();
 }
 
 void PollHelperSettings()
 {
-	if (g_openClipsHotkeyRequestInFlight)
+	if (g_openClipsHotkeyRequestInFlight) {
+		g_readAgain = true;
 		return;
-	const bool open = ObsSettingsOpen();
-	if (g_obsSettingsWasOpen && !open)
-		g_fullSyncDue = true;
-	g_obsSettingsWasOpen = open;
+	}
+	g_readAgain = false;
 	const bool full = g_fullSyncDue;
 	g_fullSyncDue = false;
 	g_openClipsHotkeyRequestInFlight = true;
@@ -206,9 +241,11 @@ void PollHelperSettings()
 		std::string settingsBody = HttpRequest("GET", path.c_str(), nullptr, 3000);
 		QMetaObject::invokeMethod(g_callbacks, [settingsBody, full]() {
 			g_openClipsHotkeyRequestInFlight = false;
-			// a helper that did not answer is asked for the full read again next time
+			// a helper that did not answer is asked for the full read again on its next push, which it sends when it connects to the pipe
 			if (full && settingsBody.empty())
 				g_fullSyncDue = true;
+			if (g_readAgain)
+				QTimer::singleShot(0, g_callbacks, []() { PollHelperSettings(); });
 			// the settings of the helper are taken only as it sends them; one it did not send leaves the switch as it was
 			if (const auto closeToTray = JsonBoolIfPresent(settingsBody, "closeToTray"))
 				g_closeToTray = *closeToTray;
@@ -225,8 +262,10 @@ void PollHelperSettings()
 			if (const auto recognition = JsonBoolIfPresent(settingsBody, "gameRecognition"))
 				CaptureContextSetRecognition(*recognition);
 			SyncStartMinimized(settingsBody);
+			SyncCloseWarning(settingsBody);
 			AlwaysOnTopApplySettings(settingsBody);
 			RegisterOpenClipsHotkey(settingsBody);
+			NativeHotkeysApplySettings(settingsBody);
 			ApplyNotifyThemeColors(settingsBody);
 			// what is sized to its text measures again, then every widget paints with the new family
 			if (UiFontApplySettings(settingsBody)) {
@@ -236,11 +275,14 @@ void PollHelperSettings()
 					w->update();
 			}
 			ClipToastApplySettings(settingsBody);
+			ClipSoundApplySettings(settingsBody);
 			RefreshTitleKeybindBadges(settingsBody);
 			ShellApplySettings(settingsBody);
 			ShellSleepApplySettings(settingsBody);
 			ClipBufferApplySettings(settingsBody);
 			FocusCardApplySettings(settingsBody);
+			ShareMonitoringApplySettings(settingsBody);
+			CaptureSwitchApplySettings(settingsBody);
 		}, Qt::QueuedConnection);
 	});
 }

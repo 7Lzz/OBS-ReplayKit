@@ -149,7 +149,7 @@ namespace ReplayKitHelper
         {
             var found = new List<string>();
             obsAnswered = false;
-            var reply = ObsWebSocket.InvokeRequest("GetInputPropertiesListPropertyItems", new JObject { ["inputName"] = SettingsLiveApply.DesktopAudioInputName, ["propertyName"] = ActiveSessionProperty }, 2500);
+            var reply = ObsRequest.Invoke("GetInputPropertiesListPropertyItems", new JObject { ["inputName"] = SettingsLiveApply.DesktopAudioInputName, ["propertyName"] = ActiveSessionProperty }, 2500);
             if (!reply.Ok) return found;
             obsAnswered = true;
             foreach (var item in reply.Data?["propertyItems"] as JArray ?? new JArray())

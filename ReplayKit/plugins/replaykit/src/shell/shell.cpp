@@ -96,9 +96,36 @@ void ShellTick()
 		ShellAccountPoll();
 }
 
+// the tick stopped while the window is hidden, which showing it again starts; ShellStop clears it so nothing starts the tick after
+bool g_shellTickHeld = false;
+
 } // namespace
 
-// keybind chips, clip length and theme colours arrive on the 1s settings poll
+void ShellSetWindowShown(bool shown)
+{
+	if (!g_shellTimer)
+		return;
+	// the title bar counts the recording time on the tick, so a recording keeps it going
+	const bool wanted = shown || obs_frontend_recording_active();
+	if (!wanted) {
+		if (g_shellTimer->isActive()) {
+			g_shellTimer->stop();
+			g_shellTickHeld = true;
+		}
+		return;
+	}
+	if (!g_shellTickHeld)
+		return;
+	g_shellTickHeld = false;
+	g_shellTimer->start();
+	// what the tick would have asked the helper for while it was stopped
+	PollSharePreview();
+	ShellStoragePoll();
+	ShellAccountPoll();
+	ShellTick();
+}
+
+// keybind chips, clip length and theme colours arrive on the settings read
 void ShellApplySettings(const std::string &settingsBody)
 {
 	if (!g_shellOn || !g_shellTitle)
@@ -192,6 +219,7 @@ void ShellStop()
 {
 	if (g_shellTitle)
 		g_shellTitle->RestoreTitle();
+	g_shellTickHeld = false;
 	if (g_shellTimer)
 		g_shellTimer->stop();
 	if (g_shellFrameFilter) {

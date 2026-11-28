@@ -131,12 +131,12 @@ namespace ReplayKitHelper
                         && s["discord_output_mode"]?.Value<string>() == "projector"
                         && (s["discord_projector_enabled"]?.Value<bool>() ?? false);
 
-                    var rbRes = ObsWebSocket.InvokeRequest("GetReplayBufferStatus");
-                    var recRes = ObsWebSocket.InvokeRequest("GetRecordStatus");
+                    var rbRes = ObsRequest.Invoke("GetReplayBufferStatus");
+                    var recRes = ObsRequest.Invoke("GetRecordStatus");
                     // mute state of the three inputs the Settings > Audio switches drive; null when an input is missing from the scene
-                    var micMute = ObsWebSocket.InvokeRequest("GetInputMute", new JObject { ["inputName"] = SettingsLiveApply.MicInputName }, 1500);
-                    var desktopMute = ObsWebSocket.InvokeRequest("GetInputMute", new JObject { ["inputName"] = SettingsLiveApply.DesktopAudioInputName }, 1500);
-                    var discordMute = ObsWebSocket.InvokeRequest("GetInputMute", new JObject { ["inputName"] = SettingsLiveApply.DiscordAudioInputName }, 1500);
+                    var micMute = ObsRequest.Invoke("GetInputMute", new JObject { ["inputName"] = SettingsLiveApply.MicInputName }, 1500);
+                    var desktopMute = ObsRequest.Invoke("GetInputMute", new JObject { ["inputName"] = SettingsLiveApply.DesktopAudioInputName }, 1500);
+                    var discordMute = ObsRequest.Invoke("GetInputMute", new JObject { ["inputName"] = SettingsLiveApply.DiscordAudioInputName }, 1500);
                     HttpResponse.SendJson(stream, 200, new JObject
                     {
                         ["micMuted"] = micMute.Ok ? micMute.Data?["inputMuted"]?.Value<bool>() : (bool?)null,
@@ -148,7 +148,7 @@ namespace ReplayKitHelper
                         ["replayBufferActive"] = rbRes.Ok ? rbRes.Data?["outputActive"]?.Value<bool>() : (bool?)null,
                         ["recordActive"] = recRes.Ok ? recRes.Data?["outputActive"]?.Value<bool>() : (bool?)null,
                         ["recordMs"] = recRes.Ok ? recRes.Data?["outputDuration"]?.Value<long?>() : (long?)null,
-                        // the disk buffer answers the replay buffer status from the plugin without obs-websocket, so only the requests obs itself answers say whether it can be reached
+                        // the disk buffer answers the replay buffer status from the plugin without asking obs, so only the requests obs itself answers say whether it can be reached
                         ["obsConnected"] = recRes.Ok || micMute.Ok || desktopMute.Ok || discordMute.Ok,
                     });
                 }

@@ -86,7 +86,7 @@ namespace ReplayKitHelper
             return obj;
         }
 
-        internal static JObject ObsResultToJson(ObsWebSocketResult r)
+        internal static JObject ObsResultToJson(ObsResult r)
         {
             var obj = new JObject { ["ok"] = r.Ok };
             if (r.Unavailable) obj["unavailable"] = true;
@@ -133,6 +133,7 @@ namespace ReplayKitHelper
         internal static readonly Func<RouteRequest, bool?>[] Handlers =
         {
             GameRoutes.Handle,
+            ObsRoutes.Handle,
             PageRoutes.Handle,
             RecordingRoutes.Handle,
             SettingsRoutes.Handle,

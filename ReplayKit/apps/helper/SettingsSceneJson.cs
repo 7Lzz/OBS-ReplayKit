@@ -229,7 +229,7 @@ namespace ReplayKitHelper
         {
             string scenesRoot = Constants.OBS_SCENES_DIR;
             string collectionName = "Untitled";
-            var list = ObsWebSocket.InvokeRequest("GetSceneCollectionList", null, 3000);
+            var list = ObsRequest.Invoke("GetSceneCollectionList", null, 3000);
             if (list.Ok && !string.IsNullOrEmpty(list.Data?["currentSceneCollectionName"]?.Value<string>()))
                 collectionName = list.Data["currentSceneCollectionName"].Value<string>();
             if (string.IsNullOrWhiteSpace(collectionName))

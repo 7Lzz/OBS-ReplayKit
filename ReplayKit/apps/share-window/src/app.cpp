@@ -346,6 +346,14 @@ void ShareApp::Tick(bool frameSignal)
 			video.Play(now);
 			cardShownAt = now;
 		}
+		// the card shows only while obs is away, so its sound is decoded as it comes up rather than held in memory the whole time obs runs
+		std::shared_ptr<CardSound> sound;
+		if (!live && !soundPath.empty()) {
+			sound = std::make_shared<CardSound>();
+			if (!LoadCardSound(soundPath, *sound))
+				sound.reset();
+		}
+		audio.SetCardSound(sound, soundVolume);
 	}
 	audio.SetCardShowing(!live);
 
@@ -549,7 +557,9 @@ std::string ShareApp::Execute(const std::string &line)
 		if (!LoadCardSound(path, *sound))
 			return Fail("the sound could not be read");
 		soundPath = path;
-		audio.SetCardSound(sound, float(volume) / 100.0f);
+		soundVolume = float(volume) / 100.0f;
+		// the decoded sound is held only while the card shows, see Tick
+		audio.SetCardSound(live ? nullptr : sound, soundVolume);
 		return Ok();
 	}
 	if (verb == "QUIT") {

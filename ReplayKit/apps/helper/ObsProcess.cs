@@ -126,12 +126,12 @@ namespace ReplayKitHelper
                     Log.Write(reason + ": native plugin did not acknowledge ALLOWCLOSE.");
             }
             catch (Exception ex) { Log.Write(reason + ": close acknowledgement failed: " + ex.Message); }
-            ObsWebSocket.DisconnectForObsClose();
+            ObsRequest.MarkObsClosing();
         }
 
         private static void ReportCloseFailure(string reason, bool notify)
         {
-            ObsWebSocket.AllowConnect();
+            ObsRequest.AllowRequests();
             string message = Locales.Message("helper.obsDidNotCloseSafelyReplaykit");
             Log.Write(reason + ": " + message);
             if (notify) Notifications.Add("warning", "obs-close-timeout", Locales.Message("helper.obsCouldNotCloseSafely"), message);

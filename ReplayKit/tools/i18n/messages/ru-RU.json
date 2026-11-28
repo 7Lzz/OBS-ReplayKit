@@ -5740,53 +5740,13 @@
     "source": "2b2976e894c7b252",
     "text": "OBS закрывается."
   },
+  "helper.obsDidNotAnswer": {
+    "source": "72846df69e4d4c09",
+    "text": "OBS не ответил вовремя."
+  },
   "helper.obsIsRestarting": {
     "source": "ce94acd699eee3b2",
     "text": "OBS перезапускается."
-  },
-  "helper.obsWebsocketAuthenticationDataIsMissing": {
-    "source": "ad88371c6f38b712",
-    "text": "Отсутствуют данные аутентификации OBS websocket."
-  },
-  "helper.obsWebsocketClosedTheConnection": {
-    "source": "b6d10dfaa8ec8557",
-    "text": "OBS websocket закрыл соединение."
-  },
-  "helper.obsWebsocketConfigIsNotValid": {
-    "source": "63cf53a74f0c9f73",
-    "text": "Конфигурация OBS websocket не является корректным JSON."
-  },
-  "helper.obsWebsocketConfigNotFound": {
-    "source": "810d8be8f82ab134",
-    "text": "Конфигурация OBS websocket не найдена."
-  },
-  "helper.obsWebsocketDidNotIdentifyThis": {
-    "source": "0d39b22022def615",
-    "text": "OBS websocket не распознал этот клиент."
-  },
-  "helper.obsWebsocketDidNotSendHello": {
-    "source": "8e7f8a034a0b80c9",
-    "text": "OBS websocket не отправил Hello."
-  },
-  "helper.obsWebsocketIsNotReachable": {
-    "source": "21e605926bb4690f",
-    "text": "OBS websocket недоступен."
-  },
-  "helper.obsWebsocketMessageIsInvalidOr": {
-    "source": "ef3a9ab8b463cf1e",
-    "text": "Сообщение OBS websocket некорректно или слишком большое."
-  },
-  "helper.obsWebsocketPasswordIsMissing": {
-    "source": "ca3108cd1ae8367a",
-    "text": "Отсутствует пароль OBS websocket."
-  },
-  "helper.obsWebsocketPortIsInvalid": {
-    "source": "926972e9d41ca85b",
-    "text": "Некорректный порт OBS websocket."
-  },
-  "helper.obsWebsocketServerIsDisabled": {
-    "source": "79a751d8c6886abc",
-    "text": "Сервер OBS websocket отключён."
   },
   "helper.obsWillRestartWithAClean": {
     "source": "a9c589e48111d22f",
@@ -5987,14 +5947,6 @@
   "lua.hotkeyUploadLatestClip": {
     "source": "df8745d476ae558d",
     "text": "Загрузить последний клип на Streamable"
-  },
-  "lua.scriptAbout": {
-    "source": "207194ba04314859",
-    "text": "Единственный скрипт ReplayKit, который видит OBS. Он запускает захват для клипов, держит мониторинг OBS выключенным, переключает источники захвата для полноэкранных игр, открывает и размещает проектор Discord, проигрывает звук сохранения клипа, управляет правами OBS, синхронизирует горячие клавиши записи и запускает помощник ReplayKit."
-  },
-  "lua.scriptLayout": {
-    "source": "78887b020556073a",
-    "text": "Код разделён на внутренние файлы по функциям, чтобы окно скриптов OBS оставалось аккуратным и всё не превращалось в один огромный файл."
   },
   "lua.toolsOpenClipFolder": {
     "source": "6e4124d40abd2bef",
@@ -9882,21 +9834,9 @@
     "source": "2c3f50eac8b41589",
     "text": "Включить демонстрацию экрана для Discord"
   },
-  "setup.enableObsWebsocket": {
-    "source": "850789894cbc103d",
-    "text": "Включить OBS WebSocket"
-  },
-  "setup.enablesTheLocalObsWebsocket": {
-    "source": "e227276dc144d45d",
-    "text": "Включает локальный OBS WebSocket."
-  },
   "setup.everythingElseIsSetUpIn": {
     "source": "6f70e3680891e028",
     "text": "Всё остальное настраивается в мастере, который открывается при первом запуске OBS."
-  },
-  "setup.existingObsWebsocketConfigurationCouldNot": {
-    "source": "31761a1ac2d37234",
-    "text": "Существующую конфигурацию websocket OBS не удалось прочитать; она не изменена."
   },
   "setup.ffmpegAndFfprobe": {
     "source": "9f76541248f43be2",

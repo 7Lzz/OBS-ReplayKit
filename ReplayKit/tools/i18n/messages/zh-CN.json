@@ -5737,53 +5737,13 @@
     "source": "2b2976e894c7b252",
     "text": "OBS 正在关闭。"
   },
+  "helper.obsDidNotAnswer": {
+    "source": "72846df69e4d4c09",
+    "text": "OBS 未及时响应。"
+  },
   "helper.obsIsRestarting": {
     "source": "ce94acd699eee3b2",
     "text": "OBS 正在重启。"
-  },
-  "helper.obsWebsocketAuthenticationDataIsMissing": {
-    "source": "ad88371c6f38b712",
-    "text": "OBS websocket 认证数据缺失。"
-  },
-  "helper.obsWebsocketClosedTheConnection": {
-    "source": "b6d10dfaa8ec8557",
-    "text": "OBS websocket 关闭了连接。"
-  },
-  "helper.obsWebsocketConfigIsNotValid": {
-    "source": "63cf53a74f0c9f73",
-    "text": "OBS websocket 配置不是有效的 JSON。"
-  },
-  "helper.obsWebsocketConfigNotFound": {
-    "source": "810d8be8f82ab134",
-    "text": "未找到 OBS websocket 配置。"
-  },
-  "helper.obsWebsocketDidNotIdentifyThis": {
-    "source": "0d39b22022def615",
-    "text": "OBS websocket 未识别此客户端。"
-  },
-  "helper.obsWebsocketDidNotSendHello": {
-    "source": "8e7f8a034a0b80c9",
-    "text": "OBS websocket 未发送 Hello。"
-  },
-  "helper.obsWebsocketIsNotReachable": {
-    "source": "21e605926bb4690f",
-    "text": "无法连接到 OBS websocket。"
-  },
-  "helper.obsWebsocketMessageIsInvalidOr": {
-    "source": "ef3a9ab8b463cf1e",
-    "text": "OBS websocket 消息无效或过大。"
-  },
-  "helper.obsWebsocketPasswordIsMissing": {
-    "source": "ca3108cd1ae8367a",
-    "text": "OBS websocket 密码缺失。"
-  },
-  "helper.obsWebsocketPortIsInvalid": {
-    "source": "926972e9d41ca85b",
-    "text": "OBS websocket 端口无效。"
-  },
-  "helper.obsWebsocketServerIsDisabled": {
-    "source": "79a751d8c6886abc",
-    "text": "OBS websocket 服务器已禁用。"
   },
   "helper.obsWillRestartWithAClean": {
     "source": "a9c589e48111d22f",
@@ -5984,14 +5944,6 @@
   "lua.hotkeyUploadLatestClip": {
     "source": "df8745d476ae558d",
     "text": "将最新剪辑上传到 Streamable"
-  },
-  "lua.scriptAbout": {
-    "source": "207194ba04314859",
-    "text": "OBS 能看到的唯一一个 ReplayKit 脚本。它会启动剪辑采集、保持 OBS 监听关闭、为全屏游戏切换采集源、打开并安放 Discord 投影、播放剪辑保存提示音、处理 OBS 权限、同步录制快捷键，并启动 ReplayKit 助手。"
-  },
-  "lua.scriptLayout": {
-    "source": "78887b020556073a",
-    "text": "实现按功能拆分为多个内部文件，这样 OBS 脚本面板保持简洁，代码也不会挤在一个巨大的文件里。"
   },
   "lua.toolsOpenClipFolder": {
     "source": "6e4124d40abd2bef",
@@ -9873,21 +9825,9 @@
     "source": "2c3f50eac8b41589",
     "text": "为 Discord 启用屏幕共享"
   },
-  "setup.enableObsWebsocket": {
-    "source": "850789894cbc103d",
-    "text": "启用 OBS WebSocket"
-  },
-  "setup.enablesTheLocalObsWebsocket": {
-    "source": "e227276dc144d45d",
-    "text": "启用本地 OBS WebSocket。"
-  },
   "setup.everythingElseIsSetUpIn": {
     "source": "6f70e3680891e028",
     "text": "其他设置会在 OBS 首次启动时打开的向导中完成。"
-  },
-  "setup.existingObsWebsocketConfigurationCouldNot": {
-    "source": "31761a1ac2d37234",
-    "text": "无法读取现有的 OBS WebSocket 配置；未作更改。"
   },
   "setup.ffmpegAndFfprobe": {
     "source": "9f76541248f43be2",

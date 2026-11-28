@@ -16,6 +16,7 @@ namespace ReplayKitSetup
         private const string TracksStep = "separate-audio-tracks-v1";
         private const string NoiseStep = "mic-noise-suppression-v1";
         private const string OpenClipsKeyStep = "open-clips-alt-z-v1";
+        private const string WebSocketOffStep = "obs-websocket-server-off-v1";
 
         private const string MicSourceName = OverlayScene.MicSourceName;
         private const string NoiseFilterName = OverlayScene.MicNoiseFilterName;
@@ -40,6 +41,7 @@ namespace ReplayKitSetup
                 (TracksStep, "separate audio tracks on", EnableSeparateAudioTracks),
                 (NoiseStep, "mic noise suppression on", EnableMicNoiseSuppression),
                 (OpenClipsKeyStep, "open clips hotkey alt + z", SetOpenClipsHotkey),
+                (WebSocketOffStep, "obs-websocket server off", () => WebSocketConfig.TurnServerOff(log)),
             };
             foreach (var step in steps)
             {

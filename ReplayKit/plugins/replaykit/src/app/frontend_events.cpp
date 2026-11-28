@@ -11,16 +11,20 @@
 
 #include "app/clip_buffer.hpp"
 #include "app/capture_context.hpp"
+#include "capture/capture_switch.hpp"
 #include "app/main_window_filter.hpp"
 #include "app/obs_menu.hpp"
+#include "app/obs_requests.hpp"
 #include "app/settings_poll.hpp"
 #include "app/single_instance.hpp"
+#include "app/tools_actions.hpp"
 #include "chrome/caption_track_filter.hpp"
 #include "chrome/title_keybind_badge.hpp"
 #include "core/app_icon.hpp"
 #include "core/async.hpp"
 #include "core/cef_host.hpp"
 #include "core/helper_client.hpp"
+#include "core/helper_launcher.hpp"
 #include "core/ipc_pipe.hpp"
 #include "core/json_lite.hpp"
 #include "core/main_window.hpp"
@@ -31,9 +35,11 @@
 #include "layout/ui_layout.hpp"
 #include "overlays/focus_card.hpp"
 #include "core/graphics_device.hpp"
+#include "notify/clip_sound.hpp"
 #include "notify/clip_toast.hpp"
 #include "notify/notify_button.hpp"
 #include "share/share_link.hpp"
+#include "share/share_monitoring.hpp"
 #include "notify/notify_panel.hpp"
 #include "ui/anchored_panel.hpp"
 #include "ui/popup_host.hpp"
@@ -114,6 +120,16 @@ void FileScreenshot(const QString &path, const QString &folderPath, int tries, q
 
 QTimer *g_notifyTimer = nullptr;
 NotifyTrackFilter *g_notifyTrackFilter = nullptr;
+// the notify and dock ticks stopped while the window is hidden, which showing it again starts; never set again once obs is closing
+bool g_hiddenHeld = false;
+bool g_exiting = false;
+
+// a slow re-position pass so a caption move no qt event covered (dpi change, a snap) still settles; the unread count comes from the helper, which says when it changes
+void NotifyTick()
+{
+	PositionAllNotifyButtons();
+	PositionAllTitleKeybindBadges();
+}
 
 // the helper finishes a file obs has just written (the silent discord track, the hevc tag); a helper that is down at that moment finds the clip on its next pass through the library
 void TellHelperFileSaved(const char *path, bool clip = false)
@@ -135,6 +151,8 @@ void TellHelperFileSaved(const char *path, bool clip = false)
 void OnFrontendEvent(enum obs_frontend_event event, void *)
 {
 	if (event == OBS_FRONTEND_EVENT_SCRIPTING_SHUTDOWN) {
+		g_exiting = true;
+		CaptureSwitchStop();
 		StopSingleInstanceWatch();
 		StopGraphicsWatch();
 		ShareLinkStop();
@@ -143,6 +161,8 @@ void OnFrontendEvent(enum obs_frontend_event event, void *)
 		return;
 	}
 	if (event == OBS_FRONTEND_EVENT_EXIT) {
+		g_exiting = true;
+		ObsRequestsStop();
 		StopSingleInstanceWatch();
 		CaptureContextStop();
 		CefCloseForShutdown();
@@ -150,8 +170,6 @@ void OnFrontendEvent(enum obs_frontend_event event, void *)
 		PrepareDocksForNextLaunch();
 		if (g_dockTweakTimer)
 			g_dockTweakTimer->stop();
-		if (g_openClipsHotkeyTimer)
-			g_openClipsHotkeyTimer->stop();
 		if (g_clipsGeoSaveTimer)
 			g_clipsGeoSaveTimer->stop();
 		if (g_obsGeoSaveTimer)
@@ -168,6 +186,7 @@ void OnFrontendEvent(enum obs_frontend_event event, void *)
 		if (g_mainWindow)
 			SaveWindowGeometry("obsMainWindow", g_mainWindow);
 		CloseCefWidgetsBeforeShutdown();
+		HelperLauncherStop();
 		return;
 	}
 
@@ -176,14 +195,18 @@ void OnFrontendEvent(enum obs_frontend_event event, void *)
 	if (event == OBS_FRONTEND_EVENT_SCENE_COLLECTION_CHANGED)
 		FocusCardEnsureScenes();
 	if (event == OBS_FRONTEND_EVENT_REPLAY_BUFFER_SAVED) {
+		ClipSoundPlay(ClipSound::ClipSaved);
 		char *path = obs_frontend_get_last_replay();
 		CaptureContextReplayFile(path ? path : "");
 		TellHelperFileSaved(path, true);
 		bfree(path);
 	}
-	if (event == OBS_FRONTEND_EVENT_RECORDING_STARTED)
+	if (event == OBS_FRONTEND_EVENT_RECORDING_STARTED) {
+		ClipSoundPlay(ClipSound::RecordingStarted);
 		ClipToastShow(ClipToastKind::RecordingStarted);
+	}
 	if (event == OBS_FRONTEND_EVENT_RECORDING_STOPPED) {
+		ClipSoundPlay(ClipSound::RecordingStopped);
 		ClipToastShow(ClipToastKind::RecordingStopped);
 		char *path = obs_frontend_get_last_recording();
 		TellHelperFileSaved(path);
@@ -210,7 +233,11 @@ void OnFrontendEvent(enum obs_frontend_event event, void *)
 	    event == OBS_FRONTEND_EVENT_REPLAY_BUFFER_STARTED || event == OBS_FRONTEND_EVENT_REPLAY_BUFFER_STOPPED ||
 	    event == OBS_FRONTEND_EVENT_STREAMING_STARTED || event == OBS_FRONTEND_EVENT_STREAMING_STOPPED ||
 	    event == OBS_FRONTEND_EVENT_VIRTUALCAM_STARTED || event == OBS_FRONTEND_EVENT_VIRTUALCAM_STOPPED) {
-		QMetaObject::invokeMethod(g_callbacks, []() { RefreshTrayIcon(); }, Qt::QueuedConnection);
+		QMetaObject::invokeMethod(g_callbacks, []() {
+			RefreshTrayIcon();
+			// the shell tick counts the recording time, so a recording keeps it going while the window is hidden
+			MainWindowShownChanged(g_mainWindow);
+		}, Qt::QueuedConnection);
 		return;
 	}
 
@@ -221,22 +248,24 @@ void OnFrontendEvent(enum obs_frontend_event event, void *)
 	ReportEncoders();
 	CaptureContextStart();
 	FocusCardStart();
+	ShareMonitoringStart();
+	CaptureSwitchStart();
+	ToolsActionsAddMenu();
+	// the clip buffer the settings ask for, in memory or on disk, starts once obs has finished loading
+	QMetaObject::invokeMethod(g_callbacks, []() { ClipBufferStart(); }, Qt::QueuedConnection);
 	PublishMainWindow();
 	InstallMainWindowCloseFilter();
 	StartSingleInstanceWatch();
 	// obs restores its saved dock state during init, so the dock half of the layout has to wait for this event; the chrome half already ran from obs_module_post_load and is simply re-asserted here
 	ApplyLayout();
-	// the browser dock is built well after FINISHED_LOADING (cef init) and obs keeps re-showing the native one / re-titling ours, so this runs forever on a slow tick. each call is a cheap findChildren + a couple of string compares.
+	// the browser dock is built well after FINISHED_LOADING (cef init) and obs keeps re-showing the native one / re-titling ours, so this runs on a slow tick while the window shows. each call is a cheap findChildren + a couple of string compares.
 	ApplyControlsDockTweaks();
 	if (!g_dockTweakTimer) {
 		g_dockTweakTimer = new QTimer(g_callbacks);
 		QObject::connect(g_dockTweakTimer, &QTimer::timeout, g_callbacks, []() { ApplyControlsDockTweaks(); });
 		g_dockTweakTimer->start(4000);
 	}
-	g_openClipsHotkeyTimer = new QTimer(g_callbacks);
-	QObject::connect(g_openClipsHotkeyTimer, &QTimer::timeout, g_callbacks, []() { PollHelperSettings(); });
-	g_openClipsHotkeyTimer->start(1000);
-	PollHelperSettings();
+	SettingsPollStart();
 
 	// the bell in obss own title bar. the Clips and Settings windows get theirs as they are created. the clean shell has its own title bar with the bell and keybind badges built in, so the caption overlays are only for the classic layout
 	if (g_shellOn) {
@@ -249,19 +278,41 @@ void OnFrontendEvent(enum obs_frontend_event event, void *)
 		g_notifyTrackFilter = new NotifyTrackFilter();
 		qApp->installNativeEventFilter(g_notifyTrackFilter);
 	}
-	// unread count, plus a slow re-position pass so a caption move no qt event covered (dpi change, a snap) still settles
 	g_notifyTimer = new QTimer(g_callbacks);
-	QObject::connect(g_notifyTimer, &QTimer::timeout, g_callbacks, []() {
-		PollNotificationCount();
-		PositionAllNotifyButtons();
-		PositionAllTitleKeybindBadges();
-	});
+	QObject::connect(g_notifyTimer, &QTimer::timeout, g_callbacks, NotifyTick);
 	g_notifyTimer->start(3000);
 	PollNotificationCount();
 
 	InstallTrayMenu();
 	// the menus of the obs menu bar are polished before anybody opens one, once the interface has settled
 	QTimer::singleShot(3000, g_callbacks, []() { PrepareObsMenus(); });
+	// obs can start hidden in the tray, which sends no hide event once the ticks exist
+	MainWindowShownChanged(g_mainWindow);
+}
+
+void MainWindowShownChanged(QWidget *window)
+{
+	if (g_exiting || !window)
+		return;
+	const bool shown = window->isVisible() && !window->isMinimized();
+	ShellSetWindowShown(shown);
+	if (!g_notifyTimer || !g_dockTweakTimer)
+		return;
+	if (!shown) {
+		if (!g_hiddenHeld) {
+			g_notifyTimer->stop();
+			g_dockTweakTimer->stop();
+			g_hiddenHeld = true;
+		}
+		return;
+	}
+	if (!g_hiddenHeld)
+		return;
+	g_hiddenHeld = false;
+	g_notifyTimer->start();
+	g_dockTweakTimer->start();
+	ApplyControlsDockTweaks();
+	NotifyTick();
 }
 
 // the app-wide filter would otherwise keep running against the button and badge lists after unload

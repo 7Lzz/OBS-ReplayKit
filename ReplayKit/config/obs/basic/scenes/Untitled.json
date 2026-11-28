@@ -995,14 +995,7 @@
         "type2": 3
     },
     "modules": {
-        "scripts-tool": [
-            {
-                "path": "C:/Users/Admin/AppData/Roaming/obs-studio/obs-replayKit/scripts/replaykit.lua",
-                "settings": {
-                    "clip_dir": ""
-                }
-            }
-        ],
+        "scripts-tool": [],
         "output-timer": {
             "streamTimerHours": 0,
             "streamTimerMinutes": 0,

@@ -60,7 +60,7 @@ namespace ReplayKitHelper
 
             if (applyVideoSettings && !restartObs)
             {
-                var camera = ObsWebSocket.InvokeRequest("GetVirtualCamStatus", null, 3000);
+                var camera = ObsRequest.Invoke("GetVirtualCamStatus", null, 3000);
                 var active = camera.Data?["outputActive"];
                 if (!camera.Ok || active?.Type != JTokenType.Boolean || active.Value<bool>())
                     return new JObject { ["applied"] = new JArray(), ["warnings"] = new JArray(Locales.Message("settings.obsOutputsWereNotStoppedSafely")) };
@@ -225,13 +225,13 @@ namespace ReplayKitHelper
 
         internal static JObject SetInputMonitorTypeRaw(string inputName, string monitorType)
         {
-            var result = ObsWebSocket.InvokeRequest("SetInputAudioMonitorType", new JObject { ["inputName"] = inputName, ["monitorType"] = monitorType }, 3000);
+            var result = ObsRequest.Invoke("SetInputAudioMonitorType", new JObject { ["inputName"] = inputName, ["monitorType"] = monitorType }, 3000);
             return result.Ok ? new JObject { ["ok"] = true, ["message"] = "" } : new JObject { ["ok"] = false, ["message"] = result.Message };
         }
 
         internal static JObject SetInputMuteRaw(string inputName, bool muted)
         {
-            var result = ObsWebSocket.InvokeRequest("SetInputMute", new JObject { ["inputName"] = inputName, ["inputMuted"] = muted }, 3000);
+            var result = ObsRequest.Invoke("SetInputMute", new JObject { ["inputName"] = inputName, ["inputMuted"] = muted }, 3000);
             return result.Ok ? new JObject { ["ok"] = true, ["message"] = "" } : new JObject { ["ok"] = false, ["message"] = result.Message };
         }
 
@@ -293,7 +293,7 @@ namespace ReplayKitHelper
 
         internal static JObject GetInputMonitorTypeValue(string inputName)
         {
-            var verify = ObsWebSocket.InvokeRequest("GetInputAudioMonitorType", new JObject { ["inputName"] = inputName }, 3000);
+            var verify = ObsRequest.Invoke("GetInputAudioMonitorType", new JObject { ["inputName"] = inputName }, 3000);
             if (!verify.Ok) return new JObject { ["ok"] = false, ["value"] = "", ["message"] = verify.Message };
             string monitorType = verify.Data?["monitorType"]?.Value<string>();
             string inputAudioMonitorType = verify.Data?["inputAudioMonitorType"]?.Value<string>();
@@ -304,7 +304,7 @@ namespace ReplayKitHelper
 
         internal static bool TestInputMuteState(string inputName, bool expected)
         {
-            var verify = ObsWebSocket.InvokeRequest("GetInputMute", new JObject { ["inputName"] = inputName }, 3000);
+            var verify = ObsRequest.Invoke("GetInputMute", new JObject { ["inputName"] = inputName }, 3000);
             if (!verify.Ok) return false;
             var value = verify.Data?["inputMuted"];
             if (value == null || value.Type == JTokenType.Null) return false;
@@ -331,22 +331,22 @@ namespace ReplayKitHelper
         internal static bool CapturesOutputDevice(JToken inputSettings) =>
             inputSettings?["output_device"]?.Value<bool>() == true;
 
-        internal static ObsWebSocketResult GetDesktopAudioCaptureSettings() =>
-            ObsWebSocket.InvokeRequest("GetInputSettings", new JObject { ["inputName"] = DesktopAudioInputName }, 3000);
+        internal static ObsResult GetDesktopAudioCaptureSettings() =>
+            ObsRequest.Invoke("GetInputSettings", new JObject { ["inputName"] = DesktopAudioInputName }, 3000);
 
-        private static ObsWebSocketResult SetDesktopAudioCaptureSettingsLive(JObject settings, ObsWebSocketResult current)
+        private static ObsResult SetDesktopAudioCaptureSettingsLive(JObject settings, ObsResult current)
         {
             if (!current.Ok) return current;
             var live = current.Data?["inputSettings"] as JObject;
-            if (live == null) return new ObsWebSocketResult { Message = Locales.Message("settings.obsDidNotReturnDesktopAudio") };
+            if (live == null) return new ObsResult { Message = Locales.Message("settings.obsDidNotReturnDesktopAudio") };
             bool outputDevice = UsesOutputDeviceRecording(settings);
             bool wasOutputDevice = CapturesOutputDevice(live);
             if (outputDevice)
             {
                 if (current.Data?["inputKind"]?.Value<string>() != "audio_capture")
-                    return new ObsWebSocketResult { Message = Locales.Message("settings.desktopAudioIsNotTheReplaykit") };
+                    return new ObsResult { Message = Locales.Message("settings.desktopAudioIsNotTheReplaykit") };
                 var monitor = SetDesktopAudioMixerState(DesktopAudioInputName, "OBS_MONITORING_TYPE_NONE", false);
-                if (monitor["ok"]?.Value<bool>() != true) return new ObsWebSocketResult { Message = monitor["message"]?.Value<string>() };
+                if (monitor["ok"]?.Value<bool>() != true) return new ObsResult { Message = monitor["message"]?.Value<string>() };
                 var discord = SetAudioSourceMixersLive(DiscordAudioInputName, 0);
                 if (!discord.Ok && discord.Code != 600) return discord;
             }
@@ -357,11 +357,11 @@ namespace ReplayKitHelper
                 || live["mode"]?.Value<string>() != "session" || live["exclude"]?.Value<bool>() != inputSettings["exclude"].Value<bool>()
                 || !SameProgramList(live["executable_list"], inputSettings["executable_list"]))
             {
-                var set = ObsWebSocket.InvokeRequest("SetInputSettings", new JObject { ["inputName"] = DesktopAudioInputName, ["inputSettings"] = inputSettings, ["overlay"] = true }, 3000);
+                var set = ObsRequest.Invoke("SetInputSettings", new JObject { ["inputName"] = DesktopAudioInputName, ["inputSettings"] = inputSettings, ["overlay"] = true }, 3000);
                 if (!set.Ok) return set;
             }
 
-            return outputDevice ? new ObsWebSocketResult { Ok = true } : RestoreDiscordAudioTracks(settings, wasOutputDevice);
+            return outputDevice ? new ObsResult { Ok = true } : RestoreDiscordAudioTracks(settings, wasOutputDevice);
         }
 
         // keeps the live desktop-audio monitoring change in sync with the on-disk scene file, so a disabled Share Preview cannot silently come back after obs restarts (obs persists audio monitoring in the scene collection, not in a profile setting this file already writes elsewhere). the mute is left as it is, so a muted desktop audio stays muted after the restart.
@@ -491,7 +491,7 @@ namespace ReplayKitHelper
             }
         }
 
-        // what the share button of the shell polls every few seconds: the switches only, with no obs-websocket call, since reading the monitor type goes thru an obs api that obs 33 logs as deprecated on every call and the virtual camera script keeps the monitoring right by itself
+        // what the share button of the shell polls every few seconds: the switches only, with no obs request, since reading the monitor type goes thru an obs api that obs 33 logs as deprecated on every call and the virtual camera script keeps the monitoring right by itself
         public static JObject GetSharePreviewFlags()
         {
             var settings = ReadSettings();
@@ -518,7 +518,7 @@ namespace ReplayKitHelper
                     warnings.Add(Locales.Message("settings.couldNotReadDesktopAudioCapture", "error", capture.Message));
                 }
             }
-            // a discord stream of something else with its sound already carries desktop audio, so it is not monitored meanwhile, the same rule the lua sync follows
+            // a discord stream of something else with its sound already carries desktop audio, so it is not monitored meanwhile, the same rule the plugin follows
             bool monitored = enabled && !DiscordStreamWorker.Held;
             string desiredMonitorType = monitored && !deviceCapture ? "OBS_MONITORING_TYPE_MONITOR_AND_OUTPUT" : "OBS_MONITORING_TYPE_NONE";
             bool repaired = false;
@@ -527,7 +527,7 @@ namespace ReplayKitHelper
             string actualMonitorType = actual["ok"]?.Value<bool>() == true ? actual["value"]?.Value<string>() : "";
             if (actual["ok"]?.Value<bool>() != true) warnings.Add(Locales.Message("settings.couldNotReadDesktopAudioMonitor", "error", actual["message"]));
 
-            var mute = ObsWebSocket.InvokeRequest("GetInputMute", new JObject { ["inputName"] = inputName }, 3000);
+            var mute = ObsRequest.Invoke("GetInputMute", new JObject { ["inputName"] = inputName }, 3000);
             bool muteOk = mute.Ok;
             bool? inputMuted = null;
             if (muteOk) inputMuted = mute.Data?["inputMuted"]?.Value<bool>() ?? false;
@@ -543,7 +543,7 @@ namespace ReplayKitHelper
                     repaired = true;
                     actual = GetInputMonitorTypeValue(inputName);
                     actualMonitorType = actual["ok"]?.Value<bool>() == true ? actual["value"]?.Value<string>() : "";
-                    mute = ObsWebSocket.InvokeRequest("GetInputMute", new JObject { ["inputName"] = inputName }, 3000);
+                    mute = ObsRequest.Invoke("GetInputMute", new JObject { ["inputName"] = inputName }, 3000);
                     muteOk = mute.Ok;
                     inputMuted = muteOk ? (mute.Data?["inputMuted"]?.Value<bool>() ?? false) : (bool?)null;
                     synced = actual["ok"]?.Value<bool>() == true && actualMonitorType == desiredMonitorType && (deviceCapture || (muteOk && inputMuted != true));
@@ -567,7 +567,7 @@ namespace ReplayKitHelper
             };
         }
 
-        // the motion blur filter on a running obs: created, updated or removed over obs-websocket, and the retired obs_composite_blur filter of older releases removed
+        // the motion blur filter on a running obs: created, updated or removed through obs requests, and the retired obs_composite_blur filter of older releases removed
 
         internal static bool TestShaderfilterPluginInstalled()
         {
@@ -621,12 +621,12 @@ namespace ReplayKitHelper
 
             foreach (var sourceName in sourceNames)
             {
-                var list = ObsWebSocket.InvokeRequest("GetSourceFilterList", new JObject { ["sourceName"] = sourceName }, 3000);
+                var list = ObsRequest.Invoke("GetSourceFilterList", new JObject { ["sourceName"] = sourceName }, 3000);
                 if (!list.Ok) { warnings.Add(Locales.Message("settings.motionBlurWasSavedButSourcename", "sourceName", sourceName, "error", list.Message)); continue; }
                 var filters = list.Data?["filters"] as JArray ?? list.Data?["sourceFilters"] as JArray ?? new JArray();
                 foreach (var retiredName in GetRetiredMotionBlurLiveFilterNames(filters))
                 {
-                    var removeRetired = ObsWebSocket.InvokeRequest("RemoveSourceFilter", new JObject { ["sourceName"] = sourceName, ["filterName"] = retiredName }, 3000);
+                    var removeRetired = ObsRequest.Invoke("RemoveSourceFilter", new JObject { ["sourceName"] = sourceName, ["filterName"] = retiredName }, 3000);
                     if (!removeRetired.Ok) warnings.Add(Locales.Message("settings.couldNotRemoveRetiredSourcenameComposite", "sourceName", sourceName, "error", removeRetired.Message));
                 }
                 string existingFilterName = GetMotionBlurLiveFilterName(filters);
@@ -635,7 +635,7 @@ namespace ReplayKitHelper
                 {
                     if (!string.IsNullOrWhiteSpace(existingFilterName))
                     {
-                        var set = ObsWebSocket.InvokeRequest("SetSourceFilterSettings", new JObject
+                        var set = ObsRequest.Invoke("SetSourceFilterSettings", new JObject
                         {
                             ["sourceName"] = sourceName, ["filterName"] = existingFilterName,
                             ["filterSettings"] = MotionBlurFilterSettingsLive(strength), ["overlay"] = false,
@@ -644,7 +644,7 @@ namespace ReplayKitHelper
                     }
                     else
                     {
-                        var create = ObsWebSocket.InvokeRequest("CreateSourceFilter", new JObject
+                        var create = ObsRequest.Invoke("CreateSourceFilter", new JObject
                         {
                             ["sourceName"] = sourceName, ["filterName"] = filterName, ["filterKind"] = OverlayScene.MotionBlurFilterKind,
                             ["filterSettings"] = MotionBlurFilterSettingsLive(strength),
@@ -652,13 +652,13 @@ namespace ReplayKitHelper
                         if (!create.Ok) { warnings.Add(Locales.Message("settings.couldNotCreateSourcenameMotionBlur", "sourceName", sourceName, "error", create.Message)); continue; }
                         existingFilterName = filterName;
                     }
-                    var enable = ObsWebSocket.InvokeRequest("SetSourceFilterEnabled", new JObject { ["sourceName"] = sourceName, ["filterName"] = existingFilterName, ["filterEnabled"] = true }, 3000);
+                    var enable = ObsRequest.Invoke("SetSourceFilterEnabled", new JObject { ["sourceName"] = sourceName, ["filterName"] = existingFilterName, ["filterEnabled"] = true }, 3000);
                     if (enable.Ok) applied.Add(sourceName + " motion blur on");
                     else warnings.Add(Locales.Message("settings.couldNotEnableSourcenameMotionBlur", "sourceName", sourceName, "error", enable.Message));
                 }
                 else if (!string.IsNullOrWhiteSpace(existingFilterName))
                 {
-                    var remove = ObsWebSocket.InvokeRequest("RemoveSourceFilter", new JObject { ["sourceName"] = sourceName, ["filterName"] = existingFilterName }, 3000);
+                    var remove = ObsRequest.Invoke("RemoveSourceFilter", new JObject { ["sourceName"] = sourceName, ["filterName"] = existingFilterName }, 3000);
                     if (remove.Ok) applied.Add(sourceName + " motion blur off");
                     else warnings.Add(Locales.Message("settings.couldNotRemoveSourcenameMotionBlur", "sourceName", sourceName, "error", remove.Message));
                 }
@@ -715,7 +715,7 @@ namespace ReplayKitHelper
             double inputLevel = 1;
             if (volumePercent == 0 || current?[AudioVolume.SavedLevel] != null)
             {
-                var volume = ObsWebSocket.InvokeRequest("GetInputVolume", new JObject { ["inputName"] = sourceName }, 3000);
+                var volume = ObsRequest.Invoke("GetInputVolume", new JObject { ["inputName"] = sourceName }, 3000);
                 if (!volume.Ok) { warnings.Add(Locales.Message("settings.couldNotReadTheLabelError", "label", label, "error", volume.Message)); return; }
                 inputLevel = AudioVolume.Level(volume.Data?["inputVolumeMul"]);
             }
@@ -724,7 +724,7 @@ namespace ReplayKitHelper
             bool SetLevel()
             {
                 if (!levelChanged) return true;
-                var result = ObsWebSocket.InvokeRequest("SetInputVolume", new JObject { ["inputName"] = sourceName, ["inputVolumeMul"] = outputLevel }, 3000);
+                var result = ObsRequest.Invoke("SetInputVolume", new JObject { ["inputName"] = sourceName, ["inputVolumeMul"] = outputLevel }, 3000);
                 if (!result.Ok) warnings.Add(Locales.Message("settings.couldNotSetTheLabelError", "label", label, "error", result.Message));
                 return result.Ok;
             }
@@ -734,18 +734,18 @@ namespace ReplayKitHelper
             bool filterChanged = !JToken.DeepEquals(current, next);
             if (existing == null)
             {
-                var create = ObsWebSocket.InvokeRequest("CreateSourceFilter", new JObject
+                var create = ObsRequest.Invoke("CreateSourceFilter", new JObject
                 {
                     ["sourceName"] = sourceName, ["filterName"] = filterName, ["filterKind"] = GainFilterKind,
                     ["filterSettings"] = next,
                 }, 3000);
                 if (!create.Ok) { warnings.Add(Locales.Message("settings.couldNotSetTheLabelError", "label", label, "error", create.Message)); return; }
-                var move = ObsWebSocket.InvokeRequest("SetSourceFilterIndex", new JObject { ["sourceName"] = sourceName, ["filterName"] = filterName, ["filterIndex"] = filters.Count }, 3000);
+                var move = ObsRequest.Invoke("SetSourceFilterIndex", new JObject { ["sourceName"] = sourceName, ["filterName"] = filterName, ["filterIndex"] = filters.Count }, 3000);
                 if (!move.Ok) warnings.Add(Locales.Message("settings.theLabelWasSetButThe", "label", label, "error", move.Message));
             }
             else if (filterChanged)
             {
-                var set = ObsWebSocket.InvokeRequest("SetSourceFilterSettings", new JObject { ["sourceName"] = sourceName, ["filterName"] = filterName, ["filterSettings"] = next, ["overlay"] = false }, 3000);
+                var set = ObsRequest.Invoke("SetSourceFilterSettings", new JObject { ["sourceName"] = sourceName, ["filterName"] = filterName, ["filterSettings"] = next, ["overlay"] = false }, 3000);
                 if (!set.Ok) { warnings.Add(Locales.Message("settings.couldNotSetTheLabelError", "label", label, "error", set.Message)); return; }
             }
             if (volumePercent == 0 && !SetLevel()) return;
@@ -780,7 +780,7 @@ namespace ReplayKitHelper
             return RecordingAudioKeysChanged(previous, settings);
         }
 
-        internal static JObject ApplyRecordingAudioLive(JObject settings, ObsWebSocketResult current = null)
+        internal static JObject ApplyRecordingAudioLive(JObject settings, ObsResult current = null)
         {
             var applied = new List<string>();
             var warnings = new List<string>();
@@ -808,29 +808,29 @@ namespace ReplayKitHelper
             return 63;
         }
 
-        private static ObsWebSocketResult SetAudioSourceMixersLive(string inputName, int mixers)
+        private static ObsResult SetAudioSourceMixersLive(string inputName, int mixers)
         {
             var tracks = new JObject();
             for (int i = 0; i < 6; i++) tracks[(i + 1).ToString(CultureInfo.InvariantCulture)] = (mixers & (1 << i)) != 0;
-            return ObsWebSocket.InvokeRequest("SetInputAudioTracks", new JObject { ["inputName"] = inputName, ["inputAudioTracks"] = tracks }, 3000);
+            return ObsRequest.Invoke("SetInputAudioTracks", new JObject { ["inputName"] = inputName, ["inputAudioTracks"] = tracks }, 3000);
         }
 
-        internal static ObsWebSocketResult RestoreDiscordAudioTracks(JObject settings, bool wasOutputDevice = false)
+        internal static ObsResult RestoreDiscordAudioTracks(JObject settings, bool wasOutputDevice = false)
         {
             // a failed switch can leave the managed discord source off every track even after device capture has stopped.
             if (!wasOutputDevice)
             {
-                var current = ObsWebSocket.InvokeRequest("GetInputAudioTracks", new JObject { ["inputName"] = DiscordAudioInputName }, 3000);
-                if (current.Code == 600) return new ObsWebSocketResult { Ok = true };
+                var current = ObsRequest.Invoke("GetInputAudioTracks", new JObject { ["inputName"] = DiscordAudioInputName }, 3000);
+                if (current.Code == 600) return new ObsResult { Ok = true };
                 if (!current.Ok) return current;
                 var tracks = current.Data?["inputAudioTracks"] as JObject;
                 if (tracks == null || tracks.Count != 6)
-                    return new ObsWebSocketResult { Message = Locales.Message("settings.obsDidNotReturnDiscordAudio") };
-                if (tracks.Values().Any(track => track.Value<bool>())) return new ObsWebSocketResult { Ok = true };
+                    return new ObsResult { Message = Locales.Message("settings.obsDidNotReturnDiscordAudio") };
+                if (tracks.Values().Any(track => track.Value<bool>())) return new ObsResult { Ok = true };
             }
 
             var set = SetAudioSourceMixersLive(DiscordAudioInputName, AudioSourceMixers(DiscordAudioInputName, settings));
-            return set.Code == 600 ? new ObsWebSocketResult { Ok = true } : set;
+            return set.Code == 600 ? new ObsResult { Ok = true } : set;
         }
 
         // puts the recording audio sources on their tracks in the running obs and in the scene file; the recording itself only reads the tracks when obs starts its outputs, which is why changing this restarts obs
@@ -970,7 +970,7 @@ namespace ReplayKitHelper
         // what obs actually has on the mic input right now, or null when obs cannot be reached or the input is missing -- callers treat null as "leave the saved values alone".
         internal static JObject ReadMicLive()
         {
-            var input = ObsWebSocket.InvokeRequest("GetInputSettings", new JObject { ["inputName"] = MicInputName }, 3000);
+            var input = ObsRequest.Invoke("GetInputSettings", new JObject { ["inputName"] = MicInputName }, 3000);
             if (!input.Ok) return null;
             var filters = GetSourceFilterListLive(MicInputName);
             if (filters["ok"]?.Value<bool>() != true) return null;
@@ -1022,7 +1022,7 @@ namespace ReplayKitHelper
 
             if (live["micDeviceId"].Value<string>() != deviceId)
             {
-                var set = ObsWebSocket.InvokeRequest("SetInputSettings", new JObject { ["inputName"] = MicInputName, ["inputSettings"] = new JObject { ["device_id"] = deviceId }, ["overlay"] = true }, 3000);
+                var set = ObsRequest.Invoke("SetInputSettings", new JObject { ["inputName"] = MicInputName, ["inputSettings"] = new JObject { ["device_id"] = deviceId }, ["overlay"] = true }, 3000);
                 if (set.Ok) applied.Add("microphone device");
                 else warnings.Add(Locales.Message("settings.couldNotSwitchTheMicrophoneError", "error", set.Message));
             }
@@ -1053,14 +1053,14 @@ namespace ReplayKitHelper
             if (existing.Count == 0)
             {
                 if (!enabled) return;
-                var create = ObsWebSocket.InvokeRequest("CreateSourceFilter", new JObject
+                var create = ObsRequest.Invoke("CreateSourceFilter", new JObject
                 {
                     ["sourceName"] = MicInputName, ["filterName"] = MicNoiseFilterName, ["filterKind"] = NoiseSuppressFilterKind,
                     ["filterSettings"] = new JObject { ["method"] = "rnnoise" },
                 }, 3000);
                 if (!create.Ok) { warnings.Add(Locales.Message("settings.couldNotAddNoiseSuppressionError", "error", create.Message)); return; }
                 // obs runs filters top to bottom, so suppression goes ahead of the noise gate and the gate judges the cleaned signal.
-                var move = ObsWebSocket.InvokeRequest("SetSourceFilterIndex", new JObject { ["sourceName"] = MicInputName, ["filterName"] = MicNoiseFilterName, ["filterIndex"] = 0 }, 3000);
+                var move = ObsRequest.Invoke("SetSourceFilterIndex", new JObject { ["sourceName"] = MicInputName, ["filterName"] = MicNoiseFilterName, ["filterIndex"] = 0 }, 3000);
                 if (!move.Ok) warnings.Add(Locales.Message("settings.noiseSuppressionWasAddedButCould", "error", move.Message));
                 applied.Add("microphone noise suppression on");
                 return;
@@ -1070,7 +1070,7 @@ namespace ReplayKitHelper
             var targets = enabled ? existing.Take(1) : existing.Where(f => f["filterEnabled"]?.Value<bool>() ?? false);
             foreach (var filter in targets)
             {
-                var toggle = ObsWebSocket.InvokeRequest("SetSourceFilterEnabled", new JObject { ["sourceName"] = MicInputName, ["filterName"] = filter["filterName"]?.Value<string>(), ["filterEnabled"] = enabled }, 3000);
+                var toggle = ObsRequest.Invoke("SetSourceFilterEnabled", new JObject { ["sourceName"] = MicInputName, ["filterName"] = filter["filterName"]?.Value<string>(), ["filterEnabled"] = enabled }, 3000);
                 if (toggle.Ok) applied.Add(enabled ? "microphone noise suppression on" : "microphone noise suppression off");
                 else warnings.Add(Locales.Message("settings.couldNotChangeNoiseSuppressionError", "error", toggle.Message));
             }
@@ -1087,7 +1087,7 @@ namespace ReplayKitHelper
             {
                 foreach (var gate in gates.Where(g => g["filterEnabled"]?.Value<bool>() ?? false))
                 {
-                    var off = ObsWebSocket.InvokeRequest("SetSourceFilterEnabled", new JObject { ["sourceName"] = MicInputName, ["filterName"] = gate["filterName"]?.Value<string>(), ["filterEnabled"] = false }, 3000);
+                    var off = ObsRequest.Invoke("SetSourceFilterEnabled", new JObject { ["sourceName"] = MicInputName, ["filterName"] = gate["filterName"]?.Value<string>(), ["filterEnabled"] = false }, 3000);
                     if (off.Ok) applied.Add("microphone input sensitivity off");
                     else warnings.Add(Locales.Message("settings.couldNotTurnTheNoiseGate", "error", off.Message));
                 }
@@ -1106,7 +1106,7 @@ namespace ReplayKitHelper
 
             if (existing == null)
             {
-                var create = ObsWebSocket.InvokeRequest("CreateSourceFilter", new JObject
+                var create = ObsRequest.Invoke("CreateSourceFilter", new JObject
                 {
                     ["sourceName"] = MicInputName, ["filterName"] = MicGateFilterName, ["filterKind"] = NoiseGateFilterKind, ["filterSettings"] = thresholds,
                 }, 3000);
@@ -1116,11 +1116,11 @@ namespace ReplayKitHelper
             }
 
             string name = existing["filterName"]?.Value<string>();
-            var set = ObsWebSocket.InvokeRequest("SetSourceFilterSettings", new JObject { ["sourceName"] = MicInputName, ["filterName"] = name, ["filterSettings"] = thresholds, ["overlay"] = true }, 3000);
+            var set = ObsRequest.Invoke("SetSourceFilterSettings", new JObject { ["sourceName"] = MicInputName, ["filterName"] = name, ["filterSettings"] = thresholds, ["overlay"] = true }, 3000);
             if (!set.Ok) { warnings.Add(Locales.Message("settings.couldNotSetTheInputSensitivity", "error", set.Message)); return; }
             if (!(existing["filterEnabled"]?.Value<bool>() ?? false))
             {
-                var on = ObsWebSocket.InvokeRequest("SetSourceFilterEnabled", new JObject { ["sourceName"] = MicInputName, ["filterName"] = name, ["filterEnabled"] = true }, 3000);
+                var on = ObsRequest.Invoke("SetSourceFilterEnabled", new JObject { ["sourceName"] = MicInputName, ["filterName"] = name, ["filterEnabled"] = true }, 3000);
                 if (!on.Ok) { warnings.Add(Locales.Message("settings.theInputSensitivityWasSetBut", "error", on.Message)); return; }
             }
             applied.Add("microphone input sensitivity");

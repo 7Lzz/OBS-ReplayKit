@@ -42,6 +42,7 @@ void PublishMainWindow()
 	if (!mainWindow)
 		return;
 	g_mainWinValue.store((quintptr)mainWindow->winId());
+	PipeWake();
 }
 
 } // namespace rk

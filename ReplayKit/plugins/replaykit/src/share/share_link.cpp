@@ -1,6 +1,7 @@
 // the plugin side of the share window: attach, the frame copy and letting go
 #include "prelude.hpp"
 #include "share/share_link.hpp"
+#include "share/share_monitoring.hpp"
 #include "share/share_audio.hpp"
 #include "core/graphics_device.hpp"
 #include "core/shared_values.hpp"
@@ -226,6 +227,7 @@ void Tick()
 		if (!g_attachment)
 			TryAttach();
 	}
+	ShareMonitoringEnsure();
 	ShareAudioRefresh();
 }
 

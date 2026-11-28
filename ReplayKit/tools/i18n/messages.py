@@ -77,7 +77,6 @@ def references(catalog):
     paths = sorted((ROOT / "ui").glob("*.html")) + sorted((ROOT / "ui").glob("*.js"))
     paths += sorted((ROOT / "apps").glob("*/*.cs")) + sorted((ROOT / "apps/setup").glob("*.html"))
     paths += sorted((ROOT / "plugins/replaykit/src").rglob("*.cpp")) + sorted((ROOT / "plugins/replaykit/src").rglob("*.hpp"))
-    paths += sorted((ROOT / "lua").rglob("*.lua"))
     used = set()
     for path in paths:
         if path.name == "helper-endpoint.js":

@@ -21,7 +21,7 @@ namespace ReplayKitShared
         public const double BongoSourceHeight = 768.0;
         public const string WasdSourceName = "WASD Overlay";
         public const string MouseSourceName = "Mouse Overlay";
-        // the group that holds the wasd and mouse overlays, which the plugin makes and obs-websocket addresses by its name like a scene; scripts/sync_shared.ps1 writes it out for the plugin
+        // the group that holds the wasd and mouse overlays, which the plugin makes and the obs requests address by its name like a scene; scripts/sync_shared.ps1 writes it out for the plugin
         public const string InputOverlayGroupName = "Group";
         public const string InputOverlaySourceKind = "input-overlay";
         public const string OpacityFilterName = "ReplayKit Overlay Opacity";
@@ -46,8 +46,11 @@ namespace ReplayKitShared
         // the rnnoise filter of the microphone, matched by the start of its kind since obs keeps a versioned one
         public const string MicNoiseFilterName = "ReplayKit Noise Suppression";
         public const string MicNoiseFilterKindPrefix = "noise_suppress_filter";
-        // the card the capture switch script shows over the captures while a game of the auto game list is open but not in front; the plugin registers its kind and puts it into every scene with a capture, and scripts/sync_shared.ps1 writes both names out for the plugin and lua
+        // the card the capture switch of the plugin shows over the captures while a game of the auto game list is open but not in front; the plugin registers its kind and puts it into every scene with a capture, and scripts/sync_shared.ps1 writes both names out for it
         public const string FocusCardSourceName = "Game Out of Focus";
+        // the key of the modules of a scene collection replaykit keeps its own data under, and the binding of its upload hotkey in it; the plugin saves them and the installer moves the binding the old lua script kept there
+        public const string SceneModuleKey = "replaykit";
+        public const string UploadHotkeyKey = "uploadHotkey";
         public const string FocusCardSourceKind = "replaykit-focus-card";
 
         // the canvas a missing or unreadable video size counts as

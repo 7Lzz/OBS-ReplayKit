@@ -5,6 +5,7 @@
 #include <array>
 
 #include "core/json_lite.hpp"
+#include "core/native_hotkeys.hpp"
 #include "core/state.hpp"
 #include "windows/clips_window.hpp"
 
@@ -114,14 +115,13 @@ void RemoveBinding(size_t slot)
 	UnregisterHotKey(nullptr, kFirstHotkeyId + int(slot));
 }
 
-void CaptureState(void *, calldata_t *cd)
-{
-	calldata_set_bool(cd, "active", g_capturing.load());
-}
 
 } // namespace
 
-QPointer<QTimer> g_openClipsHotkeyTimer;
+bool HotkeyCaptureActive()
+{
+	return g_capturing.load();
+}
 
 bool RegisterOpenClipsHotkey(const std::string &settingsBody)
 {
@@ -179,6 +179,7 @@ bool SetHotkeyCapture(bool active)
 			}
 		}
 		g_capturing.store(false);
+		NativeHotkeysCaptureEnded();
 		return true;
 	}
 	if (!g_callbacks || !g_openClipsHotkeyFilter)
@@ -215,16 +216,13 @@ bool SetHotkeyCapture(bool active)
 // puts the native filter in place that turns the registered hotkey into a clips toggle
 void InstallOpenClipsHotkeyFilter()
 {
-	proc_handler_add(obs_get_proc_handler(), "void replaykit_hotkey_capture_active(out bool active)", CaptureState, nullptr);
 	g_openClipsHotkeyFilter = new OpenClipsHotkeyFilter();
 	qApp->installNativeEventFilter(g_openClipsHotkeyFilter);
 }
 
-// takes the hotkey, its poll timer and the native filter down before this module is unloaded
+// takes the hotkey and the native filter down before this module is unloaded
 void RemoveOpenClipsHotkey()
 {
-	if (g_openClipsHotkeyTimer)
-		g_openClipsHotkeyTimer->stop();
 	delete g_openClipsReleaseTimer;
 	g_openClipsHeldKey = 0;
 	SetHotkeyCapture(false);

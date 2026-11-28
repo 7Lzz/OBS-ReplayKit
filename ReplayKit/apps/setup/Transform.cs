@@ -377,8 +377,8 @@ namespace ReplayKitSetup
 
         private const int ObsBoundsScaleInner = 2; // libobs obs_bounds_type from scene-item-properties.cpp -- fit inside bounds, preserve aspect.
 
-        // single obs-visible script entry; feature scripts are loaded inside replaykit.lua to keep tools->scripts uncluttered.
-        private const string ReplaykitScriptRelpath = ReplayKitFolder.Name + "/scripts/replaykit.lua";
+        // the script entry obs loaded replaykit.lua through, before the plugin took over everything it did
+        private const string ReplaykitScriptName = "replaykit.lua";
 
         // the clip folder as the settings and the script entry keep it: empty for the default folder (the videos known folder, which Prefs.DefaultRecordingPath and the helper fall back to), else forward-slashed
         private static string ClipDirSetting(Preferences prefs)
@@ -386,17 +386,6 @@ namespace ReplayKitSetup
             string recDirNorm = prefs.RecordingPath.Replace("\\", "/").TrimEnd('/').ToLowerInvariant();
             string defaultNorm = ClipFolder.Default().Replace('\\', '/').TrimEnd('/').ToLowerInvariant();
             return recDirNorm == defaultNorm ? "" : prefs.RecordingPath.Replace("\\", "/");
-        }
-
-        // inject replaykit runtime settings into the managed obs script entry.
-        private static void ApplyReplaykitRuntimeSettings(JObject settings, Preferences prefs)
-        {
-            settings["clip_dir"] = ClipDirSetting(prefs);
-            settings["clip_notification_enabled"] = prefs.ClipNotificationEnabled;
-            settings["recording_notification_enabled"] = prefs.RecordingNotificationEnabled;
-            settings["clip_notification_seconds"] = prefs.ReplayBufferSeconds;
-            settings["clip_sound_volume"] = prefs.ClipSoundVolume;
-            settings["recording_sound_volume"] = prefs.RecordingSoundVolume;
         }
 
         // write the runtime settings consumed by the obs dock helper. _text is the bundled template being mirrored in, not the users live file -- merging onto that would still lose every setting the wizard has no field for (openClipsKeybind and anything added since this list was last touched), which is exactly what was happening on Update: the live file has real user values, gets replaced by this transforms own from-scratch object, and anything not listed below reverts as if never set. merging onto whatever is actually live on disk instead means only a genuine first install (no live file yet) starts empty.
@@ -460,8 +449,6 @@ namespace ReplayKitSetup
             return obj.ToString(Formatting.Indented);
         }
 
-        private static string ReplaykitScriptPath() => System.IO.Path.Combine(Config.OBS_CONFIG, ReplaykitScriptRelpath.Replace('/', System.IO.Path.DirectorySeparatorChar)).Replace('\\', '/');
-
         private static string EntryBasename(JObject entry)
         {
             string path = (entry.Value<string>("path") ?? "").Replace("\\", "/");
@@ -469,34 +456,24 @@ namespace ReplayKitSetup
             return parts[parts.Length - 1].ToLowerInvariant();
         }
 
-        private static bool IsReplaykitEntry(JObject entry) => EntryBasename(entry) == System.IO.Path.GetFileName(ReplaykitScriptRelpath).ToLowerInvariant();
+        private static bool IsReplaykitEntry(JObject entry) => EntryBasename(entry) == ReplaykitScriptName;
 
-        // the one script entry obs loads replaykit through: added when it is gone, or pointed at this install when it names another place (a renamed user folder), keeping its settings; an entry that is already right is left exactly as it is
-        public static bool EnsureReplaykitScriptEntry(JObject data, Preferences prefs)
+        // the plugin does everything replaykit.lua did, so the script entry obs would load it through goes; the upload hotkey binding the script kept in its settings moves to the module key of the plugin first, unless that already has one
+        public static bool RetireReplaykitScriptEntry(JObject data)
         {
-            if (!(data["modules"] is JObject modules)) { modules = new JObject(); data["modules"] = modules; }
-            if (!(modules["scripts-tool"] is JArray scripts)) { scripts = new JArray(); modules["scripts-tool"] = scripts; }
-            string path = ReplaykitScriptPath();
+            if (!(data["modules"] is JObject modules) || !(modules["scripts-tool"] is JArray scripts)) return false;
             var entries = scripts.OfType<JObject>().Where(IsReplaykitEntry).ToList();
-            if (entries.Count == 1 && string.Equals((entries[0].Value<string>("path") ?? "").Replace('\\', '/'), path, StringComparison.OrdinalIgnoreCase)) return false;
-            var settings = CollectReplaykitSettings(scripts, prefs);
-            foreach (var entry in entries) scripts.Remove(entry);
-            scripts.Add(new JObject { ["path"] = path, ["settings"] = settings });
-            return true;
-        }
-
-        // preserve settings from the managed replaykit.lua script entry.
-        private static JObject CollectReplaykitSettings(JArray scripts, Preferences prefs)
-        {
-            var settings = new JObject();
-            foreach (var entryToken in scripts)
+            if (entries.Count == 0) return false;
+            foreach (var entry in entries)
             {
-                if (!(entryToken is JObject entry) || !IsReplaykitEntry(entry)) continue;
-                if (!(entry["settings"] is JObject entrySettings)) continue;
-                foreach (var prop in entrySettings.Properties()) settings[prop.Name] = prop.Value;
+                if (entry["settings"]?["hotkey"] is JArray hotkey && hotkey.Count > 0 && !(modules[OverlayScene.SceneModuleKey]?[OverlayScene.UploadHotkeyKey] is JArray))
+                {
+                    if (!(modules[OverlayScene.SceneModuleKey] is JObject own)) { own = new JObject(); modules[OverlayScene.SceneModuleKey] = own; }
+                    own[OverlayScene.UploadHotkeyKey] = hotkey.DeepClone();
+                }
+                scripts.Remove(entry);
             }
-            ApplyReplaykitRuntimeSettings(settings, prefs);
-            return settings;
+            return true;
         }
 
         // fit a scene item to canvas (obs ctrl+f equivalent). sourceW/H zero -> bounds-based fallback for sources without known dimensions (game capture, no display detected).
@@ -1220,7 +1197,7 @@ namespace ReplayKitSetup
             settings["exclude"] = true;
         }
 
-        // apply user prefs to the scenes file: mic device, display id, selected overlay, display + game capture fit-to-canvas, scripts-tool replaykit entry. the scene of an existing install keeps the layout of the overlay items it already has, since obs holds where they were put and sized and the installer has nothing newer about the overlay than the settings that layout came from; only items it adds are laid out here
+        // apply user prefs to the scenes file: mic device, display id, selected overlay, display + game capture fit-to-canvas, and the retired replaykit.lua script entry removed. the scene of an existing install keeps the layout of the overlay items it already has, since obs holds where they were put and sized and the installer has nothing newer about the overlay than the settings that layout came from; only items it adds are laid out here
         public static string ApplyScenesJson(string text, Preferences prefs, bool userScene)
         {
             var data = JObject.Parse(text);
@@ -1410,17 +1387,7 @@ namespace ReplayKitSetup
                 }
             }
 
-            if (!(data["modules"] is JObject modules)) { modules = new JObject(); data["modules"] = modules; }
-            var scripts = modules["scripts-tool"] as JArray ?? new JArray();
-            var replaykitSettings = CollectReplaykitSettings(scripts, prefs);
-
-            var keptScripts = new JArray(scripts.Where(e => !(e is JObject eo && IsReplaykitEntry(eo))));
-            keptScripts.Add(new JObject
-            {
-                ["path"] = ReplaykitScriptPath(),
-                ["settings"] = replaykitSettings,
-            });
-            modules["scripts-tool"] = keptScripts;
+            RetireReplaykitScriptEntry(data);
 
             return ToIndented4(data);
         }

@@ -193,7 +193,7 @@ namespace ReplayKitHelper
         internal static string GetCurrentProfileDir()
         {
             string profilesRoot = Constants.OBS_PROFILES_DIR;
-            var profileList = ObsWebSocket.InvokeRequest("GetProfileList", null, 3000);
+            var profileList = ObsRequest.Invoke("GetProfileList", null, 3000);
             string profileName = profileList.Ok ? profileList.Data?["currentProfileName"]?.Value<string>() : null;
             string folder = ObsUserIni.Read("Basic", "ProfileDir");
             string savedProfile = ObsUserIni.Read("Basic", "Profile");
@@ -231,7 +231,7 @@ namespace ReplayKitHelper
         // the bongo input in the live scene. one an older install left as the opengl bongobs-cat is hidden and renamed out of the way, never removed: that plugin keeps its keyboard hook running on freed state once its source is destroyed, and the next key press takes obs down. SetOverlaySceneFile and the installer drop it while obs is not running
         internal static JObject SelectBongoInput(string sceneName, JArray items, JObject inputSettings, List<string> warnings, bool refresh)
         {
-            var kinds = ObsWebSocket.InvokeRequest("GetInputKindList", new JObject { ["unversioned"] = true }, 3000);
+            var kinds = ObsRequest.Invoke("GetInputKindList", new JObject { ["unversioned"] = true }, 3000);
             if (!kinds.Ok || !(kinds.Data?["inputKinds"] as JArray ?? new JArray()).Any(k => k.Value<string>() == BongoInputKind))
             {
                 warnings.Add(Locales.Message("settings.bongoCatNeedsTheReplaykitObs"));
@@ -239,13 +239,13 @@ namespace ReplayKitHelper
             }
             string Kind(string name)
             {
-                var result = ObsWebSocket.InvokeRequest("GetInputSettings", new JObject { ["inputName"] = name }, 3000);
+                var result = ObsRequest.Invoke("GetInputSettings", new JObject { ["inputName"] = name }, 3000);
                 if (!result.Ok) throw new InvalidOperationException(Locales.Message("settings.couldNotSetUpBongoCat", "error", result.Message));
                 return result.Data?["inputKind"]?.Value<string>();
             }
             bool Rename(string from, string to)
             {
-                var result = ObsWebSocket.InvokeRequest("SetInputName", new JObject { ["inputName"] = from, ["newInputName"] = to }, 3000);
+                var result = ObsRequest.Invoke("SetInputName", new JObject { ["inputName"] = from, ["newInputName"] = to }, 3000);
                 if (!result.Ok) warnings.Add(Locales.Message("settings.couldNotSetUpBongoCat", "error", result.Message));
                 return result.Ok;
             }
@@ -279,7 +279,7 @@ namespace ReplayKitHelper
             if (current == null)
             {
                 refresh = true;
-                var created = ObsWebSocket.InvokeRequest("CreateInput", new JObject
+                var created = ObsRequest.Invoke("CreateInput", new JObject
                 {
                     ["sceneName"] = sceneName, ["inputName"] = OverlayScene.BongoSourceName, ["inputKind"] = BongoInputKind,
                     ["inputSettings"] = inputSettings, ["sceneItemEnabled"] = true,
@@ -293,7 +293,7 @@ namespace ReplayKitHelper
             }
             if (refresh)
             {
-                var update = ObsWebSocket.InvokeRequest("SetInputSettings", new JObject
+                var update = ObsRequest.Invoke("SetInputSettings", new JObject
                 {
                     ["inputName"] = OverlayScene.BongoSourceName, ["inputSettings"] = inputSettings, ["overlay"] = true,
                 }, 3000);
@@ -330,10 +330,10 @@ namespace ReplayKitHelper
             };
         }
 
-        // a member already in Group is moved to where the picked layouts put it, and the mouse hidden while it is off; obs-websocket takes the group by its name like a scene
+        // a member already in Group is moved to where the picked layouts put it, and the mouse hidden while it is off; the obs requests take the group by its name like a scene
         internal static void PlaceInputOverlayMember(string name, JObject settings, List<string> warnings)
         {
-            var list = ObsWebSocket.InvokeRequest("GetGroupSceneItemList", new JObject { ["sceneName"] = OverlayScene.InputOverlayGroupName }, 3000);
+            var list = ObsRequest.Invoke("GetGroupSceneItemList", new JObject { ["sceneName"] = OverlayScene.InputOverlayGroupName }, 3000);
             if (!list.Ok) { warnings.Add(Locales.Message("settings.couldNotReadTheOverlayGroup", "error", list.Message)); return; }
             var member = (list.Data?["sceneItems"] as JArray ?? new JArray()).OfType<JObject>().FirstOrDefault(i => i["sourceName"]?.Value<string>() == name);
             if (member == null) return;
@@ -350,8 +350,8 @@ namespace ReplayKitHelper
             bool removed = false;
             foreach (var name in new[] { OverlayScene.WasdSourceName, OverlayScene.MouseSourceName })
             {
-                if (!ObsWebSocket.InvokeRequest("GetInputSettings", new JObject { ["inputName"] = name }, 3000).Ok) continue;
-                var result = ObsWebSocket.InvokeRequest("RemoveInput", new JObject { ["inputName"] = name }, 3000);
+                if (!ObsRequest.Invoke("GetInputSettings", new JObject { ["inputName"] = name }, 3000).Ok) continue;
+                var result = ObsRequest.Invoke("RemoveInput", new JObject { ["inputName"] = name }, 3000);
                 if (result.Ok) removed = true;
                 else warnings.Add(Locales.Message("settings.couldNotRemoveNameError", "name", name, "error", result.Message));
             }
@@ -368,22 +368,22 @@ namespace ReplayKitHelper
         // the bongo input and any input parked by an older renderer switch; one of the opengl bongobs-cat kind is only removed while that plugin is not loaded, since destroying its source leaves its keyboard hook running on freed state
         internal static bool RemoveBongoLive(List<string> warnings)
         {
-            var kinds = ObsWebSocket.InvokeRequest("GetInputKindList", new JObject { ["unversioned"] = true }, 3000);
+            var kinds = ObsRequest.Invoke("GetInputKindList", new JObject { ["unversioned"] = true }, 3000);
             bool legacyLoaded = !kinds.Ok || (kinds.Data?["inputKinds"] as JArray ?? new JArray()).Any(k => k.Value<string>() == LegacyBongoInputKind);
             bool removed = false;
             foreach (var name in new[] { OverlayScene.BongoSourceName, BongoInactiveName, BongoSwitchingName })
             {
-                var input = ObsWebSocket.InvokeRequest("GetInputSettings", new JObject { ["inputName"] = name }, 3000);
+                var input = ObsRequest.Invoke("GetInputSettings", new JObject { ["inputName"] = name }, 3000);
                 if (!input.Ok) continue;
                 if (input.Data?["inputKind"]?.Value<string>() == LegacyBongoInputKind && legacyLoaded) continue;
-                var result = ObsWebSocket.InvokeRequest("RemoveInput", new JObject { ["inputName"] = name }, 3000);
+                var result = ObsRequest.Invoke("RemoveInput", new JObject { ["inputName"] = name }, 3000);
                 if (result.Ok) removed = true;
                 else warnings.Add(Locales.Message("settings.couldNotRemoveNameError", "name", name, "error", result.Message));
             }
             return removed;
         }
 
-        // the obs-websocket twin of SetOverlaySceneFile, used when obs must not be restarted: toggle visibility, refresh the bongo settings and reposition.
+        // the live twin of SetOverlaySceneFile, used when obs must not be restarted: toggle visibility, refresh the bongo settings and reposition.
         internal static JObject ApplyOverlayLive(JObject settings, JObject preset, bool recreateBongo = true, bool rebuildInputOverlay = false)
         {
             var warnings = new List<string>();
@@ -405,7 +405,7 @@ namespace ReplayKitHelper
             if (overlayStyle != "input_overlay" || rebuildInputOverlay) removed |= RemoveInputOverlayLive(sceneName, items, warnings);
             // a removed source keeps its name until obs has let go of it, and a new source of that name is refused until then
             if (rebuildInputOverlay)
-                for (int i = 0; i < 30 && new[] { OverlayScene.WasdSourceName, OverlayScene.MouseSourceName }.Any(n => ObsWebSocket.InvokeRequest("GetInputSettings", new JObject { ["inputName"] = n }, 3000).Ok); i++)
+                for (int i = 0; i < 30 && new[] { OverlayScene.WasdSourceName, OverlayScene.MouseSourceName }.Any(n => ObsRequest.Invoke("GetInputSettings", new JObject { ["inputName"] = n }, 3000).Ok); i++)
                     Thread.Sleep(100);
             if (overlayStyle != "bongo_cat") removed |= RemoveBongoLive(warnings);
             if (removed)
@@ -483,7 +483,7 @@ namespace ReplayKitHelper
                         var io = InputOverlaySourceSettings(entry.image, entry.layout);
                         if (group != null)
                         {
-                            var s = ObsWebSocket.InvokeRequest("SetInputSettings", new JObject { ["inputName"] = entry.name, ["inputSettings"] = io, ["overlay"] = true }, 3000);
+                            var s = ObsRequest.Invoke("SetInputSettings", new JObject { ["inputName"] = entry.name, ["inputSettings"] = io, ["overlay"] = true }, 3000);
                             if (!s.Ok) warnings.Add(Locales.Message("settings.couldNotUpdateNameError", "name", entry.name, "error", s.Message));
                             PlaceInputOverlayMember(entry.name, settings, warnings);
                             continue;

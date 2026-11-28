@@ -199,7 +199,6 @@ namespace ReplayKitSetup
                     return (object)ok;
                 });
             Add(SetupLocale.Pair("setup.applyDefaultSettings"), SetupLocale.Pair("setup.turnsOnTheDefaultsThisVersion"), () => (object)DefaultsMigration.Run(progress.LogLine));
-            Add(SetupLocale.Pair("setup.enableObsWebsocket"), SetupLocale.Pair("setup.enablesTheLocalObsWebsocket"), () => (object)Installer.ConfigureObsWebsocket(progress.LogLine));
             Add(SetupLocale.Pair("setup.installCustomControlsAndClips"), SetupLocale.Pair("setup.addsTheDockAndClipsFiles"), () => (object)(Installer.InstallObsCustomDock(progress.LogLine) > 0));
             Add(SetupLocale.Pair("setup.installReplaykitPlugin"), SetupLocale.Pair("setup.addsTheReplaykitWindowNotificationsAnd"), () => (object)NativePlugin.InstallReplaykitPlugin(progress.LogLine));
             Add(SetupLocale.Pair("setup.registerClipNotifications"), SetupLocale.Pair("setup.letsClipReadyNotificationsShowUp"), () => (object)Installer.RegisterClipNotificationShortcut(progress.LogLine));

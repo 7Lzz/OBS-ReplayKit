@@ -8,6 +8,7 @@
 #include <QWindowStateChangeEvent>
 #include <util/config-file.h>
 
+#include "app/frontend_events.hpp"
 #include "core/app_icon.hpp"
 #include "core/ipc_pipe.hpp"
 #include "core/idle_memory.hpp"
@@ -71,8 +72,10 @@ protected:
 				return true;
 			}
 		}
-		if (type == QEvent::Show || type == QEvent::Hide || type == QEvent::WindowStateChange)
+		if (type == QEvent::Show || type == QEvent::Hide || type == QEvent::WindowStateChange) {
 			IdleMemory::WindowChanged(m_mw);
+			MainWindowShownChanged(m_mw);
+		}
 		if (type == QEvent::Move || type == QEvent::Resize) {
 			ScheduleObsMainGeometrySave();
 			return false; // observe only, never consume

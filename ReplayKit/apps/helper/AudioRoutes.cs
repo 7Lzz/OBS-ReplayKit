@@ -90,7 +90,7 @@ namespace ReplayKitHelper
                         HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("helper.expectedInputMicDesktopOrDiscord") });
                         return false;
                     }
-                    var res = ObsWebSocket.InvokeRequest("SetInputMute", new JObject { ["inputName"] = inputName, ["inputMuted"] = body["muted"].Value<bool>() }, 3000);
+                    var res = ObsRequest.Invoke("SetInputMute", new JObject { ["inputName"] = inputName, ["inputMuted"] = body["muted"].Value<bool>() }, 3000);
                     HttpResponse.SendJson(stream, res.Ok ? 200 : res.Unavailable ? 503 : 409, ObsResultToJson(res));
                 }
                 catch (Exception ex) { HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = ex.Message }); }

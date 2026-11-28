@@ -390,7 +390,7 @@ namespace ReplayKitHelper
 
         internal static JObject SyncCaptureDisplayFromObs(JObject settings)
         {
-            var input = ObsWebSocket.InvokeRequest("GetInputSettings", new JObject { ["inputName"] = OverlayScene.DisplayCaptureSourceName }, 3000);
+            var input = ObsRequest.Invoke("GetInputSettings", new JObject { ["inputName"] = OverlayScene.DisplayCaptureSourceName }, 3000);
             if (!input.Ok) return settings;
             string wanted = NormalizeCaptureDisplay(input.Data?["inputSettings"]?[WantedMonitorKey]);
             if (string.Equals(wanted, settings["captureDisplay"]?.Value<string>(), StringComparison.Ordinal)) return settings;
@@ -403,7 +403,7 @@ namespace ReplayKitHelper
         internal static JObject DisplayCaptureMethodSettings()
         {
             if (!CaptureMethod.PreferWgc) return new JObject();
-            var input = ObsWebSocket.InvokeRequest("GetInputSettings", new JObject { ["inputName"] = OverlayScene.DisplayCaptureSourceName }, 3000);
+            var input = ObsRequest.Invoke("GetInputSettings", new JObject { ["inputName"] = OverlayScene.DisplayCaptureSourceName }, 3000);
             JObject current = input.Ok ? input.Data?["inputSettings"] as JObject : null;
             // a source that does not exist yet is made with the method; one obs could not be asked about is left as it is
             if (!input.Ok && input.Code != 600) return new JObject();
@@ -420,7 +420,7 @@ namespace ReplayKitHelper
             var inputSettings = new JObject { [WantedMonitorKey] = wanted };
             // a chosen display that is not connected keeps whatever shows now, and the script moves to it once it is back
             if (chosen != null) inputSettings["monitor_id"] = chosen.Id;
-            var set = ObsWebSocket.InvokeRequest("SetInputSettings", new JObject { ["inputName"] = OverlayScene.DisplayCaptureSourceName, ["inputSettings"] = inputSettings, ["overlay"] = true }, 3000);
+            var set = ObsRequest.Invoke("SetInputSettings", new JObject { ["inputName"] = OverlayScene.DisplayCaptureSourceName, ["inputSettings"] = inputSettings, ["overlay"] = true }, 3000);
             if (set.Ok) return new JObject { ["applied"] = new JArray("Display Capture display"), ["warnings"] = new JArray() };
             if (set.Code == 600) return new JObject { ["applied"] = new JArray(), ["warnings"] = new JArray() };
             return new JObject { ["applied"] = new JArray(), ["warnings"] = new JArray(Locales.Message("settings.displayCaptureNotUpdatedError", "error", set.Message)) };
@@ -1117,6 +1117,8 @@ namespace ReplayKitHelper
                 DiscordPresence.SetEnabled(settings["discordRichPresence"]?.Type == JTokenType.Boolean && settings["discordRichPresence"].Value<bool>());
                 ObsUpdate.SetEnabled(DevelopmentFlag(settings, "checkObsUpdates"));
             }
+            // every write of the settings comes through here, and the plugin reads them only when told
+            PipeClient.SendPollSettings();
         }
 
         // the clip listing resolves its folder through AppConfig.GetClipDir, which reads the runtime helper_config -- that config only carries what the lua bootstrap wrote, so a folder chosen in ReplayKit Settings never reached it and the listing silently walked the default folder instead. mirror the saved value across on every write and at startup so Settings is the single source of truth.
@@ -1197,7 +1199,7 @@ namespace ReplayKitHelper
 
         // everything below changes the running obs or its live scene collection file, as opposed to the schema/normalize code above
 
-        internal static JObject ObsResultAsJson(ObsWebSocketResult r) => r.Ok ? new JObject { ["ok"] = true } : new JObject { ["ok"] = false, ["message"] = r.Message };
+        internal static JObject ObsResultAsJson(ObsResult r) => r.Ok ? new JObject { ["ok"] = true } : new JObject { ["ok"] = false, ["message"] = r.Message };
 
         // memory cap for the replay buffer: a peak bitrate estimate per preset tier (the tiers assume 720p for performance and 1080p for the others), raised in proportion to the pixel count of the output actually recorded, times the buffer length; a smaller output never lowers it below the tier estimate.
         internal static double ScaledRbSizeMb(string presetName, int replaySeconds, JObject preset)
@@ -1211,11 +1213,11 @@ namespace ReplayKitHelper
 
         internal static JObject StopObsOutputIfActive(string statusRequest, string stopRequest)
         {
-            var status = ObsWebSocket.InvokeRequest(statusRequest, null, 3000);
+            var status = ObsRequest.Invoke(statusRequest, null, 3000);
             var active = status.Data?["outputActive"];
             if (!status.Ok || active?.Type != JTokenType.Boolean) return new JObject { ["ok"] = false, ["wasActive"] = false, ["warning"] = Locales.Message("settings.outputReadStateFailed", "output", OutputName(statusRequest), "error", status.Message) };
             if (!active.Value<bool>()) return new JObject { ["ok"] = true, ["wasActive"] = false };
-            var stop = ObsWebSocket.InvokeRequest(stopRequest, null, 8000);
+            var stop = ObsRequest.Invoke(stopRequest, null, 8000);
             if (!stop.Ok) return new JObject { ["ok"] = false, ["wasActive"] = true, ["warning"] = Locales.Message("settings.outputStopFailed", "output", OutputName(statusRequest), "error", stop.Message) };
             var wait = WaitObsOutputState(statusRequest, false, 8000);
             if (wait["ok"]?.Value<bool>() != true) return new JObject { ["ok"] = false, ["wasActive"] = true, ["warning"] = wait["warning"] };
@@ -1233,7 +1235,7 @@ namespace ReplayKitHelper
             DateTime deadline = DateTime.UtcNow.AddMilliseconds(Math.Max(1000, timeoutMs));
             do
             {
-                var status = ObsWebSocket.InvokeRequest(statusRequest, null, 3000);
+                var status = ObsRequest.Invoke(statusRequest, null, 3000);
                 var active = status.Data?["outputActive"];
                 if (status.Ok && active?.Type == JTokenType.Boolean && active.Value<bool>() == desiredActive) return new JObject { ["ok"] = true };
                 // a status read over the cached socket costs a few ms, and every poll gap is time the clip buffer stays stopped
@@ -1248,7 +1250,7 @@ namespace ReplayKitHelper
         {
             if (state["wasActive"]?.Value<bool>() != true) return new JObject { ["ok"] = true };
             PipeClient.ReleaseObsOutputsAndWait(1500);
-            var start = ObsWebSocket.InvokeRequest(startRequest, null, 8000);
+            var start = ObsRequest.Invoke(startRequest, null, 8000);
             if (!start.Ok) return new JObject { ["ok"] = false, ["warning"] = Locales.Message("settings.outputRestartFailed", "output", OutputName(startRequest), "error", start.Message) };
             string statusRequest = startRequest == "StartRecord" ? "GetRecordStatus"
                 : startRequest == "StartReplayBuffer" ? "GetReplayBufferStatus"
@@ -1264,7 +1266,7 @@ namespace ReplayKitHelper
 
         internal const string ReplayBufferOutputName = "Replay Buffer";
 
-        internal static ObsWebSocketResult SetVideoSettingsLive(JObject preset) => ObsWebSocket.InvokeRequest("SetVideoSettings", preset["video"], 5000);
+        internal static ObsResult SetVideoSettingsLive(JObject preset) => ObsRequest.Invoke("SetVideoSettings", preset["video"], 5000);
 
         internal static void SetFractionalFpsProfile(JObject preset, List<string> warnings)
         {
@@ -1283,10 +1285,10 @@ namespace ReplayKitHelper
             }
         }
 
-        internal static ObsWebSocketResult SetReplayBufferOutputLive(JObject settings, JObject preset)
+        internal static ObsResult SetReplayBufferOutputLive(JObject settings, JObject preset)
         {
             JObject outputSettings = new JObject();
-            var existing = ObsWebSocket.InvokeRequest("GetOutputSettings", new JObject { ["outputName"] = ReplayBufferOutputName }, 3000);
+            var existing = ObsRequest.Invoke("GetOutputSettings", new JObject { ["outputName"] = ReplayBufferOutputName }, 3000);
             if (existing.Ok && existing.Data?["outputSettings"] is JObject existingSettings) outputSettings = (JObject)existingSettings.DeepClone();
 
             string clipDir = settings["clipDir"]?.Value<string>();
@@ -1296,12 +1298,12 @@ namespace ReplayKitHelper
             outputSettings["directory"] = clipDir;
             outputSettings["path"] = clipDir;
 
-            return ObsWebSocket.InvokeRequest("SetOutputSettings", new JObject { ["outputName"] = ReplayBufferOutputName, ["outputSettings"] = outputSettings }, 5000);
+            return ObsRequest.Invoke("SetOutputSettings", new JObject { ["outputName"] = ReplayBufferOutputName, ["outputSettings"] = outputSettings }, 5000);
         }
 
         internal static JObject GetSceneName()
         {
-            var scenes = ObsWebSocket.InvokeRequest("GetSceneList", null, 3000);
+            var scenes = ObsRequest.Invoke("GetSceneList", null, 3000);
             if (!scenes.Ok) return new JObject { ["ok"] = false, ["message"] = scenes.Message };
             string current = scenes.Data?["currentProgramSceneName"]?.Value<string>();
             if (!string.IsNullOrEmpty(current)) return new JObject { ["ok"] = true, ["name"] = current };
@@ -1311,7 +1313,7 @@ namespace ReplayKitHelper
 
         internal static JObject GetSceneItems(string sceneName)
         {
-            var r = ObsWebSocket.InvokeRequest("GetSceneItemList", new JObject { ["sceneName"] = sceneName }, 3000);
+            var r = ObsRequest.Invoke("GetSceneItemList", new JObject { ["sceneName"] = sceneName }, 3000);
             if (!r.Ok) return new JObject { ["ok"] = false, ["message"] = r.Message, ["items"] = new JArray() };
             return new JObject { ["ok"] = true, ["items"] = r.Data?["sceneItems"] as JArray ?? new JArray() };
         }
@@ -1329,7 +1331,7 @@ namespace ReplayKitHelper
         internal static JObject SetSceneItemEnabled(string sceneName, JObject item, bool enabled)
         {
             if (item == null) return new JObject { ["ok"] = true, ["skipped"] = true };
-            var r = ObsWebSocket.InvokeRequest("SetSceneItemEnabled", new JObject
+            var r = ObsRequest.Invoke("SetSceneItemEnabled", new JObject
             {
                 ["sceneName"] = sceneName,
                 ["sceneItemId"] = item["sceneItemId"]?.Value<int>() ?? 0,
@@ -1342,7 +1344,7 @@ namespace ReplayKitHelper
         internal static JObject RemoveSceneItem(string sceneName, JObject item)
         {
             if (item == null) return new JObject { ["ok"] = true, ["skipped"] = true };
-            var r = ObsWebSocket.InvokeRequest("RemoveSceneItem", new JObject
+            var r = ObsRequest.Invoke("RemoveSceneItem", new JObject
             {
                 ["sceneName"] = sceneName,
                 ["sceneItemId"] = item["sceneItemId"]?.Value<int>() ?? 0,
@@ -1350,7 +1352,7 @@ namespace ReplayKitHelper
             return ObsResultAsJson(r);
         }
 
-        // obs-websocket only accepts a specific subset of transform fields in SetSceneItemTransform (a full GetSceneItemTransform readback includes derived/readonly fields like sourceWidth that the setter rejects) -- this is the allow-list.
+        // the plugin, like obs-websocket did, only accepts a specific subset of transform fields in SetSceneItemTransform (a full GetSceneItemTransform readback includes derived/readonly fields like sourceWidth that the setter rejects) -- this is the allow-list.
         internal static readonly string[] SettableTransformKeys = { "positionX", "positionY", "scaleX", "scaleY", "rotation", "alignment", "boundsType", "boundsAlignment", "cropToBounds", "cropLeft", "cropRight", "cropTop", "cropBottom" };
 
         internal static JObject GetSettableSceneItemTransform(JObject transform)
@@ -1374,7 +1376,7 @@ namespace ReplayKitHelper
         internal static JObject SetSceneItemTransform(string sceneName, JObject item, JObject transform)
         {
             if (item == null) return new JObject { ["ok"] = true, ["skipped"] = true };
-            var r = ObsWebSocket.InvokeRequest("SetSceneItemTransform", new JObject
+            var r = ObsRequest.Invoke("SetSceneItemTransform", new JObject
             {
                 ["sceneName"] = sceneName,
                 ["sceneItemId"] = item["sceneItemId"]?.Value<int>() ?? 0,
@@ -1386,7 +1388,7 @@ namespace ReplayKitHelper
         internal static JObject GetSceneItemTransformLive(string sceneName, JObject item)
         {
             if (item == null) return new JObject { ["ok"] = true, ["skipped"] = true, ["transform"] = null };
-            var r = ObsWebSocket.InvokeRequest("GetSceneItemTransform", new JObject
+            var r = ObsRequest.Invoke("GetSceneItemTransform", new JObject
             {
                 ["sceneName"] = sceneName,
                 ["sceneItemId"] = item["sceneItemId"]?.Value<int>() ?? 0,
@@ -1407,7 +1409,7 @@ namespace ReplayKitHelper
         internal static JObject GetCanvasSizeLive()
         {
             double w = 0.0, h = 0.0;
-            var r = ObsWebSocket.InvokeRequest("GetVideoSettings", null, 3000);
+            var r = ObsRequest.Invoke("GetVideoSettings", null, 3000);
             if (r.Ok)
             {
                 w = GetDoubleValue(r.Data, "baseWidth", 0.0);
@@ -1535,14 +1537,14 @@ namespace ReplayKitHelper
             var item = FindSceneItem(items["items"] as JArray, name);
             if (item != null)
             {
-                var settingsResult = ObsWebSocket.InvokeRequest("SetInputSettings", new JObject { ["inputName"] = name, ["inputSettings"] = inputSettings, ["overlay"] = true }, 3000);
+                var settingsResult = ObsRequest.Invoke("SetInputSettings", new JObject { ["inputName"] = name, ["inputSettings"] = inputSettings, ["overlay"] = true }, 3000);
                 if (!settingsResult.Ok) return ObsResultAsJson(settingsResult);
                 var enableResult = SetSceneItemEnabled(sceneName, item, enabled);
                 if (enableResult["ok"]?.Value<bool>() != true) return enableResult;
                 return new JObject { ["ok"] = true, ["item"] = item };
             }
 
-            var created = ObsWebSocket.InvokeRequest("CreateInput", new JObject
+            var created = ObsRequest.Invoke("CreateInput", new JObject
             {
                 ["sceneName"] = sceneName,
                 ["inputName"] = name,
@@ -1552,9 +1554,9 @@ namespace ReplayKitHelper
             }, 5000);
             if (!created.Ok)
             {
-                var settingsResult = ObsWebSocket.InvokeRequest("SetInputSettings", new JObject { ["inputName"] = name, ["inputSettings"] = inputSettings, ["overlay"] = true }, 3000);
+                var settingsResult = ObsRequest.Invoke("SetInputSettings", new JObject { ["inputName"] = name, ["inputSettings"] = inputSettings, ["overlay"] = true }, 3000);
                 if (!settingsResult.Ok) return ObsResultAsJson(created);
-                var sceneItem = ObsWebSocket.InvokeRequest("CreateSceneItem", new JObject { ["sceneName"] = sceneName, ["sourceName"] = name, ["sceneItemEnabled"] = enabled }, 5000);
+                var sceneItem = ObsRequest.Invoke("CreateSceneItem", new JObject { ["sceneName"] = sceneName, ["sourceName"] = name, ["sceneItemEnabled"] = enabled }, 5000);
                 if (!sceneItem.Ok) return ObsResultAsJson(created);
                 return new JObject { ["ok"] = true, ["item"] = new JObject { ["sceneItemId"] = sceneItem.Data?["sceneItemId"]?.Value<int>() ?? 0, ["sourceName"] = name } };
             }
@@ -1569,7 +1571,7 @@ namespace ReplayKitHelper
             {
                 try { return new JObject { ["ok"] = true, ["index"] = value.Value<int>() }; } catch (FormatException) { } catch (InvalidCastException) { }
             }
-            var result = ObsWebSocket.InvokeRequest("GetSceneItemIndex", new JObject { ["sceneName"] = sceneName, ["sceneItemId"] = item["sceneItemId"]?.Value<int>() ?? 0 }, 3000);
+            var result = ObsRequest.Invoke("GetSceneItemIndex", new JObject { ["sceneName"] = sceneName, ["sceneItemId"] = item["sceneItemId"]?.Value<int>() ?? 0 }, 3000);
             if (!result.Ok) return new JObject { ["ok"] = false, ["message"] = result.Message, ["index"] = -1 };
             return new JObject { ["ok"] = true, ["index"] = result.Data?["sceneItemIndex"]?.Value<int>() ?? -1 };
         }
@@ -1578,7 +1580,7 @@ namespace ReplayKitHelper
         {
             if (item == null) return new JObject { ["ok"] = true, ["skipped"] = true };
             if (index < 0) index = 0;
-            var r = ObsWebSocket.InvokeRequest("SetSceneItemIndex", new JObject { ["sceneName"] = sceneName, ["sceneItemId"] = item["sceneItemId"]?.Value<int>() ?? 0, ["sceneItemIndex"] = index }, 3000);
+            var r = ObsRequest.Invoke("SetSceneItemIndex", new JObject { ["sceneName"] = sceneName, ["sceneItemId"] = item["sceneItemId"]?.Value<int>() ?? 0, ["sceneItemIndex"] = index }, 3000);
             return ObsResultAsJson(r);
         }
 

@@ -1,6 +1,7 @@
 // the clip buffer: obs keeps it in memory as its replay buffer, or this keeps it on disk as short pieces and the helper joins the newest of them into a clip
 #include "prelude.hpp"
 #include "app/clip_buffer.hpp"
+#include "notify/clip_sound.hpp"
 #include "app/capture_context.hpp"
 
 #include <QDateTime>
@@ -171,17 +172,31 @@ bool DiskWaitsForGraphics()
 	return g_failedGraphics && !g_matchGraphicsUntil;
 }
 
+// what the helper was last told, -1 before the first report
+int g_sentCapturing = -1;
+int g_sentRetained = -1;
+
 std::string DiskStateQuery(const char *activeKey)
 {
 	g_diskStateStamp = std::max<std::uint64_t>(g_diskStateStamp + 1, os_gettime_ns());
-	return std::string("?") + activeKey + (DiskCapturing() ? "=1" : "=0") +
-	       (DiskCanSaveRetained() ? "&retained=1" : "&retained=0") + "&clipStamp=" + std::to_string(g_diskStateStamp);
+	const bool capturing = DiskCapturing();
+	const bool retained = DiskCanSaveRetained();
+	g_sentCapturing = capturing;
+	g_sentRetained = retained;
+	return std::string("?") + activeKey + (capturing ? "=1" : "=0") + (retained ? "&retained=1" : "&retained=0") + "&clipStamp=" + std::to_string(g_diskStateStamp);
 }
 
 void ReportState()
 {
 	const std::string path = "/clip-buffer/state" + DiskStateQuery("active");
 	RunAsync([path]() { HttpRequest("POST", path.c_str(), nullptr, 2000); });
+}
+
+// capturing also ends on its own when the frames stall, which no event says, so the ticks the buffer runs anyway look for it; the helper keeps what it was told for as long as the plugin is connected
+void ReportStateIfChanged()
+{
+	if (int(DiskCapturing()) != g_sentCapturing || int(DiskCanSaveRetained()) != g_sentRetained)
+		ReportState();
 }
 
 void ForgetPiece(const std::string &path)
@@ -662,7 +677,10 @@ void StartDisk(bool keepPieces)
 	}
 	if (!g_purgeTimer) {
 		g_purgeTimer = new QTimer(g_callbacks);
-		QObject::connect(g_purgeTimer, &QTimer::timeout, g_callbacks, []() { Purge(); });
+		QObject::connect(g_purgeTimer, &QTimer::timeout, g_callbacks, []() {
+			Purge();
+			ReportStateIfChanged();
+		});
 	}
 	if (!keepPieces)
 		CaptureContextResetBuffer();
@@ -670,7 +688,10 @@ void StartDisk(bool keepPieces)
 	g_splitAsked = false;
 	if (!g_splitTimer) {
 		g_splitTimer = new QTimer(g_callbacks);
-		QObject::connect(g_splitTimer, &QTimer::timeout, g_callbacks, []() { SplitWhenDue(); });
+		QObject::connect(g_splitTimer, &QTimer::timeout, g_callbacks, []() {
+			SplitWhenDue();
+			ReportStateIfChanged();
+		});
 	}
 	g_splitTimer->start(1000);
 	blog(LOG_INFO, "[replaykit] disk clip buffer started: %d s clips in %d s pieces, %zu audio track(s), %s encoders%s", g_clipSeconds, kPieceSeconds, g_audio.size(),
@@ -793,10 +814,8 @@ void SaveDisk()
 	g_awaitingSplit = capturing;
 	const int gen = ++g_saveGen;
 	g_saveStamp = QDateTime::currentMSecsSinceEpoch();
-	// play the save sound on the press; the confirmation waits for the finished file
-	calldata_t saving = {};
-	signal_handler_signal(obs_get_signal_handler(), "replaykit_clip_saving", &saving);
-	calldata_free(&saving);
+	// the save sound plays on the press; the confirmation waits for the finished file
+	ClipSoundPlay(ClipSound::ClipSaved);
 	TellPagesClipSaving("start");
 	TellHelperClipSaving(g_saveStamp, "start");
 	if (!capturing) {
@@ -894,20 +913,6 @@ void OnHotkeyBindingsChanged(void *, calldata_t *cd)
 }
 
 // the auto start script asks this instead of starting the obs replay buffer itself, so a disk buffer never starts the memory one first
-void ClipStartProc(void *, calldata_t *cd)
-{
-	calldata_set_bool(cd, "handled", true);
-	if (g_callbacks)
-		QMetaObject::invokeMethod(g_callbacks, []() { ClipBufferStart(); }, Qt::QueuedConnection);
-}
-
-void ClipSaveProc(void *, calldata_t *cd)
-{
-	calldata_set_bool(cd, "handled", true);
-	if (g_callbacks)
-		QMetaObject::invokeMethod(g_callbacks, []() { ClipBufferSave(); }, Qt::QueuedConnection);
-}
-
 void SwitchMode(Mode next)
 {
 	const Mode previous = g_mode;
@@ -939,10 +944,7 @@ void ClipBufferInit()
 	g_stopTimer = new QTimer(g_callbacks);
 	g_stopTimer->setInterval(kStopCheckMs);
 	QObject::connect(g_stopTimer, &QTimer::timeout, g_stopTimer, FinishDiskStopWhenInactive);
-	signal_handler_add(obs_get_signal_handler(), "void replaykit_clip_saving()");
 	signal_handler_add(obs_get_signal_handler(), "void replaykit_clip_saved(string path)");
-	proc_handler_add(obs_get_proc_handler(), "void replaykit_clip_start(out bool handled)", ClipStartProc, nullptr);
-	proc_handler_add(obs_get_proc_handler(), "void replaykit_clip_save(out bool handled)", ClipSaveProc, nullptr);
 	signal_handler_connect(obs_get_signal_handler(), "hotkey_bindings_changed", OnHotkeyBindingsChanged, nullptr);
 	g_saveHotkey = obs_hotkey_register_frontend("ReplayKit.SaveClip", TrMessage("shell.hotkeySaveClipDiskBuffer").toUtf8().constData(), OnSaveHotkey, nullptr);
 	blog(LOG_INFO, "[replaykit] clip buffer mode at startup: %s", ModeName(g_mode));

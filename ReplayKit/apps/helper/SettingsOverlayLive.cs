@@ -25,10 +25,10 @@ using static ReplayKitHelper.SettingsHttp;
 
 namespace ReplayKitHelper
 {
-    // the overlay on a running obs: the opacity and colour filter over obs-websocket, which sources an overlay style uses, and the live preview the settings page drives while a slider moves
+    // the overlay on a running obs: the opacity and colour filter through obs requests, which sources an overlay style uses, and the live preview the settings page drives while a slider moves
     internal static class SettingsOverlayLive
     {
-        // the overlay opacity filter on a running obs: reading, creating and updating it over obs-websocket
+        // the overlay opacity filter on a running obs: reading, creating and updating it through obs requests
 
         internal static JObject GetOverlayOpacityLiveFilterInfo(JArray filters)
         {
@@ -66,7 +66,7 @@ namespace ReplayKitHelper
 
         internal static JObject GetSourceFilterListLive(string sourceName)
         {
-            var list = ObsWebSocket.InvokeRequest("GetSourceFilterList", new JObject { ["sourceName"] = sourceName }, 3000);
+            var list = ObsRequest.Invoke("GetSourceFilterList", new JObject { ["sourceName"] = sourceName }, 3000);
             if (!list.Ok) return new JObject { ["ok"] = false, ["message"] = list.Message, ["filters"] = new JArray() };
             var filters = list.Data?["filters"] as JArray ?? list.Data?["sourceFilters"] as JArray ?? new JArray();
             return new JObject { ["ok"] = true, ["message"] = "", ["filters"] = filters };
@@ -82,7 +82,7 @@ namespace ReplayKitHelper
             return file != null ? new JObject { ["path"] = file.FullName } : null;
         }
 
-        // last-resort readback of the opacity filter straight off disk, for the settings payload only (never a write target) -- used when a live websocket filter lookup fails, so the settings dock still shows something sensible even if obs isnt reachable right now. picks the most-recently-written scene file under basic\scenes, a looser resolution than GetSceneCollectionPath (which asks obs which collection is actually active); that imprecision is fine here since this never drives a write.
+        // last-resort readback of the opacity filter straight off disk, for the settings payload only (never a write target) -- used when a live filter lookup fails, so the settings dock still shows something sensible even if obs isnt reachable right now. picks the most-recently-written scene file under basic\scenes, a looser resolution than GetSceneCollectionPath (which asks obs which collection is actually active); that imprecision is fine here since this never drives a write.
         internal static JObject GetSceneFileOverlayOpacityPercent(JObject settings)
         {
             var pathToken = GetLatestSceneCollectionPath();
@@ -135,28 +135,28 @@ namespace ReplayKitHelper
             if (opacityPercent >= SettingLimits.OverlayOpacityMax && !hasColorAdjustments)
             {
                 if (string.IsNullOrWhiteSpace(existingFilterName)) return new JObject { ["ok"] = true, ["message"] = "" };
-                var setFull = ObsWebSocket.InvokeRequest("SetSourceFilterSettings", new JObject
+                var setFull = ObsRequest.Invoke("SetSourceFilterSettings", new JObject
                 {
                     ["sourceName"] = sourceName, ["filterName"] = existingFilterName,
                     ["filterSettings"] = OverlayOpacityFilterSettingsLive(SettingLimits.OverlayOpacityMax, legacyPercent, settings), ["overlay"] = true,
                 }, 3000);
                 if (!setFull.Ok) return new JObject { ["ok"] = false, ["message"] = setFull.Message };
-                var enableFull = ObsWebSocket.InvokeRequest("SetSourceFilterEnabled", new JObject { ["sourceName"] = sourceName, ["filterName"] = existingFilterName, ["filterEnabled"] = true }, 3000);
+                var enableFull = ObsRequest.Invoke("SetSourceFilterEnabled", new JObject { ["sourceName"] = sourceName, ["filterName"] = existingFilterName, ["filterEnabled"] = true }, 3000);
                 return enableFull.Ok ? new JObject { ["ok"] = true, ["message"] = "" } : new JObject { ["ok"] = false, ["message"] = enableFull.Message };
             }
 
             var filterSettings = OverlayOpacityFilterSettingsLive(opacityPercent, legacyPercent, settings);
             if (!string.IsNullOrWhiteSpace(existingFilterName))
             {
-                var set = ObsWebSocket.InvokeRequest("SetSourceFilterSettings", new JObject { ["sourceName"] = sourceName, ["filterName"] = existingFilterName, ["filterSettings"] = filterSettings, ["overlay"] = true }, 3000);
+                var set = ObsRequest.Invoke("SetSourceFilterSettings", new JObject { ["sourceName"] = sourceName, ["filterName"] = existingFilterName, ["filterSettings"] = filterSettings, ["overlay"] = true }, 3000);
                 if (!set.Ok) return new JObject { ["ok"] = false, ["message"] = set.Message };
             }
             else
             {
-                var create = ObsWebSocket.InvokeRequest("CreateSourceFilter", new JObject { ["sourceName"] = sourceName, ["filterName"] = OverlayScene.OpacityFilterName, ["filterKind"] = OverlayScene.OpacityFilterVersionedKind, ["filterSettings"] = filterSettings }, 3000);
+                var create = ObsRequest.Invoke("CreateSourceFilter", new JObject { ["sourceName"] = sourceName, ["filterName"] = OverlayScene.OpacityFilterName, ["filterKind"] = OverlayScene.OpacityFilterVersionedKind, ["filterSettings"] = filterSettings }, 3000);
                 if (!create.Ok)
                 {
-                    var createFallback = ObsWebSocket.InvokeRequest("CreateSourceFilter", new JObject
+                    var createFallback = ObsRequest.Invoke("CreateSourceFilter", new JObject
                     {
                         ["sourceName"] = sourceName, ["filterName"] = OverlayScene.OpacityFilterName, ["filterKind"] = OverlayScene.OpacityFilterKind,
                         ["filterSettings"] = OverlayOpacityFilterSettingsLive(opacityPercent, true, settings),
@@ -174,7 +174,7 @@ namespace ReplayKitHelper
                         legacyPercent = OverlayOpacityFilterUsesLegacyPercent(createdFilter["kind"]?.Value<string>() ?? "", createdFilter["settings"] as JObject);
                         if (legacyPercent)
                         {
-                            var setCreated = ObsWebSocket.InvokeRequest("SetSourceFilterSettings", new JObject
+                            var setCreated = ObsRequest.Invoke("SetSourceFilterSettings", new JObject
                             {
                                 ["sourceName"] = sourceName, ["filterName"] = existingFilterName,
                                 ["filterSettings"] = OverlayOpacityFilterSettingsLive(opacityPercent, true, settings), ["overlay"] = true,
@@ -184,7 +184,7 @@ namespace ReplayKitHelper
                     }
                 }
             }
-            var enable = ObsWebSocket.InvokeRequest("SetSourceFilterEnabled", new JObject { ["sourceName"] = sourceName, ["filterName"] = existingFilterName, ["filterEnabled"] = true }, 3000);
+            var enable = ObsRequest.Invoke("SetSourceFilterEnabled", new JObject { ["sourceName"] = sourceName, ["filterName"] = existingFilterName, ["filterEnabled"] = true }, 3000);
             return enable.Ok ? new JObject { ["ok"] = true, ["message"] = "" } : new JObject { ["ok"] = false, ["message"] = enable.Message };
         }
 
@@ -214,7 +214,7 @@ namespace ReplayKitHelper
                 new[] { OverlayScene.WindowCaptureSourceName, "cursor", "showCursorWindowCapture" },
             })
             {
-                var set = ObsWebSocket.InvokeRequest("SetInputSettings", new JObject
+                var set = ObsRequest.Invoke("SetInputSettings", new JObject
                 {
                     ["inputName"] = target[0],
                     ["inputSettings"] = new JObject { [target[1]] = CursorSetting(settings, target[2]) },
@@ -229,7 +229,7 @@ namespace ReplayKitHelper
 
         internal static JObject SetDisplayCaptureCursorLive(JObject settings)
         {
-            var set = ObsWebSocket.InvokeRequest("SetInputSettings", new JObject
+            var set = ObsRequest.Invoke("SetInputSettings", new JObject
             {
                 ["inputName"] = OverlayScene.DisplayCaptureSourceName,
                 ["inputSettings"] = new JObject { ["capture_cursor"] = CursorSetting(settings, "showCursorDisplayCapture") },
@@ -419,10 +419,10 @@ namespace ReplayKitHelper
             var cursorResult = SetDisplayCaptureCursorLive(settings);
             if (cursorResult["ok"]?.Value<bool>() != true) warnings.Add(Locales.Message("settings.couldNotUpdateTheDisplayCapture", "error", cursorResult["message"]));
 
-            var setGame = ObsWebSocket.InvokeRequest("SetInputSettings", new JObject { ["inputName"] = OverlayScene.GameCaptureSourceName, ["inputSettings"] = gameInputSettings, ["overlay"] = true }, 3000);
+            var setGame = ObsRequest.Invoke("SetInputSettings", new JObject { ["inputName"] = OverlayScene.GameCaptureSourceName, ["inputSettings"] = gameInputSettings, ["overlay"] = true }, 3000);
             if (!setGame.Ok) warnings.Add(Locales.Message("settings.couldNotUpdateGameCaptureSettings", "error", setGame.Message));
 
-            var setWindow = ObsWebSocket.InvokeRequest("SetInputSettings", new JObject { ["inputName"] = OverlayScene.WindowCaptureSourceName, ["inputSettings"] = windowSettings, ["overlay"] = true }, 3000);
+            var setWindow = ObsRequest.Invoke("SetInputSettings", new JObject { ["inputName"] = OverlayScene.WindowCaptureSourceName, ["inputSettings"] = windowSettings, ["overlay"] = true }, 3000);
             if (!setWindow.Ok) warnings.Add(Locales.Message("settings.couldNotUpdateWindowCaptureSettings", "error", setWindow.Message));
 
             if (useWindowCapture && string.IsNullOrWhiteSpace(settings["screenshareGameWindow"]?.Value<string>()))

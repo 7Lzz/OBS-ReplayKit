@@ -246,11 +246,11 @@ namespace ReplayKitHelper
 
         // the profile parameters of basic.ini and the monitoring device
 
-        internal static ObsWebSocketResult SetObsProfileParameterSafe(string category, string name, string value) =>
-            ObsWebSocket.InvokeRequest("SetProfileParameter", new JObject { ["parameterCategory"] = category, ["parameterName"] = name, ["parameterValue"] = value }, 3000);
+        internal static ObsResult SetObsProfileParameterSafe(string category, string name, string value) =>
+            ObsRequest.Invoke("SetProfileParameter", new JObject { ["parameterCategory"] = category, ["parameterName"] = name, ["parameterValue"] = value }, 3000);
 
-        internal static ObsWebSocketResult GetObsProfileParameterSafe(string category, string name) =>
-            ObsWebSocket.InvokeRequest("GetProfileParameter", new JObject { ["parameterCategory"] = category, ["parameterName"] = name }, 3000);
+        internal static ObsResult GetObsProfileParameterSafe(string category, string name) =>
+            ObsRequest.Invoke("GetProfileParameter", new JObject { ["parameterCategory"] = category, ["parameterName"] = name }, 3000);
 
         internal static JObject GetObsProfileParameterValue(string category, string name)
         {
@@ -333,17 +333,17 @@ namespace ReplayKitHelper
             catch (JsonException) { return new JObject(); }
         }
 
-        internal static ObsWebSocketResult GetReplayBufferHotkeyJson()
+        internal static ObsResult GetReplayBufferHotkeyJson()
         {
-            var result = ObsWebSocket.InvokeRequest("GetVersion");
+            var result = ObsRequest.Invoke("GetVersion");
             if (!result.Ok) return result;
             if (!Version.TryParse(result.Data?["obsVersion"]?.Value<string>(), out var version))
-                return new ObsWebSocketResult { Ok = false, Message = Locales.Message("settings.obsVersionIsInvalid") };
+                return new ObsResult { Ok = false, Message = Locales.Message("settings.obsVersionIsInvalid") };
             return GetObsProfileParameterSafe("Hotkeys", version.Major >= 33 ? "OBSBasic.SaveReplayBuffer" : "ReplayBuffer");
         }
 
         // keep both formats current so switching obs versions preserves the saved clip bindings
-        internal static ObsWebSocketResult SetReplayBufferHotkeyJson(JObject combo, JObject extra)
+        internal static ObsResult SetReplayBufferHotkeyJson(JObject combo, JObject extra)
         {
             var result = SetObsProfileParameterSafe("Hotkeys", "ReplayBuffer", ConvertClipKeybindToBasicIni(combo, extra));
             if (!result.Ok) return result;

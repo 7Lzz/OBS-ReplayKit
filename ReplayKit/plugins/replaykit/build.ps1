@@ -52,6 +52,7 @@ $buildInputs = $sourceFiles + @(
     (Join-Path $ReplayKitGenerated 'share_window_values.hpp'),
     (Join-Path $ReplayKitGenerated 'core\shared_values.hpp'),
     (Join-Path $ReplayKitGenerated 'obs_audio_group.hpp'),
+    (Join-Path $ReplayKitGenerated 'replaykit_folder.hpp'),
     $ObsVersionsManifest,
     (Join-Path $PSScriptRoot '..\..\scripts\obs_versions.ps1'),
     $PSCommandPath

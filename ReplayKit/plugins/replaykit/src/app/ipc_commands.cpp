@@ -19,7 +19,10 @@
 #include "core/state.hpp"
 #include "core/window_state.hpp"
 #include "notify/notify_button.hpp"
+#include "notify/notify_panel.hpp"
+#include "app/obs_requests.hpp"
 #include "share/share_audio.hpp"
+#include "share/share_monitoring.hpp"
 #include "shell/shell_account.hpp"
 #include "shell/shell_grip.hpp"
 #include "shell/shell_history.hpp"
@@ -277,17 +280,25 @@ void PipeDispatchLine(const std::string &line)
 			QMetaObject::invokeMethod(g_callbacks, [n]() { ShellHostPong(n); }, Qt::QueuedConnection);
 		}
 	} else if (line == "POLLSETTINGS") {
-		// a theme being previewed in the settings tab: read the colours now instead of on the next second
+		// the settings changed, an update badge changed or the helper just connected: the plugin has no timer of its own for them
 		QMetaObject::invokeMethod(g_callbacks, []() { PollHelperSettings(); }, Qt::QueuedConnection);
+	} else if (line == "NOTIFY") {
+		QMetaObject::invokeMethod(g_callbacks, []() { PollNotificationCount(); }, Qt::QueuedConnection);
 	} else if (line == "RELEASEOUTPUTS") {
-		// the helper is about to start the replay buffer or a recording through obs-websocket and waits for the ack
+		// the helper is about to start the replay buffer or a recording and waits for the ack
 		QMetaObject::invokeMethod(g_callbacks, []() {
-			ShellStartOutputWhenFree([]() { g_pipeSendOutputsReleasedAck.store(true); });
+			ShellStartOutputWhenFree([]() {
+				g_pipeSendOutputsReleasedAck.store(true);
+				PipeWake();
+			});
 		}, Qt::QueuedConnection);
 	} else if (line.rfind("SHARECARD ", 0) == 0) {
 		// drawn on the ui thread, where qt draws text and svg
 		const std::string request = line.substr(10);
-		QMetaObject::invokeMethod(g_callbacks, [request]() { g_pipeShareCardAck.store(RenderShareCard(request) ? 1 : 0); }, Qt::QueuedConnection);
+		QMetaObject::invokeMethod(g_callbacks, [request]() {
+			g_pipeShareCardAck.store(RenderShareCard(request) ? 1 : 0);
+			PipeWake();
+		}, Qt::QueuedConnection);
 	} else if (line.rfind("LANGUAGE ", 0) == 0 || line.rfind("MONITORDEVICE ", 0) == 0) {
 		const auto start = line.find(' ') + 1;
 		const auto end = line.find(' ', start);
@@ -332,10 +343,14 @@ void PipeDispatchLine(const std::string &line)
 		QMetaObject::invokeMethod(g_callbacks, [edges]() { ShellStartEdgeResize(edges); }, Qt::QueuedConnection);
 	} else if (line == "SHAREAUDIOHOLD 0" || line == "SHAREAUDIOHOLD 1") {
 		ShareAudioSetHeld(line.back() == '1');
+		QMetaObject::invokeMethod(g_callbacks, []() { ShareMonitoringEnsure(); }, Qt::QueuedConnection);
 	} else if (line == "ALLOWCLOSE") {
 		// a real restart/exit is coming -- let the next WM_CLOSE through the close-to-tray filter for 60s, and ack so the helper knows the filter saw it before it posts the close.
 		g_allowCloseUntilMs.store(GetTickCount64() + 60000);
 		g_pipeSendAllowCloseAck.store(true);
+		PipeWake();
+	} else if (line.rfind("OBSREQ ", 0) == 0 && line.size() < 60000) {
+		ObsRequestDispatch(line.substr(7));
 	}
 }
 

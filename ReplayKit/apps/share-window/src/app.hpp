@@ -50,6 +50,7 @@ private:
 	CardMode cardMode = CardMode::Full;
 	std::wstring cardPath;
 	std::wstring soundPath;
+	float soundVolume = 0.0f;
 
 	bool mediaFoundation = false;
 	CardVideo video;

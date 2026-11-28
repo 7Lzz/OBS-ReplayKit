@@ -1,6 +1,7 @@
 // field extraction for the small known-shape helper responses
 #pragma once
 
+#include <QJsonObject>
 #include <optional>
 #include <string>
 
@@ -16,5 +17,7 @@ int JsonIntField(const std::string &body, const char *field, int defaultValue);
 // byte counts do not fit an int
 long long JsonInt64Field(const std::string &body, const char *field, long long defaultValue);
 double JsonDoubleField(const std::string &body, const char *field, double defaultValue);
+// the json object an answer of HttpRequest carries, which still starts with its http headers; empty when it carries none
+QJsonObject JsonBodyObject(const std::string &response);
 
 } // namespace rk

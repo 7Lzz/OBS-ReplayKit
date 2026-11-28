@@ -31,6 +31,14 @@ namespace ReplayKitHelper
         private static DateTime checkedAt = DateTime.MinValue;
         private static volatile string readyVersion = "";
 
+        // the plugin reads the badge with the settings, and reads them only when told
+        private static void SetReady(string version)
+        {
+            if (version == readyVersion) return;
+            readyVersion = version;
+            PipeClient.SendPollSettings();
+        }
+
         public static string ReadyVersion => readyVersion;
 
         // the 30 minute tick only goes to github when the switch is on and the last answer is 6 hours old
@@ -47,7 +55,7 @@ namespace ReplayKitHelper
             enabled = on;
             if (!on)
             {
-                readyVersion = "";
+                SetReady("");
                 return;
             }
             checkedAt = DateTime.MinValue;
@@ -59,7 +67,7 @@ namespace ReplayKitHelper
         {
             version = (version ?? "").Trim();
             if (version.Length > 0 && !Regex.IsMatch(version, @"^\d{1,4}\.\d{1,4}\.\d{1,4}$")) return new JObject { ["ok"] = false, ["message"] = Locales.Message("update.badVersion") };
-            readyVersion = version;
+            SetReady(version);
             return new JObject { ["ok"] = true, ["obsUpdateReady"] = version };
         }
 
@@ -79,7 +87,7 @@ namespace ReplayKitHelper
                 var installed = InstalledVersion();
                 string ready = enabled && latest.Length > 0 && installed != null && Version.Parse(latest) > installed ? latest : "";
                 if (ready != readyVersion) Log.Write("obs update check: " + (ready.Length > 0 ? "OBS " + ready + " is out, installed " + installed : "OBS is up to date"));
-                readyVersion = ready;
+                SetReady(ready);
             }
             catch (Exception ex) when (ex is HttpRequestException || ex is OperationCanceledException || ex is JsonException || ex is InvalidDataException || ex is IOException)
             {

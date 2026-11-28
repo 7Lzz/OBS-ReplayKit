@@ -20,7 +20,6 @@ ReplayKit/apps/helper/obj/
 /ReplayKit/apps/share-window/protocol/share_window_values.hpp
 /ReplayKit/apps/process-host/obs_audio_group.hpp
 /ReplayKit/apps/process-host/replaykit_folder.hpp
-/ReplayKit/lua/shared_values.lua
 /ReplayKit/ui/helper-endpoint.js
 
 # runtime state the installer and helper write into the users appdata; ignored in case a live folder is ever copied into the repo, so credentials, cookies and per-user paths can never be committed

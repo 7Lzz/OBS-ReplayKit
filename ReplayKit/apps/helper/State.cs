@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Net.WebSockets;
 using System.Threading.Tasks;
 using Microsoft.Win32;
 using Newtonsoft.Json.Linq;
@@ -270,11 +269,6 @@ namespace ReplayKitHelper
         public readonly object IpcLock = new object();
         public bool IpcClientConnected;
         public long ObsMainWindowHwnd;           // 0 until the plugin sends MAINWIN
-
-        // guarded by ObsWebSocketLock
-        public readonly object ObsWebSocketLock = new object();
-        public ClientWebSocket ObsWebSocket;
-        public int ObsWebSocketPort;
 
         // guarded by UpdateCheckLock
         public readonly object UpdateCheckLock = new object();

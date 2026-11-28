@@ -833,6 +833,12 @@ namespace ReplayKitHelper
         private const int DWMWCP_ROUND = 2;
         private const int DWMWA_COLOR_DEFAULT = unchecked((int)0xFFFFFFFF);
 
+        [DllImport("user32.dll", SetLastError = true)] private static extern bool SetWindowDisplayAffinity(IntPtr hWnd, uint dwAffinity);
+        private const uint WDA_EXCLUDEFROMCAPTURE = 0x11;
+
+        // keeps a window of the helper out of screenshare pickers and desktop captures; only the process that owns a window may set this, and windows before 10 2004 refuse it, which leaves the window visible to capture
+        public static bool ExcludeFromCapture(IntPtr hWnd) => hWnd != IntPtr.Zero && SetWindowDisplayAffinity(hWnd, WDA_EXCLUDEFROMCAPTURE);
+
         // win11 anti-aliased rounded corners + the standard system border for a frameless window the helper owns (the update window -- UpdatePromptWindow.cs, which keeps WS_THICKFRAME so dwm treats it as roundable). replaces a CreateRoundRectRgn clip: window regions are never anti-aliased and opt a window out of dwm rounding entirely (see MS "apply rounded corners" docs). the border is dwm-drawn at DWMWA_COLOR_DEFAULT -- the exact call chrome makes -- so it follows the rounded corners; a self-drawn (form-padding) border is rectangular and gets chopped at those corners.
         public static void EnableDwmRounding(IntPtr hWnd)
         {

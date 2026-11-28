@@ -1,6 +1,7 @@
 // samples which game a clip shows, from the captures of the current scene and the window in front, and queues it for the helper
 #include "prelude.hpp"
 #include "app/capture_context.hpp"
+#include "core/ipc_pipe.hpp"
 
 #include <QJsonDocument>
 #include <QJsonArray>
@@ -40,6 +41,7 @@ void Queue(const char *verb, const QJsonObject &data)
 	if (messages.size() >= 512)
 		messages.pop_front();
 	messages.push_back(std::string(verb) + " " + QJsonDocument(data).toJson(QJsonDocument::Compact).toStdString());
+	PipeWake();
 }
 
 QString ImagePath(DWORD pid)
