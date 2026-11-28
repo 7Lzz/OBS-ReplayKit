@@ -57,7 +57,7 @@ namespace ReplayKitHelper
                     if (parts[0] == "video") { bases.Insert(0, den); video = true; }
                     else bases.Add(den);
                 }
-                else if (parts.Length == 1 && decimal.TryParse(parts[0], NumberStyles.Float, CultureInfo.InvariantCulture, out decimal start))
+                else if (parts.Length == 1 && decimal.TryParse(parts[0], NumberStyles.Float, CultureInfo.InvariantCulture, out decimal start) && start >= 0 && start < 1000000000m)
                 {
                     startUs = (long)Math.Round(start * 1000000, MidpointRounding.AwayFromZero);
                 }

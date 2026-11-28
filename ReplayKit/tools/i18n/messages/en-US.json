@@ -2995,6 +2995,10 @@
     "context": "Message the helper shows when an action fails or finishes in a ReplayKit window, sent by the background helper.",
     "text": "Bad start/end"
   },
+  "editor.badSubtitles": {
+    "context": "Error in the clip editor when subtitle data cannot be read, sent by the background helper.",
+    "text": "Bad subtitles"
+  },
   "editor.badVideoLookError": {
     "context": "Message the helper shows when an action fails or finishes in a ReplayKit window, sent by the background helper. Keep {error} as written.",
     "text": "Bad video look: {error}"
@@ -5011,6 +5015,10 @@
     "context": "Message the helper shows when an action fails or finishes in a ReplayKit window, sent by the background helper.",
     "text": "That clip was not found"
   },
+  "editor.thatFileCouldNotBeReadAsAudio": {
+    "context": "Error in the clip editor when an imported file cannot be decoded as audio, sent by the background helper.",
+    "text": "That file could not be read as audio"
+  },
   "editor.thatFileHasNoAudio": {
     "context": "Error message in a ReplayKit window, sent by the background helper.",
     "text": "That file has no audio"
@@ -5395,6 +5403,10 @@
     "context": "Message the helper shows when an action fails or finishes in a ReplayKit window, sent by the background helper.",
     "text": "Too many existing trim outputs"
   },
+  "editor.tooManyPresets": {
+    "context": "Error in the clip editor when the user tries to save more presets than the limit allows, sent by the background helper.",
+    "text": "There are too many presets. Delete some first."
+  },
   "editor.tooManySubtitles": {
     "context": "Error in the clip editor, sent by the background helper.",
     "text": "Too many subtitles"
@@ -5483,6 +5495,10 @@
     "context": "Error message in a ReplayKit window, sent by the background helper.",
     "text": "Unknown speech range."
   },
+  "editor.unknownTrimMode": {
+    "context": "Error in the clip editor when a save request uses an unrecognised mode, sent by the background helper. Keep {mode} as written.",
+    "text": "Unknown trim mode '{mode}'"
+  },
   "editor.unmute": {
     "context": "Label in the timeline of the clip editor.",
     "text": "Unmute"
@@ -5534,6 +5550,10 @@
   "editor.videoSpeedX": {
     "context": "Text in the timeline of the clip editor. Keep {speed} as written.",
     "text": "Video {speed}x"
+  },
+  "editor.voiceoverTake": {
+    "context": "Default track name for a voiceover recorded in the clip editor. Keep {number} as written.",
+    "text": "Voiceover {number}"
   },
   "editor.volume": {
     "context": "Label in the timeline of the clip editor.",

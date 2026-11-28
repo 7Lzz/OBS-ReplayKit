@@ -2995,6 +2995,10 @@
     "source": "9d26d468e25871be",
     "text": "Início/fim inválidos"
   },
+  "editor.badSubtitles": {
+    "source": "5a4ef0f8500ab1d6",
+    "text": "Legendas inválidas"
+  },
   "editor.badVideoLookError": {
     "source": "1ea995696f2aa08a",
     "text": "Aparência de vídeo inválida: {error}"
@@ -5011,6 +5015,10 @@
     "source": "6da3e6910d7c5556",
     "text": "Esse clipe não foi encontrado"
   },
+  "editor.thatFileCouldNotBeReadAsAudio": {
+    "source": "4f09c6c88536b498",
+    "text": "Esse arquivo não pôde ser lido como áudio"
+  },
   "editor.thatFileHasNoAudio": {
     "source": "a5adb3b52721e929",
     "text": "Esse arquivo não tem áudio"
@@ -5395,6 +5403,10 @@
     "source": "83f35a6127f1f033",
     "text": "Há saídas de corte existentes demais"
   },
+  "editor.tooManyPresets": {
+    "source": "af4468f1a5194434",
+    "text": "Há predefinições demais. Exclua algumas primeiro."
+  },
   "editor.tooManySubtitles": {
     "source": "e4dec3dca173da94",
     "text": "Legendas demais"
@@ -5483,6 +5495,10 @@
     "source": "b6af4c2ffa2ec661",
     "text": "Intervalo de fala desconhecido."
   },
+  "editor.unknownTrimMode": {
+    "source": "febd6d355469bd73",
+    "text": "Modo de corte desconhecido '{mode}'"
+  },
   "editor.unmute": {
     "source": "c261db78a6b1f179",
     "text": "Desativar mudo"
@@ -5534,6 +5550,10 @@
   "editor.videoSpeedX": {
     "source": "b9c1c3bbe815f739",
     "text": "Vídeo {speed}x"
+  },
+  "editor.voiceoverTake": {
+    "source": "e7e8e3d0c87a8ee5",
+    "text": "Narração {number}"
   },
   "editor.volume": {
     "source": "429bd43d726de417",

@@ -40,7 +40,7 @@ namespace ReplayKitHelper
         internal static string IconDir => Path.Combine(AppConfig.GetReplayKitRoot(), "game-icons");
         internal static bool ValidId(string id) => id != null && Regex.IsMatch(id, @"\A(?:[0-9]{1,24}|steam-[0-9]{1,10}|custom-[a-f0-9]{32})\z");
         // the icon of a roblox experience sits beside the game icons, though an experience is no game of its own
-        internal static bool ValidIconId(string id) => ValidId(id) || id != null && Regex.IsMatch(id, "^(?:[0-9]{1,24}|steam-[0-9]{1,10}|custom-[a-f0-9]{32}|roblox-[0-9]{1,20})-[a-f0-9]{16}$");
+        internal static bool ValidIconId(string id) => ValidId(id) || id != null && Regex.IsMatch(id, @"\A(?:[0-9]{1,24}|steam-[0-9]{1,10}|custom-[a-f0-9]{32}|roblox-[0-9]{1,20})-[a-f0-9]{16}\z");
         internal static bool Playable(string exe)
         {
             string name = (exe ?? "").ToLowerInvariant();
@@ -97,7 +97,7 @@ namespace ReplayKitHelper
             var matches = candidates.Where(g => g.Rules.Any(r => normalized.EndsWith("/" + r, StringComparison.Ordinal))).ToList();
             if (matches.Count == 1 && (!(exe == "java.exe" || exe == "javaw.exe" || exe == "electron.exe") || matches[0].Rules.Any(r => r.Contains("/") && normalized.EndsWith("/" + r, StringComparison.Ordinal)))) return matches[0];
             var explicitGames = ReplaykitSettings.ReadSettings()["screenshareGameOverrides"] as JArray;
-            if (explicitGames != null && explicitGames.Any(g => string.Equals(g["exeName"]?.Value<string>(), exe, StringComparison.OrdinalIgnoreCase)))
+            if (explicitGames != null && explicitGames.OfType<JObject>().Any(g => string.Equals(g["exeName"]?.Value<string>(), exe, StringComparison.OrdinalIgnoreCase)))
                 return Custom(Path.GetFileNameWithoutExtension(exe));
             // installed through steam, else through another launcher (epic, gog, ubisoft, ea, battle.net, riot, rockstar, itch.io, xbox)
             var installed = SteamGames.Find(path) ?? LauncherGames.Find(path);
@@ -232,7 +232,7 @@ namespace ReplayKitHelper
         {
             string text = (query ?? "").Trim();
             if (text.Length > 100) throw new ArgumentException(Locales.Message("clips.searchIsTooLong"));
-            var custom = ClipStore.Read(CustomFile, db => db.Properties().Where(p => ValidId(p.Name)).Select(p => new Game { Id = p.Name, Name = p.Value["name"]?.Value<string>() ?? "Game" }).ToList(), 1024 * 1024);
+            var custom = ClipStore.Read(CustomFile, db => db.Properties().Where(p => ValidId(p.Name) && p.Value is JObject).Select(p => new Game { Id = p.Name, Name = p.Value["name"]?.Value<string>() ?? "Game" }).ToList(), 1024 * 1024);
             return new JArray(Catalog.Value.Games.Values.Concat(SteamGames.Games()).Concat(custom)
                 .GroupBy(game => game.Id).Select(group => group.First())
                 .Where(game => game.Name.IndexOf(text, StringComparison.OrdinalIgnoreCase) >= 0)
@@ -264,7 +264,8 @@ namespace ReplayKitHelper
             lock (Gate) return currentIcons = currentIcons ?? loaded;
         }
 
-        private static readonly Regex IconVersion = new Regex("^[a-f0-9]{16}$", RegexOptions.Compiled);
+        private static readonly Regex IconVersion = new Regex(@"\A[a-f0-9]{16}\z", RegexOptions.Compiled);
+        internal static bool ValidIconVersion(string version) => version != null && IconVersion.IsMatch(version);
 
         [DllImport("shell32.dll", CharSet = CharSet.Unicode)] private static extern uint ExtractIconEx(string file, int index, IntPtr[] large, IntPtr[] small, uint count);
         private static readonly Regex StoreLogoName = new Regex("StoreLogo=\"([A-Za-z0-9 ._-]{1,100}\\.png)\"", RegexOptions.Compiled | RegexOptions.CultureInvariant);
@@ -273,7 +274,9 @@ namespace ReplayKitHelper
         private static string IconSource(string path)
         {
             if (!path.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) || ExtractIconEx(path, -1, null, null, 0) > 0) return path;
-            string dir = Path.GetDirectoryName(path), config = Path.Combine(dir, "MicrosoftGame.config");
+            string dir = Path.GetDirectoryName(path);
+            if (string.IsNullOrEmpty(dir)) return path;
+            string config = Path.Combine(dir, "MicrosoftGame.config");
             if (!File.Exists(config) || new FileInfo(config).Length > 256 * 1024) return path;
             var name = StoreLogoName.Match(File.ReadAllText(config));
             string logo = name.Success ? Path.Combine(dir, name.Groups[1].Value) : null;
@@ -344,7 +347,7 @@ namespace ReplayKitHelper
                         // written beside the target and moved in, so a failed save never leaves a broken icon behind
                         string part = target + "." + Guid.NewGuid().ToString("N") + ".part";
                         try { File.WriteAllBytes(part, png); File.Move(part, target); }
-                        finally { if (File.Exists(part)) File.Delete(part); }
+                        finally { try { if (File.Exists(part)) File.Delete(part); } catch (IOException) { } catch (UnauthorizedAccessException) { } }
                     }
                     saved = true;
                     bool changed;

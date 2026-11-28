@@ -107,7 +107,7 @@ namespace ReplayKitHelper
                 if (segments == null) { error = Locales.Message("editor.badAudioEdit"); return null; }
                 string label = UnsafeLabel.Replace(laneJson.Value<string>("label") ?? "", "").Trim();
                 if (label.Length > 60) label = label.Substring(0, 60).Trim();
-                if (label.Length == 0) label = "Track " + laneNumber;
+                if (label.Length == 0) label = Trim.NumberedAudioTrackLabel(laneNumber - 1);
                 var lane = new Lane { Label = label };
                 bool laneMuted = laneJson.Value<bool?>("muted") == true;
                 foreach (var segToken in segments)
@@ -192,7 +192,7 @@ namespace ReplayKitHelper
             var chains = new List<string>();
             var laneOutputs = new List<KeyValuePair<string, string>>();
             int pieceCount = 0;
-            Func<int, int> rateOf = src => src >= ImportBase ? AudioImports.SampleRate : src < sampleRates.Count && sampleRates[src] > 0 ? sampleRates[src] : 48000;
+            Func<int, int> rateOf = src => src >= ImportBase ? AudioImports.SampleRate : sampleRates != null && src < sampleRates.Count && sampleRates[src] > 0 ? sampleRates[src] : 48000;
             // where a part is cut from: an audio stream of the source, or the one stream of a file that was brought in
             Func<Part, string> cutFrom = part => part.Src >= ImportBase ? "[" + importInputs[part.Src] + ":a:0]" : "[" + inputIndex + ":a:" + part.Src + "]";
             foreach (var lane in Lanes)

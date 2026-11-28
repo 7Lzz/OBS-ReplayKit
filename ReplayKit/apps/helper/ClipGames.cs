@@ -108,9 +108,9 @@ namespace ReplayKitHelper
                 ["ageMs"] = acceptedAt > 0 ? (JToken)((long)GetTickCount64() - acceptedAt) : JValue.CreateNull(), ["historyEntries"] = CaptureTimeline.Count, ["pendingSaves"] = Saves.Count, ["steam"] = SteamGames.Status(), ["launchers"] = LauncherGames.Status() };
         }
 
-        private static bool InScreenshots(string file) => string.Equals(Path.GetFileName(Path.GetDirectoryName(file)), "Screenshots", StringComparison.OrdinalIgnoreCase);
+        private static bool InScreenshots(string file) => string.Equals(Path.GetFileName(Path.GetDirectoryName(file)), Screenshots.FolderName, StringComparison.OrdinalIgnoreCase);
         private static string Owner(string file) => InScreenshots(file) ? Path.GetDirectoryName(Path.GetDirectoryName(file)) : Clips.LibraryRoot(Path.GetDirectoryName(file));
-        private static string Key(string file) => InScreenshots(file) ? "@screenshots/" + Path.GetFileName(file) : Path.GetFileName(file);
+        private static string Key(string file) => InScreenshots(file) ? Screenshots.DbKeyPrefix + Path.GetFileName(file) : Path.GetFileName(file);
 
         internal static JObject Read(string file)
         {
@@ -162,7 +162,7 @@ namespace ReplayKitHelper
             if (experience != null) summary["experience"] = experience;
             // the icon version this clip was made with, when it is of the game the clip goes by
             var pinned = current?["gameIcon"] as JObject;
-            string game = MainGame(summary), version = pinned?["version"]?.Type == JTokenType.String ? pinned["version"].Value<string>() : null;
+            string game = CaptureTimeline.MainGameId(summary), version = pinned?["version"]?.Type == JTokenType.String ? pinned["version"].Value<string>() : null;
             if (game != null && pinned?["id"]?.ToString() == game && version != null && GameCatalog.ValidIconId(game + "-" + version)) summary["icon"] = game + "-" + version;
             return summary;
         }
@@ -177,7 +177,7 @@ namespace ReplayKitHelper
             if (capture == null || !File.Exists(file)) return;
             var summary = CaptureTimeline.Describe(capture);
             // the clip keeps the icon its game has now, unless it already carries the icon of that same game from the clip it was made from
-            string game = MainGame(summary);
+            string game = CaptureTimeline.MainGameId(summary);
             string version = game != null && (capture["gameIcon"] as JObject)?["id"]?.ToString() != game ? GameCatalog.CurrentIcon(game) : null;
             Clips.UpdateDb(db =>
             {
@@ -207,9 +207,6 @@ namespace ReplayKitHelper
         }
 
         internal static void Copy(string source, string target) => Write(target, Read(source));
-
-        // the game a clip goes by: its main game, or the one game it holds part of
-        private static string MainGame(JObject summary) => summary["kind"]?.Value<string>() == "game" ? summary["id"]?.Value<string>() : summary["partial"]?["id"]?.Value<string>();
 
         internal static bool Matches(JObject row, string game)
         {
@@ -332,8 +329,9 @@ namespace ReplayKitHelper
                         if (raw["ranges"] is JArray ranges)
                         {
                             if (ranges.Count > 4096) return;
-                            var intervals = new JArray();
                             double position = 0, duration = Trim.ProbeVideo(full)?.Duration ?? 0;
+                            if (!CaptureTimeline.Number(duration) || duration <= 0) return;
+                            var intervals = new JArray();
                             foreach (var range in ranges)
                             {
                                 long start = range["s"]?.Value<long>() ?? 0, stop = range["e"]?.Value<long>() ?? 0;
@@ -425,7 +423,7 @@ namespace ReplayKitHelper
         private static JObject ChangeMembership(JObject previous, double duration, GameCatalog.Game added, string removed)
         {
             var summary = CaptureTimeline.Describe(previous);
-            string primary = MainGame(summary);
+            string primary = CaptureTimeline.MainGameId(summary);
             var games = (JArray)summary["games"];
             var members = games.OfType<JObject>().Where(g => summary["kind"].Value<string>() == "mixed" || g["id"].Value<string>() == primary)
                 .Select(g => new GameCatalog.Game { Id = g["id"].Value<string>(), Name = g["name"].Value<string>() }).ToList();
@@ -459,7 +457,7 @@ namespace ReplayKitHelper
             else if (single != null)
             {
                 var earlier = result["original"] as JObject;
-                var details = primary == single.Id ? previous : MainGame(CaptureTimeline.Describe(earlier)) == single.Id ? earlier : null;
+                var details = primary == single.Id ? previous : CaptureTimeline.MainGameId(CaptureTimeline.Describe(earlier)) == single.Id ? earlier : null;
                 foreach (string key in CaptureTimeline.GameDetailKeys)
                     if (details?[key] is JObject detail) result[key] = detail.DeepClone();
             }
@@ -554,8 +552,8 @@ namespace ReplayKitHelper
 
         private static JObject PieceDetails(JObject summary, JObject source)
         {
-            string game = MainGame(summary);
-            bool matches = game != null && game == MainGame(CaptureTimeline.Describe(source));
+            string game = CaptureTimeline.MainGameId(summary);
+            bool matches = game != null && game == CaptureTimeline.MainGameId(CaptureTimeline.Describe(source));
             return new JObject
             {
                 ["id"] = game,
@@ -566,7 +564,7 @@ namespace ReplayKitHelper
 
         private static void CarryDetails(JObject target, IEnumerable<JObject> pieces)
         {
-            string game = MainGame(CaptureTimeline.Describe(target));
+            string game = CaptureTimeline.MainGameId(CaptureTimeline.Describe(target));
             if (game == null) return;
             var matching = pieces.Where(piece => piece["id"]?.Value<string>() == game).ToList();
             if (matching.Count == 0) return;

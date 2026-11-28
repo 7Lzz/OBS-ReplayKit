@@ -58,10 +58,12 @@ namespace ReplayKitHelper
             }
         }
 
+        private static readonly Encoding StrictUtf8 = new UTF8Encoding(false, true);
+
         internal static JObject Text(string file)
         {
             using (var input = Open(file, 1024 * 1024))
-            using (var reader = new StreamReader(input, new UTF8Encoding(false, true), true))
+            using (var reader = new StreamReader(input, StrictUtf8, true))
             {
                 var buffer = new char[1024 * 1024 + 1];
                 int length = reader.ReadBlock(buffer, 0, buffer.Length);
@@ -87,7 +89,7 @@ namespace ReplayKitHelper
             for (int i = 0; i <= 4096; i++)
             {
                 byte next = reader.ReadByte();
-                if (next == 0) return new UTF8Encoding(false, true).GetString(bytes.ToArray());
+                if (next == 0) return StrictUtf8.GetString(bytes.ToArray());
                 bytes.Add(next);
             }
             throw new InvalidDataException(Locales.Message("clips.steamMetadataStringIsTooLong"));

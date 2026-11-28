@@ -24,36 +24,39 @@ namespace ReplayKitHelper
                 RedirectStandardError = true,
             };
             using (var proc = Process.Start(psi))
-            using (var deadline = new System.Threading.CancellationTokenSource(TimeSpan.FromHours(2)))
-            using (var stopping = System.Threading.CancellationTokenSource.CreateLinkedTokenSource(token, deadline.Token))
-            using (stopping.Token.Register(() => { try { if (!proc.HasExited) proc.Kill(); } catch (InvalidOperationException) { } catch (System.ComponentModel.Win32Exception) { } }))
             {
-                var stderrTask = proc.StandardError.ReadToEndAsync();
-                double durationUs = Math.Max(1.0, durationSec * 1000000.0);
-                int lastPct = -1;
-                string line;
-                while ((line = proc.StandardOutput.ReadLine()) != null)
+                if (proc == null) throw new InvalidOperationException(Locales.Message("clips.compressionPassFailed", "pass", pass, "code", -1));
+                using (var deadline = new System.Threading.CancellationTokenSource(TimeSpan.FromHours(2)))
+                using (var stopping = System.Threading.CancellationTokenSource.CreateLinkedTokenSource(token, deadline.Token))
+                using (stopping.Token.Register(() => { try { if (!proc.HasExited) proc.Kill(); } catch (InvalidOperationException) { } catch (System.ComponentModel.Win32Exception) { } }))
                 {
-                    if (line.StartsWith("out_time_us="))
+                    var stderrTask = proc.StandardError.ReadToEndAsync();
+                    double durationUs = Math.Max(1.0, durationSec * 1000000.0);
+                    int lastPct = -1;
+                    string line;
+                    while ((line = proc.StandardOutput.ReadLine()) != null)
                     {
-                        if (double.TryParse(line.Substring(12), NumberStyles.Float, CultureInfo.InvariantCulture, out double us))
+                        if (line.StartsWith("out_time_us="))
                         {
-                            int pct = (int)Math.Floor(startPercent + (endPercent - startPercent) * Math.Min(1.0, us / durationUs));
-                            if (pct != lastPct)
+                            if (double.TryParse(line.Substring(12), NumberStyles.Float, CultureInfo.InvariantCulture, out double us))
                             {
-                                lastPct = pct;
-                                UploadState.SetUploadState(requestId: requestId, state: "compressing", phase: phase, percent: pct);
+                                int pct = (int)Math.Floor(startPercent + (endPercent - startPercent) * Math.Max(0.0, Math.Min(1.0, us / durationUs)));
+                                if (pct != lastPct)
+                                {
+                                    lastPct = pct;
+                                    UploadState.SetUploadState(requestId: requestId, state: "compressing", phase: phase, percent: pct);
+                                }
                             }
                         }
                     }
+                    proc.WaitForExit();
+                    string stderr = stderrTask.Result;
+                    token.ThrowIfCancellationRequested();
+                    if (deadline.IsCancellationRequested) throw new TimeoutException(Locales.Message("storage.compressionExceededItsTimeLimit"));
+                    if (!string.IsNullOrEmpty(stderr)) Log.Write("compress-upload " + phase + " stderr: " + stderr, "compress", requestId);
+                    UploadState.SetUploadState(requestId: requestId, state: "compressing", phase: phase, percent: endPercent);
+                    if (proc.ExitCode != 0) throw new InvalidOperationException(Locales.Message("clips.compressionPassFailed", "pass", pass, "code", proc.ExitCode));
                 }
-                proc.WaitForExit();
-                string stderr = stderrTask.Result;
-                token.ThrowIfCancellationRequested();
-                if (deadline.IsCancellationRequested) throw new TimeoutException(Locales.Message("storage.compressionExceededItsTimeLimit"));
-                if (!string.IsNullOrEmpty(stderr)) Log.Write("compress-upload " + phase + " stderr: " + stderr, "compress", requestId);
-                UploadState.SetUploadState(requestId: requestId, state: "compressing", phase: phase, percent: endPercent);
-                if (proc.ExitCode != 0) throw new InvalidOperationException(Locales.Message("clips.compressionPassFailed", "pass", pass, "code", proc.ExitCode));
             }
         }
 
@@ -86,10 +89,16 @@ namespace ReplayKitHelper
                 Log.Write("Uploading compressed temp copy (" + Math.Round(fi.Length / 1024.0 / 1024.0, 2) + " MB)", "compress", requestId);
                 UploadState.SetUploadState(requestId: requestId, state: "uploading", phase: "uploading", percent: 95);
 
-                return UploadWorker.Run(requestId, tempPath, authCookies, requireAuth, 95, 4, false, JobCoordinator.Token(requestId));
+                var token = JobCoordinator.Token(requestId);
+                return UploadWorker.Run(requestId, tempPath, authCookies, requireAuth, 95, 4, token);
             }
             catch (Exception ex)
             {
+                if (ex is OperationCanceledException || JobCoordinator.Token(requestId).IsCancellationRequested)
+                {
+                    Log.Write("compress-upload cancelled: " + ex.Message, "compress", requestId);
+                    return new UploadOutcome { Ok = false, Message = "Cancelled" };
+                }
                 Log.Write("ERROR: " + ex.Message, "compress", requestId);
                 UploadState.SetUploadState(requestId: requestId, state: "error", phase: "error", percent: 0, error: ex.Message);
                 return new UploadOutcome { Ok = false, Message = ex.Message };

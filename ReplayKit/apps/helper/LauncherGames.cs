@@ -93,7 +93,11 @@ namespace ReplayKitHelper
 
         private static RegistryKey Open(RegistryHive hive, RegistryView view, string path)
         {
-            try { return RegistryKey.OpenBaseKey(hive, view).OpenSubKey(path); }
+            try
+            {
+                using (var baseKey = RegistryKey.OpenBaseKey(hive, view))
+                    return baseKey.OpenSubKey(path);
+            }
             catch (Exception ex) when (ex is SecurityException || ex is UnauthorizedAccessException || ex is IOException) { return null; }
         }
 
@@ -273,11 +277,12 @@ namespace ReplayKitHelper
             }
             ThreadPool.QueueUserWorkItem(_ =>
             {
-                var next = new List<Entry>();
-                try { next = Read(); }
+                List<Entry> next = null;
+                string message = "unavailable";
+                try { next = Read(); message = "ready"; }
                 // nothing may escape this pool thread, or the helper process ends
                 catch (Exception ex) { Log.Write("Launcher games unavailable: " + ex.GetType().Name + ": " + ex.Message); }
-                finally { lock (Gate) { entries = next; status = "ready"; pending = false; } }
+                finally { lock (Gate) { if (next != null) entries = next; status = message; pending = false; } }
             });
         }
 

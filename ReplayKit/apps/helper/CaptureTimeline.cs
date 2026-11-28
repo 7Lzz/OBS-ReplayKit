@@ -177,6 +177,13 @@ namespace ReplayKitHelper
             return rows;
         }
 
+        // the game a clip goes by: its main game, or the one game it holds part of
+        internal static string MainGameId(JObject summary)
+        {
+            string id = ReadText(summary?["kind"]) == "game" ? ReadText(summary["id"]) : ReadText(summary?["partial"]?["id"]);
+            return id.Length > 0 ? id : null;
+        }
+
         // normal footage contributes the game it goes by; previously edited footage keeps its timed labels
         internal static void PlaceVideoGames(JArray target, JObject cut, JObject summary, double at)
         {
@@ -186,7 +193,7 @@ namespace ReplayKitHelper
                     Add(target, at + ReadNumber(row["s"]), at + ReadNumber(row["e"]), row);
                 return;
             }
-            string game = ReadText(summary["kind"]) == "game" ? ReadText(summary["id"]) : ReadText(summary["partial"]?["id"]);
+            string game = MainGameId(summary) ?? "";
             var ids = new HashSet<string>(StringComparer.Ordinal);
             if (game.Length > 0) ids.Add(game);
             else if (ReadText(summary["kind"]) == "mixed")
@@ -317,9 +324,9 @@ namespace ReplayKitHelper
                 if (gap > .5) unknown["no-evidence|"] = (unknown.TryGetValue("no-evidence|", out double held) ? held : 0) + gap;
                 if (unknown.Count > 0)
                 {
-                    var reason = unknown.OrderByDescending(p => p.Value).First().Key.Split('|');
+                    var reason = unknown.OrderByDescending(p => p.Value).First().Key.Split(new[] { '|' }, 2);
                     result["why"] = reason[0];
-                    if (reason[1].Length > 0) result["app"] = reason[1];
+                    if (reason.Length > 1 && reason[1].Length > 0) result["app"] = reason[1];
                 }
             }
             result["manual"] = capture?["manual"]?.Type == JTokenType.Boolean && capture["manual"].Value<bool>();

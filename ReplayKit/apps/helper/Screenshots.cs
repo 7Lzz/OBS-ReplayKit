@@ -10,13 +10,15 @@ namespace ReplayKitHelper
 {
     internal static class Screenshots
     {
+        internal const string FolderName = "Screenshots";
+        internal const string DbKeyPrefix = "@screenshots/";
         internal const int MaxNameLength = 255;
         private const int ThumbWidth = 480;
         private static readonly object ThumbGate = new object();
         public static string Folder(string clipFolder = null, bool create = false)
         {
             string root = Path.GetFullPath(clipFolder ?? AppConfig.GetClipDir());
-            string folder = Path.Combine(root, "Screenshots");
+            string folder = Path.Combine(root, FolderName);
             if (!Directory.Exists(root)) throw new DirectoryNotFoundException(Locales.Message("common.clipFolderNotFound"));
             if (File.Exists(folder)) throw new IOException(Locales.Message("clips.theScreenshotsFolderIsOccupiedBy"));
             if (Directory.Exists(folder) && (File.GetAttributes(folder) & FileAttributes.ReparsePoint) != 0)
@@ -155,7 +157,7 @@ namespace ReplayKitHelper
                     ["size"] = item.File.Length,
                     ["mtime"] = new DateTimeOffset(item.File.LastWriteTimeUtc).ToUnixTimeSeconds(),
                     ["version"] = item.Version,
-                    ["capture"] = ClipGames.Public(metadata["@screenshots/" + item.File.Name]?["capture"] as JObject, item.File),
+                    ["capture"] = ClipGames.Public(metadata[DbKeyPrefix + item.File.Name]?["capture"] as JObject, item.File),
                 }));
         }
     }

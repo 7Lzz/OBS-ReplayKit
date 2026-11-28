@@ -17,6 +17,8 @@ namespace ReplayKitHelper
             string folder = Path.Combine(root, "GIFs");
             if (!Directory.Exists(root)) throw new DirectoryNotFoundException(Locales.Message("common.clipFolderNotFound"));
             if (File.Exists(folder)) throw new IOException(Locales.Message("editor.theGifFolderIsOccupiedBy"));
+            if (Directory.Exists(folder) && (File.GetAttributes(folder) & FileAttributes.ReparsePoint) != 0)
+                throw new IOException(Locales.Message("editor.theGifFolderCannotBeA"));
             if (create) Directory.CreateDirectory(folder);
             if (Directory.Exists(folder) && (File.GetAttributes(folder) & FileAttributes.ReparsePoint) != 0)
                 throw new IOException(Locales.Message("editor.theGifFolderCannotBeA"));
@@ -105,7 +107,11 @@ namespace ReplayKitHelper
             string folder = Folder(true);
             string temporary = Path.Combine(folder, "_replaykit_" + Guid.NewGuid().ToString("N") + ".gif");
             string stem = Path.GetFileNameWithoutExtension(source.Name);
-            if (stem.Length > 150) stem = stem.Substring(0, 150);
+            if (stem.Length > 150)
+            {
+                int cut = char.IsHighSurrogate(stem[149]) ? 149 : 150;
+                stem = stem.Substring(0, cut);
+            }
             try
             {
                 // the frame rate is 100 over the frame time from the settings, so every frame lands on a whole hundredth of a second, the unit a gif stores, and plays at an even pace (15 fps would mix 6 and 7 hundredths and stutter)

@@ -170,7 +170,7 @@ namespace ReplayKitHelper
                 if (job.Task.IsFaulted)
                 {
                     string msg = job.Task.Exception?.InnerException?.Message ?? job.Task.Exception?.Message ?? Locales.Message("setup.unknownError");
-                    result = new KeyframeScanResult { Ok = false, Message = "Keyframe worker crashed: " + msg };
+                    result = new KeyframeScanResult { Ok = false, Message = Locales.Message("editor.couldNotReadKeyframesError", "error", msg) };
                 }
                 else
                 {
@@ -218,7 +218,7 @@ namespace ReplayKitHelper
             return job;
         }
 
-        public static KeyframeScanResult GetClipKeyframeTimes(string sourceName, double durationSec = 0.0)
+        public static KeyframeScanResult GetClipKeyframeTimes(string sourceName)
         {
             var source = Clips.GetSafeClipPath(sourceName);
             if (source == null || !File.Exists(source.Full))
@@ -242,7 +242,7 @@ namespace ReplayKitHelper
                         return new KeyframeScanResult { Ok = false, Pending = true, Message = Locales.Message("editor.keyframeScansAreBusy"), RetryMs = 500 };
                     string ffprobe = Compression.GetToolPaths()["ffprobe"]?.Value<string>();
                     if (string.IsNullOrWhiteSpace(ffprobe) || !File.Exists(ffprobe))
-                        return new KeyframeScanResult { Ok = false, Message = "ffprobe.exe not found in clip folder" };
+                        return new KeyframeScanResult { Ok = false, Message = Locales.Message("editor.fastTrimSnapPointsUnavailable") };
                     job = StartTrimKeyframeWorkerLocked(source, ffprobe, jobKey, cacheKey, cacheSig);
                     startedNew = true;
                 }
@@ -251,11 +251,12 @@ namespace ReplayKitHelper
             return GetTrimKeyframeWorkerResult(job);
         }
 
-        // picks a non-colliding "<base> (<suffix>).<ext>" or "<base> (<suffix> n).<ext>" filename inside the clip folder. returns null if 99 candidates are taken.
-        public static string GetSuffixedOutputName(string sourceName, string suffix, string folder, int maxNameLength = int.MaxValue)
+        // picks a non-colliding "<base> (<suffix>).<ext>" or "<base> (<suffix> n).<ext>" filename inside the output folder. returns null if 99 candidates are taken.
+        public static string GetSuffixedOutputName(string sourceName, string suffix, string folder, int maxNameLength = int.MaxValue, bool checkLibrary = true)
         {
             string baseName = Path.GetFileNameWithoutExtension(sourceName);
             string ext = Path.GetExtension(sourceName);
+            string root = checkLibrary ? Clips.LibraryRoot(folder) : null;
             for (int i = 1; i <= 99; i++)
             {
                 string ending = " (" + suffix + (i == 1 ? "" : " " + i) + ")" + ext;
@@ -263,7 +264,7 @@ namespace ReplayKitHelper
                 if (stemLength <= 0) return null;
                 if (char.IsHighSurrogate(baseName[stemLength - 1])) stemLength--;
                 string candidate = baseName.Substring(0, stemLength) + ending;
-                if (!File.Exists(Path.Combine(folder, candidate)) && !Clips.NameTaken(candidate)) return candidate;
+                if (!File.Exists(Path.Combine(folder, candidate)) && (!checkLibrary || !Clips.NameTaken(candidate, root))) return candidate;
             }
             return null;
         }
@@ -418,7 +419,10 @@ namespace ReplayKitHelper
                 int width = stream.Value<int?>("width") ?? 0;
                 int height = stream.Value<int?>("height") ?? 0;
                 string aspect = stream.Value<string>("sample_aspect_ratio");
-                double rotation = (stream["side_data_list"] as JArray)?.FirstOrDefault(item => item["rotation"] != null)?.Value<double>("rotation") ?? 0;
+                var rotationToken = (stream["side_data_list"] as JArray)?.OfType<JObject>()
+                    .Select(item => item["rotation"])
+                    .FirstOrDefault(tok => tok != null && (tok.Type == JTokenType.Integer || tok.Type == JTokenType.Float));
+                double rotation = rotationToken?.Value<double>() ?? 0;
                 if (Math.Abs(rotation % 180) == 90)
                 {
                     (width, height) = (height, width);
@@ -448,7 +452,7 @@ namespace ReplayKitHelper
         private static string ValidFrameRate(string raw)
         {
             if (string.IsNullOrEmpty(raw)) return null;
-            var m = System.Text.RegularExpressions.Regex.Match(raw, @"^(\d{1,6})/(\d{1,6})$");
+            var m = System.Text.RegularExpressions.Regex.Match(raw, @"\A(\d{1,6})/(\d{1,6})\z");
             if (!m.Success) return null;
             double num = double.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture);
             double den = double.Parse(m.Groups[2].Value, CultureInfo.InvariantCulture);
@@ -513,8 +517,7 @@ namespace ReplayKitHelper
         private static List<string> ScreenshotArgs(VideoPlan plan, VideoPlan.SourceInfo info, double speed, double frameTime, string sourcePath, string look, LayerPlan layers, string subtitles, string frame, string aspect)
         {
             string N(double x) => x.ToString("0.######", CultureInfo.InvariantCulture);
-            string[] ratio = info.Fps.Split('/');
-            double rate = double.Parse(ratio[0], CultureInfo.InvariantCulture) / double.Parse(ratio[1], CultureInfo.InvariantCulture);
+            double rate = info.FrameRate;
             double t = frameTime - plan.Start;
             var argv = new List<string> { "-hide_banner", "-loglevel", "error" };
             var piece = plan.PieceAt(frameTime, speed);
@@ -600,7 +603,7 @@ namespace ReplayKitHelper
             if (layered && !composed) return new TrimResult { Ok = false, Message = Locales.Message("editor.layersNeedTheVideoOfThe") };
             // a picture of another size, rate or bitrate is made again as well
             if (retimed || composed || subtitled || looked || layered || framed || screenshot || render.Any) precise = true;
-            if (double.IsNaN(startSec) || double.IsNaN(endSec) || double.IsInfinity(startSec) || double.IsInfinity(endSec))
+            if (double.IsNaN(startSec) || double.IsNaN(endSec) || double.IsInfinity(startSec) || double.IsInfinity(endSec) || endSec > 604800)
                 return new TrimResult { Ok = false, Message = Locales.Message("editor.badStartEnd") };
             if (startSec < 0) return new TrimResult { Ok = false, Message = Locales.Message("editor.startMustBe0") };
             if (endSec <= startSec) return new TrimResult { Ok = false, Message = Locales.Message("editor.endMustBeGreaterThanStart") };
@@ -608,7 +611,7 @@ namespace ReplayKitHelper
             if (duration < EditorLimits.ClipSecondsMin) return new TrimResult { Ok = false, Message = Locales.Message("editor.trimMustBeAtLeast0", "seconds", EditorLimits.ClipSecondsMin.ToString(Locales.Culture())) };
 
             mode = !string.IsNullOrEmpty(mode) ? mode.ToLowerInvariant() : "copy";
-            if (mode != "copy" && mode != "overwrite" && mode != "screenshot") return new TrimResult { Ok = false, Message = "Unknown trim mode '" + mode + "'" };
+            if (mode != "copy" && mode != "overwrite" && mode != "screenshot") return new TrimResult { Ok = false, Message = Locales.Message("editor.unknownTrimMode", "mode", mode) };
             bool overwrite = mode == "overwrite";
 
             var source = Clips.GetSafeClipPath(sourceName);
@@ -659,7 +662,7 @@ namespace ReplayKitHelper
                 string outputFolder = screenshot ? Screenshots.Folder(Clips.LibraryRoot(Path.GetDirectoryName(source.Full)), create: true) : Path.GetDirectoryName(source.Full);
                 string suffix = screenshot ? "screenshot" : precise ? "trimmed" : "trimmed (fast)";
                 outName = screenshot
-                    ? GetSuffixedOutputName(Path.ChangeExtension(source.Name, ".png"), suffix, outputFolder, Screenshots.MaxNameLength)
+                    ? GetSuffixedOutputName(Path.ChangeExtension(source.Name, ".png"), suffix, outputFolder, Screenshots.MaxNameLength, checkLibrary: false)
                     : GetSuffixedOutputName(source.Name, suffix, outputFolder);
                 if (outName == null) return new TrimResult { Ok = false, Message = Locales.Message("editor.tooManyExistingTrimOutputs") };
                 finalPath = Path.Combine(outputFolder, outName);
@@ -700,7 +703,7 @@ namespace ReplayKitHelper
                 if (videoPlan == null) return new TrimResult { Ok = false, Message = videoError };
                 windowStart = videoPlan.Start;
                 windowEnd = videoPlan.End;
-                // A single unchanged CFR video range can use the existing accurate input seek; the audio keeps its original timeline on its own input.
+                // a single unchanged cfr video range can use the existing accurate input seek; the audio keeps its original timeline on its own input.
                 if (!layered && !screenshot && videoSpeed == 1 && sourceInfo.PixelFormat == "yuv420p" &&
                     sourceInfo.SampleAspect == "1:1" && sourceInfo.ConstantFrameRate && videoPlan.TryDirectRange(out directStart, out directEnd) &&
                     Math.Abs(directStart - startSec) <= 0.000501 && Math.Abs(directEnd - endSec) <= 0.000501)
@@ -719,8 +722,7 @@ namespace ReplayKitHelper
                 return new TrimResult { Ok = false, Message = Locales.Message("editor.theScreenshotTimeIsOutsideThe") };
             if (screenshot)
             {
-                string[] rate = sourceInfo.Fps.Split('/');
-                double fps = double.Parse(rate[0], CultureInfo.InvariantCulture) / double.Parse(rate[1], CultureInfo.InvariantCulture);
+                double fps = sourceInfo.FrameRate;
                 double last = Math.Max(0, Math.Ceiling((windowEnd - windowStart) * fps) - 1);
                 frameTime = windowStart + Math.Min(last, Math.Floor((frameTime - windowStart) * fps)) / fps;
             }
@@ -977,7 +979,11 @@ namespace ReplayKitHelper
                 return new TrimResult { Ok = false, Message = Locales.Message("editor.trimFailedError", "error", ex.Message) };
             }
 
-            if (!File.Exists(outPath) || new FileInfo(outPath).Length == 0) return new TrimResult { Ok = false, Message = Locales.Message("editor.ffmpegOutputMissing") };
+            if (!File.Exists(outPath) || new FileInfo(outPath).Length == 0)
+            {
+                try { if (File.Exists(outPath)) File.Delete(outPath); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+                return new TrimResult { Ok = false, Message = Locales.Message("editor.ffmpegOutputMissing") };
+            }
 
             // from here the file is put in place, which the editor shows as the last step
             UploadState.SetUploadState(requestId: requestId, phase: "finishing", percent: 98);

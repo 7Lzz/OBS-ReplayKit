@@ -28,16 +28,19 @@ namespace ReplayKitHelper
             };
             cancellationToken.ThrowIfCancellationRequested();
             using (var proc = Process.Start(psi))
-            using (var deadline = new CancellationTokenSource(TimeSpan.FromMinutes(2)))
-            using (var stopping = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, deadline.Token))
-            using (stopping.Token.Register(() => { try { if (!proc.HasExited) proc.Kill(); } catch (InvalidOperationException) { } catch (System.ComponentModel.Win32Exception) { } }))
             {
-                var stdout = proc.StandardOutput.ReadToEndAsync();
-                var stderr = proc.StandardError.ReadToEndAsync();
-                proc.WaitForExit();
-                cancellationToken.ThrowIfCancellationRequested();
-                if (deadline.IsCancellationRequested) throw new TimeoutException(Locales.Message("share.networkWorkerExceededItsTimeLimit"));
-                return new Result { ExitCode = proc.ExitCode, Stdout = stdout.GetAwaiter().GetResult(), Stderr = stderr.GetAwaiter().GetResult() };
+                if (proc == null) throw new InvalidOperationException("curl.exe did not start");
+                using (var deadline = new CancellationTokenSource(TimeSpan.FromMinutes(2)))
+                using (var stopping = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, deadline.Token))
+                using (stopping.Token.Register(() => { try { if (!proc.HasExited) proc.Kill(); } catch (InvalidOperationException) { } catch (System.ComponentModel.Win32Exception) { } }))
+                {
+                    var stdout = proc.StandardOutput.ReadToEndAsync();
+                    var stderr = proc.StandardError.ReadToEndAsync();
+                    proc.WaitForExit();
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (deadline.IsCancellationRequested) throw new TimeoutException(Locales.Message("share.networkWorkerExceededItsTimeLimit"));
+                    return new Result { ExitCode = proc.ExitCode, Stdout = stdout.GetAwaiter().GetResult(), Stderr = stderr.GetAwaiter().GetResult() };
+                }
             }
         }
 

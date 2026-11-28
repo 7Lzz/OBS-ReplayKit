@@ -2993,6 +2993,10 @@
     "source": "9d26d468e25871be",
     "text": "无效的开始/结束"
   },
+  "editor.badSubtitles": {
+    "source": "5a4ef0f8500ab1d6",
+    "text": "无效的字幕"
+  },
   "editor.badVideoLookError": {
     "source": "1ea995696f2aa08a",
     "text": "视频效果无效：{error}"
@@ -5009,6 +5013,10 @@
     "source": "6da3e6910d7c5556",
     "text": "未找到该剪辑"
   },
+  "editor.thatFileCouldNotBeReadAsAudio": {
+    "source": "4f09c6c88536b498",
+    "text": "无法将该文件作为音频读取"
+  },
   "editor.thatFileHasNoAudio": {
     "source": "a5adb3b52721e929",
     "text": "该文件没有音频"
@@ -5393,6 +5401,10 @@
     "source": "83f35a6127f1f033",
     "text": "已有过多的裁剪输出"
   },
+  "editor.tooManyPresets": {
+    "source": "af4468f1a5194434",
+    "text": "预设过多。请先删除一些。"
+  },
   "editor.tooManySubtitles": {
     "source": "e4dec3dca173da94",
     "text": "字幕过多"
@@ -5481,6 +5493,10 @@
     "source": "b6af4c2ffa2ec661",
     "text": "未知语音范围。"
   },
+  "editor.unknownTrimMode": {
+    "source": "febd6d355469bd73",
+    "text": "未知的剪辑模式“{mode}”"
+  },
   "editor.unmute": {
     "source": "c261db78a6b1f179",
     "text": "取消静音"
@@ -5532,6 +5548,10 @@
   "editor.videoSpeedX": {
     "source": "b9c1c3bbe815f739",
     "text": "视频 {speed}x"
+  },
+  "editor.voiceoverTake": {
+    "source": "e7e8e3d0c87a8ee5",
+    "text": "配音 {number}"
   },
   "editor.volume": {
     "source": "429bd43d726de417",

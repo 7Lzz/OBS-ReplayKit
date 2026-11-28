@@ -46,7 +46,7 @@ namespace ReplayKitHelper
                 }
                 if (!ThumbnailJobs.TryGetValue(outPath, out task))
                 {
-                    // A timed-out shell call still owns a slot until it actually returns.
+                    // a timed-out shell call still owns a slot until it actually returns.
                     while (ThumbnailJobs.Count >= 2)
                     {
                         int remaining = (int)Math.Max(0, 8000 - wait.ElapsedMilliseconds);

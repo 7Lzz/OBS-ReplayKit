@@ -2996,6 +2996,10 @@
     "source": "9d26d468e25871be",
     "text": "Недопустимые начало/конец"
   },
+  "editor.badSubtitles": {
+    "source": "5a4ef0f8500ab1d6",
+    "text": "Недопустимые субтитры"
+  },
   "editor.badVideoLookError": {
     "source": "1ea995696f2aa08a",
     "text": "Некорректный видеостиль: {error}"
@@ -5012,6 +5016,10 @@
     "source": "6da3e6910d7c5556",
     "text": "Этот клип не найден"
   },
+  "editor.thatFileCouldNotBeReadAsAudio": {
+    "source": "4f09c6c88536b498",
+    "text": "Не удалось прочитать этот файл как аудио"
+  },
   "editor.thatFileHasNoAudio": {
     "source": "a5adb3b52721e929",
     "text": "В этом файле нет звука"
@@ -5396,6 +5404,10 @@
     "source": "83f35a6127f1f033",
     "text": "Слишком много существующих результатов обрезки"
   },
+  "editor.tooManyPresets": {
+    "source": "af4468f1a5194434",
+    "text": "Слишком много пресетов. Сначала удалите несколько."
+  },
   "editor.tooManySubtitles": {
     "source": "e4dec3dca173da94",
     "text": "Слишком много субтитров"
@@ -5484,6 +5496,10 @@
     "source": "b6af4c2ffa2ec661",
     "text": "Неизвестный участок речи."
   },
+  "editor.unknownTrimMode": {
+    "source": "febd6d355469bd73",
+    "text": "Неизвестный режим обрезки «{mode}»"
+  },
   "editor.unmute": {
     "source": "c261db78a6b1f179",
     "text": "Включить звук"
@@ -5535,6 +5551,10 @@
   "editor.videoSpeedX": {
     "source": "b9c1c3bbe815f739",
     "text": "Видео {speed}x"
+  },
+  "editor.voiceoverTake": {
+    "source": "e7e8e3d0c87a8ee5",
+    "text": "Озвучка {number}"
   },
   "editor.volume": {
     "source": "429bd43d726de417",

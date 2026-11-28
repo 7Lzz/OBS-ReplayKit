@@ -2,7 +2,6 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
-using System.Text.RegularExpressions;
 using Newtonsoft.Json.Linq;
 
 namespace ReplayKitHelper
@@ -13,11 +12,10 @@ namespace ReplayKitHelper
         public const string UploadPath = "/import-media/upload";
         private const long MaxBytes = 50L * 1024 * 1024;
         private static readonly string Root = ClipCache.KindDir("media");
-        private static readonly Regex IdPattern = new Regex("^[0-9a-f]{16}$", RegexOptions.Compiled);
         private static readonly string[] Extensions = { ".png", ".gif", ".jpg" };
         private static readonly object StoreGate = new object();
 
-        public static bool IsId(string id) => id != null && IdPattern.IsMatch(id);
+        public static bool IsId(string id) => ClipCache.IsValidKey(id);
 
         private static JObject Fail(string name, string message) => new JObject { ["ok"] = false, ["name"] = name, ["message"] = message };
 
@@ -40,7 +38,7 @@ namespace ReplayKitHelper
 
         public static string ContentType(string path)
         {
-            switch (Path.GetExtension(path))
+            switch (Path.GetExtension(path).ToLowerInvariant())
             {
                 case ".gif": return "image/gif";
                 case ".jpg": return "image/jpeg";
@@ -48,7 +46,7 @@ namespace ReplayKitHelper
             }
         }
 
-        public static bool IsGif(string path) => Path.GetExtension(path) == ".gif";
+        public static bool IsGif(string path) => string.Equals(Path.GetExtension(path), ".gif", StringComparison.OrdinalIgnoreCase);
 
         // the format by its first bytes, or null when it is none of the ones taken
         private static string Sniff(byte[] head, int count)
@@ -64,8 +62,7 @@ namespace ReplayKitHelper
             string name = NameFrom(path);
             try
             {
-                // the path comes from the dialog of this helper, and anything that is not a plain file on a drive or a share is turned away all the same
-                if (string.IsNullOrWhiteSpace(path) || !Path.IsPathRooted(path) || Path.GetPathRoot(path).Length < 3 || path.StartsWith(@"\\.\", StringComparison.Ordinal) || path.StartsWith(@"\\?\", StringComparison.Ordinal))
+                if (!AudioImports.IsUsableLocalPath(path))
                     return Fail(name, Locales.Message("editor.fileCannotBeUsed"));
                 if (!File.Exists(path)) return Fail(name, Locales.Message("editor.fileWasNotFound"));
                 using (var input = File.OpenRead(path))
@@ -156,16 +153,6 @@ namespace ReplayKitHelper
             return new JObject { ["ok"] = true, ["id"] = id, ["name"] = name, ["gif"] = ext == ".gif" };
         }
 
-        // the name a layer carries: the file name without its folder and extension, free of control characters and not too long
-        private static string NameFrom(string raw)
-        {
-            raw = raw ?? "";
-            string name = raw.Substring(Math.Max(raw.LastIndexOf('\\'), raw.LastIndexOf('/')) + 1);
-            int dot = name.LastIndexOf('.');
-            if (dot > 0) name = name.Substring(0, dot);
-            name = Regex.Replace(Regex.Replace(name, @"\p{C}+", " "), @"\s+", " ").Trim();
-            if (name.Length > 60) name = name.Substring(0, 60).Trim();
-            return name.Length == 0 ? Locales.Message("editor.image") : name;
-        }
+        private static string NameFrom(string raw) => AudioImports.CleanImportName(raw, Locales.Message("editor.image"));
     }
 }

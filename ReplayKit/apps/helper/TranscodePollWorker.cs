@@ -33,7 +33,7 @@ namespace ReplayKitHelper
             {
                 if (quiet || readyNotified) return;
                 readyNotified = true;
-                string url = "https://streamable.com/" + shortcode;
+                string url = Upload.StreamableUrl(shortcode);
                 bool copied = false;
                 if (copyLink)
                 {
@@ -71,6 +71,7 @@ namespace ReplayKitHelper
             try { Directory.CreateDirectory(scratchDir); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
 
             string lastWritten = "";
+            bool finished = false;
             while (DateTime.UtcNow < deadline)
             {
                 Thread.Sleep(5000);
@@ -93,16 +94,19 @@ namespace ReplayKitHelper
                     cargs.Add(url);
 
                     var r = Curl.Run(cargs.ToArray());
-                    int.TryParse((r.Stdout + r.Stderr).Trim(), out int code);
+                    int.TryParse((r.Stdout ?? "").Trim(), out int code);
                     if (code >= 200 && code < 300 && File.Exists(respPath))
                     {
                         string body = File.ReadAllText(respPath);
                         try
                         {
                             var obj = JObject.Parse(body);
-                            if (obj["status"] != null) status = obj["status"].Value<int>();
+                            var statusToken = obj["status"];
+                            if (statusToken != null && statusToken.Type == JTokenType.Integer) status = statusToken.Value<int>();
                             // streamables field is "percent" (0-100) -- the old "percentage_complete" never existed on this response, so the dock only ever saw 0 and showed "Processing..." with no number.
-                            if (obj["percent"] != null) percent = obj["percent"].Value<int>();
+                            var pctToken = obj["percent"];
+                            if (pctToken != null && (pctToken.Type == JTokenType.Integer || pctToken.Type == JTokenType.Float))
+                                percent = Math.Max(0, Math.Min(100, (int)Math.Round(pctToken.Value<double>())));
                         }
                         catch (JsonException) { }
                     }
@@ -125,7 +129,7 @@ namespace ReplayKitHelper
                 string stateKey = status.Value + "|" + percent;
                 if (stateKey == lastWritten)
                 {
-                    if (status.Value >= 2) { if (status.Value == 2) NotifyReady(); break; }
+                    if (status.Value >= 2) { finished = true; if (status.Value == 2) NotifyReady(); break; }
                     continue;
                 }
 
@@ -146,10 +150,10 @@ namespace ReplayKitHelper
                     return 1;
                 }
 
-                if (status.Value >= 2) { if (status.Value == 2) NotifyReady(); break; }
+                if (status.Value >= 2) { finished = true; if (status.Value == 2) NotifyReady(); break; }
             }
 
-            if (DateTime.UtcNow >= deadline)
+            if (!finished && DateTime.UtcNow >= deadline)
             {
                 try
                 {

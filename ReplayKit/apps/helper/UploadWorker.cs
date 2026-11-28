@@ -169,8 +169,9 @@ namespace ReplayKitHelper
             }
         }
 
-        public static UploadOutcome Run(string requestId, string clipPath, string authCookies, bool requireAuth, int progressBase, int progressSpan, bool quiet = false, CancellationToken cancelToken = default(CancellationToken))
+        public static UploadOutcome Run(string requestId, string clipPath, string authCookies, bool requireAuth, int progressBase, int progressSpan, CancellationToken cancelToken = default(CancellationToken))
         {
+            Directory.CreateDirectory(Constants.SCRATCH_DIR);
             string tempPrefix = Path.Combine(Constants.SCRATCH_DIR, "streamable_" + requestId);
             string jar = tempPrefix + ".cookies.txt";
             string transcodeBodyPath = tempPrefix + ".transcode_body.json";
@@ -224,7 +225,7 @@ namespace ReplayKitHelper
                 // step 1: shortcode + presigned s3 form.
                 Log.Write("Step 1: requesting upload shortcode...", "upload", requestId);
                 WriteStatus(requestId, progressBase, progressSpan, "uploading", "requesting upload", 8);
-                string url1 = "https://api-f.streamable.com/api/v1/uploads/shortcode?size=" + size + "&version=unknown";
+                string url1 = Constants.STREAMABLE_API + "/api/v1/uploads/shortcode?size=" + size + "&version=unknown";
                 var step1Args = new List<string>(TransportArgs())
                 {
                     "-s", "-S", "-m", "30", "-c", jar,
@@ -241,9 +242,11 @@ namespace ReplayKitHelper
                 {
                     throw new InvalidOperationException(Locales.Message("share.step1CurlFailedExitCode", "code", r1.ExitCode));
                 }
-                var data = JObject.Parse(r1.Stdout);
+                JObject data;
+                try { data = JObject.Parse(r1.Stdout); }
+                catch (JsonException) { throw new InvalidOperationException(Locales.Message("share.step1ResponseMissingShortcode")); }
                 string shortcode = data["shortcode"]?.Value<string>();
-                if (string.IsNullOrEmpty(shortcode))
+                if (!Upload.IsValidShortcode(shortcode))
                     throw new InvalidOperationException(Locales.Message("share.step1ResponseMissingShortcode"));
                 Log.Write("shortcode: " + shortcode, "upload", requestId);
 
@@ -257,26 +260,25 @@ namespace ReplayKitHelper
                 var s3Fields = data["fields"] as JObject ?? new JObject();
 
                 int s3Status = 0;
-                string s3Body = "";
                 for (int attempt = 1; ; attempt++)
                 {
                     if (cancelToken.IsCancellationRequested) return new UploadOutcome { Ok = false, Message = "Cancelled" };
                     try
                     {
-                        s3Body = UploadFileToS3WithProgress(s3Url, s3Fields, clipItem.FullName, requestId, progressBase, progressSpan, 8, 100, cancelToken, out s3Status);
+                        UploadFileToS3WithProgress(s3Url, s3Fields, clipItem.FullName, requestId, progressBase, progressSpan, 8, 100, cancelToken, out s3Status);
                         break;
                     }
                     catch (OperationCanceledException) { return new UploadOutcome { Ok = false, Message = "Cancelled" }; }
                     catch (WebException wex) when (attempt < 3 && IsTransientWebError(wex) && !cancelToken.IsCancellationRequested)
                     {
                         Log.Write("Step 2: attempt " + attempt + " failed (" + wex.Status + "), retrying in 3s...", "upload", requestId);
-                        Thread.Sleep(3000);
+                        cancelToken.WaitHandle.WaitOne(3000);
                     }
                     // a long upload spends minutes on the wire, so a mid-transfer socket drop (or ReadWriteTimeout surfacing as IOException rather than WebException) is a normal transient -- retry the same as a WebException instead of hard-failing.
                     catch (IOException ioex) when (attempt < 3 && !cancelToken.IsCancellationRequested)
                     {
                         Log.Write("Step 2: attempt " + attempt + " failed (io: " + ioex.Message + "), retrying in 3s...", "upload", requestId);
-                        Thread.Sleep(3000);
+                        cancelToken.WaitHandle.WaitOne(3000);
                     }
                 }
                 if (s3Status < 200 || s3Status >= 300)
@@ -290,7 +292,7 @@ namespace ReplayKitHelper
                 Log.Write("Step 3: triggering transcode...", "upload", requestId);
                 WriteStatus(requestId, progressBase, progressSpan, "uploading", "finalizing", 100);
                 string transcoderOptionsJson = (data["transcoder_options"] ?? new JObject()).ToString(Formatting.None);
-                File.WriteAllText(transcodeBodyPath, transcoderOptionsJson, Encoding.ASCII);
+                File.WriteAllText(transcodeBodyPath, transcoderOptionsJson, new UTF8Encoding(false));
 
                 var step3Args = new List<string>(TransportArgs())
                 {
@@ -303,7 +305,7 @@ namespace ReplayKitHelper
                     "-H", "Content-Type: application/json",
                     "-A", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
                     "--data", "@" + transcodeBodyPath,
-                    "https://api-f.streamable.com/api/v1/transcode/" + shortcode,
+                    Constants.STREAMABLE_API + "/api/v1/transcode/" + shortcode,
                 };
                 var r3 = Curl.Run(step3Args.ToArray(), cancelToken);
                 if (cancelToken.IsCancellationRequested) return new UploadOutcome { Ok = false, Message = "Cancelled" };
@@ -323,7 +325,7 @@ namespace ReplayKitHelper
 
                 if (cancelToken.IsCancellationRequested) return new UploadOutcome { Ok = false, Message = "Cancelled" };
 
-                string finalUrl = "https://streamable.com/" + shortcode;
+                string finalUrl = Upload.StreamableUrl(shortcode);
                 Log.Write("DONE: " + finalUrl, "upload", requestId);
                 WriteStatus(requestId, progressBase, progressSpan, "done", "done", 100, url: finalUrl);
 

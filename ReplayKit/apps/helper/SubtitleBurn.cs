@@ -23,7 +23,7 @@ namespace ReplayKitHelper
 
         // the shipped fonts a save uses are copied next to the subtitles for the ass filter to load
         private const string FontsFolder = "fonts";
-        private static readonly Regex ColorRe = new Regex("^#[0-9a-f]{6}([0-9a-f]{2})?$", RegexOptions.CultureInvariant);
+        private static readonly Regex ColorRe = new Regex(@"\A#[0-9a-f]{6}([0-9a-f]{2})?\z", RegexOptions.CultureInvariant);
 
         private sealed class Style
         {
@@ -87,23 +87,24 @@ namespace ReplayKitHelper
         {
             error = null;
             var burn = new SubtitleBurn();
-            if (!(edit is JObject obj) || !(obj["rows"] is JArray rows) || rows.Count > MaxRows) { error = "Bad subtitles"; return null; }
+            string bad = Locales.Message("editor.badSubtitles");
+            if (!(edit is JObject obj) || !(obj["rows"] is JArray rows) || rows.Count > MaxRows) { error = bad; return null; }
             int cueCount = 0, wordCount = 0;
             foreach (var rowToken in rows)
             {
-                if (!(rowToken is JObject r) || !(r["cues"] is JArray cues)) { error = "Bad subtitles"; return null; }
+                if (!(rowToken is JObject r) || !(r["cues"] is JArray cues)) { error = bad; return null; }
                 var style = ParseStyle(r["style"] as JObject);
                 double cell = Number(r["cell"]);
-                if (style == null || double.IsNaN(cell) || cell < 0.5 || cell > 3) { error = "Bad subtitles"; return null; }
+                if (style == null || double.IsNaN(cell) || cell < 0.5 || cell > 3) { error = bad; return null; }
                 cueCount += cues.Count;
                 if (cueCount > MaxCues) { error = Locales.Message("editor.tooManySubtitles"); return null; }
                 var row = new Row { Index = burn._rows.Count, Style = style, Cell = cell };
                 foreach (var token in cues)
                 {
-                    if (!(token is JObject c) || !(c["lines"] is JArray lines) || !(c["widths"] is JArray widths)) { error = "Bad subtitles"; return null; }
+                    if (!(token is JObject c) || !(c["lines"] is JArray lines) || !(c["widths"] is JArray widths)) { error = bad; return null; }
                     double start = Number(c["start"]);
                     double end = Number(c["end"]);
-                    if (double.IsNaN(start) || double.IsNaN(end) || lines.Count == 0 || lines.Count > MaxLines || widths.Count != lines.Count) { error = "Bad subtitles"; return null; }
+                    if (double.IsNaN(start) || double.IsNaN(end) || lines.Count == 0 || lines.Count > MaxLines || widths.Count != lines.Count) { error = bad; return null; }
                     var kept = new List<string>();
                     double maxWidth = 0;
                     int length = 0;
@@ -111,7 +112,7 @@ namespace ReplayKitHelper
                     {
                         string line = lines[i]?.Type == JTokenType.String ? lines[i].Value<string>() : null;
                         double width = Number(widths[i]);
-                        if (line == null || double.IsNaN(width) || width < 0 || width > 200) { error = "Bad subtitles"; return null; }
+                        if (line == null || double.IsNaN(width) || width < 0 || width > 200) { error = bad; return null; }
                         line = Clean(line);
                         length += line.Length;
                         if (line.Length == 0 || length > EditorLimits.SubtitleTextMax) continue;
@@ -121,7 +122,7 @@ namespace ReplayKitHelper
                     List<double> words = null, ends = null;
                     if (c["words"] != null && c["words"].Type != JTokenType.Null)
                     {
-                        if (!(c["words"] is JArray list) || list.Count > EditorLimits.SubtitleTextMax) { error = "Bad subtitles"; return null; }
+                        if (!(c["words"] is JArray list) || list.Count > EditorLimits.SubtitleTextMax) { error = bad; return null; }
                         wordCount += list.Count;
                         if (wordCount > MaxWords) { error = Locales.Message("editor.tooManySubtitles"); return null; }
                         words = new List<double>(list.Count);
@@ -131,7 +132,7 @@ namespace ReplayKitHelper
                             var pair = w as JArray;
                             double at = pair != null && pair.Count == 2 ? Number(pair[0]) : double.NaN;
                             double to = pair != null && pair.Count == 2 ? Number(pair[1]) : double.NaN;
-                            if (double.IsNaN(at) || double.IsNaN(to) || to < at) { error = "Bad subtitles"; return null; }
+                            if (double.IsNaN(at) || double.IsNaN(to) || to < at) { error = bad; return null; }
                             words.Add(at);
                             ends.Add(to);
                         }
@@ -170,8 +171,8 @@ namespace ReplayKitHelper
             style.Shadow = Flag(s["shadow"], style.Shadow);
             style.WordOn = Flag(s["wordOn"], style.WordOn);
             style.WordFx = Pick(s["wordFx"]?.Type == JTokenType.String ? s["wordFx"].Value<string>() : null, "word", "word", "fill");
-            style.Align = Pick(s["align"]?.Value<string>(), "center", "left", "center", "right");
-            style.Position = Pick(s["position"]?.Value<string>(), "bottom", "bottom", "middle", "top");
+            style.Align = Pick(s["align"]?.Type == JTokenType.String ? s["align"].Value<string>() : null, "center", "left", "center", "right");
+            style.Position = Pick(s["position"]?.Type == JTokenType.String ? s["position"].Value<string>() : null, "bottom", "bottom", "middle", "top");
             double x = Number(s["x"]), y = Number(s["y"]);
             if (!double.IsNaN(x) && !double.IsNaN(y))
             {

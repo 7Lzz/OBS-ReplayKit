@@ -85,7 +85,7 @@ namespace ReplayKitHelper
                     message = Locales.Message("editor.editorSessionChanged");
                     return false;
                 }
-                // A cancelled load or page unload must win over an older request arriving late.
+                // a cancelled load or page unload must win over an older request arriving late.
                 editor.Revision = revision;
                 if (paths == null) editor.Paths.Clear();
                 else

@@ -39,6 +39,7 @@ namespace ReplayKitHelper
         private static readonly Regex SteamIcon = new Regex(
             "class=\"apphub_AppIcon\"[^>]*>\\s*<img\\s+src=\"https://shared\\.(?:fastly|akamai)\\.steamstatic\\.com/community_assets/images/apps/([0-9]{1,10})/([a-f0-9]{40})\\.jpg\"",
             RegexOptions.Compiled | RegexOptions.CultureInvariant);
+        private static readonly byte[] PngSignature = { 137, 80, 78, 71, 13, 10, 26, 10 };
         private static readonly Dictionary<string, (byte[] Bytes, DateTime Expires)> Cache =
             new Dictionary<string, (byte[], DateTime)>(StringComparer.Ordinal);
 
@@ -48,9 +49,7 @@ namespace ReplayKitHelper
             if (!GameCatalog.ValidId(id)) return null;
             var game = GameCatalog.Get(id);
             if (game == null) return null;
-            uint steam = game.SteamAppId;
-            if (steam == 0 && id.StartsWith("steam-", StringComparison.Ordinal))
-                uint.TryParse(id.Substring(6), out steam);
+            uint steam = game.SteamAppId != 0 ? game.SteamAppId : GameCatalog.SteamAppIdFor(id);
             var source = id.StartsWith("steam-", StringComparison.Ordinal) && steam != 0
                 ? GameCatalog.BySteamId(steam) ?? game : game;
             if (source.IconHash == null && steam == 0) return null;
@@ -81,8 +80,7 @@ namespace ReplayKitHelper
         {
             if (game == null) return null;
             if (game.IconHash != null) return DiscordIconUrl(game.Id, game.IconHash, 512);
-            uint steam = game.SteamAppId;
-            if (steam == 0 && game.Id.StartsWith("steam-", StringComparison.Ordinal)) uint.TryParse(game.Id.Substring(6), out steam);
+            uint steam = game.SteamAppId != 0 ? game.SteamAppId : GameCatalog.SteamAppIdFor(game.Id);
             var source = steam != 0 ? GameCatalog.BySteamId(steam) ?? game : game;
             // a steam library game is a steam- id of its own, while the catalog entry with the same app id holds the discord icon
             if (source.IconHash != null) return DiscordIconUrl(source.Id, source.IconHash, 512);
@@ -168,7 +166,7 @@ namespace ReplayKitHelper
                         if (exists) File.Replace(temporary, path, null);
                         else File.Move(temporary, path);
                     }
-                    finally { if (File.Exists(temporary)) File.Delete(temporary); }
+                    finally { try { if (File.Exists(temporary)) File.Delete(temporary); } catch (IOException) { } catch (UnauthorizedAccessException) { } }
                 }
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
@@ -182,7 +180,7 @@ namespace ReplayKitHelper
         private static bool IsImage(byte[] bytes, string type)
         {
             if (type == "image/png")
-                return bytes.Length >= 24 && bytes.Take(8).SequenceEqual(new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 });
+                return bytes.Length >= 24 && bytes.Take(8).SequenceEqual(PngSignature);
             return bytes.Length >= 4 && bytes[0] == 255 && bytes[1] == 216 && bytes[2] == 255;
         }
 
@@ -234,7 +232,7 @@ namespace ReplayKitHelper
                         provider.CoolDown(response.Headers.RetryAfter);
                         Log.Write("Catalog artwork cooling down " + new Uri(url).Host + " after HTTP " + (int)response.StatusCode);
                     }
-                    if (!response.IsSuccessStatusCode || response.Content.Headers.ContentType?.MediaType != type ||
+                    if (!response.IsSuccessStatusCode || !string.Equals(response.Content.Headers.ContentType?.MediaType, type, StringComparison.OrdinalIgnoreCase) ||
                         prefixBytes == 0 && response.Content.Headers.ContentLength > MaxBytes) return null;
 
                     // the app icon is near the top of the page, so skip the rest

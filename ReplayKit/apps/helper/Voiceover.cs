@@ -48,7 +48,13 @@ namespace ReplayKitHelper
                 // a mic test running at the same time would only meter the same microphone twice
                 MicTest.Stop();
                 _staging = Path.Combine(Constants.SCRATCH_DIR, StagingPrefix + Guid.NewGuid().ToString("N"));
-                Directory.CreateDirectory(_staging);
+                try { Directory.CreateDirectory(_staging); }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+                {
+                    DiscardLocked();
+                    Log.Write("Voiceover start staging: " + ex.Message);
+                    return Fail(ex.Message);
+                }
                 _wav = Path.Combine(_staging, WavName);
                 var session = MicLoopback.Start(deviceId, gain, noise, sensitivity, false, out string error, _wav);
                 if (session == null)
@@ -98,7 +104,7 @@ namespace ReplayKitHelper
                 _wav = null;
                 _staging = null;
                 _takes++;
-                var import = AudioImports.BeginFromRecording(wav, staging, "Voiceover " + _takes);
+                var import = AudioImports.BeginFromRecording(wav, staging, Locales.Message("editor.voiceoverTake", "number", _takes));
                 return new JObject { ["ok"] = true, ["kept"] = true, ["seconds"] = Math.Round(seconds, 2), ["import"] = import };
             }
         }

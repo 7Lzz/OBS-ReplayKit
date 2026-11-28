@@ -2993,6 +2993,10 @@
     "source": "9d26d468e25871be",
     "text": "不正な開始/終了"
   },
+  "editor.badSubtitles": {
+    "source": "5a4ef0f8500ab1d6",
+    "text": "不正な字幕"
+  },
   "editor.badVideoLookError": {
     "source": "1ea995696f2aa08a",
     "text": "映像の見た目の設定が不正です: {error}"
@@ -5009,6 +5013,10 @@
     "source": "6da3e6910d7c5556",
     "text": "そのクリップが見つかりませんでした"
   },
+  "editor.thatFileCouldNotBeReadAsAudio": {
+    "source": "4f09c6c88536b498",
+    "text": "そのファイルは音声として読み込めませんでした"
+  },
   "editor.thatFileHasNoAudio": {
     "source": "a5adb3b52721e929",
     "text": "そのファイルには音声がありません"
@@ -5393,6 +5401,10 @@
     "source": "83f35a6127f1f033",
     "text": "既存のトリム出力が多すぎます"
   },
+  "editor.tooManyPresets": {
+    "source": "af4468f1a5194434",
+    "text": "プリセットが多すぎます。先にいくつか削除してください。"
+  },
   "editor.tooManySubtitles": {
     "source": "e4dec3dca173da94",
     "text": "字幕が多すぎます"
@@ -5481,6 +5493,10 @@
     "source": "b6af4c2ffa2ec661",
     "text": "不明な発話範囲です。"
   },
+  "editor.unknownTrimMode": {
+    "source": "febd6d355469bd73",
+    "text": "不明なトリムモード「{mode}」"
+  },
   "editor.unmute": {
     "source": "c261db78a6b1f179",
     "text": "ミュート解除"
@@ -5532,6 +5548,10 @@
   "editor.videoSpeedX": {
     "source": "b9c1c3bbe815f739",
     "text": "動画 {speed}x"
+  },
+  "editor.voiceoverTake": {
+    "source": "e7e8e3d0c87a8ee5",
+    "text": "ボイスオーバー {number}"
   },
   "editor.volume": {
     "source": "429bd43d726de417",

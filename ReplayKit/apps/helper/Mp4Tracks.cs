@@ -80,7 +80,7 @@ namespace ReplayKitHelper
                 {
                     size = end - pos;
                 }
-                if (size < header || pos + size > end) yield break;
+                if (size < header || size > end - pos) yield break;
                 s.Seek(pos + 4, SeekOrigin.Begin);
                 var type = new byte[4];
                 if (!ReadBytes(s, type, 4)) yield break;
@@ -114,6 +114,7 @@ namespace ReplayKitHelper
                 if (!TryFind(s, trak.PayloadStart, trak.End, "mdia", out Box mdia)) continue;
                 if (!TryFind(s, mdia.PayloadStart, mdia.End, "hdlr", out Box hdlr)) continue;
 
+                if (hdlr.PayloadStart + 12 > hdlr.End) continue;
                 s.Seek(hdlr.PayloadStart + 8, SeekOrigin.Begin);
                 if (!ReadBytes(s, buf, 4)) continue;
                 string handler = System.Text.Encoding.ASCII.GetString(buf, 0, 4);
@@ -130,19 +131,23 @@ namespace ReplayKitHelper
                 }
 
                 uint timescale = 0;
-                if (TryFind(s, mdia.PayloadStart, mdia.End, "mdhd", out Box mdhd))
+                if (TryFind(s, mdia.PayloadStart, mdia.End, "mdhd", out Box mdhd) && mdhd.PayloadStart + 1 <= mdhd.End)
                 {
                     s.Seek(mdhd.PayloadStart, SeekOrigin.Begin);
                     if (ReadBytes(s, buf, 1))
                     {
-                        s.Seek(mdhd.PayloadStart + (buf[0] == 1 ? 20 : 12), SeekOrigin.Begin);
-                        if (ReadBytes(s, buf, 4)) timescale = ReadU32(buf, 0);
+                        long tsOffset = mdhd.PayloadStart + (buf[0] == 1 ? 20 : 12);
+                        if (tsOffset + 4 <= mdhd.End)
+                        {
+                            s.Seek(tsOffset, SeekOrigin.Begin);
+                            if (ReadBytes(s, buf, 4)) timescale = ReadU32(buf, 0);
+                        }
                     }
                 }
 
                 string sampleEntry = "";
                 int channels = 0;
-                if (TryFind(s, mdia.PayloadStart, mdia.End, "minf", out Box minf) && TryFind(s, minf.PayloadStart, minf.End, "stbl", out Box stbl) && TryFind(s, stbl.PayloadStart, stbl.End, "stsd", out Box stsd))
+                if (TryFind(s, mdia.PayloadStart, mdia.End, "minf", out Box minf) && TryFind(s, minf.PayloadStart, minf.End, "stbl", out Box stbl) && TryFind(s, stbl.PayloadStart, stbl.End, "stsd", out Box stsd) && stsd.PayloadStart + 16 <= stsd.End)
                 {
                     // the box starts with its version and flags and the number of entries, then the first entry with its size and its name
                     s.Seek(stsd.PayloadStart + 12, SeekOrigin.Begin);
@@ -205,53 +210,20 @@ namespace ReplayKitHelper
         public static int CountAudio(string path) => ReadFile(path)?.Count(t => t.Audio) ?? 0;
 
         // whether the file is an mp4 whose track boxes can be read; for one that is not, a count of no audio tracks says nothing, since the file may hold audio that is not seen
-        public static bool IsReadable(string path)
-        {
-            try
-            {
-                using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
-                {
-                    return Read(fs) != null;
-                }
-            }
-            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
-            {
-                return false;
-            }
-        }
+        public static bool IsReadable(string path) => ReadFile(path) != null;
 
         // the sample rate of every audio track in file order, empty when the file cannot be read as an mp4
         public static List<int> AudioSampleRates(string path)
         {
-            try
-            {
-                using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
-                {
-                    var tracks = Read(fs);
-                    return tracks == null ? new List<int>() : tracks.Where(t => t.Audio).Select(t => t.Timescale > 0 ? (int)t.Timescale : 48000).ToList();
-                }
-            }
-            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
-            {
-                return new List<int>();
-            }
+            var tracks = ReadFile(path);
+            return tracks == null ? new List<int>() : tracks.Where(t => t.Audio).Select(t => t.Timescale > 0 ? (int)t.Timescale : 48000).ToList();
         }
 
         // the codec of every audio track in file order, mp4a for aac, empty when the file cannot be read as an mp4
         public static List<string> AudioSampleEntries(string path)
         {
-            try
-            {
-                using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
-                {
-                    var tracks = Read(fs);
-                    return tracks == null ? new List<string>() : tracks.Where(t => t.Audio).Select(t => t.SampleEntry).ToList();
-                }
-            }
-            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
-            {
-                return new List<string>();
-            }
+            var tracks = ReadFile(path);
+            return tracks == null ? new List<string>() : tracks.Where(t => t.Audio).Select(t => t.SampleEntry).ToList();
         }
 
         public enum Fix { Nothing, Changed, Busy, Failed }
@@ -264,16 +236,7 @@ namespace ReplayKitHelper
         {
             using var reader = JobCoordinator.ReadSource(path);
             // looked at read only first, so a clip that needs nothing is never opened for writing
-            List<Track> tracks;
-            try
-            {
-                using (var ro = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
-                    tracks = Read(ro);
-            }
-            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
-            {
-                return Fix.Nothing;
-            }
+            var tracks = ReadFile(path);
             if (tracks == null) return Fix.Nothing;
             var audio = tracks.Where(t => t.Audio).ToList();
             if (audio.Count < 2) return Fix.Nothing;

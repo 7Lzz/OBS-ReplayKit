@@ -35,6 +35,16 @@ namespace ReplayKitHelper
             public string SampleAspect;
             public bool ConstantFrameRate;
             public long Bitrate;
+
+            public double FrameRate
+            {
+                get
+                {
+                    string[] parts = Fps.Split('/');
+                    return double.Parse(parts[0], CultureInfo.InvariantCulture) /
+                        (parts.Length == 1 ? 1 : double.Parse(parts[1], CultureInfo.InvariantCulture));
+                }
+            }
         }
 
         private const int MaxPieces = 64;
@@ -82,7 +92,7 @@ namespace ReplayKitHelper
                 Start = window.Value<double?>("start") ?? double.NaN,
                 End = window.Value<double?>("end") ?? double.NaN,
             };
-            if (!Finite(plan.Start) || !Finite(plan.End) || plan.Start < -86400 || plan.End > 86400 || plan.End - plan.Start < 0.5) { error = Locales.Message("editor.videoEditCouldNotBeRead"); return null; }
+            if (!Finite(plan.Start) || !Finite(plan.End) || plan.Start < -86400 || plan.End > 86400 || plan.End - plan.Start < EditorLimits.ClipSecondsMin) { error = Locales.Message("editor.videoEditCouldNotBeRead"); return null; }
             var durations = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
             foreach (var token in pieces)
             {
@@ -95,7 +105,7 @@ namespace ReplayKitHelper
                 };
                 double length = sourceDuration;
                 var refToken = po?["ref"];
-                if (refToken != null)
+                if (refToken != null && refToken.Type != JTokenType.Null)
                 {
                     var clip = refToken.Type == JTokenType.String ? Clips.GetEditorSource(refToken.Value<string>()) : null;
                     if (clip == null || !System.IO.File.Exists(clip.Full)) { error = refToken.Type == JTokenType.String && VideoImports.IsRef(refToken.Value<string>()) ? Locales.Message("editor.addedVideoToVideoMoved") : Locales.Message("editor.addedClipToVideoNotInFolder"); return null; }
@@ -115,7 +125,7 @@ namespace ReplayKitHelper
                     && piece.SrcStart >= 0 && piece.SrcEnd - piece.SrcStart >= 0.01 && piece.SrcEnd <= length + 0.1;
                 if (!valid) { error = Locales.Message("editor.videoEditCouldNotBeRead"); return null; }
                 var rate = po["speed"];
-                if (rate != null)
+                if (rate != null && rate.Type != JTokenType.Null)
                 {
                     if (rate.Type != JTokenType.Float && rate.Type != JTokenType.Integer) { error = Locales.Message("editor.videoSpeedOutOfRange"); return null; }
                     double value = rate.Value<double>();
@@ -123,7 +133,7 @@ namespace ReplayKitHelper
                     piece.Speed = value;
                 }
                 var look = po["look"];
-                if (look != null)
+                if (look != null && look.Type != JTokenType.Null)
                 {
                     piece.Look = VideoLook.Parse(look, out error);
                     if (piece.Look == null) return null;
@@ -191,9 +201,7 @@ namespace ReplayKitHelper
         {
             var chains = new List<string>();
             var labels = new List<string>();
-            string[] fps = info.Fps.Split('/');
-            double frameRate = double.Parse(fps[0], CultureInfo.InvariantCulture) /
-                (fps.Length == 1 ? 1 : double.Parse(fps[1], CultureInfo.InvariantCulture));
+            double frameRate = info.FrameRate;
             // rounding accumulated edges keeps video cuts, audio and overlays on the same clock.
             long Frame(double time) => (long)Math.Ceiling((time - Start) * frameRate - 1e-6);
             long cursor = 0;

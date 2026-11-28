@@ -42,12 +42,31 @@ namespace ReplayKitHelper
         private static readonly string Root = ClipCache.KindDir("imports");
         private static readonly object Gate = new object();
         private static readonly Dictionary<string, Job> Jobs = new Dictionary<string, Job>();
-        private static readonly Regex IdPattern = new Regex("^[0-9a-f]{16}$", RegexOptions.Compiled);
         private static readonly Regex NoAudio = new Regex("matches no streams|does not contain any stream", RegexOptions.IgnoreCase | RegexOptions.Compiled);
         // a handful of files dropped together are decoded two at a time
         private static readonly SemaphoreSlim Slots = new SemaphoreSlim(2);
 
-        public static bool IsId(string id) => id != null && IdPattern.IsMatch(id);
+        public static bool IsId(string id) => ClipCache.IsValidKey(id);
+
+        // the path comes from the dialog of this helper, and anything that is not a plain file on a drive or a share is turned away all the same
+        internal static bool IsUsableLocalPath(string path) =>
+            !string.IsNullOrWhiteSpace(path) && Path.IsPathRooted(path) && Path.GetPathRoot(path).Length >= 3 &&
+            !path.StartsWith(@"\\.\", StringComparison.Ordinal) && !path.StartsWith(@"\\?\", StringComparison.Ordinal);
+
+        // the name an imported item carries: the file name without its folder and extension, free of control characters and not too long
+        internal static string CleanImportName(string raw, string fallback, int maxLength = 60)
+        {
+            string name = LastPart(raw);
+            int dot = name.LastIndexOf('.');
+            if (dot > 0) name = name.Substring(0, dot);
+            name = Regex.Replace(Regex.Replace(name, @"\p{C}+", " "), @"\s+", " ").Trim();
+            if (name.Length > maxLength)
+            {
+                int cut = char.IsHighSurrogate(name[maxLength - 1]) ? maxLength - 1 : maxLength;
+                name = name.Substring(0, cut).Trim();
+            }
+            return name.Length == 0 ? fallback : name;
+        }
 
         private static JObject Fail(string message) => new JObject { ["ok"] = false, ["message"] = message };
 
@@ -119,8 +138,7 @@ namespace ReplayKitHelper
             string name = NameFrom(path);
             try
             {
-                // the path comes from the dialog of this helper, and anything that is not a plain file on a drive or a share is turned away all the same
-                if (string.IsNullOrWhiteSpace(path) || !Path.IsPathRooted(path) || Path.GetPathRoot(path).Length < 3 || path.StartsWith(@"\\.\", StringComparison.Ordinal) || path.StartsWith(@"\\?\", StringComparison.Ordinal))
+                if (!IsUsableLocalPath(path))
                     return Skipped(name, Locales.Message("editor.fileCannotBeUsed"));
                 var info = new FileInfo(path);
                 if (!info.Exists) return Skipped(name, Locales.Message("editor.fileWasNotFound"));
@@ -252,7 +270,7 @@ namespace ReplayKitHelper
             {
                 string text = string.Join(" ", run.Output).Trim();
                 Log.Write("AudioImports: ffmpeg exit " + run.ExitCode + " for " + job.Name + ": " + (text.Length > 300 ? text.Substring(0, 300) : text));
-                throw new ImportException(NoAudio.IsMatch(text) ? Locales.Message("editor.thatFileHasNoAudio") : "That file could not be read as audio");
+                throw new ImportException(NoAudio.IsMatch(text) ? Locales.Message("editor.thatFileHasNoAudio") : Locales.Message("editor.thatFileCouldNotBeReadAsAudio"));
             }
             if (!File.Exists(audio) || new FileInfo(audio).Length == 0 || !File.Exists(raw)) throw new ImportException(Locales.Message("editor.thatFileHasNoAudio"));
             double duration = ClipAudioTracks.WritePeaks(raw, Path.Combine(dir, PeaksName));
@@ -288,21 +306,12 @@ namespace ReplayKitHelper
             return raw.Substring(Math.Max(raw.LastIndexOf('\\'), raw.LastIndexOf('/')) + 1);
         }
 
-        // the name a row carries: the file name without its folder and extension, free of control characters and not too long
-        private static string NameFrom(string raw)
-        {
-            string name = LastPart(raw);
-            int dot = name.LastIndexOf('.');
-            if (dot > 0) name = name.Substring(0, dot);
-            name = Regex.Replace(Regex.Replace(name, @"\p{C}+", " "), @"\s+", " ").Trim();
-            if (name.Length > 60) name = name.Substring(0, 60).Trim();
-            return name.Length == 0 ? Locales.Message("common.audio") : name;
-        }
+        private static string NameFrom(string raw) => CleanImportName(raw, Locales.Message("common.audio"));
 
         // the extension helps ffmpeg tell formats apart that look alike, so it is kept when it is plain letters and digits
         private static string ExtensionFrom(string raw)
         {
-            var m = Regex.Match(LastPart(raw), @"\.([A-Za-z0-9]{1,5})$");
+            var m = Regex.Match(LastPart(raw), @"\.([A-Za-z0-9]{1,5})\z");
             return m.Success ? "." + m.Groups[1].Value.ToLowerInvariant() : "";
         }
     }

@@ -26,7 +26,7 @@ namespace ReplayKitHelper
         private static readonly Regex JoinLine = new Regex(@"^(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,7})?Z),[^\[]*\[FLog::GameJoinLoadTime\] Report game_join_loadtime: placeid:(\d{1,20}),.*?universeid:(\d{1,20})", RegexOptions.Compiled | RegexOptions.CultureInvariant);
         private static readonly Regex LeaveLine = new Regex(@"^(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,7})?Z),[^\[]*\[FLog::SessionTransitionFSM\] (?:Entered app session|Tearing down)\.", RegexOptions.Compiled | RegexOptions.CultureInvariant);
         private static readonly Regex LogName = new Regex(@"_(\d{8}T\d{6}Z)_Player_[0-9A-Fa-f]{1,16}(?:_last)?\.log$", RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
-        private static readonly Regex UniverseId = new Regex(@"^[0-9]{1,20}$", RegexOptions.Compiled);
+        private static readonly Regex UniverseId = new Regex(@"\A[0-9]{1,20}\z", RegexOptions.Compiled);
         private static readonly HttpClient Http = CreateHttpClient();
         private static readonly object Gate = new object();
 
@@ -53,39 +53,51 @@ namespace ReplayKitHelper
             // the roblox installer and launchers like bloxstrap log under Roblox\logs; the microsoft store app logs inside its package
             var dirs = new List<string> { Path.Combine(local, "Roblox", "logs") };
             string packages = Path.Combine(local, "Packages");
-            if (Directory.Exists(packages)) dirs.AddRange(Directory.EnumerateDirectories(packages, "ROBLOXCORPORATION.ROBLOX_*").Take(4).Select(d => Path.Combine(d, "LocalState", "logs")));
+            try
+            {
+                if (Directory.Exists(packages)) dirs.AddRange(Directory.EnumerateDirectories(packages, "ROBLOXCORPORATION.ROBLOX_*").Take(4).Select(d => Path.Combine(d, "LocalState", "logs")));
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
             var logs = new List<Tuple<DateTime, string>>();
             foreach (string dir in dirs)
             {
-                if (!Directory.Exists(dir) || (File.GetAttributes(dir) & FileAttributes.ReparsePoint) != 0) continue;
-                foreach (string file in Directory.EnumerateFiles(dir, "*_Player_*.log").Take(2000))
+                try
                 {
-                    var match = LogName.Match(Path.GetFileName(file));
-                    if (match.Success && DateTime.TryParseExact(match.Groups[1].Value, "yyyyMMdd'T'HHmmss'Z'", CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out DateTime started) &&
-                        started <= until && (!launch.HasValue || started >= launch.Value))
-                        logs.Add(Tuple.Create(started, file));
+                    if (!Directory.Exists(dir) || (File.GetAttributes(dir) & FileAttributes.ReparsePoint) != 0) continue;
+                    foreach (string file in Directory.EnumerateFiles(dir, "*_Player_*.log").Take(2000))
+                    {
+                        var match = LogName.Match(Path.GetFileName(file));
+                        if (match.Success && DateTime.TryParseExact(match.Groups[1].Value, "yyyyMMdd'T'HHmmss'Z'", CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out DateTime started) &&
+                            started <= until && (!launch.HasValue || started >= launch.Value))
+                            logs.Add(Tuple.Create(started, file));
+                    }
                 }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
             }
             foreach (var log in logs.OrderByDescending(l => l.Item1).Take(4).OrderBy(l => l.Item1))
             {
-                using (var stream = new FileStream(log.Item2, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+                try
                 {
-                    visits.Add(new Visit { At = log.Item1 });
-                    if (stream.Length > MaxLogBytes) continue;
-                    using (var reader = new StreamReader(stream))
+                    using (var stream = new FileStream(log.Item2, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
                     {
-                        string line;
-                        while ((line = reader.ReadLine()) != null)
+                        visits.Add(new Visit { At = log.Item1 });
+                        if (stream.Length > MaxLogBytes) continue;
+                        using (var reader = new StreamReader(stream))
                         {
-                            if (line.IndexOf("game_join_loadtime", StringComparison.Ordinal) < 0 && line.IndexOf("SessionTransitionFSM", StringComparison.Ordinal) < 0) continue;
-                            var join = JoinLine.Match(line);
-                            var leave = join.Success ? null : LeaveLine.Match(line);
-                            var at = join.Success ? join.Groups[1].Value : leave.Success ? leave.Groups[1].Value : null;
-                            if (at == null || !DateTime.TryParse(at, CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out DateTime when)) continue;
-                            visits.Add(new Visit { At = when, Universe = join.Success ? join.Groups[3].Value : null, Place = join.Success ? join.Groups[2].Value : null });
+                            string line;
+                            while ((line = reader.ReadLine()) != null)
+                            {
+                                if (line.IndexOf("game_join_loadtime", StringComparison.Ordinal) < 0 && line.IndexOf("SessionTransitionFSM", StringComparison.Ordinal) < 0) continue;
+                                var join = JoinLine.Match(line);
+                                var leave = join.Success ? null : LeaveLine.Match(line);
+                                var at = join.Success ? join.Groups[1].Value : leave.Success ? leave.Groups[1].Value : null;
+                                if (at == null || !DateTime.TryParse(at, CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out DateTime when)) continue;
+                                visits.Add(new Visit { At = when, Universe = join.Success ? join.Groups[3].Value : null, Place = join.Success ? join.Groups[2].Value : null });
+                            }
                         }
                     }
                 }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
             }
             return visits.OrderBy(v => v.At).ToList();
         }
@@ -110,7 +122,7 @@ namespace ReplayKitHelper
             try
             {
                 var summary = CaptureTimeline.Describe(capture);
-                string game = summary["kind"].Value<string>() == "game" ? summary["id"]?.Value<string>() : summary["partial"]?["id"]?.Value<string>();
+                string game = CaptureTimeline.MainGameId(summary);
                 if (game != RobloxId || endTick <= 0) return;
                 double duration = capture["duration"]?.Value<double>() ?? 0;
                 DateTime end = DateTime.UtcNow - TimeSpan.FromMilliseconds(Math.Max(0, (long)GetTickCount64() - endTick));
@@ -136,11 +148,11 @@ namespace ReplayKitHelper
         // what the clips page shows of a roblox clip: the icon and name pinned to it, or while those are being looked up the newest known ones
         internal static JObject Describe(JObject capture, JObject summary)
         {
-            string game = summary["kind"]?.Value<string>() == "game" ? summary["id"]?.Value<string>() : summary["partial"]?["id"]?.Value<string>();
+            string game = CaptureTimeline.MainGameId(summary);
             var experience = capture?["experience"] as JObject;
             string universe = experience?["universe"]?.Type == JTokenType.String ? experience["universe"].Value<string>() : null;
             if (game != RobloxId || !ValidUniverse(universe)) return null;
-            string icon = experience["icon"]?.Type == JTokenType.String && ValidVersion(experience["icon"].Value<string>()) ? experience["icon"].Value<string>() : null;
+            string icon = experience["icon"]?.Type == JTokenType.String && GameCatalog.ValidIconVersion(experience["icon"].Value<string>()) ? experience["icon"].Value<string>() : null;
             string name = experience["name"]?.Type == JTokenType.String ? experience["name"].Value<string>() : null;
             if (icon == null || name == null)
             {
@@ -175,7 +187,6 @@ namespace ReplayKitHelper
         }
 
         internal static string IconId(string universe, string version) => "roblox-" + universe + "-" + version;
-        private static bool ValidVersion(string version) => version != null && Regex.IsMatch(version, "^[a-f0-9]{16}$");
 
         // what is known of an experience: its newest name and icon, the image address that icon came from, when roblox was last asked, and when it may be asked again after a failure
         private sealed class Entry
@@ -216,7 +227,7 @@ namespace ReplayKitHelper
                     Cache[row.Name] = new Entry
                     {
                         Name = value["name"]?.Type == JTokenType.String ? value["name"].Value<string>() : null,
-                        Icon = value["icon"]?.Type == JTokenType.String && ValidVersion(value["icon"].Value<string>()) ? value["icon"].Value<string>() : null,
+                        Icon = value["icon"]?.Type == JTokenType.String && GameCatalog.ValidIconVersion(value["icon"].Value<string>()) ? value["icon"].Value<string>() : null,
                         Url = value["url"]?.Type == JTokenType.String ? value["url"].Value<string>() : null,
                         Checked = value["checked"]?.Type == JTokenType.Date ? value["checked"].Value<DateTime>().ToUniversalTime() : DateTime.MinValue,
                     };
@@ -331,24 +342,34 @@ namespace ReplayKitHelper
                 string name = (game?["name"]?.Type == JTokenType.String ? game["name"].Value<string>() : "").Trim();
                 string url = thumb?["state"]?.ToString() == "Completed" ? thumb["imageUrl"]?.ToString() : null;
                 Entry entry;
-                lock (Gate) { if (!Cache.TryGetValue(universe, out entry)) Cache[universe] = entry = new Entry(); }
-                if (name.Length > 0 && name.Length <= 160 && !name.Any(char.IsControl)) entry.Name = name;
-                // an icon still in moderation, or an experience made private or deleted, keeps the last icon; it is asked about again after ten minutes, then twice as long each time it still has none, up to a day
-                if (url == null)
+                bool validName = name.Length > 0 && name.Length <= 160 && !name.Any(char.IsControl);
+                string knownUrl = null, knownIcon = null;
+                lock (Gate)
                 {
-                    entry.Misses = Math.Min(entry.Misses + 1, 8);
-                    entry.RetryAt = now + TimeSpan.FromMinutes(Math.Min(24 * 60, 10 << (entry.Misses - 1)));
-                    lock (Gate) Due.Add(universe);
-                    entry.Checked = now;
-                    continue;
+                    if (!Cache.TryGetValue(universe, out entry)) Cache[universe] = entry = new Entry();
+                    if (validName) entry.Name = name;
+                    // an icon still in moderation, or an experience made private or deleted, keeps the last icon; it is asked about again after ten minutes, then twice as long each time it still has none, up to a day
+                    if (url == null)
+                    {
+                        entry.Misses = Math.Min(entry.Misses + 1, 8);
+                        entry.RetryAt = now + TimeSpan.FromMinutes(Math.Min(24 * 60, 10 << (entry.Misses - 1)));
+                        Due.Add(universe);
+                        entry.Checked = now;
+                        continue;
+                    }
+                    knownUrl = entry.Url;
+                    knownIcon = entry.Icon;
                 }
-                entry.Misses = 0;
-                if (url != entry.Url || entry.Icon == null || !File.Exists(Path.Combine(GameCatalog.IconDir, IconId(universe, entry.Icon) + ".png")))
+                string savedIcon = knownIcon;
+                if (url != knownUrl || knownIcon == null || !File.Exists(Path.Combine(GameCatalog.IconDir, IconId(universe, knownIcon) + ".png")))
+                    savedIcon = SaveIcon(universe, url);
+                lock (Gate)
                 {
-                    entry.Icon = SaveIcon(universe, url);
+                    entry.Misses = 0;
+                    entry.Icon = savedIcon;
                     entry.Url = url;
+                    entry.Checked = now;
                 }
-                entry.Checked = now;
             }
             ClipStore.Update(GameCatalog.CustomFile, db =>
             {
@@ -396,10 +417,10 @@ namespace ReplayKitHelper
                 }
                 File.Move(part, target);
             }
-            finally { if (File.Exists(part)) File.Delete(part); }
+            finally { try { if (File.Exists(part)) File.Delete(part); } catch (IOException) { } catch (UnauthorizedAccessException) { } }
             // the single icon file of the first version of this feature is replaced by the versioned ones
             string legacy = Path.Combine(GameCatalog.IconDir, "roblox-" + universe + ".png");
-            if (File.Exists(legacy)) File.Delete(legacy);
+            try { if (File.Exists(legacy)) File.Delete(legacy); } catch (IOException) { } catch (UnauthorizedAccessException) { }
             Log.Write("Roblox experience " + universe + " icon " + version + " saved");
             return version;
         }

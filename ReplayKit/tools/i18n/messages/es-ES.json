@@ -2995,6 +2995,10 @@
     "source": "9d26d468e25871be",
     "text": "Inicio/fin no válido"
   },
+  "editor.badSubtitles": {
+    "source": "5a4ef0f8500ab1d6",
+    "text": "Subtítulos no válidos"
+  },
   "editor.badVideoLookError": {
     "source": "1ea995696f2aa08a",
     "text": "Aspecto de vídeo no válido: {error}"
@@ -5011,6 +5015,10 @@
     "source": "6da3e6910d7c5556",
     "text": "No se encontró ese clip"
   },
+  "editor.thatFileCouldNotBeReadAsAudio": {
+    "source": "4f09c6c88536b498",
+    "text": "Ese archivo no se pudo leer como audio"
+  },
   "editor.thatFileHasNoAudio": {
     "source": "a5adb3b52721e929",
     "text": "Ese archivo no tiene audio"
@@ -5395,6 +5403,10 @@
     "source": "83f35a6127f1f033",
     "text": "Demasiadas salidas de recorte existentes"
   },
+  "editor.tooManyPresets": {
+    "source": "af4468f1a5194434",
+    "text": "Hay demasiados preajustes. Elimina algunos primero."
+  },
   "editor.tooManySubtitles": {
     "source": "e4dec3dca173da94",
     "text": "Demasiados subtítulos"
@@ -5483,6 +5495,10 @@
     "source": "b6af4c2ffa2ec661",
     "text": "Rango de voz desconocido."
   },
+  "editor.unknownTrimMode": {
+    "source": "febd6d355469bd73",
+    "text": "Modo de recorte desconocido '{mode}'"
+  },
   "editor.unmute": {
     "source": "c261db78a6b1f179",
     "text": "Quitar silencio"
@@ -5534,6 +5550,10 @@
   "editor.videoSpeedX": {
     "source": "b9c1c3bbe815f739",
     "text": "Vídeo {speed}x"
+  },
+  "editor.voiceoverTake": {
+    "source": "e7e8e3d0c87a8ee5",
+    "text": "Voz en off {number}"
   },
   "editor.volume": {
     "source": "429bd43d726de417",

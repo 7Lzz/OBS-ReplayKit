@@ -56,14 +56,14 @@ namespace ReplayKitHelper
             lock (Gate)
             {
                 if (_windowOpen) return false;
+                try { if (Directory.Exists(ProfileDirectory)) Directory.Delete(ProfileDirectory, true); }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+                {
+                    Log.Write("Clear Streamable profile: " + ex.Message);
+                    return false;
+                }
+                return true;
             }
-            try { if (Directory.Exists(ProfileDirectory)) Directory.Delete(ProfileDirectory, true); }
-            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
-            {
-                Log.Write("Clear Streamable profile: " + ex.Message);
-                return false;
-            }
-            return true;
         }
 
         private static JObject StatusLocked()
@@ -124,12 +124,12 @@ namespace ReplayKitHelper
                     async System.Threading.Tasks.Task CheckSession()
                     {
                         // one check at a time: the timer, navigation and history events can all fire while a slow one is still running
-                        if (checking) return;
+                        if (checking || form.IsDisposed || form.Disposing || browser.IsDisposed || browser.CoreWebView2 == null) return;
                         checking = true;
                         try
                         {
                             var cookies = await browser.CoreWebView2.CookieManager.GetCookiesAsync("https://streamable.com");
-                            if (cookies == null || cookies.Count == 0) return;
+                            if (form.IsDisposed || form.Disposing || cookies == null || cookies.Count == 0) return;
                             string jar = ToCookieJar(cookies);
                             if (string.IsNullOrEmpty(jar) || jar == lastCheckedJar) return;
                             // the /me call shells out to curl and blocks until it answers, so it runs off the ui thread -- a blocked ui thread cannot pump window messages, and a drag is one of them
@@ -163,12 +163,14 @@ namespace ReplayKitHelper
                         try
                         {
                             form.Show();
-                            _formHandle = form.Handle;
-                            // plain SetForegroundWindow from here reliably lost to windows' anti-focus-stealing heuristic -- this thread never received the input event that triggered it (the click happened in obss dock, over http, not in this process), which is exactly the case that heuristic exists to block. Native.FocusHwnd does the attach-thread-input dance that actually works around it; its the same call already used to bring an existing window forward on a repeat click, so both paths now behave the same way.
+                            lock (Gate) { _formHandle = form.Handle; }
+                            // plain SetForegroundWindow from here reliably lost to windows anti-focus-stealing heuristic -- this thread never received the input event that triggered it (the click happened in obss dock, over http, not in this process), which is exactly the case that heuristic exists to block. Native.FocusHwnd does the attach-thread-input dance that actually works around it; its the same call already used to bring an existing window forward on a repeat click, so both paths now behave the same way.
                             Native.FocusHwnd(form.Handle);
                             ApplyTheme(form.Handle);
                             var environment = await CoreWebView2Environment.CreateAsync(null, ProfileDirectory);
+                            if (form.IsDisposed || form.Disposing || browser.IsDisposed) return;
                             await browser.EnsureCoreWebView2Async(environment);
+                            if (form.IsDisposed || form.Disposing || browser.IsDisposed || browser.CoreWebView2 == null) return;
                             browser.CoreWebView2.NavigationCompleted += async (s, e) => await CheckSession();
                             // catches a client-side route change (history.pushState/replaceState) after login, which does not raise NavigationCompleted at all -- see the sessionPoll comment above for why the interval timer below is still kept as a backstop alongside this.
                             browser.CoreWebView2.HistoryChanged += async (s, e) => await CheckSession();
@@ -178,6 +180,7 @@ namespace ReplayKitHelper
                         }
                         catch (Exception ex)
                         {
+                            if (form.IsDisposed || form.Disposing) return;
                             SetError(Locales.Message("share.couldNotOpenTheSecureStreamable", "error", ex.Message));
                             form.Close();
                         }
@@ -234,18 +237,26 @@ namespace ReplayKitHelper
             catch (Exception ex) { Log.Write("Streamable sign-in theme apply: " + ex.Message); }
         }
 
+        private static bool HasCookieControl(string value) => value.IndexOfAny(new[] { '\r', '\n', '\t' }) >= 0;
+
         private static string ToCookieJar(System.Collections.Generic.IList<CoreWebView2Cookie> cookies)
         {
             var text = new StringBuilder("# Netscape HTTP Cookie File\r\n");
+            var unixEpoch = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
             foreach (var cookie in cookies)
             {
                 string domain = cookie.Domain ?? "";
-                if (!domain.EndsWith("streamable.com", StringComparison.OrdinalIgnoreCase)) continue;
+                if (!string.Equals(domain, "streamable.com", StringComparison.OrdinalIgnoreCase) &&
+                    !domain.EndsWith(".streamable.com", StringComparison.OrdinalIgnoreCase)) continue;
+                string path = string.IsNullOrEmpty(cookie.Path) ? "/" : cookie.Path;
                 if (string.IsNullOrWhiteSpace(cookie.Name) || cookie.Value == null) continue;
-                long expires = cookie.IsSession ? 0 : new DateTimeOffset(cookie.Expires).ToUnixTimeSeconds();
+                if (HasCookieControl(domain) || HasCookieControl(path) || HasCookieControl(cookie.Name) || HasCookieControl(cookie.Value)) continue;
+                long expires = 0;
+                if (!cookie.IsSession && cookie.Expires > unixEpoch)
+                    expires = new DateTimeOffset(DateTime.SpecifyKind(cookie.Expires, DateTimeKind.Utc)).ToUnixTimeSeconds();
                 text.Append(domain).Append('\t')
                     .Append(domain.StartsWith(".", StringComparison.Ordinal) ? "TRUE" : "FALSE").Append('\t')
-                    .Append(string.IsNullOrEmpty(cookie.Path) ? "/" : cookie.Path).Append('\t')
+                    .Append(path).Append('\t')
                     .Append(cookie.IsSecure ? "TRUE" : "FALSE").Append('\t')
                     .Append(expires.ToString(CultureInfo.InvariantCulture)).Append('\t')
                     .Append(cookie.Name).Append('\t').Append(cookie.Value).Append("\r\n");

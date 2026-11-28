@@ -74,7 +74,7 @@ namespace ReplayKitHelper
                         Rotate = Num(o, "rotate", -180, 180),
                     };
                     if (layer.End - layer.At < 0.04) throw new BadLayer("one is too short");
-                    if (o["look"] != null)
+                    if (o["look"] != null && o["look"].Type != JTokenType.Null)
                     {
                         layer.Look = VideoLook.Parse(o["look"], out string lookError);
                         if (layer.Look == null) throw new BadLayer(lookError ?? "a look is not readable");
@@ -86,7 +86,7 @@ namespace ReplayKitHelper
                         if (clip == null || !File.Exists(clip.Full)) { error = VideoImports.IsRef(reference) ? Locales.Message("editor.addedVideoMoved") : Locales.Message("editor.addedClipNotInFolder"); return null; }
                         layer.Path = clip.Full;
                         layer.Clip = true;
-                        if (o["speed"] != null) layer.Speed = Num(o, "speed", EditorLimits.VideoSpeedMin, EditorLimits.VideoSpeedMax);
+                        if (o["speed"] != null && o["speed"].Type != JTokenType.Null) layer.Speed = Num(o, "speed", EditorLimits.VideoSpeedMin, EditorLimits.VideoSpeedMax);
                     }
                     else if (kind == "media")
                     {

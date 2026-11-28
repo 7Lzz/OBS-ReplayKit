@@ -3,7 +3,6 @@ using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.RegularExpressions;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -15,10 +14,11 @@ namespace ReplayKitHelper
         private const string Prefix = "rkvideo-";
         private const string SourceFile = "source.json";
         private static readonly string Root = ClipCache.KindDir("videos");
-        private static readonly Regex RefPattern = new Regex("^rkvideo-[0-9a-f]{16}$", RegexOptions.Compiled);
         private static readonly string[] Extensions = { ".mp4", ".m4v", ".mov", ".mkv", ".webm" };
+        private static readonly object StoreGate = new object();
 
-        public static bool IsRef(string reference) => reference != null && RefPattern.IsMatch(reference);
+        public static bool IsRef(string reference) =>
+            reference != null && reference.StartsWith(Prefix, StringComparison.Ordinal) && ClipCache.IsValidKey(reference.Substring(Prefix.Length));
 
         public static string DirFor(string reference) => Path.Combine(Root, reference.Substring(Prefix.Length));
 
@@ -35,7 +35,7 @@ namespace ReplayKitHelper
                 if (!File.Exists(Path.Combine(dir, ClipCache.DoneMarker)) || !File.Exists(record)) return null;
                 var saved = JObject.Parse(File.ReadAllText(record));
                 string path = saved.Value<string>("path");
-                if (!Usable(path)) return null;
+                if (!AudioImports.IsUsableLocalPath(path)) return null;
                 var info = new FileInfo(path);
                 if (!info.Exists || (info.Attributes & FileAttributes.ReparsePoint) != 0) return null;
                 if (saved.Value<long?>("size") != info.Length || saved.Value<long?>("mtimeTicks") != info.LastWriteTimeUtc.Ticks) return null;
@@ -49,19 +49,12 @@ namespace ReplayKitHelper
             }
         }
 
-        // the path comes from the dialog of this helper, and anything that is not a plain file on a drive or a share is turned away all the same
-        private static bool Usable(string path) =>
-            !string.IsNullOrWhiteSpace(path) && Path.IsPathRooted(path) && Path.GetPathRoot(path).Length >= 3 &&
-            !path.StartsWith(@"\\.\", StringComparison.Ordinal) && !path.StartsWith(@"\\?\", StringComparison.Ordinal);
-
         public static JObject FromPath(string path)
         {
-            string name = Path.GetFileNameWithoutExtension(path ?? "");
-            if (name.Length > 80) name = name.Substring(0, 80);
-            if (name.Length == 0) name = Locales.Message("editor.video");
+            string name = AudioImports.CleanImportName(path, Locales.Message("editor.video"), 80);
             try
             {
-                if (!Usable(path)) return Fail(name, Locales.Message("editor.fileCannotBeUsed"));
+                if (!AudioImports.IsUsableLocalPath(path)) return Fail(name, Locales.Message("editor.fileCannotBeUsed"));
                 var info = new FileInfo(Path.GetFullPath(path));
                 if (!info.Exists) return Fail(name, Locales.Message("editor.fileWasNotFound"));
                 if ((info.Attributes & FileAttributes.ReparsePoint) != 0) return Fail(name, Locales.Message("editor.fileCannotBeUsed"));
@@ -77,18 +70,21 @@ namespace ReplayKitHelper
                 }
                 string reference = Prefix + id;
                 string dir = DirFor(reference);
-                if (Resolve(reference) == null)
+                lock (StoreGate)
                 {
-                    ClipCache.Prune(dir);
-                    Directory.CreateDirectory(dir);
-                    var record = new JObject
+                    if (Resolve(reference) == null)
                     {
-                        ["path"] = info.FullName,
-                        ["size"] = info.Length,
-                        ["mtimeTicks"] = info.LastWriteTimeUtc.Ticks,
-                    };
-                    File.WriteAllText(Path.Combine(dir, SourceFile), record.ToString(Formatting.None));
-                    File.WriteAllText(Path.Combine(dir, ClipCache.DoneMarker), "");
+                        ClipCache.Prune(dir);
+                        Directory.CreateDirectory(dir);
+                        var record = new JObject
+                        {
+                            ["path"] = info.FullName,
+                            ["size"] = info.Length,
+                            ["mtimeTicks"] = info.LastWriteTimeUtc.Ticks,
+                        };
+                        File.WriteAllText(Path.Combine(dir, SourceFile), record.ToString(Formatting.None));
+                        File.WriteAllText(Path.Combine(dir, ClipCache.DoneMarker), "");
+                    }
                 }
                 return new JObject
                 {

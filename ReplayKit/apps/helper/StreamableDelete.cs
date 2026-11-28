@@ -1,7 +1,6 @@
 using System;
 using System.IO;
 using System.Text;
-using System.Text.RegularExpressions;
 
 namespace ReplayKitHelper
 {
@@ -19,8 +18,7 @@ namespace ReplayKitHelper
                 if (!File.Exists(clip.Full)) return (404, Locales.Message("common.clipNotFound"));
 
                 string url = Clips.GetLink(clip.Name, folder);
-                var match = Regex.Match(url ?? "", @"\Ahttps://streamable\.com/([A-Za-z0-9_-]{1,64})\z");
-                if (!match.Success || !string.Equals(url, expectedUrl, StringComparison.Ordinal))
+                if (!Upload.TryParseStreamableShortcode(url, out string shortcode) || !string.Equals(url, expectedUrl, StringComparison.Ordinal))
                     return (409, Locales.Message("clips.streamableLinkChanged"));
 
                 string cookies;
@@ -36,7 +34,7 @@ namespace ReplayKitHelper
                 jar = Path.Combine(Constants.SCRATCH_DIR, "streamable_delete_" + Guid.NewGuid().ToString("N") + ".cookies.txt");
                 File.WriteAllText(jar, cookies, Encoding.ASCII);
 
-                string videoUrl = Constants.STREAMABLE_API + "/api/v1/videos/" + match.Groups[1].Value;
+                string videoUrl = Constants.STREAMABLE_API + "/api/v1/videos/" + shortcode;
                 var response = Curl.Run("-q", "-sS", "--max-time", "10", "--max-filesize", "4096", "-b", jar,
                     "-H", "Origin: https://streamable.com", "-H", "Referer: https://streamable.com/",
                     "-X", "DELETE", "-w", "\\n%{http_code}", videoUrl);
@@ -45,7 +43,7 @@ namespace ReplayKitHelper
                 int separator = response.Stdout.LastIndexOf('\n');
                 int status = 0;
                 deleted = response.ExitCode == 0 && separator >= 0 &&
-                    int.TryParse(response.Stdout.Substring(separator + 1), out status) && status >= 200 && status < 300 &&
+                    int.TryParse(response.Stdout.Substring(separator + 1).Trim(), out status) && status >= 200 && status < 300 &&
                     response.Stdout.Substring(0, separator).Trim() == "true";
                 // a video that is already gone, such as one deleted on the site, cannot be deleted again, so a refused delete removes the link only when a lookup of the video answers 404, which streamable gives only for a video that no longer exists
                 if (!deleted && status >= 400 && status < 500)

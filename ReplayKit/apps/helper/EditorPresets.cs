@@ -16,7 +16,7 @@ namespace ReplayKitHelper
         private const int MaxNameLength = 40;
         private const int MaxDataBytes = 16 * 1024;
         private static readonly string[] Kinds = { "subtitle", "video" };
-        private static readonly Regex Id = new Regex("^[A-Za-z0-9_-]{1,40}$", RegexOptions.CultureInvariant);
+        private static readonly Regex Id = new Regex(@"\A[A-Za-z0-9_-]{1,40}\z", RegexOptions.CultureInvariant);
 
         private static string StorePath() => ReplayKitShared.StateLayout.Resolve(AppConfig.GetReplayKitRoot(), ReplayKitShared.StateLayout.EditorPresetsFile);
 
@@ -72,7 +72,7 @@ namespace ReplayKitHelper
             JArray list;
             try { list = JObject.Parse(body ?? "")["presets"] as JArray; }
             catch (JsonException) { return Fail(Locales.Message("editor.badPresets")); }
-            if (list == null || list.Count > MaxPresets) return Fail(list == null ? Locales.Message("editor.badPresets") : "There are too many presets. Delete some first.");
+            if (list == null || list.Count > MaxPresets) return Fail(list == null ? Locales.Message("editor.badPresets") : Locales.Message("editor.tooManyPresets"));
             var kept = CleanList(list);
             if (kept.Count != list.Count) return Fail(Locales.Message("editor.badPresets"));
             try

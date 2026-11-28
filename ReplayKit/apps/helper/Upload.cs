@@ -127,7 +127,7 @@ namespace ReplayKitHelper
                 // token so /cancel-upload can abort between steps -- killing the curl process only covers a cancel that lands while curl is actually running; steps 1/3 and the gaps had no way to stop, so a cancel at (say) 70% could still finish the S3 upload + trigger the transcode.
                 var token = JobCoordinator.Token(requestId);
 
-                reservation.Start(() => UploadWorker.Run(requestId, uploadFull, auth.Cookies, auth.Required, 0, 100, quiet, token),
+                reservation.Start(() => UploadWorker.Run(requestId, uploadFull, auth.Cookies, auth.Required, 0, 100, token),
                     t => HandleUploadCompletion(t, requestId, clipName, clip.Root, fileIdentity, quiet, auth));
 
                 return new JObject { ["ok"] = true, ["state"] = "uploading", ["clip"] = clipName, ["requestId"] = requestId };
@@ -154,7 +154,7 @@ namespace ReplayKitHelper
 
             if (workerThrew)
             {
-                UploadState.SetUploadState(requestId: requestId, state: "error", active: false, error: "Upload failed: " + workerThrewMessage, phase: "error");
+                UploadState.SetUploadState(requestId: requestId, state: "error", active: false, error: Locales.Message("clips.uploadFailedError", "error", workerThrewMessage ?? ""), phase: "error");
                 return;
             }
 
@@ -167,9 +167,7 @@ namespace ReplayKitHelper
             }
 
             string result = outcome.Url;
-            string shortcode = "";
-            var match = Regex.Match(result, @"^https://streamable\.com/([A-Za-z0-9_-]+)$");
-            if (match.Success) shortcode = match.Groups[1].Value;
+            TryParseStreamableShortcode(result, out string shortcode);
 
             // the transcode step just triggered streamables encode; the video isnt watchable until streamable finishes processing it. mark ready=false and let the background poller flip it once streamables api reports status=2.
             JobCoordinator.Commit(requestId, () =>
@@ -214,8 +212,22 @@ namespace ReplayKitHelper
             ToastNotify.Show(Locales.Message("share.clipUploaded"), body, ResolveToastIconPath());
         }
 
+        private static readonly Regex StreamableUrlPattern = new Regex(@"\Ahttps://streamable\.com/([A-Za-z0-9_-]{1,64})\z", RegexOptions.Compiled);
+        private static readonly Regex ShortcodePattern = new Regex(@"\A[A-Za-z0-9_-]{1,64}\z", RegexOptions.Compiled);
+
+        internal static bool IsValidShortcode(string shortcode) => !string.IsNullOrEmpty(shortcode) && ShortcodePattern.IsMatch(shortcode);
+
+        internal static bool TryParseStreamableShortcode(string url, out string shortcode)
+        {
+            var match = StreamableUrlPattern.Match(url ?? "");
+            shortcode = match.Success ? match.Groups[1].Value : "";
+            return match.Success;
+        }
+
+        internal static string StreamableUrl(string shortcode) => "https://streamable.com/" + shortcode;
+
         // background transcode poller: streamables /transcode only queues the encode, and the video is watchable once /api/v1/videos/<shortcode> reports status 2. it runs as this exe in --transcode-poll mode outside the kill-on-close job, since a poll inside the helper died with it and left clips stuck on processing
-        private static void StartTranscodePoll(string shortcode, string clipName, bool quiet = false, UploadAuth auth = null)
+        private static bool StartTranscodePoll(string shortcode, string clipName, bool quiet = false, UploadAuth auth = null)
         {
             string cookieJar = "";
             bool launched = false;
@@ -254,10 +266,12 @@ namespace ReplayKitHelper
                 if (Native.SpawnDetached(cmdLine, Constants.HelperRoot) <= 0)
                     throw new InvalidOperationException(Locales.Message("share.couldNotLaunchTheTranscodeStatus"));
                 launched = true;
+                return true;
             }
-            catch (Exception ex) when (ex is IOException || ex is InvalidOperationException || ex is System.ComponentModel.Win32Exception)
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is InvalidOperationException || ex is System.ComponentModel.Win32Exception)
             {
                 Log.Write("Could not start transcode poll worker: " + ex.Message, "upload");
+                return false;
             }
             finally
             {
@@ -288,10 +302,8 @@ namespace ReplayKitHelper
             long uploadedAt = entry["uploaded_at"]?.Value<long>() ?? 0;
             long age = DateTimeOffset.UtcNow.ToUnixTimeSeconds() - uploadedAt;
             if (uploadedAt <= 0 || age >= Constants.GetEntryRetentionSec(entry) || (recentOnly && age > 90 * 60)) return false;
-            var link = Regex.Match(entry["url"]?.Value<string>() ?? "", @"\Ahttps://streamable\.com/([A-Za-z0-9_-]+)\z");
-            if (!link.Success) return false;
-            StartTranscodePoll(link.Groups[1].Value, name, quiet: true);
-            return true;
+            if (!TryParseStreamableShortcode(entry["url"]?.Value<string>(), out string shortcode)) return false;
+            return StartTranscodePoll(shortcode, name, quiet: true);
         }
     }
 }

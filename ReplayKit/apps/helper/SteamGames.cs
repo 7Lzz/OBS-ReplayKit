@@ -104,6 +104,7 @@ namespace ReplayKitHelper
                     if (Directory.Exists(path)) installed.Add(Tuple.Create(id, name, path + "\\"));
                 }
             }
+            if (installed.Count == 0) return result;
             var info = SteamData.Apps(Path.Combine(root, "appcache", "appinfo.vdf"), new HashSet<uint>(installed.Select(p => p.Item1)));
             foreach (var app in installed)
             {
@@ -147,7 +148,7 @@ namespace ReplayKitHelper
                     }
                 }
                 // the readers refuse a file they do not understand with InvalidDataException; nothing may escape this pool thread, or the helper process ends
-                catch (Exception ex) when (ex is IOException || ex is InvalidDataException || ex is UnauthorizedAccessException || ex is ArgumentException || ex is SecurityException || ex is Newtonsoft.Json.JsonException || ex is InvalidOperationException || ex is FormatException || ex is OverflowException || ex is EndOfStreamException)
+                catch (Exception ex)
                 { Log.Write("Local Steam metadata unavailable: " + ex.GetType().Name + ": " + ex.Message); next = new Library(); }
                 finally { lock (Gate) { library = next; status = message; pending = false; } }
             });

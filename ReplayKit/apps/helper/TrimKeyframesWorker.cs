@@ -9,14 +9,14 @@ using Newtonsoft.Json.Linq;
 
 namespace ReplayKitHelper
 {
-    // scans a clips keyframe (i-frame) timestamps with ffprobe, for the trim uis snap-to-keyframe markers. two strategies: a fast packet-flags pass first, falling back to a slower full frame decode pass when the fast pass comes back empty (some containers/codecs dont expose keyframe flags on the packet stream). runs as an in-process task from Trim.StartTrimKeyframeScan and returns its result directly.
+    // scans a clips keyframe (i-frame) timestamps with ffprobe, for the trim uis snap-to-keyframe markers. two strategies: a fast packet-flags pass first, falling back to a slower full frame decode pass when the fast pass comes back empty (some containers/codecs dont expose keyframe flags on the packet stream). runs as an in-process task from Trim.GetClipKeyframeTimes and returns its result directly.
     internal static class TrimKeyframesWorker
     {
         private static void AddKeyframeTime(List<double> times, string raw)
         {
             if (string.IsNullOrWhiteSpace(raw) || string.Equals(raw, "N/A", StringComparison.OrdinalIgnoreCase)) return;
             string clean = raw.Trim().Trim('"');
-            if (double.TryParse(clean, NumberStyles.Float, CultureInfo.InvariantCulture, out double value) && value >= 0)
+            if (double.TryParse(clean, NumberStyles.Float, CultureInfo.InvariantCulture, out double value) && !double.IsNaN(value) && !double.IsInfinity(value) && value >= 0)
                 times.Add(value);
         }
 
@@ -71,7 +71,7 @@ namespace ReplayKitHelper
             try
             {
                 using var reader = JobCoordinator.ReadSource(sourcePath);
-                if (!File.Exists(ffprobe)) return new KeyframeScanResult { Ok = false, Message = "ffprobe.exe not found" };
+                if (!File.Exists(ffprobe)) return new KeyframeScanResult { Ok = false, Message = Locales.Message("editor.fastTrimSnapPointsUnavailable") };
                 if (!File.Exists(sourcePath)) return new KeyframeScanResult { Ok = false, Message = Locales.Message("common.sourceClipNotFound") };
 
                 var sw = Stopwatch.StartNew();

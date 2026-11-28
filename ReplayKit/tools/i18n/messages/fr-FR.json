@@ -2995,6 +2995,10 @@
     "source": "9d26d468e25871be",
     "text": "Début/fin non valide"
   },
+  "editor.badSubtitles": {
+    "source": "5a4ef0f8500ab1d6",
+    "text": "Sous-titres non valides"
+  },
   "editor.badVideoLookError": {
     "source": "1ea995696f2aa08a",
     "text": "Style vidéo incorrect : {error}"
@@ -5011,6 +5015,10 @@
     "source": "6da3e6910d7c5556",
     "text": "Ce clip est introuvable"
   },
+  "editor.thatFileCouldNotBeReadAsAudio": {
+    "source": "4f09c6c88536b498",
+    "text": "Ce fichier n'a pas pu être lu comme audio"
+  },
   "editor.thatFileHasNoAudio": {
     "source": "a5adb3b52721e929",
     "text": "Ce fichier ne contient pas d'audio"
@@ -5395,6 +5403,10 @@
     "source": "83f35a6127f1f033",
     "text": "Trop de sorties de rognage existantes"
   },
+  "editor.tooManyPresets": {
+    "source": "af4468f1a5194434",
+    "text": "Il y a trop de préréglages. Supprimez-en d'abord quelques-uns."
+  },
   "editor.tooManySubtitles": {
     "source": "e4dec3dca173da94",
     "text": "Trop de sous-titres"
@@ -5483,6 +5495,10 @@
     "source": "b6af4c2ffa2ec661",
     "text": "Plage de parole inconnue."
   },
+  "editor.unknownTrimMode": {
+    "source": "febd6d355469bd73",
+    "text": "Mode de découpe inconnu « {mode} »"
+  },
   "editor.unmute": {
     "source": "c261db78a6b1f179",
     "text": "Restaurer l'Audio"
@@ -5534,6 +5550,10 @@
   "editor.videoSpeedX": {
     "source": "b9c1c3bbe815f739",
     "text": "Vidéo {speed}x"
+  },
+  "editor.voiceoverTake": {
+    "source": "e7e8e3d0c87a8ee5",
+    "text": "Voix off {number}"
   },
   "editor.volume": {
     "source": "429bd43d726de417",

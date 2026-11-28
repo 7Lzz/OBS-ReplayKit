@@ -378,10 +378,9 @@ namespace ReplayKitHelper
             {
                 if (req.Method != "GET") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "GET required"); return false; }
                 string file = Q("file");
-                double.TryParse(Q("duration"), NumberStyles.Float, CultureInfo.InvariantCulture, out double durationSec);
                 try
                 {
-                    var result = Trim.GetClipKeyframeTimes(file, durationSec);
+                    var result = Trim.GetClipKeyframeTimes(file);
                     int code = result.Ok ? 200 : result.Pending ? 202 : 400;
                     HttpResponse.SendJson(stream, code, KeyframeResultToJson(result));
                 }
