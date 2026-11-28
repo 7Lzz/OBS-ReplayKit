@@ -57,10 +57,10 @@ namespace ReplayKitHelper
         // the cards show the first frame as a small jpeg and only play the gif itself while hovered, so a grid of gifs does not decode every animation at once
         internal static string Thumb(string path) => Screenshots.Thumb(path, "gifs", "GIF");
 
-        // a gif goes into deleted history like a clip or a screenshot while that is on, and is deleted for good when it is off; true when it was kept
-        internal static bool Delete(string path)
+        // a gif goes into deleted history like a clip or a screenshot while that is on and keep is true, and is deleted for good otherwise; true when it was kept
+        internal static bool Delete(string path, bool keep = true)
         {
-            bool kept = DeletedHistory.Keep(path, "gif", Path.GetDirectoryName(Path.GetDirectoryName(path)), null);
+            bool kept = keep && DeletedHistory.Keep(path, "gif", Path.GetDirectoryName(Path.GetDirectoryName(path)), null);
             if (!kept) File.Delete(path);
             return kept;
         }

@@ -223,6 +223,10 @@
     "source": "accde3bd67a86725",
     "text": "再次点击以移到回收站"
   },
+  "clips.clickAgainToPermanentlyDelete": {
+    "source": "40517b57b90ade0e",
+    "text": "再次点击以永久删除"
+  },
   "clips.clickToStopSchedulingNewCompresses": {
     "source": "c5a8b5ba1b077739",
     "text": "点击后不再开始新的压缩。正在进行的压缩会继续完成。"
@@ -1074,6 +1078,10 @@
   "clips.moveToTrash": {
     "source": "d797d4b93afa80dc",
     "text": "移到回收站"
+  },
+  "clips.permanentlyDelete": {
+    "source": "308dcf89a243a4bb",
+    "text": "永久删除"
   },
   "clips.moved1SelectedClipToThe": {
     "source": "30a8abe7b72cf543",

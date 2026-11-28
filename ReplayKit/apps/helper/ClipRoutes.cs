@@ -268,7 +268,7 @@ namespace ReplayKitHelper
                     string shot = Screenshots.Resolve(Q("file"), Q("v"));
                     if (shot == null) { HttpResponse.SendJson(stream, 404, new JObject { ["ok"] = false, ["message"] = Locales.Message("clips.screenshotNotFound") }); return false; }
                     var answer = new JObject { ["ok"] = true };
-                    if (path == "/screenshots/delete") answer["kept"] = Screenshots.Delete(shot);
+                    if (path == "/screenshots/delete") answer["kept"] = Screenshots.Delete(shot, !IsPermanent(query));
                     else if (path == "/screenshots/rename") answer["name"] = Screenshots.Rename(shot, query.ContainsKey("to") ? query["to"] : null);
                     else if (path == "/screenshots/copy") Screenshots.Copy(shot);
                     else answer["focused"] = Explorer.RevealInExplorer(shot);
@@ -327,7 +327,7 @@ namespace ReplayKitHelper
             if (path == "/delete")
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
-                var deleted = Clips.DeleteClip(query.ContainsKey("file") ? query["file"] : null);
+                var deleted = Clips.DeleteClip(query.ContainsKey("file") ? query["file"] : null, !IsPermanent(query));
                 if (deleted.Status == 200) HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["name"] = deleted.Name, ["kept"] = deleted.Kept, ["warning"] = deleted.Warning });
                 else HttpResponse.SendJson(stream, deleted.Status, new JObject { ["ok"] = false, ["message"] = deleted.Message });
                 return false;
@@ -400,7 +400,7 @@ namespace ReplayKitHelper
                     {
                         string gif = GifExports.Resolve(Q("file"));
                         if (gif == null) { HttpResponse.SendJson(stream, 404, new JObject { ["ok"] = false, ["message"] = Locales.Message("clips.gifNotFound") }); return false; }
-                        if (path == "/gifs/delete") answer["kept"] = GifExports.Delete(gif);
+                        if (path == "/gifs/delete") answer["kept"] = GifExports.Delete(gif, !IsPermanent(query));
                         else if (path == "/gifs/rename") answer["name"] = GifExports.Rename(gif, Q("to"));
                         else if (path == "/gifs/copy") GifExports.Copy(gif);
                         else answer["focused"] = Explorer.RevealInExplorer(gif);
@@ -486,5 +486,9 @@ namespace ReplayKitHelper
 
             return null;
         }
+
+        private static bool IsPermanent(Dictionary<string, string> query) =>
+            query.TryGetValue("permanent", out string raw) &&
+            (raw == "1" || string.Equals(raw, "true", StringComparison.OrdinalIgnoreCase));
     }
 }

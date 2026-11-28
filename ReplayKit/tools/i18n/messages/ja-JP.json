@@ -223,6 +223,10 @@
     "source": "accde3bd67a86725",
     "text": "もう一度クリックしてゴミ箱に移動"
   },
+  "clips.clickAgainToPermanentlyDelete": {
+    "source": "40517b57b90ade0e",
+    "text": "もう一度クリックして完全に削除"
+  },
   "clips.clickToStopSchedulingNewCompresses": {
     "source": "c5a8b5ba1b077739",
     "text": "クリックすると新しい圧縮を開始しなくなります。実行中の圧縮は最後まで続きます。"
@@ -1074,6 +1078,10 @@
   "clips.moveToTrash": {
     "source": "d797d4b93afa80dc",
     "text": "ゴミ箱に移動"
+  },
+  "clips.permanentlyDelete": {
+    "source": "308dcf89a243a4bb",
+    "text": "完全に削除"
   },
   "clips.moved1SelectedClipToThe": {
     "source": "30a8abe7b72cf543",

@@ -126,6 +126,7 @@ const CLIP_HOVER_PROFILES = {
       replayKitSettings.showCodecTags = showCodecTags;
       document.querySelectorAll(".card").forEach((card) => syncCodecBadge(card));
     }
+    if (data.settings.deletedHistoryDays !== undefined) setTrashOn(Number(data.settings.deletedHistoryDays) > 0);
   }
   loadReplayKitSettings();
   window.addEventListener("focus", loadReplayKitSettings);
@@ -145,6 +146,8 @@ const CLIP_HOVER_PROFILES = {
     EXPORT_GIF: _svgInner(_RKI["nav/gifs"]),
     SCREENSHOT: _svgInner(_RKI["quick/screenshot"]),
     TRASH: _svgInner(_RKI["action/trash"]),
+    TRASH_DELETE: _svgInner(_RKI["action/trash-delete"]),
+    TRASH_DUAL: '<g class="ic-trash">' + _svgInner(_RKI["action/trash"]) + '</g><g class="ic-perm">' + _svgInner(_RKI["action/trash-delete"]) + '</g>',
     RESTORE: _svgInner(_RKI["editor/undo"]),
     STAR: _svgInner(_RKI["toggle/star"]),
     STAR_BORDER: _svgInner(_RKI["toggle/star-border"]),
@@ -370,9 +373,9 @@ const CLIP_HOVER_PROFILES = {
       setTimeout(() => showToast(RK_M("clips.couldNotReadYourSavedSection"), "error", RK_M("common.clips")), 0);
     }
   }
-  const screenshotGallery = !HOME_MODE && window.RKScreenshots ? RKScreenshots.create({helper:HELPER, formatSize, formatAge:formatClipDate, icons:ICON, resize:bindCardResize, flip:rkFlip, openMenu:openCardMenuAt, closeMenus:closeAllMenus, relabel:relabelDeleteButtons, armDelete:armDeleteButton, resetDeletes:resetAllArmedDeleteButtons, hovers:applyClipHovers, toast:(message) => { showToast(escapeHtml(message), "info"); scheduleToastHide(2400); }, filter:row => !gameFilters || gameFilters.matches(row, false), collapsed:() => sectionCollapsed("screenshots"), notify:message => showToast(escapeHtml(message), "bad", RK_M("common.screenshots")), changed:() => renderLoadedClips(loadedClips)}) : null;
+  const screenshotGallery = !HOME_MODE && window.RKScreenshots ? RKScreenshots.create({helper:HELPER, formatSize, formatAge:formatClipDate, icons:ICON, resize:bindCardResize, flip:rkFlip, openMenu:openCardMenuAt, closeMenus:closeAllMenus, relabel:relabelDeleteButtons, armDelete:armDeleteButton, resetDeletes:resetAllArmedDeleteButtons, isShiftDelete:() => trashOn && shiftHeld, hovers:applyClipHovers, toast:(message) => { showToast(escapeHtml(message), "info"); scheduleToastHide(2400); }, filter:row => !gameFilters || gameFilters.matches(row, false), collapsed:() => sectionCollapsed("screenshots"), notify:message => showToast(escapeHtml(message), "bad", RK_M("common.screenshots")), changed:() => renderLoadedClips(loadedClips)}) : null;
   // the gifs exported from the clip menu: the same gallery as the screenshots, over the GIFs folder
-  const gifGallery = !HOME_MODE && window.RKScreenshots ? RKScreenshots.create({kind:"gif", helper:HELPER, formatSize, formatAge:formatClipDate, icons:ICON, resize:bindCardResize, flip:rkFlip, openMenu:openCardMenuAt, closeMenus:closeAllMenus, relabel:relabelDeleteButtons, armDelete:armDeleteButton, resetDeletes:resetAllArmedDeleteButtons, hovers:applyClipHovers, toast:(message) => { showToast(escapeHtml(message), "info"); scheduleToastHide(2400); }, filter:row => !gameFilters || gameFilters.matches(row, false), collapsed:() => sectionCollapsed("gifs"), notify:message => showToast(escapeHtml(message), "bad", RK_M("clips.gifs")), changed:() => renderLoadedClips(loadedClips)}) : null;
+  const gifGallery = !HOME_MODE && window.RKScreenshots ? RKScreenshots.create({kind:"gif", helper:HELPER, formatSize, formatAge:formatClipDate, icons:ICON, resize:bindCardResize, flip:rkFlip, openMenu:openCardMenuAt, closeMenus:closeAllMenus, relabel:relabelDeleteButtons, armDelete:armDeleteButton, resetDeletes:resetAllArmedDeleteButtons, isShiftDelete:() => trashOn && shiftHeld, hovers:applyClipHovers, toast:(message) => { showToast(escapeHtml(message), "info"); scheduleToastHide(2400); }, filter:row => !gameFilters || gameFilters.matches(row, false), collapsed:() => sectionCollapsed("gifs"), notify:message => showToast(escapeHtml(message), "bad", RK_M("clips.gifs")), changed:() => renderLoadedClips(loadedClips)}) : null;
   const mediaGalleries = [screenshotGallery, gifGallery].filter(Boolean);
   // the gallery that is the whole view of a filter, for the screenshots and gifs filters
   const galleryFor = (filter) => filter === "screenshots" ? screenshotGallery : filter === "gifs" ? gifGallery : null;
@@ -2070,7 +2073,7 @@ const CLIP_HOVER_PROFILES = {
     const menu = card.querySelector(".menu-dropdown");
     if (menu) closeCardMenu(menu);
     else card.classList.remove("menu-open");
-    resetDeleteButton(card.querySelector(".delete-menu-item"));
+    card.querySelectorAll(".delete-menu-item").forEach(resetDeleteButton);
     setCardProcessing(card, false);
     const preview = card.querySelector(".preview");
     if (preview) preview.classList.remove("is-playing", "is-video-ready", "is-idle");
@@ -3010,40 +3013,110 @@ const CLIP_HOVER_PROFILES = {
     return lastClipsByName.get(name) || loadedClips.find(c => c && c.name === name) || null;
   }
 
+  // while deleted history is on a delete moves the clip, screenshot or gif into the trash unless shift is held or the permanent delete row is picked; a button with a label of its own (a draft, streamable, the trash itself) keeps it
+  let trashOn = true;
+  let shiftHeld = false;
+  let armedDeleteBtn = null;
+  let hoveredDeleteBtn = null;
+  let openMenuDropdown = null;
+  function deleteMovesToTrash(btn) {
+    return trashOn && !shiftHeld && btn.dataset.deletePermanent !== "true" && !btn.dataset.deleteLabel;
+  }
+  function deleteLabelFor(btn) {
+    if (btn.dataset.deleteLabel) return btn.dataset.deleteLabel;
+    if (btn.dataset.deletePermanent === "true" || (trashOn && shiftHeld)) return RK_M("clips.permanentlyDelete");
+    if (trashOn) return RK_M("clips.moveToTrash");
+    return btn.dataset.deleteKind === "screenshot" ? RK_M("clips.deleteScreenshot") : btn.dataset.deleteKind === "gif" ? RK_M("clips.deleteGif") : RK_M("clips.deleteClip");
+  }
+  function paintDeleteButton(btn) {
+    if (!btn) return;
+    if (btn.dataset.deletePermanent === "true") {
+      btn.hidden = !trashOn;
+      if (!trashOn && btn.classList.contains("is-armed")) {
+        resetDeleteButton(btn);
+        return;
+      }
+    }
+    const isPerm = btn.dataset.deletePermanent === "true" || (trashOn && shiftHeld && !btn.dataset.deleteLabel);
+    const toTrash = deleteMovesToTrash(btn);
+    const armed = btn.classList.contains("is-armed");
+    const tip = armed
+      ? (btn.dataset.deleteKind === "streamable" ? RK_M("clips.confirmStreamableDelete") : toTrash ? RK_M("clips.clickAgainToMoveToTrash") : isPerm ? RK_M("clips.clickAgainToPermanentlyDelete") : RK_M("common.clickAgainToDelete"))
+      : deleteLabelFor(btn);
+    if (btn.dataset.tooltip !== tip) {
+      btn.dataset.tooltip = tip;
+      btn.setAttribute("aria-label", tip);
+    }
+    const label = btn.querySelector(".menu-item-label");
+    if (label) {
+      const next = armed
+        ? (toTrash ? RK_M("clips.trash") : RK_M("common.delete2"))
+        : (btn.dataset.deleteKind === "streamable" ? deleteLabelFor(btn) : isPerm ? RK_M("clips.permanentlyDelete") : toTrash ? RK_M("clips.moveToTrash") : RK_M("common.delete"));
+      if (label.textContent !== next) label.textContent = next;
+    }
+    const confirm = btn.querySelector(".delete-confirm-text");
+    if (confirm) {
+      const nextConfirm = toTrash ? RK_M("clips.trash") : RK_M("common.delete2");
+      if (confirm.textContent !== nextConfirm) confirm.textContent = nextConfirm;
+    }
+  }
   function resetDeleteButton(btn) {
     if (!btn) return;
     if (btn._deleteArmTimer) {
       clearTimeout(btn._deleteArmTimer);
       btn._deleteArmTimer = 0;
     }
+    if (armedDeleteBtn === btn) armedDeleteBtn = null;
     btn.classList.remove("is-armed");
-    btn.dataset.tooltip = deleteLabelFor(btn);
-    btn.setAttribute("aria-label", deleteLabelFor(btn));
-    const toTrash = trashOn && !btn.dataset.deleteLabel;
-    const label = btn.querySelector(".menu-item-label");
-    if (label) label.textContent = btn.dataset.deleteKind === "streamable" ? deleteLabelFor(btn) : toTrash ? RK_M("clips.moveToTrash") : RK_M("common.delete");
-    const confirm = btn.querySelector(".delete-confirm-text");
-    if (confirm) confirm.textContent = toTrash ? RK_M("clips.trash") : RK_M("common.delete2");
-  }
-
-  // while deleted history is on a delete only moves the clip or screenshot into the trash, so its buttons say so; a button with a label of its own (a draft, the trash itself) keeps it
-  let trashOn = true;
-  function deleteLabelFor(btn) {
-    if (btn.dataset.deleteLabel) return btn.dataset.deleteLabel;
-    if (trashOn) return RK_M("clips.moveToTrash");
-    return btn.dataset.deleteKind === "screenshot" ? RK_M("clips.deleteScreenshot") : btn.dataset.deleteKind === "gif" ? RK_M("clips.deleteGif") : RK_M("clips.deleteClip");
+    paintDeleteButton(btn);
   }
   function relabelDeleteButtons(root) {
-    (root || document).querySelectorAll(".delete-btn:not(.is-armed)").forEach(resetDeleteButton);
+    (root || document).querySelectorAll(".delete-btn").forEach(paintDeleteButton);
   }
   function setTrashOn(on) {
+    on = !!on;
     if (on === trashOn) return;
     trashOn = on;
+    document.body.classList.toggle("is-shift-delete", trashOn && shiftHeld);
     relabelDeleteButtons();
-    if (!bulkDeleteArmed) resetBulkDeleteButton();
+    paintBulkDeleteButton();
   }
+  // icons swap via one body class (css visibility on the two svg groups), so holding shift only updates the text of at most the hovered, armed, open-menu, or bulk button instead of walking every card
+  function setShiftHeld(on) {
+    on = !!on;
+    if (on === shiftHeld) return;
+    shiftHeld = on;
+    if (!trashOn) return;
+    document.body.classList.toggle("is-shift-delete", shiftHeld);
+    if (armedDeleteBtn) paintDeleteButton(armedDeleteBtn);
+    if (hoveredDeleteBtn && hoveredDeleteBtn !== armedDeleteBtn) {
+      if (hoveredDeleteBtn === bulkDeleteBtn) paintBulkDeleteButton();
+      else paintDeleteButton(hoveredDeleteBtn);
+    }
+    if (openMenuDropdown) openMenuDropdown.querySelectorAll(".delete-menu-item").forEach(paintDeleteButton);
+    if (bulkDeleteArmed && bulkDeleteBtn && hoveredDeleteBtn !== bulkDeleteBtn) paintBulkDeleteButton();
+  }
+  // capture phase so the tooltip attribute is current before RKTooltip reads it on mouseover
+  document.addEventListener("mouseover", (e) => {
+    const btn = e.target && e.target.closest ? e.target.closest(".delete-btn, #bulk-delete") : null;
+    if (btn === hoveredDeleteBtn) return;
+    hoveredDeleteBtn = btn;
+    if (!btn) return;
+    if (btn === bulkDeleteBtn) paintBulkDeleteButton();
+    else paintDeleteButton(btn);
+  }, true);
+  document.addEventListener("mouseout", (e) => {
+    if (!hoveredDeleteBtn) return;
+    if (e.relatedTarget && hoveredDeleteBtn.contains(e.relatedTarget)) return;
+    hoveredDeleteBtn = null;
+  });
+  window.addEventListener("keydown", (e) => { if (!e.repeat && (e.key === "Shift" || e.shiftKey !== shiftHeld)) setShiftHeld(e.shiftKey); }, true);
+  window.addEventListener("keyup", (e) => { if (e.key === "Shift" || e.shiftKey !== shiftHeld) setShiftHeld(e.shiftKey); }, true);
+  window.addEventListener("blur", () => setShiftHeld(false));
+  document.addEventListener("visibilitychange", () => { if (document.hidden) setShiftHeld(false); });
 
   function resetAllArmedDeleteButtons(exceptBtn) {
+    if (armedDeleteBtn && armedDeleteBtn !== exceptBtn) resetDeleteButton(armedDeleteBtn);
     document.querySelectorAll(".delete-btn.is-armed").forEach((btn) => {
       if (btn !== exceptBtn) resetDeleteButton(btn);
     });
@@ -3053,11 +3126,8 @@ const CLIP_HOVER_PROFILES = {
     if (!btn) return;
     resetDeleteButton(btn);
     btn.classList.add("is-armed");
-    const toTrash = trashOn && !btn.dataset.deleteLabel;
-    btn.dataset.tooltip = btn.dataset.deleteKind === "streamable" ? RK_M("clips.confirmStreamableDelete") : toTrash ? RK_M("clips.clickAgainToMoveToTrash") : RK_M("common.clickAgainToDelete");
-    btn.setAttribute("aria-label", btn.dataset.tooltip);
-    const label = btn.querySelector(".menu-item-label");
-    if (label) label.textContent = toTrash ? RK_M("clips.trash") : RK_M("common.delete2");
+    armedDeleteBtn = btn;
+    paintDeleteButton(btn);
     btn._deleteArmTimer = setTimeout(() => resetDeleteButton(btn), 3000);
   }
 
@@ -3146,7 +3216,7 @@ const CLIP_HOVER_PROFILES = {
           </button>
           <div class="title-actions">
             <button class="icon-mini-btn delete-btn" data-tooltip="${escapeHtml(RK_M("clips.deleteClip"))}" aria-label="${escapeHtml(RK_M("clips.deleteClip"))}" type="button">
-              <svg viewBox="0 0 24 24">${ICON.TRASH}</svg>
+              <svg viewBox="0 0 24 24">${ICON.TRASH_DUAL}</svg>
               <span class="delete-confirm-text">${escapeHtml(RK_M("common.delete2"))}</span>
             </button>
             <div class="menu-container">
@@ -3208,8 +3278,12 @@ const CLIP_HOVER_PROFILES = {
                 </div>
                 <div class="menu-separator"></div>
                 <div class="menu-item delete-menu-item delete-btn" role="button" tabindex="0" aria-label="${escapeHtml(RK_M("clips.deleteClip"))}">
-                  <svg class="menu-item-icon" viewBox="0 0 24 24">${ICON.TRASH}</svg>
+                  <svg class="menu-item-icon" viewBox="0 0 24 24">${ICON.TRASH_DUAL}</svg>
                   <span class="menu-item-label">${escapeHtml(RK_M("common.delete"))}</span>
+                </div>
+                <div class="menu-item delete-menu-item delete-btn perm-delete-item" data-delete-permanent="true" role="button" tabindex="0" aria-label="${escapeHtml(RK_M("clips.permanentlyDelete"))}"${trashOn ? "" : " hidden"}>
+                  <svg class="menu-item-icon" viewBox="0 0 24 24">${ICON.TRASH_DELETE}</svg>
+                  <span class="menu-item-label">${escapeHtml(RK_M("clips.permanentlyDelete"))}</span>
                 </div>
               </div>
             </div>
@@ -3247,10 +3321,12 @@ const CLIP_HOVER_PROFILES = {
     const favoriteMenuItem = card.querySelector(".favorite-menu-item");
     const selectMenuItem = card.querySelector(".select-menu-item");
     const renameMenuItem = card.querySelector(".rename-menu-item");
-    const deleteMenuItem = card.querySelector(".delete-menu-item:not(.delete-upload-item)");
+    const deleteMenuItem = card.querySelector(".delete-menu-item:not(.delete-upload-item):not(.perm-delete-item)");
+    const permDeleteMenuItem = card.querySelector(".perm-delete-item");
     const deleteUploadItem = card.querySelector(".delete-upload-item");
     const openFolderEl = card.querySelector(".open-folder-item");
     const deleteClipEl = card.querySelector(".delete-btn");
+    relabelDeleteButtons(card);
 
     enableCursorZoom(preview, video, () => isVideoFullscreen(video) || isTheaterPreview(preview));
 
@@ -3901,6 +3977,7 @@ const CLIP_HOVER_PROFILES = {
         }
         return;
       }
+      const permanent = trigger.dataset.deletePermanent === "true" || (trashOn && (e.shiftKey || shiftHeld));
       resetDeleteButton(trigger);
       closeCardMenu(menuDropdown);
       if (trigger === deleteUploadItem) {
@@ -3912,10 +3989,19 @@ const CLIP_HOVER_PROFILES = {
         discardDraft(card.dataset.name);
         return;
       }
-      deleteClip(card);
+      deleteClip(card, permanent);
     }
     deleteMenuItem.addEventListener("click", (e) => handleDeleteAction(e, deleteMenuItem));
+    permDeleteMenuItem.addEventListener("click", (e) => handleDeleteAction(e, permDeleteMenuItem));
     deleteClipEl.addEventListener("click", (e) => handleDeleteAction(e, deleteClipEl));
+    [deleteMenuItem, permDeleteMenuItem].forEach((item) => {
+      item.addEventListener("keydown", (e) => {
+        if (e.key !== "Enter" && e.key !== " ") return;
+        e.preventDefault();
+        e.stopPropagation();
+        if (!e.repeat) handleDeleteAction(e, item);
+      });
+    });
     deleteUploadItem.addEventListener("click", (e) => {
       if (deleteUploadItem.dataset.url) handleDeleteAction(e, deleteUploadItem);
     });
@@ -4071,12 +4157,12 @@ const CLIP_HOVER_PROFILES = {
     renderLoadedClips(loadedClips);
   }
 
-  async function deleteClip(card) {
+  async function deleteClip(card, permanent = false) {
     const filename = card.dataset.name;
     if (!filename) return;
     // confirmation now happens on the trash icon (the two-click pattern wired up in rendercard). by the time this runs the user has explicitly clicked delete twice, so a redundant browser confirm() would be condescending.
     try {
-      const res = await fetch(HELPER + "/delete?file=" + encodeURIComponent(filename), {
+      const res = await fetch(HELPER + "/delete?file=" + encodeURIComponent(filename) + (permanent ? "&permanent=1" : ""), {
         method: "POST", cache: "no-store",
       });
       const data = await res.json().catch(() => ({}));
@@ -4450,6 +4536,7 @@ const CLIP_HOVER_PROFILES = {
     }
     if (window.RKTooltip) RKTooltip.hide();
     resetAllArmedDeleteButtons();
+    relabelDeleteButtons(menuDropdown);
     document.querySelectorAll(".menu-dropdown.is-open").forEach((d) => {
       if (d !== menuDropdown) {
         closeCardMenu(d);
@@ -4488,10 +4575,12 @@ const CLIP_HOVER_PROFILES = {
     menuDropdown.style.setProperty("--menu-top", top + "px");
     menuDropdown.classList.add("is-open");
     card.classList.add("menu-open");
+    openMenuDropdown = menuDropdown;
   }
 
   function closeCardMenu(menu) {
     if (!menu) return;
+    if (openMenuDropdown === menu) openMenuDropdown = null;
     if (menu.querySelector("[data-tooltip-in-menu]") && window.RKTooltip) RKTooltip.hide();
     menu.classList.remove("is-open");
     const card = menu.closest(".card, .screenshot-card");
@@ -6627,19 +6716,36 @@ const CLIP_HOVER_PROFILES = {
 
   let bulkDeleteArmed = false;
   let bulkDeleteArmTimer = 0;
+  function paintBulkDeleteButton() {
+    if (!bulkDeleteBtn) return;
+    const isPerm = trashOn && shiftHeld;
+    const toTrash = trashOn && !shiftHeld;
+    if (bulkDeleteArmed) {
+      const tip = toTrash ? RK_M("clips.confirmMoveToTrashCount", { count: selectedClipNames.size }) : RK_M("clips.confirmDeleteCount", { count: selectedClipNames.size });
+      if (bulkDeleteBtn.dataset.tooltip !== tip) {
+        bulkDeleteBtn.dataset.tooltip = tip;
+        bulkDeleteBtn.setAttribute("aria-label", tip);
+      }
+      return;
+    }
+    const tip = toTrash ? RK_M("clips.moveToTrash") : (isPerm ? RK_M("clips.permanentlyDelete") : RK_M("common.delete"));
+    if (bulkDeleteBtn.dataset.tooltip !== tip) bulkDeleteBtn.dataset.tooltip = tip;
+    const aria = toTrash ? RK_M("clips.moveSelectedClipsToTrash") : RK_M("clips.deleteSelectedClips");
+    if (bulkDeleteBtn.getAttribute("aria-label") !== aria) bulkDeleteBtn.setAttribute("aria-label", aria);
+  }
   function resetBulkDeleteButton() {
     bulkDeleteArmed = false;
     if (bulkDeleteArmTimer) { clearTimeout(bulkDeleteArmTimer); bulkDeleteArmTimer = 0; }
     if (!bulkDeleteBtn) return;
     bulkDeleteBtn.classList.remove("is-armed");
-    bulkDeleteBtn.dataset.tooltip = trashOn ? RK_M("clips.moveToTrash") : RK_M("common.delete");
-    bulkDeleteBtn.setAttribute("aria-label", trashOn ? RK_M("clips.moveSelectedClipsToTrash") : RK_M("clips.deleteSelectedClips"));
+    paintBulkDeleteButton();
   }
 
   let bulkDeleting = false;
-  async function deleteSelectedClips() {
+  async function deleteSelectedClips(permanent = false) {
     const names = Array.from(selectedClipNames);
     if (!names.length || bulkDeleting) return;
+    const toTrashRun = trashOn && !permanent;
     bulkDeleting = true;
     if (bulkDeleteBtn) bulkDeleteBtn.disabled = true;
     if (bulkClearBtn) bulkClearBtn.disabled = true;
@@ -6650,10 +6756,10 @@ const CLIP_HOVER_PROFILES = {
     try {
       for (let i = 0; i < names.length; i++) {
         const count = { done: i + 1, total: names.length };
-        showToast(trashOn ? RK_M("clips.movingToTrashDoneTotal", count) : RK_M("clips.deletingDoneTotal", count), "info");
+        showToast(toTrashRun ? RK_M("clips.movingToTrashDoneTotal", count) : RK_M("clips.deletingDoneTotal", count), "info");
         if (i === 0) await afterPopupPaint();
         try {
-          const res = await fetch(HELPER + "/delete?file=" + encodeURIComponent(names[i]), {
+          const res = await fetch(HELPER + "/delete?file=" + encodeURIComponent(names[i]) + (permanent ? "&permanent=1" : ""), {
             method: "POST", cache: "no-store",
           });
           const data = await res.json().catch(() => ({}));
@@ -6721,18 +6827,18 @@ const CLIP_HOVER_PROFILES = {
     });
   }
   if (bulkDeleteBtn) {
-    bulkDeleteBtn.addEventListener("click", () => {
+    bulkDeleteBtn.addEventListener("click", (e) => {
       if (!selectedClipNames.size) return;
       if (!bulkDeleteArmed) {
         bulkDeleteArmed = true;
         bulkDeleteBtn.classList.add("is-armed");
-        bulkDeleteBtn.dataset.tooltip = (trashOn ? RK_M("clips.confirmMoveToTrashCount", { count: selectedClipNames.size }) : RK_M("clips.confirmDeleteCount", { count: selectedClipNames.size }));
-        bulkDeleteBtn.setAttribute("aria-label", bulkDeleteBtn.dataset.tooltip);
+        paintBulkDeleteButton();
         bulkDeleteArmTimer = setTimeout(resetBulkDeleteButton, 3000);
         return;
       }
+      const permanent = trashOn && (e.shiftKey || shiftHeld);
       resetBulkDeleteButton();
-      deleteSelectedClips();
+      deleteSelectedClips(permanent);
     });
   }
   if (bulkClearBtn) bulkClearBtn.addEventListener("click", clearClipSelection);

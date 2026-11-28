@@ -223,6 +223,10 @@
     "source": "accde3bd67a86725",
     "text": "Нажмите ещё раз, чтобы переместить в корзину"
   },
+  "clips.clickAgainToPermanentlyDelete": {
+    "source": "40517b57b90ade0e",
+    "text": "Нажмите ещё раз, чтобы удалить навсегда"
+  },
   "clips.clickToStopSchedulingNewCompresses": {
     "source": "c5a8b5ba1b077739",
     "text": "Нажмите, чтобы больше не запускать новые сжатия. Уже идущие сжатия будут завершены."
@@ -1074,6 +1078,10 @@
   "clips.moveToTrash": {
     "source": "d797d4b93afa80dc",
     "text": "Переместить в корзину"
+  },
+  "clips.permanentlyDelete": {
+    "source": "308dcf89a243a4bb",
+    "text": "Удалить навсегда"
   },
   "clips.moved1SelectedClipToThe": {
     "source": "30a8abe7b72cf543",

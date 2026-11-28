@@ -223,6 +223,10 @@
     "source": "accde3bd67a86725",
     "text": "Cliquez à nouveau pour mettre à la corbeille"
   },
+  "clips.clickAgainToPermanentlyDelete": {
+    "source": "40517b57b90ade0e",
+    "text": "Cliquez à nouveau pour supprimer définitivement"
+  },
   "clips.clickToStopSchedulingNewCompresses": {
     "source": "c5a8b5ba1b077739",
     "text": "Cliquez pour ne plus lancer de nouvelles compressions. Celles déjà en cours se termineront."
@@ -1074,6 +1078,10 @@
   "clips.moveToTrash": {
     "source": "d797d4b93afa80dc",
     "text": "Déplacer vers la corbeille"
+  },
+  "clips.permanentlyDelete": {
+    "source": "308dcf89a243a4bb",
+    "text": "Supprimer définitivement"
   },
   "clips.moved1SelectedClipToThe": {
     "source": "30a8abe7b72cf543",

@@ -249,7 +249,7 @@ window.RKScreenshots = {
         '<div class="title-row"><span class="name" translate="no"></span>' +
         '<button class="icon-mini-btn edit-btn" data-tooltip="Rename" aria-label="Rename" type="button" data-i18n-aria-label="common.rename" data-i18n-data-tooltip="common.rename">' + svg(icons.EDIT) + "</button>" +
         '<div class="title-actions">' +
-          '<button class="icon-mini-btn delete-btn" ' + deleteAttrs + ' data-tooltip="' + deleteLabel + '" aria-label="' + deleteLabel + '" type="button">' + svg(icons.TRASH) + '<span class="delete-confirm-text" data-i18n="common.delete2"></span></button>' +
+          '<button class="icon-mini-btn delete-btn" ' + deleteAttrs + ' data-tooltip="' + deleteLabel + '" aria-label="' + deleteLabel + '" type="button">' + svg(icons.TRASH_DUAL) + '<span class="delete-confirm-text" data-i18n="common.delete2"></span></button>' +
           '<div class="menu-container"><button class="icon-mini-btn menu-btn" data-tooltip="More options" aria-label="More options" type="button" data-i18n-aria-label="common.moreOptions" data-i18n-data-tooltip="common.moreOptions">' + svg(icons.MORE) + "</button>" +
             '<div class="menu-dropdown" data-skel="skip">' +
               '<div class="menu-heading" data-i18n="clips.share"></div>' +
@@ -258,7 +258,8 @@ window.RKScreenshots = {
               '<div class="menu-item" data-act="rename">' + svg(icons.EDIT).replace("<svg", '<svg class="menu-item-icon"') + "<span data-i18n='clips.editName'></span></div>" +
               '<div class="menu-item" data-act="reveal">' + svg(icons.FOLDER_OPEN).replace("<svg", '<svg class="menu-item-icon"') + "<span data-i18n='clips.openFileLocation'></span></div>" +
               '<div class="menu-separator"></div>' +
-              '<div class="menu-item delete-menu-item delete-btn" data-act="delete" ' + deleteAttrs + ' role="button" tabindex="0" aria-label="' + deleteLabel + '">' + svg(icons.TRASH).replace("<svg", '<svg class="menu-item-icon"') + '<span class="menu-item-label" data-i18n="common.delete"></span></div>' +
+              '<div class="menu-item delete-menu-item delete-btn" data-act="delete" ' + deleteAttrs + ' role="button" tabindex="0" aria-label="' + deleteLabel + '">' + svg(icons.TRASH_DUAL).replace("<svg", '<svg class="menu-item-icon"') + '<span class="menu-item-label" data-i18n="common.delete"></span></div>' +
+              '<div class="menu-item delete-menu-item delete-btn perm-delete-item" data-act="delete-permanent" data-delete-permanent="true" ' + deleteAttrs + ' role="button" tabindex="0" aria-label="' + RK_M("clips.permanentlyDelete") + '">' + svg(icons.TRASH_DELETE).replace("<svg", '<svg class="menu-item-icon"') + '<span class="menu-item-label" data-i18n="clips.permanentlyDelete"></span></div>' +
             "</div></div>" +
         "</div></div>" +
         '<div class="meta"></div>';
@@ -280,7 +281,7 @@ window.RKScreenshots = {
       const revealItem = menu.querySelector('[data-act="reveal"]');
       if (kind.games && window.RKClipGames && revealItem) revealItem.after(RKClipGames.menuAction(() => row, true, options.closeMenus));
       const closeMenu = () => { menu.classList.remove("is-open"); card.classList.remove("menu-open"); };
-      async function remove(trigger, inMenu) {
+      async function remove(trigger, inMenu, event) {
         // the same two clicks as a clip: the first arms the button, the second deletes
         options.resetDeletes(trigger);
         if (!trigger.classList.contains("is-armed")) {
@@ -289,10 +290,14 @@ window.RKScreenshots = {
           if (inMenu) { menu.classList.add("is-open"); card.classList.add("menu-open"); }
           return;
         }
+        const permanent = trigger.dataset.deletePermanent === "true" || !!(event && event.shiftKey) || !!(options.isShiftDelete && options.isShiftDelete());
         options.resetDeletes();
         options.closeMenus();
-        try { await act(row, "delete"); refresh(); window.dispatchEvent(new Event("replaykit:deleted-changed")); }
-        catch (error) { options.notify(error.message); }
+        try {
+          const done = await act(row, "delete", permanent ? "&permanent=1" : "");
+          refresh();
+          if (done.kept) window.dispatchEvent(new Event("replaykit:deleted-changed"));
+        } catch (error) { options.notify(error.message); }
       }
       body.addEventListener("click", async event => {
         const button = event.target.closest("button, .menu-item");
@@ -300,13 +305,21 @@ window.RKScreenshots = {
         event.stopPropagation();
         if (button.classList.contains("menu-btn")) { options.openMenu(card, menu, event); return; }
         if (button.classList.contains("edit-btn")) { rename(card, row); return; }
-        if (button.matches(".title-actions > .delete-btn")) { remove(button, false); return; }
+        if (button.matches(".title-actions > .delete-btn")) { remove(button, false, event); return; }
         const action = button.dataset.act;
-        if (action === "delete") { remove(button, true); return; }
+        if (action === "delete" || action === "delete-permanent") { remove(button, true, event); return; }
         closeMenu();
         if (action === "rename") rename(card, row);
         else if (action === "copy") copy(row);
         else if (action === "reveal") act(row, "reveal").catch(error => options.notify(error.message));
+      });
+      body.addEventListener("keydown", event => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        const item = event.target.closest(".delete-menu-item");
+        if (!item) return;
+        event.preventDefault();
+        event.stopPropagation();
+        if (!event.repeat) remove(item, true, event);
       });
       card.addEventListener("contextmenu", event => {
         if (event.target.closest("input")) return;

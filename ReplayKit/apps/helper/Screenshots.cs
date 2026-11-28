@@ -95,10 +95,10 @@ namespace ReplayKitHelper
             return thumb;
         }
 
-        // a screenshot goes into deleted history with its game tag while that is on, and is deleted for good when it is off; true when it was kept
-        public static bool Delete(string path)
+        // a screenshot goes into deleted history with its game tag while that is on and keep is true, and is deleted for good otherwise; true when it was kept
+        public static bool Delete(string path, bool keep = true)
         {
-            bool kept = DeletedHistory.Keep(path, "screenshot", Path.GetDirectoryName(Path.GetDirectoryName(path)), ClipGames.Read(path));
+            bool kept = keep && DeletedHistory.Keep(path, "screenshot", Path.GetDirectoryName(Path.GetDirectoryName(path)), ClipGames.Read(path));
             if (!kept) File.Delete(path);
             ClipGames.Forget(path);
             return kept;

@@ -219,6 +219,10 @@
     "context": "Tooltip in the clips library.",
     "text": "Click again to move to trash"
   },
+  "clips.clickAgainToPermanentlyDelete": {
+    "context": "Confirmation tooltip in the clips library shown after the first click on a permanent delete button.",
+    "text": "Click again to permanently delete"
+  },
   "clips.clickToStopSchedulingNewCompresses": {
     "context": "Tooltip of the Compress All button in the clips library while it is running.",
     "text": "Click to stop starting new compresses. Compresses that are already running will finish."
@@ -1074,6 +1078,10 @@
   "clips.moveToTrash": {
     "context": "Label in the clips library.",
     "text": "Move to trash"
+  },
+  "clips.permanentlyDelete": {
+    "context": "Action in the clips library that permanently deletes a clip, screenshot, or GIF without moving it to the trash.",
+    "text": "Permanently delete"
   },
   "clips.moved1SelectedClipToThe": {
     "context": "Text in the clips library.",

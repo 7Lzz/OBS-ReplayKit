@@ -239,10 +239,10 @@ namespace ReplayKitHelper
             public string Warning = "";
         }
 
-        // deletes one clip for good, the way the clips page does, so the storage card can delete a list of them with the same checks: the name has to resolve inside the clip folder, and a clip that an upload, trim or compression holds is left alone
-        public static DeleteResult DeleteClip(string rawName)
+        // deletes one clip, either moving it into deleted history or removing it for good when keep is false, so the storage card and permanent-delete actions share the same path and job checks
+        public static DeleteResult DeleteClip(string rawName, bool keep = true)
         {
-            return DeleteClip(GetSafeClipPath(rawName));
+            return DeleteClip(GetSafeClipPath(rawName), keep: keep);
         }
 
         // keep false is for the deletes whose point is the space they free, which a clip kept in deleted history would not give back

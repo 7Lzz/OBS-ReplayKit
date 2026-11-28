@@ -1676,6 +1676,12 @@
   .icon-mini-btn.delete-btn svg {
     transition: width 140ms ease, opacity 80ms linear;
   }
+  /* both trash and permanent-delete glyphs live inside one svg so holding shift swaps every visible icon via visibility with no dom reparsing or layout */
+  .delete-btn .ic-perm, .bulk-delete .ic-perm { visibility: hidden; }
+  body.is-shift-delete .delete-btn:not([data-delete-label]) .ic-trash,
+  body.is-shift-delete .bulk-delete .ic-trash { visibility: hidden; }
+  body.is-shift-delete .delete-btn:not([data-delete-label]) .ic-perm,
+  body.is-shift-delete .bulk-delete .ic-perm { visibility: visible; }
   .delete-confirm-text {
     display: inline-block;
     max-width: 0;
@@ -1754,6 +1760,7 @@
     white-space: nowrap;
     user-select: none;
   }
+  .menu-item[hidden] { display: none; }
   .menu-item svg {
     width: 16px;
     height: 16px;
