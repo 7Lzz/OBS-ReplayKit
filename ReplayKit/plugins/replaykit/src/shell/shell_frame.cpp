@@ -62,8 +62,8 @@ void ShellEnsureMinimumSize(HWND hwnd)
 	SetWindowPos(hwnd, nullptr, left, top, w, h, SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
-// DWMWA_CLOAK: a cloaked window is still composed, so it paints and is seen by the system as visible, but it is not put on the screen
-constexpr DWORD kDwmCloak = 13;
+// windows takes a maximized window that covers its monitor for a fullscreen one and pulls the taskbar down under it, even an auto-hide taskbar that should slide in over it, unless the window carries this property
+constexpr wchar_t kNonRudeProp[] = L"NonRudeHWND";
 bool g_shellFirstShown = false;
 bool g_shellCloaked = false;
 QElapsedTimer g_shellShowClock;
@@ -72,8 +72,9 @@ void ShellSetCloak(HWND hwnd, bool on)
 {
 	if (!hwnd)
 		return;
+	// a cloaked window is still composed, so it paints and is seen by the system as visible, but it is not put on the screen
 	const BOOL value = on ? TRUE : FALSE;
-	DwmSetWindowAttribute(hwnd, kDwmCloak, &value, sizeof(value));
+	DwmSetWindowAttribute(hwnd, DWMWA_CLOAK, &value, sizeof(value));
 	g_shellCloaked = on;
 }
 
@@ -133,20 +134,30 @@ void ShellFinishShow()
 	blog(LOG_INFO, "[replaykit] window show: the window stayed out of sight %d ms until its chrome had painted", int(g_shellShowClock.elapsed()));
 }
 
-// a window that was maximized before it ever had a normal size restores to a rectangle as big as the screen, which looks as if nothing happened, so a restore that lands on one is given a proper size, centred on the work area
+// a window that was maximized before it ever had a normal size restores to a rectangle as big as the screen, which looks as if nothing happened; such a size is given a proper one instead, and false says the size was fine as it was
+bool ShellProperRestoredSize(const RECT &work, LONG *w, LONG *h)
+{
+	const LONG workW = work.right - work.left;
+	const LONG workH = work.bottom - work.top;
+	if (*w < workW - 24 || *h < workH - 24)
+		return false;
+	*w = workW * 7 / 10;
+	*h = workH * 8 / 10;
+	return true;
+}
+
+// a restore that lands on a rectangle as big as the screen is given a proper size, centred on the work area
 void ShellFixRestoredSize(HWND hwnd)
 {
 	RECT work = {};
 	RECT now = {};
 	if (!ShellWorkAreaOf(hwnd, &work) || !GetWindowRect(hwnd, &now))
 		return;
-	const LONG workW = work.right - work.left;
-	const LONG workH = work.bottom - work.top;
-	if (now.right - now.left < workW - 24 || now.bottom - now.top < workH - 24)
+	LONG w = now.right - now.left;
+	LONG h = now.bottom - now.top;
+	if (!ShellProperRestoredSize(work, &w, &h))
 		return;
-	const LONG w = workW * 7 / 10;
-	const LONG h = workH * 8 / 10;
-	SetWindowPos(hwnd, nullptr, work.left + (workW - w) / 2, work.top + (workH - h) / 2, w, h, SWP_NOZORDER | SWP_NOACTIVATE);
+	SetWindowPos(hwnd, nullptr, work.left + (work.right - work.left - w) / 2, work.top + (work.bottom - work.top - h) / 2, w, h, SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
 // the frameless top-level qt made has no sizing border, caption or snap support of its own. the system styles that give it those come back here, and the non-client area is then removed again in the frame filter so none of it is drawn
@@ -158,9 +169,8 @@ void ShellApplyFrameStyle(HWND hwnd)
 		SetWindowLongPtr(hwnd, GWL_STYLE, want);
 		SetWindowPos(hwnd, nullptr, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
 	}
-	// windows takes a maximized window that covers its monitor for a fullscreen one and pulls the taskbar down under it, even an auto-hide taskbar that should slide in over it
 	if (!g_shellNativeFullscreen)
-		SetPropW(hwnd, L"NonRudeHWND", reinterpret_cast<HANDLE>(1));
+		SetPropW(hwnd, kNonRudeProp, reinterpret_cast<HANDLE>(1));
 	// one pixel of extended frame is what keeps the drop shadow on a window with no non-client area; the client is opaque, so it never shows through
 	ShellSyncFrameMargins(hwnd);
 }
@@ -316,14 +326,9 @@ void ShellRestoreDrag(QMainWindow *mw, POINT cursor, bool handOff)
 	if (!hwnd || !ShellWorkAreaOf(hwnd, &work) || !GetWindowRect(hwnd, &maxed) || !GetWindowPlacement(hwnd, &placement))
 		return;
 	const LONG workW = work.right - work.left;
-	const LONG workH = work.bottom - work.top;
 	LONG w = placement.rcNormalPosition.right - placement.rcNormalPosition.left;
 	LONG h = placement.rcNormalPosition.bottom - placement.rcNormalPosition.top;
-	// a remembered size as big as the screen would restore into what looks like the same window
-	if (w >= workW - 24 && h >= workH - 24) {
-		w = workW * 7 / 10;
-		h = workH * 8 / 10;
-	}
+	ShellProperRestoredSize(work, &w, &h);
 	// the maximized window hangs past the work area by its border, so the position along the bar is measured against the visible part
 	const double along = workW > 0 ? qBound(0.0, double(cursor.x - work.left) / double(workW), 1.0) : 0.5;
 	const LONG left = qBound<LONG>(work.left, cursor.x - LONG(along * w), qMax<LONG>(work.left, work.right - w));
@@ -364,6 +369,7 @@ QMargins ShellMaximizeOverhang(QMainWindow *mw)
 	return QMargins(logical(info.rcWork.left - wr.left), logical(info.rcWork.top - wr.top), logical(wr.right - info.rcWork.right),
 			logical(wr.bottom - info.rcWork.bottom));
 }
+
 ITaskbarList2 *g_shellTaskbar = nullptr;
 
 // stretches the obs window over the whole monitor it is on, or puts it back. this is the fullscreen of a playing clip, done on the window itself so nothing of the frame, the rail or the taskbar is left showing
@@ -386,7 +392,7 @@ void ShellNativeFullscreen(bool on)
 		GetWindowPlacement(hwnd, &g_shellFsPlacement);
 		GetWindowRect(hwnd, &g_shellFsRect);
 		g_shellNativeFullscreen = true;
-		RemovePropW(hwnd, L"NonRudeHWND");
+		RemovePropW(hwnd, kNonRudeProp);
 		// a maximized window stays on its maximized rectangle whatever it is asked for, so it is restored first and maximized again on the way back
 		if (IsZoomed(hwnd))
 			ShowWindow(hwnd, SW_RESTORE);
@@ -407,7 +413,7 @@ void ShellNativeFullscreen(bool on)
 	g_shellNativeFullscreen = false;
 	if (ITaskbarList2 *list = ShellTaskbarList())
 		list->MarkFullscreenWindow(hwnd, FALSE);
-	SetPropW(hwnd, L"NonRudeHWND", reinterpret_cast<HANDLE>(1));
+	SetPropW(hwnd, kNonRudeProp, reinterpret_cast<HANDLE>(1));
 	// the placement brings back maximized or normal, and the rectangle after it puts a maximized window on the work area again
 	SetWindowPlacement(hwnd, &g_shellFsPlacement);
 	// a maximized window is put back on its rectangle by windows; a normal one is placed again exactly as it was

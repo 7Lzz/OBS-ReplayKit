@@ -16,7 +16,7 @@
 
 namespace rk {
 
-// the left column: icon-only, a filled circle behind the page that is showing, a tip beside each icon on hover. the top of the window (logo, badges, controls) is the title bar above it, painted in the same colour so the two read as one L-shaped frame
+// the left column: icon-only, the rounded square of the title bar buttons behind the page that is showing, a tip beside each icon on hover. the top of the window (logo, badges, controls) is the title bar above it, painted in the same colour so the two read as one L-shaped frame
 class ShellRail : public QWidget {
 public:
 	enum Id { Home = 0, Clips = 1, Projector = 2, Share = 3, Settings = 4 };
@@ -49,7 +49,7 @@ private:
 		QSvgRenderer *renderer = nullptr;
 	};
 
-	// round hit area 44 wide on a 52 pitch; the last group hangs off the bottom edge so settings stays put however tall the window is
+	// a square hit area kRailButtonSize wide, kRailButtonGap apart; the last group hangs off the bottom edge so settings stays put however tall the window is
 	QRectF ItemRect(int index) const;
 	int HitItem(const QPoint &pt) const;
 	void SetHover(int index);

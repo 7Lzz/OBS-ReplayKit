@@ -31,8 +31,6 @@ int pick = 0;
 bool held = false;
 // how long a page that never answers can keep the window off the screen
 constexpr int kHoldCapMs = 2500;
-// DWMWA_CLOAK: a cloaked window is still composed and painted, but not put on the screen
-constexpr DWORD kDwmCloak = 13;
 
 QString Page(const QString &url)
 {
@@ -60,8 +58,9 @@ void Hold(bool on)
 	if (!window || held == on)
 		return;
 	held = on;
+	// a cloaked window is still composed and painted, but not put on the screen
 	const BOOL value = on ? TRUE : FALSE;
-	DwmSetWindowAttribute((HWND)window->winId(), kDwmCloak, &value, sizeof(value));
+	DwmSetWindowAttribute((HWND)window->winId(), DWMWA_CLOAK, &value, sizeof(value));
 }
 
 // a popup page that never came up at all (its load failed while the helper was down) answers nothing for the rest of the session, so it is loaded again once the helper answers, at most every half minute

@@ -82,7 +82,6 @@ private:
 	bool m_ready = false;
 	bool m_warming = false;
 	bool m_gaveUp = false;
-	bool m_blind = false;
 	bool m_openWaits = false;
 	std::string m_waitingScript;
 	// what the last open showed, so a card built again after opening empty shows it again

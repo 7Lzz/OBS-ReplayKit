@@ -27,7 +27,7 @@ void SyncSetupWindowClose()
 		EnableMenuItem(menu, SC_CLOSE, MF_BYCOMMAND | (g_setupPending ? MF_GRAYED : MF_ENABLED));
 }
 
-// twin of CreateSettingsWindow for the one-time first-run wizard. It gets the same native icon path so CEFs favicon cannot leave Setup visually different from Clips and Settings.
+// twin of CreateSettingsWindow for the one-time first-run wizard; it gets the same native icon path so the favicon of cef cannot leave setup looking diffrent from clips and settings
 void CreateSetupWindow(bool quiet)
 {
 	if (!CefOpen()) {

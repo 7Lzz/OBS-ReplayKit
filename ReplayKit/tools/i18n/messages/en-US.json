@@ -275,10 +275,6 @@
     "context": "Message the helper shows when an action fails or finishes in a ReplayKit window, sent by the background helper.",
     "text": "Clipping is off."
   },
-  "clips.clipsEditor": {
-    "context": "Title in the clips library.",
-    "text": "Clips - Editor"
-  },
   "clips.closeDeletedHistory": {
     "context": "Screen reader label in the deleted history of the clips library.",
     "text": "Close deleted history"
@@ -10819,6 +10815,10 @@
   "shell.ifThisStaysAntivirusMayHave": {
     "context": "Text in the window title of a view.",
     "text": "If this stays, antivirus may have removed OBSReplayKit.exe: restore it, or run the ReplayKit installer again"
+  },
+  "shell.loadingObsSettings": {
+    "context": "Text on the loader over the window while the OBS settings are built.",
+    "text": "Loading OBS settings"
   },
   "shell.lockThePreviewSoTheScene": {
     "context": "Text in the projector bar.",

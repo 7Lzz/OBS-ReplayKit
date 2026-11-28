@@ -19,8 +19,10 @@ namespace rk {
 
 namespace {
 
-// the card keeps this much of the obs window showing around it
+// the card keeps this much of the obs window showing around it, and is never made smaller than the floor however small the window is
 constexpr int kCardMargin = 40;
+constexpr int kCardMinW = 420;
+constexpr int kCardMinH = 360;
 // dwm attributes from the windows 11 sdk, spelled out so an older sdk still builds; a windows that does not know them ignores the call
 constexpr DWORD kCornerPreference = 33;
 constexpr DWORD kBorderColor = 34;
@@ -115,8 +117,8 @@ void ModalCard::Sync()
 		return;
 	const QRect stage(host->mapToGlobal(QPoint(0, 0)), host->size());
 	m_curtain->setGeometry(stage);
-	const int w = qMax(420, qMin(m_spec.width, stage.width() - kCardMargin * 2));
-	const int h = qMax(360, qMin(m_spec.height, stage.height() - kCardMargin * 2));
+	const int w = qMax(kCardMinW, qMin(m_spec.width, stage.width() - kCardMargin * 2));
+	const int h = qMax(kCardMinH, qMin(m_spec.height, stage.height() - kCardMargin * 2));
 	m_card->setGeometry(stage.center().x() - w / 2, stage.center().y() - h / 2, w, h);
 }
 
@@ -130,8 +132,8 @@ void ModalCard::FollowWindowRect()
 	const qreal dpr = host->devicePixelRatioF();
 	const int hostW = int(wr.right - wr.left);
 	const int hostH = int(wr.bottom - wr.top);
-	const int w = qRound(qMax(420, qMin(m_spec.width, qRound(hostW / dpr) - kCardMargin * 2)) * dpr);
-	const int h = qRound(qMax(360, qMin(m_spec.height, qRound(hostH / dpr) - kCardMargin * 2)) * dpr);
+	const int w = qRound(qMax(kCardMinW, qMin(m_spec.width, qRound(hostW / dpr) - kCardMargin * 2)) * dpr);
+	const int h = qRound(qMax(kCardMinH, qMin(m_spec.height, qRound(hostH / dpr) - kCardMargin * 2)) * dpr);
 	const int x = int(wr.left) + (hostW - w) / 2;
 	const int y = int(wr.top) + (hostH - h) / 2;
 	HWND curtain = (HWND)m_curtain->winId();
@@ -254,17 +256,13 @@ void ModalCard::StartCardWarm()
 	m_card->show();
 	PopupHost::SetOwner(this, m_curtain);
 	WaitForPage(run);
-	blog(LOG_INFO, "[replaykit] %s warm-up started%s", m_spec.name, m_blind ? " (its page cannot report, waiting a fixed time)" : "");
+	blog(LOG_INFO, "[replaykit] %s warm-up started", m_spec.name);
 	// the wait is bounded, so a page that never says it is up cannot hold the card back for long
-	QTimer::singleShot(m_blind ? kCefWarmBlindMs : kCefWarmCapMs, m_curtain.data(), [this, run]() {
+	QTimer::singleShot(kCefWarmCapMs, m_curtain.data(), [this, run]() {
 		if (!m_warming || run != m_run)
 			return;
-		if (m_blind) {
-			m_ready = true;
-		} else {
-			m_gaveUp = true;
-			blog(LOG_WARNING, "[replaykit] the page of the %s did not say it was up in time, so it opens as it is", m_spec.name);
-		}
+		m_gaveUp = true;
+		blog(LOG_WARNING, "[replaykit] the page of the %s did not say it was up in time, so it opens as it is", m_spec.name);
 		EndCardWarm();
 	});
 }
@@ -357,7 +355,7 @@ bool ModalCard::WarmNext()
 
 QJsonObject ModalCard::WarmReport() const
 {
-	return QJsonObject{{"built", !m_card.isNull()}, {"ready", m_ready}, {"warming", m_warming}, {"gaveUp", m_gaveUp}, {"blind", m_blind}, {"warmMs", double(m_warmMs)}};
+	return QJsonObject{{"built", !m_card.isNull()}, {"ready", m_ready}, {"warming", m_warming}, {"gaveUp", m_gaveUp}, {"warmMs", double(m_warmMs)}};
 }
 
 bool ModalCard::IsOpen() const
@@ -492,7 +490,6 @@ void ModalCard::HideCurtain()
 		m_curtain->hide();
 }
 
-// reads the screen where the card is: the page fills the card with its colour right out to the edges, so when none of the points just inside the edge has it the browser is putting nothing on the window and the dim shows through
 QJsonObject ModalCard::Probe()
 {
 	return QJsonObject{{"open", IsOpen()}, {"looksEmpty", CardLooksEmpty()}, {"heals", m_heals}};

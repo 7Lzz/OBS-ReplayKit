@@ -279,10 +279,6 @@
     "source": "ff00bd8355ad9377",
     "text": "Le clipping est désactivé."
   },
-  "clips.clipsEditor": {
-    "source": "73af8ffeafda4529",
-    "text": "Clips - Éditeur"
-  },
   "clips.closeDeletedHistory": {
     "source": "c841203dc5314629",
     "text": "Fermer l'historique des éléments supprimés"
@@ -10822,6 +10818,10 @@
   "shell.ifThisStaysAntivirusMayHave": {
     "source": "d0750aedf2e81a9a",
     "text": "Si cela persiste, l'antivirus a peut-être supprimé OBSReplayKit.exe : restaurez-le ou relancez l'installateur de ReplayKit"
+  },
+  "shell.loadingObsSettings": {
+    "source": "b8f54fe795aee89e",
+    "text": "Chargement des paramètres d’OBS"
   },
   "shell.lockThePreviewSoTheScene": {
     "source": "93011b7da59ae979",

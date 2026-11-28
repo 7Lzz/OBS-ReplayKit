@@ -279,10 +279,6 @@
     "source": "ff00bd8355ad9377",
     "text": "Clipping ist aus."
   },
-  "clips.clipsEditor": {
-    "source": "73af8ffeafda4529",
-    "text": "Clips - Editor"
-  },
   "clips.closeDeletedHistory": {
     "source": "c841203dc5314629",
     "text": "Verlauf gelöschter Clips schließen"
@@ -10818,6 +10814,10 @@
   "shell.ifThisStaysAntivirusMayHave": {
     "source": "d0750aedf2e81a9a",
     "text": "Wenn dies bestehen bleibt, hat der Virenschutz möglicherweise OBSReplayKit.exe entfernt: sie wiederherstellen oder das ReplayKit-Installationsprogramm erneut ausführen"
+  },
+  "shell.loadingObsSettings": {
+    "source": "b8f54fe795aee89e",
+    "text": "OBS-Einstellungen werden geladen"
   },
   "shell.lockThePreviewSoTheScene": {
     "source": "93011b7da59ae979",

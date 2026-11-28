@@ -2,13 +2,16 @@
 #include "prelude.hpp"
 #include "layout/controls_dock.hpp"
 
+#include <QSaveFile>
+
+#include "core/shared_values.hpp"
 #include "core/state.hpp"
 #include "core/window_state.hpp"
 #include "layout/ui_layout.hpp"
 
 namespace rk {
 
-// our browser dock replaces obss native "Controls" dock (Start Streaming / Recording / ...). place ours in the native docks slot, hide the native one, and force ours to the plain title "Controls". runs on a slow forever-timer because obs re-titles the dock after the browser loads and re-shows the native dock from its stored state. NEVER close() an obs dock -- OBSDock::closeEvent pops the "Closing Dockable Window" box; toggleViewAction / setVisible do not. the persistent config rename is PatchBrowserDockTitleInUserIni().
+// our browser dock replaces obss native "Controls" dock (Start Streaming / Recording / ...). place ours in the native docks slot, hide the native one, and force ours to the plain title kControlsDockTitle. runs on a slow forever-timer because obs re-titles the dock after the browser loads and re-shows the native dock from its stored state. never close() an obs dock -- OBSDock::closeEvent pops the "Closing Dockable Window" box; toggleViewAction / setVisible do not. the persistent config rename is PatchBrowserDockTitleInUserIni().
 void ApplyControlsDockTweaks()
 {
 	QWidget *mw = g_mainWindow ? g_mainWindow.data() : (QWidget *)obs_frontend_get_main_window();
@@ -17,7 +20,7 @@ void ApplyControlsDockTweaks()
 	auto *main = qobject_cast<QMainWindow *>(mw);
 	QDockWidget *nativeDock = mw->findChild<QDockWidget *>("controlsDock");
 
-	// obs names an extra-browser dock "<title>_extraBrowser" (confirmed in the obs log), not by uuid -- FindSidebarDock skips nativeDock explicitly becuase it carries the exact same windowTitle() "Controls" as ourDock once the rename near the bottom of this function has run once, and findChildren()s enumeration order, not anything meaningful, would otherwise decide which of the two this resolves to.
+	// obs names an extra-browser dock "<title>_extraBrowser" (confirmed in the obs log), not by uuid -- FindSidebarDock skips nativeDock explicitly becuase it carries the exact same windowTitle() as ourDock once the rename near the bottom of this function has run once, and findChildren()s enumeration order, not anything meaningful, would otherwise decide which of the two this resolves to.
 	QDockWidget *ourDock = main ? FindSidebarDock(main) : nullptr;
 
 	// the clean layout keeps this dock hidden behind the icon rail and re-asserts that on the slow tick, because obs Reset UI restores its own stock layout; the classic first-run placement below only applies to the classic layout
@@ -61,48 +64,52 @@ void ApplyControlsDockTweaks()
 	}
 
 	// force the plain title
-	if (ourDock && ourDock->windowTitle() != QLatin1String("Controls")) {
-		ourDock->setWindowTitle(QStringLiteral("Controls"));
+	const QString title = QString::fromLatin1(kControlsDockTitle);
+	if (ourDock && ourDock->windowTitle() != title) {
+		ourDock->setWindowTitle(title);
 		if (QWidget *tb = ourDock->titleBarWidget()) {
 			for (QLabel *lbl : tb->findChildren<QLabel *>())
-				if (lbl->text().contains(QLatin1String("Custom Controls")))
-					lbl->setText(QStringLiteral("Controls"));
+				if (lbl->text().contains(QLatin1String(kControlsDockLegacyTitle)))
+					lbl->setText(title);
 		}
 	}
 }
 
-// the visible title bar is handled live by ApplyControlsDockTweaks; this makes the rename stick in obss own config (the "Custom Browser Docks" dialog + the dock name obs creates it with next launch). called from the EXIT event, which fires AFTER OBSBasic::closeEvent has already written user.ini, so this edit lands last and survives.
+// the visible title bar is handled live by ApplyControlsDockTweaks; this makes the rename stick in obss own config (the "Custom Browser Docks" dialog + the dock name obs creates it with next launch). called from the EXIT event, which fires AFTER OBSBasic::closeEvent has already written user.ini, so this edit lands last and survives. written through a temp file, since a user.ini cut short is the whole config of obs gone
 void PatchBrowserDockTitleInUserIni()
 {
-	QString path = qEnvironmentVariable("APPDATA") + "/obs-studio/user.ini";
+	const QString path = ObsUserIniPath();
 	QFile f(path);
 	if (!f.open(QIODevice::ReadOnly | QIODevice::Text))
 		return;
-	QString text = QString::fromUtf8(f.readAll());
+	const QString text = QString::fromUtf8(f.readAll());
 	f.close();
-	// only the ExtraBrowserDocks line, only when it is our uuids entry, only the exact stale title token.
+	// only an ExtraBrowserDocks line that holds our uuid (the setup writes it with its dashes, the id of the dock has none) and only the exact stale title token; every such line, since obs reads the last of a key that is there twice
+	const QString uuid = QString::fromLatin1(kControlsDockUuid);
+	const QString bareUuid = QString(uuid).remove(QLatin1Char('-'));
+	const QString legacy = QString::fromLatin1(kControlsDockLegacyTitle);
+	const QString title = QString::fromLatin1(kControlsDockTitle);
 	QStringList lines = text.split('\n');
 	bool changed = false;
 	for (QString &line : lines) {
-		if (!line.startsWith(QLatin1String("ExtraBrowserDocks=")))
+		if (!line.startsWith(QLatin1String("ExtraBrowserDocks=")) || !(line.contains(uuid, Qt::CaseInsensitive) || line.contains(bareUuid, Qt::CaseInsensitive)))
 			continue;
-		if (!line.contains(QLatin1String("a59ce0ef5d6f4a4f91d9c7c3c1d4e2b0")))
-			break;
-		QString before = line;
-		line.replace(QLatin1String("\"title\": \"Custom Controls\""), QLatin1String("\"title\": \"Controls\""));
-		line.replace(QLatin1String("\"title\":\"Custom Controls\""), QLatin1String("\"title\":\"Controls\""));
-		changed = (line != before);
-		break;
+		const QString before = line;
+		line.replace(QStringLiteral("\"title\": \"%1\"").arg(legacy), QStringLiteral("\"title\": \"%1\"").arg(title));
+		line.replace(QStringLiteral("\"title\":\"%1\"").arg(legacy), QStringLiteral("\"title\":\"%1\"").arg(title));
+		changed = changed || line != before;
 	}
 	if (!changed)
 		return;
-	QFile w(path);
-	if (w.open(QIODevice::WriteOnly | QIODevice::Text)) {
-		w.write(lines.join('\n').toUtf8());
-		w.close();
-		blog(LOG_INFO, "[replaykit] renamed the browser dock to 'Controls' in user.ini");
+	QSaveFile w(path);
+	const QByteArray bytes = lines.join('\n').toUtf8();
+	if (!w.open(QIODevice::WriteOnly | QIODevice::Text) || w.write(bytes) != bytes.size() || !w.commit()) {
+		blog(LOG_WARNING, "[replaykit] the browser dock could not be renamed in user.ini");
+		return;
 	}
+	blog(LOG_INFO, "[replaykit] renamed the browser dock to '%s' in user.ini", kControlsDockTitle);
 }
+
 QTimer *g_dockTweakTimer = nullptr;
 
 } // namespace rk

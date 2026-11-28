@@ -180,7 +180,7 @@ void ShellBadge::paintEvent(QPaintEvent *)
 		}
 		p.setPen((m_live || m_armed) ? QPen(edge, 1.0) : Qt::NoPen);
 		p.setBrush(fill);
-		p.drawRoundedRect(pill, 9, 9);
+		p.drawRoundedRect(pill, kTabRadius, kTabRadius);
 	}
 
 	const qreal ink = m_dim ? 0.42 : 1.0;

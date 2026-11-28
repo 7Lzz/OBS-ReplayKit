@@ -11,6 +11,12 @@ QString IconPath(const QString &name)
 	return ReplayKitRootPath() + QStringLiteral("/icons/") + name;
 }
 
+QColor MixColor(const QColor &a, const QColor &b, qreal t)
+{
+	return QColor::fromRgbF(a.redF() + (b.redF() - a.redF()) * t, a.greenF() + (b.greenF() - a.greenF()) * t, a.blueF() + (b.blueF() - a.blueF()) * t,
+				a.alphaF() + (b.alphaF() - a.alphaF()) * t);
+}
+
 // renders an svg into a pixmap and recolours every painted pixel, since QSvgRenderer has no css context for currentColor and the shell chrome follows the theme text colour instead of the fixed white the caption glyphs use. the pixmap carries the device ratio, so drawing it at a logical position stays sharp on scaled displays
 QPixmap TintedSvgPixmap(QSvgRenderer &svg, const QSizeF &logicalSize, qreal dpr, const QColor &color)
 {

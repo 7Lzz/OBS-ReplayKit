@@ -5,6 +5,7 @@
 #include "core/draw_util.hpp"
 #include "core/main_window.hpp"
 #include "core/state.hpp"
+#include "core/state_files.hpp"
 #include "core/theme.hpp"
 #include "shell/shell_frame.hpp"
 #include "shell/shell_sleep.hpp"
@@ -16,7 +17,6 @@
 #include <QCheckBox>
 #include <QRegularExpression>
 #include <QSaveFile>
-#include <QStandardPaths>
 #include <QWindowStateChangeEvent>
 
 namespace rk {
@@ -28,7 +28,7 @@ QRgb g_pageBrushColor = 0;
 
 QString SourceResizeStyle()
 {
-	const QString dir = QStandardPaths::writableLocation(QStandardPaths::TempLocation) + QStringLiteral("/ReplayKit/scratch/source-resize");
+	const QString dir = TempScratchPath() + QStringLiteral("/source-resize");
 	if (!QDir().mkpath(dir)) {
 		blog(LOG_WARNING, "[replaykit] the source resize indicator folder could not be made");
 		return {};
@@ -114,7 +114,7 @@ void InkSourceIcon(QLabel *label, bool on)
 // the arrow of the dropdowns of the pages (nav/combo-arrow), in a colour of the theme and turned over for an open dropdown, written to the scratch folder of replaykit, since a qss image cannot be recoloured; made again only when the colour changes. empty when it cannot be written, and the dropdown then keeps the arrow of the obs theme
 QString TintedComboArrow(const QColor &ink, bool open)
 {
-	const QString dir = QStandardPaths::writableLocation(QStandardPaths::TempLocation) + QStringLiteral("/ReplayKit/scratch/combo-arrow");
+	const QString dir = TempScratchPath() + QStringLiteral("/combo-arrow");
 	const QString path = dir + QStringLiteral("/%1-%2.svg").arg(ink.name().mid(1), open ? QStringLiteral("up") : QStringLiteral("down"));
 	if (QFile::exists(path))
 		return path;
@@ -134,7 +134,7 @@ QString TintedComboArrow(const QColor &ink, bool open)
 // the shared checkmark (action/check) in a colour of the theme, for the picked row of a dropdown, the way the dropdowns of the pages mark it; empty when it cannot be written
 QString TintedCheck(const QColor &ink)
 {
-	const QString dir = QStandardPaths::writableLocation(QStandardPaths::TempLocation) + QStringLiteral("/ReplayKit/scratch/combo-arrow");
+	const QString dir = TempScratchPath() + QStringLiteral("/combo-arrow");
 	const QString path = dir + QStringLiteral("/check-%1.svg").arg(ink.name().mid(1));
 	if (QFile::exists(path))
 		return path;
@@ -159,8 +159,11 @@ QString InkedIndicatorRules(const QColor &ink)
 		return rules;
 	madeFor = ink.name();
 	rules.clear();
-	const QString dir = QStandardPaths::writableLocation(QStandardPaths::TempLocation) + QStringLiteral("/ReplayKit/scratch/source-icons");
-	QDir().mkpath(dir);
+	const QString dir = TempScratchPath() + QStringLiteral("/source-icons");
+	if (!QDir().mkpath(dir)) {
+		madeFor.clear();
+		return rules;
+	}
 	struct Indicator {
 		const char *kind;
 		const char *state;
@@ -180,11 +183,11 @@ QString InkedIndicatorRules(const QColor &ink)
 		QString svg = QString::fromUtf8(in.readAll());
 		svg.replace(paint, QStringLiteral("\\1") + ink.name());
 		const QString path = dir + QStringLiteral("/%1-%2-%3.svg").arg(QLatin1String(indicator.kind), QLatin1String(indicator.state), ink.name().mid(1));
-		QFile out(path);
-		if (!out.open(QIODevice::WriteOnly | QIODevice::Truncate))
+		// a rule that points at a file cut short would draw no icon at all, so the file is written whole or not at all and the theme keeps its own icon
+		QSaveFile out(path);
+		const QByteArray bytes = svg.toUtf8();
+		if (!out.open(QIODevice::WriteOnly) || out.write(bytes) != bytes.size() || !out.commit())
 			continue;
-		out.write(svg.toUtf8());
-		out.close();
 		// the dot classes of the obs theme are its own shorthand, so the class property is matched directly here
 		rules += QStringLiteral("SourceTreeItem[rkSelected=\"true\"] QCheckBox[class~=\"%1\"]::indicator:%2, SourceTreeItem[rkSelected=\"true\"] QCheckBox[class~=\"%1\"]::indicator:%2:hover { image:url(%3); }")
 				 .arg(QLatin1String(indicator.kind), QLatin1String(indicator.state), path);
@@ -566,11 +569,8 @@ bool ShellHostFilter::eventFilter(QObject *watched, QEvent *event)
 					ShellPrepareShow();
 				ShellResetHostProbe();
 				ShellSleepWindowChanged();
-				if (g_shellHost) {
-					const bool minimizedEditor = m_mw->isMinimized() && ShellEditorActive();
-					const bool showing = m_mw->isVisible() && !m_mw->isMinimized();
-					ShellRunJs(g_shellHost->browser, showing ? "window.RKShell && RKShell.windowShown(true);" : minimizedEditor ? "window.RKShell && RKShell.windowShown(false, true);" : "window.RKShell && RKShell.windowShown(false);");
-				}
+				if (g_shellHost)
+					ShellTellWindowShown(g_shellHost->browser, m_mw->isVisible() && !m_mw->isMinimized());
 				ShellSyncFrameMargins(g_shellHwnd);
 				// whoever asked for the maximize (obs restoring its saved state, a shortcut) went through qt, which only resizes
 				QTimer::singleShot(0, g_callbacks, []() { ShellMakeMaximizeReal(); });

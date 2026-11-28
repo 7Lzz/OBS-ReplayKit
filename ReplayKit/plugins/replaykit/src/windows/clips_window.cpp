@@ -24,7 +24,7 @@ namespace {
 // ui-thread only flag guarding against a second click opening a redundant window while the first ones background check is still talking to the helper
 bool g_clipsCheckInFlight = false;
 
-// CEF treats a parent QWidgets close event as a browser-close request even when Qt leaves the parent allocated. Ignore that event after hiding the window so the browser stays usable when a hotkey reopens Clips immediately afterward.
+// cef treats a close event of the parent qwidget as a request to close the browser even when qt leaves the parent allocated, so the event is ignored after the window is hidden and the browser stays usable when a hotkey reopens clips right afterward
 class ClipsWindow : public QWidget {
 private:
 	void PublishState(bool shown)
@@ -100,7 +100,7 @@ void CreateClipsWindow()
 	}
 
 	QWidget *win = new ClipsWindow();
-	// closing Clips only hides it. Keeping its CEF host alive avoids a deferred-delete race when a hotkey reopens it immediately after close, which could otherwise create a blank window or call Qt through a stale widget pointer.
+	// closing clips only hides it: keeping its cef host alive avoids a deferred delete racing a hotkey that reopens it right after the close, which could leave a blank window or reach qt through a stale widget pointer
 	win->setAttribute(Qt::WA_DeleteOnClose, false);
 	win->setWindowTitle(kClipsWindowTitle);
 	win->resize(1280, 800);
@@ -116,7 +116,7 @@ void CreateClipsWindow()
 	auto *status = new QLineEdit(win);
 	status->hide();
 	QObject::connect(browser, SIGNAL(titleChanged(QString)), status, SLOT(setText(QString)));
-	QObject::connect(status, &QLineEdit::textChanged, win, [win](const QString &title) { win->setProperty("replaykitEditorActive", title == QLatin1String("Clips - Editor")); });
+	QObject::connect(status, &QLineEdit::textChanged, win, [win](const QString &title) { win->setProperty("replaykitEditorActive", title == QLatin1String("rk-status:clips:editor")); });
 
 	// restore the remembered position/size before the first show so it doesnt flash at the default spot.
 	RestoreWindowGeometry("clipsWindow", win);
@@ -189,7 +189,8 @@ void ShowClips()
 
 	// checks /focus-window first since the docks own button or a leftover window may already have one open, then runs both blocking http calls off the ui thread and posts back thru queued invokeMethod since qwidget/qcefwidget arent thread-safe
 	RunAsync([]() {
-		bool focused = HttpFocusWindowSucceeded("/focus-window?title=Clips", 800);
+		const QByteArray path = "/focus-window?title=" + QUrl::toPercentEncoding(QString::fromLatin1(kClipsWindowTitle));
+		bool focused = HttpFocusWindowSucceeded(path.constData(), 800);
 		bool cefReady = focused || EnsureCefReadyBlocking();
 		QMetaObject::invokeMethod(
 			g_callbacks,

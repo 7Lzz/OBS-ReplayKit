@@ -59,8 +59,8 @@ void ShellRail::PlaceStorage()
 		m_storage->hide();
 		return;
 	}
-	const int y = int(ItemRect(firstBottom).top()) - ShellStorage::kHeight - RailButtonGap;
-	const bool fits = y >= int(ItemRect(lastTop).bottom()) + RailButtonGap;
+	const int y = int(ItemRect(firstBottom).top()) - ShellStorage::kHeight - kRailButtonGap;
+	const bool fits = y >= int(ItemRect(lastTop).bottom()) + kRailButtonGap;
 	m_storage->setGeometry(0, y, width(), ShellStorage::kHeight);
 	m_storage->setVisible(m_storage->GetInfo().known && fits);
 }
@@ -161,8 +161,8 @@ void ShellRail::paintEvent(QPaintEvent *)
 
 QRectF ShellRail::ItemRect(int index) const
 {
-	const qreal d = RailButtonSize;
-	const qreal pitch = RailButtonSize + RailButtonGap;
+	const qreal d = kRailButtonSize;
+	const qreal pitch = kRailButtonSize + kRailButtonGap;
 	int bottomCount = 0;
 	int slot = 0;
 	for (int i = 0; i < m_items.size(); ++i)

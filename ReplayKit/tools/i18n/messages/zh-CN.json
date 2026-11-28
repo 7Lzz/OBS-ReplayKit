@@ -279,10 +279,6 @@
     "source": "ff00bd8355ad9377",
     "text": "截取已关闭。"
   },
-  "clips.clipsEditor": {
-    "source": "73af8ffeafda4529",
-    "text": "片段 - 编辑器"
-  },
   "clips.closeDeletedHistory": {
     "source": "c841203dc5314629",
     "text": "关闭已删除记录"
@@ -10814,6 +10810,10 @@
   "shell.ifThisStaysAntivirusMayHave": {
     "source": "d0750aedf2e81a9a",
     "text": "如果此提示持续出现，杀毒软件可能已删除 OBSReplayKit.exe：请将其还原，或重新运行 ReplayKit 安装程序。"
+  },
+  "shell.loadingObsSettings": {
+    "source": "b8f54fe795aee89e",
+    "text": "正在加载 OBS 设置"
   },
   "shell.lockThePreviewSoTheScene": {
     "source": "93011b7da59ae979",

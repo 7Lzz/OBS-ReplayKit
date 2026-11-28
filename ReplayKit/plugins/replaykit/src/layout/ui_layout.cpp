@@ -43,10 +43,16 @@ UiLayout ReadLayoutFromSettingsFile()
 		       : UiLayout::Clean;
 }
 
-// the panels the clean layout folds away, by the object names obs gives them: the browser dock is its title plus _extraBrowser, and the title was Custom Controls before it was renamed
+// obs names a browser dock by its title plus _extraBrowser
+QString BrowserDockName(const char *title)
+{
+	return QString::fromLatin1(title) + QStringLiteral("_extraBrowser");
+}
+
+// the panels the clean layout folds away, by the object names obs gives them, the controls browser dock under its title now and under the one it had before it was renamed
 bool IsCleanFoldedDock(const QString &name)
 {
-	static const QStringList names = {"scenesDock", "sourcesDock", "mixerDock", "transitionsDock", "controlsDock", "statsDock", "Controls_extraBrowser", "Custom Controls_extraBrowser"};
+	static const QStringList names = {"scenesDock", "sourcesDock", "mixerDock", "transitionsDock", "controlsDock", "statsDock", BrowserDockName(kControlsDockTitle), BrowserDockName(kControlsDockLegacyTitle)};
 	return names.contains(name);
 }
 
@@ -92,20 +98,26 @@ QByteArray HideFoldedDocksInState(QByteArray state, bool *panelShown, const QStr
 
 UiLayout g_wantedLayout = UiLayout::Clean;
 
-// the browser dock that carries the ReplayKit controls page. matched strictly first (its own object name or title), and only then by the generic extra-browser suffix, so another custom browser dock is never mistaken for it. the native controlsDock is skipped on purpose: it carries the exact same windowTitle() "Controls" once the rename has run
+QString ObsUserIniPath()
+{
+	return qEnvironmentVariable("APPDATA") + QStringLiteral("/obs-studio/user.ini");
+}
+
+// the browser dock that carries the ReplayKit controls page. matched strictly first (its own object name or title), and only then by the generic extra-browser suffix, so another custom browser dock is never mistaken for it. the native controlsDock is skipped on purpose: it carries the exact same windowTitle() once the rename has run
 QDockWidget *FindSidebarDock(QMainWindow *mw)
 {
 	QDockWidget *nativeDock = mw->findChild<QDockWidget *>("controlsDock");
 	QDockWidget *suffixMatch = nullptr;
+	const QString bareUuid = QString::fromLatin1(kControlsDockUuid).remove(QLatin1Char('-'));
 	for (QDockWidget *dock : mw->findChildren<QDockWidget *>()) {
 		if (dock == nativeDock)
 			continue;
 		QString id = dock->objectName();
 		id.remove('-');
-		if (id.toLower() == QLatin1String("a59ce0ef5d6f4a4f91d9c7c3c1d4e2b0") ||
-		    dock->objectName() == QLatin1String("Controls_extraBrowser") ||
-		    dock->windowTitle() == QLatin1String("Custom Controls") ||
-		    dock->windowTitle() == QLatin1String("Controls"))
+		if (id.compare(bareUuid, Qt::CaseInsensitive) == 0 ||
+		    dock->objectName() == BrowserDockName(kControlsDockTitle) ||
+		    dock->windowTitle() == QLatin1String(kControlsDockLegacyTitle) ||
+		    dock->windowTitle() == QLatin1String(kControlsDockTitle))
 			return dock;
 		if (!suffixMatch && dock->objectName().endsWith(QLatin1String("_extraBrowser")))
 			suffixMatch = dock;
@@ -153,7 +165,6 @@ void ApplyLayoutChrome(bool clean)
 			layout->setContentsMargins(clean ? QMargins(kStageLeft, kStageTop, kStageRight, kStageBottom) : g_savedCentralMargins);
 		}
 	}
-
 }
 
 // the dock half of a layout change. layoutDocksApplied in window_state.ini remembers which layout the docks currently reflect, so switching happens once per real change and never on every launch (obs already persists the dock state itself)
@@ -226,22 +237,21 @@ void PrepareDocksForNextLaunch()
 		return;
 
 	QSettings ini(WindowStateIniPath(), QSettings::IniFormat);
-	QFile file(qEnvironmentVariable("APPDATA") + "/obs-studio/user.ini");
+	QFile file(ObsUserIniPath());
 	if (!file.open(QIODevice::ReadOnly))
 		return;
 	QList<QByteArray> lines = file.readAll().split('\n');
 	file.close();
 
+	// obs merges a [BasicWindow] that is there twice and reads the last DockState in it, so that is the line to change
 	qsizetype dockLine = -1;
 	bool inSection = false;
 	for (qsizetype i = 0; i < lines.size(); ++i) {
 		const QByteArray trimmed = lines[i].trimmed();
 		if (trimmed.startsWith('['))
 			inSection = trimmed == "[BasicWindow]";
-		else if (inSection && trimmed.startsWith("DockState=")) {
+		else if (inSection && trimmed.startsWith("DockState="))
 			dockLine = i;
-			break;
-		}
 	}
 	if (dockLine < 0)
 		return;
@@ -318,6 +328,7 @@ void ApplyLayout()
 	ApplyLayoutDocks(g_shellOn ? UiLayout::Clean : UiLayout::Classic);
 	LockCleanLayoutMenus();
 }
+
 bool g_shellBootSkipped = false;
 
 // unfinished clean starts in a row that send the next launch to the classic layout

@@ -100,20 +100,13 @@ void ClickObsSettingsButton(QDialogButtonBox::StandardButton which)
 	}
 }
 
-} // namespace
-
-QString ShellViewName()
+// the view that shows, the way the helper and the pages name it
+QString ShownViewKey()
 {
-	switch (g_shellView) {
-	case ShellView::Home: return QStringLiteral("home");
-	case ShellView::Projector: return QStringLiteral("projector");
-	case ShellView::Clips: return QStringLiteral("clips");
-	case ShellView::Settings: return QStringLiteral("settings");
-	case ShellView::Setup: return QStringLiteral("setup");
-	case ShellView::ObsSettings: return QStringLiteral("obs-settings");
-	}
-	return QString();
+	return QString::fromLatin1(ShellViewKey(g_shellView));
 }
+
+} // namespace
 
 ShellQuickMenu::ShellQuickMenu(QWidget *owner) : m_owner(owner) {}
 
@@ -141,8 +134,9 @@ void ShellQuickMenu::Toggle(ShellTitleButton *button)
 	}
 	if (m_asking)
 		return;
-	const QString view = ShellViewName();
-	if (view != QLatin1String("home") && view != QLatin1String("clips") && view != QLatin1String("settings") && view != QLatin1String("setup")) {
+	const QString view = ShownViewKey();
+	// only the pages give the helper a list of their own
+	if (!ShellIsPageView(g_shellView)) {
 		Open(button, std::string());
 		return;
 	}
@@ -162,7 +156,7 @@ void ShellQuickMenu::Toggle(ShellTitleButton *button)
 
 void ShellQuickMenu::Open(ShellTitleButton *button, const std::string &pageList)
 {
-	const QString view = ShellViewName();
+	const QString view = ShownViewKey();
 	QJsonArray groups;
 	const QJsonArray own = ViewActions(view, pageList);
 	if (!own.isEmpty())
@@ -225,7 +219,7 @@ void ShellQuickMenu::Follow()
 void ShellQuickMenu::Run(const QString &view, const QString &id)
 {
 	// a pick made in a view that is no longer the one showing is left alone
-	if (!ValidPart(view) || !ValidPart(id) || view != ShellViewName())
+	if (!ValidPart(view) || !ValidPart(id) || view != ShownViewKey())
 		return;
 	AnchoredPanel::HideAll(true);
 	if (id.startsWith(QLatin1String("page-"))) {

@@ -12,6 +12,8 @@
 namespace rk {
 
 void ShellRunJs(QCefWidget *browser, const std::string &js);
+// tells the pages whether the window is on screen; a window that is not, minimized with an editor open, says so, since the editor keeps its work going there
+void ShellTellWindowShown(QCefWidget *browser, bool shown);
 
 // the one browser the clean layout keeps inside the obs window: its page (shell.html) holds home, clips, settings and setup as iframes that stay loaded, so a view change is a flip inside the page and no native window is ever hidden or shown again. same rule as the popup windows it replaces: hidden, never destroyed, so the cef browser is not torn down mid-session
 class ShellPage : public QWidget {

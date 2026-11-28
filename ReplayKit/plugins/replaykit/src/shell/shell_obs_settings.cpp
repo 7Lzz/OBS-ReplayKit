@@ -16,21 +16,21 @@ namespace rk {
 namespace {
 
 // a hidden modal dialog for as long as the folded in settings dialog lives. obs will not hide the window to the tray while any modal dialog exists, and this dialog was made non modal so it can live inside the window, which takes that protection away: a hide from the tray icon left obs holding a pointer to the settings dialog that its exec() frees on return, and the next show from the tray went through it
-QPointer<QDialog> s_settingsGuard;
+QPointer<QDialog> g_settingsGuard;
 
 void ObsSettingsGuard(bool on)
 {
 	if (!on) {
-		delete s_settingsGuard.data();
+		delete g_settingsGuard.data();
 		return;
 	}
 	QMainWindow *mw = ObsMainWindowQt();
-	if (!mw || s_settingsGuard)
+	if (!mw || g_settingsGuard)
 		return;
 	QDialog *guard = new QDialog(mw);
 	guard->setObjectName(QStringLiteral("rkObsSettingsGuard"));
 	guard->setModal(true);
-	s_settingsGuard = guard;
+	g_settingsGuard = guard;
 }
 
 // what obs greys out while any output runs (OBSBasicSettings load code); it reads that state once, when it builds the dialog

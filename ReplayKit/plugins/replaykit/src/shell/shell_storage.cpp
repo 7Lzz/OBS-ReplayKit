@@ -23,7 +23,7 @@ namespace {
 bool g_pollInFlight = false;
 
 constexpr qreal kRingD = 26.0;
-constexpr qreal kRingTop = (RailButtonSize - kRingD) / 2.0;
+constexpr qreal kRingTop = (kRailButtonSize - kRingD) / 2.0;
 constexpr qreal kRingStroke = 3.0;
 // the hairlines that bring the outline fill of small text to the ink the css text has in the browser, the same idea as the labels of the native list
 constexpr qreal kTextStroke = 0.2;
@@ -34,15 +34,12 @@ QColor UsageColour(qreal fraction)
 	const QColor green = g_chromeSuccess;
 	const QColor amber = g_chromeWarning;
 	const QColor red = g_menuDanger.lighter(115);
-	const auto mix = [](const QColor &a, const QColor &b, qreal t) {
-		return QColor::fromRgbF(a.redF() + (b.redF() - a.redF()) * t, a.greenF() + (b.greenF() - a.greenF()) * t, a.blueF() + (b.blueF() - a.blueF()) * t);
-	};
 	const qreal f = qBound(0.0, fraction, 1.0);
 	if (f <= 0.45)
 		return green;
 	if (f <= 0.75)
-		return mix(green, amber, (f - 0.45) / 0.30);
-	return mix(amber, red, (f - 0.75) / 0.25);
+		return MixColor(green, amber, (f - 0.45) / 0.30);
+	return MixColor(amber, red, (f - 0.75) / 0.25);
 }
 
 QFont UsedFont()
@@ -53,14 +50,7 @@ QFont UsedFont()
 	return f;
 }
 
-QFont CompressFont()
-{
-	QFont f(UiFontFamily());
-	f.setPixelSize(10);
-	f.setWeight(QFont::Medium);
-	return f;
-}
-
+// the limit under the size, and the clip count in its place while clips are compressed
 QFont LimitFont()
 {
 	QFont f(UiFontFamily());
@@ -97,7 +87,7 @@ void ShellStorage::enterEvent(QEnterEvent *event)
 	StorageModalPrepare();
 	if (!g_notifyTip)
 		g_notifyTip = new NotifyTip();
-	const QRect anchor((width() - RailButtonSize) / 2, 0, RailButtonSize, RailButtonSize);
+	const QRect anchor((width() - kRailButtonSize) / 2, 0, kRailButtonSize, kRailButtonSize);
 	g_notifyTip->ShowFor(m_info.compressing ? TrMessage("shell.compressingClipsTimePercent", {{"time", m_info.compressText}, {"percent", QString::number(m_info.compressPercent)}}) : TrMessage("common.storage"),
 			     QRect(mapToGlobal(anchor.topLeft()), anchor.size()), NotifyTip::Side::Right);
 }
@@ -145,7 +135,7 @@ void ShellStorage::paintEvent(QPaintEvent *)
 	if (m_hover || m_down) {
 		p.setPen(Qt::NoPen);
 		p.setBrush(ChromeInk(m_down ? 0.13 : 0.08));
-		const QRectF frame(width() / 2.0 - RailButtonSize / 2.0, 0, RailButtonSize, RailButtonSize);
+		const QRectF frame(width() / 2.0 - kRailButtonSize / 2.0, 0, kRailButtonSize, kRailButtonSize);
 		p.drawRoundedRect(frame, ShellTitleButton::kRadius, ShellTitleButton::kRadius);
 	}
 
@@ -170,10 +160,10 @@ void ShellStorage::paintEvent(QPaintEvent *)
 	}
 
 	const qreal ink = m_hover || m_down ? 1.0 : 0.66;
-	const QRectF usedBox(0, RailButtonSize + 4, width(), 15);
+	const QRectF usedBox(0, kRailButtonSize + 4, width(), 15);
 	DrawPageText(p, usedBox, Qt::AlignHCenter | Qt::AlignVCenter, busy ? QStringLiteral("%1%").arg(m_info.compressPercent) : m_info.used, UsedFont(), busy ? QColor(g_menuAccentLight) : full ? g_menuDanger : ChromeInk(ink), kTextStroke);
 	const QRectF limitBox(0, usedBox.bottom() - 1, width(), 14);
-	DrawPageText(p, limitBox, Qt::AlignHCenter | Qt::AlignVCenter, busy ? m_info.compressText : m_info.limit, busy ? CompressFont() : LimitFont(), ChromeInk(ink * 0.85), kTextStroke);
+	DrawPageText(p, limitBox, Qt::AlignHCenter | Qt::AlignVCenter, busy ? m_info.compressText : m_info.limit, LimitFont(), ChromeInk(ink * 0.85), kTextStroke);
 }
 
 void ShellStoragePoll()

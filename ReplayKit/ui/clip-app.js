@@ -6866,7 +6866,8 @@ const CLIP_HOVER_PROFILES = {
   function publishQuickActions() {
     const api = editorApi();
     const editing = !!api && trimVeil.classList.contains("is-open");
-    if (!window.RKEmbedded) document.title = trimVeil.classList.contains("is-open") || trimProcessingVeil.classList.contains("is-open") ? RK_M("clips.clipsEditor") : RK_M("common.clips");
+    // the clips window of the classic layout follows the title to know whether the editor is open; the native window keeps its own title, so this one is a marker and not a text anyone reads
+    if (!window.RKEmbedded) document.title = trimVeil.classList.contains("is-open") || trimProcessingVeil.classList.contains("is-open") ? "rk-status:clips:editor" : "rk-status:clips:page";
     const actions = editing ? api.quickActions() : [{ id:"open-folder", label:RK_M("common.openClipsFolder"), icon:"action/folder-open" }];
     const body = JSON.stringify({ actions });
     if (body === quickSent) return;

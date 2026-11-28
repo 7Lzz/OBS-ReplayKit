@@ -15,6 +15,17 @@ void ShellRunJs(QCefWidget *browser, const std::string &js)
 	RunBrowserScript(browser, js);
 }
 
+void ShellTellWindowShown(QCefWidget *browser, bool shown)
+{
+	if (shown) {
+		ShellRunJs(browser, "window.RKShell && RKShell.windowShown(true);");
+		return;
+	}
+	QMainWindow *window = ObsMainWindowQt();
+	const bool minimizedEditor = window && window->isMinimized() && ShellEditorActive();
+	ShellRunJs(browser, minimizedEditor ? "window.RKShell && RKShell.windowShown(false, true);" : "window.RKShell && RKShell.windowShown(false);");
+}
+
 ShellPage::ShellPage(QWidget *parent)
 	: QWidget(parent)
 {
@@ -28,15 +39,13 @@ ShellPage::ShellPage(QWidget *parent)
 void ShellPage::showEvent(QShowEvent *event)
 {
 	QWidget::showEvent(event);
-	ShellRunJs(browser, "window.RKShell && RKShell.windowShown(true);");
+	ShellTellWindowShown(browser, true);
 }
 
 void ShellPage::hideEvent(QHideEvent *event)
 {
 	QWidget::hideEvent(event);
-	QMainWindow *window = ObsMainWindowQt();
-	const bool minimizedEditor = window && window->isMinimized() && ShellEditorActive();
-	ShellRunJs(browser, minimizedEditor ? "window.RKShell && RKShell.windowShown(false, true);" : "window.RKShell && RKShell.windowShown(false);");
+	ShellTellWindowShown(browser, false);
 }
 
 } // namespace rk

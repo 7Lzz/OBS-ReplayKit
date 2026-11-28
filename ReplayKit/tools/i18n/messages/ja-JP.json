@@ -279,10 +279,6 @@
     "source": "ff00bd8355ad9377",
     "text": "クリッピングはオフです。"
   },
-  "clips.clipsEditor": {
-    "source": "73af8ffeafda4529",
-    "text": "クリップ - エディター"
-  },
   "clips.closeDeletedHistory": {
     "source": "c841203dc5314629",
     "text": "削除履歴を閉じる"
@@ -10814,6 +10810,10 @@
   "shell.ifThisStaysAntivirusMayHave": {
     "source": "d0750aedf2e81a9a",
     "text": "これが続く場合、ウイルス対策ソフトが OBSReplayKit.exe を削除した可能性があります。復元するか、ReplayKit のインストーラーをもう一度実行してください。"
+  },
+  "shell.loadingObsSettings": {
+    "source": "b8f54fe795aee89e",
+    "text": "OBS の設定を読み込んでいます"
   },
   "shell.lockThePreviewSoTheScene": {
     "source": "93011b7da59ae979",

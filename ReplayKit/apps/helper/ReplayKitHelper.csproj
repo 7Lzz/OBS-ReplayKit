@@ -49,6 +49,7 @@
     <Compile Include="..\..\shared\ObsExit.cs" Link="ObsExit.cs" />
     <Compile Include="..\..\shared\ObsIni.cs" Link="ObsIni.cs" />
     <Compile Include="..\..\shared\ReplayKitFolder.cs" Link="ReplayKitFolder.cs" />
+    <Compile Include="..\..\shared\ReplayKitRepo.cs" Link="ReplayKitRepo.cs" />
     <Compile Include="..\..\shared\SleepOverrideRequest.cs" Link="SleepOverrideRequest.cs" />
     <Compile Include="..\..\shared\HotkeyModifiers.cs" Link="HotkeyModifiers.cs" />
     <Compile Include="..\..\shared\WindowLayout.cs" Link="WindowLayout.cs" />

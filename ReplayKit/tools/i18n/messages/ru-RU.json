@@ -279,10 +279,6 @@
     "source": "ff00bd8355ad9377",
     "text": "Клипирование выключено."
   },
-  "clips.clipsEditor": {
-    "source": "73af8ffeafda4529",
-    "text": "Клипы — редактор"
-  },
   "clips.closeDeletedHistory": {
     "source": "c841203dc5314629",
     "text": "Закрыть удалённые"
@@ -10826,6 +10822,10 @@
   "shell.ifThisStaysAntivirusMayHave": {
     "source": "d0750aedf2e81a9a",
     "text": "Если это сохраняется, антивирус мог удалить OBSReplayKit.exe: восстановите его или запустите установщик ReplayKit снова"
+  },
+  "shell.loadingObsSettings": {
+    "source": "b8f54fe795aee89e",
+    "text": "Загрузка настроек OBS"
   },
   "shell.lockThePreviewSoTheScene": {
     "source": "93011b7da59ae979",

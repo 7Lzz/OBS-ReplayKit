@@ -14,6 +14,7 @@
 #include "core/helper_client.hpp"
 #include "core/json_lite.hpp"
 #include "core/locale.hpp"
+#include "core/shared_values.hpp"
 #include "core/state.hpp"
 #include "core/theme.hpp"
 #include "core/ui_font.hpp"
@@ -24,14 +25,6 @@
 namespace rk {
 
 namespace {
-
-const char kGithubUrl[] = "https://github.com/7Lzz/OBS-ReplayKit";
-
-QColor Mix(const QColor &a, const QColor &b, qreal t)
-{
-	return QColor::fromRgbF(a.redF() + (b.redF() - a.redF()) * t, a.greenF() + (b.greenF() - a.greenF()) * t, a.blueF() + (b.blueF() - a.blueF()) * t,
-				a.alphaF() + (b.alphaF() - a.alphaF()) * t);
-}
 
 // what a label or a switch of the dialog says, without its markup and its accelerator marks
 QString PlainText(QString text)
@@ -59,7 +52,7 @@ bool HoldsText(QWidget *w, const QString &needle)
 // the helper hands links to the default browser, the same route the sidebar of the replaykit settings takes for this one
 void OpenGithub()
 {
-	const QByteArray path = "/open-url?url=" + QUrl::toPercentEncoding(QString::fromLatin1(kGithubUrl));
+	const QByteArray path = "/open-url?url=" + QUrl::toPercentEncoding(QString::fromLatin1(kReplayKitRepoPage));
 	RunAsync([path]() { HttpRequest("POST", path.constData(), nullptr, 3000); });
 }
 
@@ -182,7 +175,7 @@ void ShellObsNav::paintEvent(QPaintEvent *)
 			}
 			const QSizeF glyph(15, 15);
 			p.drawPixmap(QPointF(box.center().x() - glyph.width() / 2.0, box.center().y() - glyph.height() / 2.0),
-				     TintedSvgPixmap(m_github, glyph, devicePixelRatioF(), Mix(g_menuMuted, g_notifyTipFg, t)));
+				     TintedSvgPixmap(m_github, glyph, devicePixelRatioF(), MixColor(g_menuMuted, g_notifyTipFg, t)));
 		}
 	}
 

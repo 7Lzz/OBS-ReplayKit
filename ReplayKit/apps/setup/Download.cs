@@ -3,13 +3,14 @@ using System.Collections.Generic;
 using System.IO;
 using System.Net.Http;
 using System.Threading;
+using ReplayKitShared;
 
 namespace ReplayKitSetup
 {
     internal static class Download
     {
         // what every download of the setup names itself as
-        internal const string UserAgent = "OBSReplayKit/1.0 (+https://github.com/7Lzz/OBS-ReplayKit)";
+        internal const string UserAgent = "OBSReplayKit/1.0 (+" + ReplayKitRepo.Page + ")";
 
         internal static void Save(HttpClient client, string url, string path, long limit, TimeSpan timeout,
             long expectedLength = 0, Action<long, long> progress = null, ISet<string> allowedHosts = null)

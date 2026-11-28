@@ -130,7 +130,7 @@ void TitleKeybindBadge::paintEvent(QPaintEvent *)
 	for (int i = 0; i < entries.size(); i++) {
 		if (i > 0)
 			x += kChipGap;
-		// bold white name (Recording/Clipping) same as the tray rows own nameLabel, paired tight against its chip
+		// bold white name (clip or recording) same as the tray rows own nameLabel, paired tight against its chip
 		p.setFont(nameFont);
 		p.setPen(QColor(255, 255, 255));
 		qreal nameW = nameFm.horizontalAdvance(entries[i].first);

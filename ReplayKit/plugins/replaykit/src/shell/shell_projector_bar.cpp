@@ -31,8 +31,6 @@ constexpr int kSlideMs = 300;
 constexpr int kTintMs = 220;
 constexpr int kGrowMs = 130;
 
-// glyphs stroked like the icons of the rail; the colour is put on when they are drawn
-
 QFont LabelFont()
 {
 	QFont f(UiFontFamily());
@@ -40,19 +38,6 @@ QFont LabelFont()
 	f.setWeight(QFont::DemiBold);
 	f.setHintingPreference(QFont::PreferNoHinting);
 	return f;
-}
-
-QColor Blend(const QColor &a, const QColor &b, qreal t)
-{
-	return QColor::fromRgbF(a.redF() + (b.redF() - a.redF()) * t, a.greenF() + (b.greenF() - a.greenF()) * t, a.blueF() + (b.blueF() - a.blueF()) * t);
-}
-
-// colours blended with their alpha, which the plain blend above leaves out
-QColor BlendAlpha(const QColor &a, const QColor &b, qreal t)
-{
-	QColor c;
-	c.setRgbF(a.redF() + (b.redF() - a.redF()) * t, a.greenF() + (b.greenF() - a.greenF()) * t, a.blueF() + (b.blueF() - a.blueF()) * t, a.alphaF() + (b.alphaF() - a.alphaF()) * t);
-	return c;
 }
 
 // the knob goes over with a small overshoot, the same curve as the knob of the settings
@@ -170,7 +155,7 @@ protected:
 		const bool preview = m_kind == Kind::Preview;
 		// what is switched on reads brighter than what is off, and the lock takes the accent while it holds, since that is the state that has to be noticed
 		QColor ink = m_on ? (preview ? g_notifyTipFg : g_menuAccentLight) : g_menuMuted;
-		ink = Blend(ink, g_notifyTipFg, hover * 0.45);
+		ink = MixColor(ink, g_notifyTipFg, hover * 0.45);
 		if (m_held)
 			p.setOpacity(0.5);
 		QSvgRenderer &glyph = preview ? (m_on ? eye : eyeOff) : (m_on ? locked : unlocked);
@@ -190,7 +175,7 @@ protected:
 			const qreal here = qBound(0.0, m_pos, 1.0);
 			const QColor lit = g_menuAccent;
 			p.setPen(Qt::NoPen);
-			p.setBrush(BlendAlpha(ChromeInk(0.20 + 0.10 * m_grow), BlendAlpha(lit, lit.lighter(112), m_grow), tint));
+			p.setBrush(MixColor(ChromeInk(0.20 + 0.10 * m_grow), MixColor(lit, lit.lighter(112), m_grow), tint));
 			p.drawRoundedRect(track, kSwitchH / 2.0, kSwitchH / 2.0);
 			// the knob stretches under the press, and on a switch that is on it stretches back toward the middle so it stays inside
 			const qreal height = kSwitchH - 6.0;
@@ -198,7 +183,7 @@ protected:
 			const qreal x = track.left() + 3.0 + (kSwitchW - kSwitchH) * m_pos - 5.0 * m_press * here;
 			p.setBrush(QColor(0, 0, 0, 56));
 			p.drawRoundedRect(QRectF(x, track.top() + 4.0, knob, height), height / 2.0, height / 2.0);
-			p.setBrush(BlendAlpha(ChromeInk(0.82), g_menuOnAccent, tint));
+			p.setBrush(MixColor(ChromeInk(0.82), g_menuOnAccent, tint));
 			p.drawRoundedRect(QRectF(x, track.top() + 3.0, knob, height), height / 2.0, height / 2.0);
 			p.restore();
 		}

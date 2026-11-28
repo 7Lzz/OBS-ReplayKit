@@ -10,8 +10,6 @@ namespace rk {
 
 namespace {
 
-// the arrows as they were drawn, on the 24 grid like the rest of the icons; only the shape is kept and recoloured
-
 constexpr int kGlyph = 20;
 
 } // namespace

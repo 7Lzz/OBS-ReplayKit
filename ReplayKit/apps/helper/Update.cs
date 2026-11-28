@@ -16,12 +16,10 @@ namespace ReplayKitHelper
     // self-update: checks github releases, downloads and sha256-verifies the installer, then starts it in --update mode (apps/setup/Update.cs is the receiving end)
     internal static class Update
     {
-        private const string Owner = "7Lzz";
-        private const string Repo = "OBS-ReplayKit";
         private const string InstallerAsset = "OBSReplayKit.exe";
         // sha256sum-style sidecar for the installer, one "<hash>  OBSReplayKit.exe" line. named after the file it covers, which is the only other asset on a release.
         private const string ChecksumsAsset = "OBSReplayKit.exe.sha256";
-        internal const string ReleasePage = "https://github.com/" + Owner + "/" + Repo + "/releases/latest";
+        internal const string ReleasePage = ReplayKitRepo.LatestReleasePage;
 
         // floor to reject a broken release before it closes obs -- a framework-dependent slip or a payload-less exe lands far under this. mirrors the same guard scripts/build.ps1 applies at the producing end.
         private const long MinInstallerBytes = 10L * 1024 * 1024;
@@ -162,7 +160,7 @@ namespace ReplayKitHelper
 
         private static ReleaseInfo FetchLatestRelease()
         {
-            string url = "https://api.github.com/repos/" + Owner + "/" + Repo + "/releases/latest";
+            string url = "https://api.github.com/repos/" + ReplayKitRepo.Owner + "/" + ReplayKitRepo.Name + "/releases/latest";
             var release = InvokeGitHubApi(url);
             string tagName = release["tag_name"]?.Value<string>();
             if (string.IsNullOrEmpty(tagName)) throw new InvalidOperationException(Locales.Message("update.latestReleaseDidNotIncludeA"));
@@ -216,7 +214,7 @@ namespace ReplayKitHelper
             foreach (string tag in new[] { "v" + norm, norm })
             {
                 JObject release;
-                try { release = InvokeGitHubApi("https://api.github.com/repos/" + Owner + "/" + Repo + "/releases/tags/" + tag); }
+                try { release = InvokeGitHubApi("https://api.github.com/repos/" + ReplayKitRepo.Owner + "/" + ReplayKitRepo.Name + "/releases/tags/" + tag); }
                 catch (InvalidOperationException) { continue; }
                 string tagName = release["tag_name"]?.Value<string>();
                 if (string.IsNullOrEmpty(tagName)) continue;

@@ -6,6 +6,7 @@
 #include "core/helper_client.hpp"
 #include "core/json_lite.hpp"
 #include "core/locale.hpp"
+#include "core/shared_values.hpp"
 #include "core/state.hpp"
 #include "core/state_files.hpp"
 #include "core/theme.hpp"
@@ -63,7 +64,7 @@ void ShellAccountButton::SetAccount(const Account &account)
 		m_picture = QPixmap();
 		m_pictureScaled = QPixmap();
 		if (!account.picture.isEmpty())
-			m_picture.load(StateFilePath(QStringLiteral("profile_picture.png")), "PNG");
+			m_picture.load(StateFilePath(QString::fromLatin1(kProfilePictureFile)), "PNG");
 	}
 	m_account = account;
 	SetTip(account.signedIn ? (account.name.isEmpty() ? TrMessage("shell.streamableSignedIn") : TrMessage("shell.streamableName", {{"name", account.name}})) : TrMessage("shell.streamableAnonymous"));
@@ -188,13 +189,8 @@ void ShellAccountPoll()
 		ShellAccountButton::Account account;
 		if (answered) {
 			account.signedIn = JsonBoolField(body, "signedIn", false);
-			// the helper hides the real name, so the masked one is what there is to show; display name is only the words "Signed in"
-			std::string name = ExtractJsonStringField(body, "maskedUsername");
-			if (name.empty())
-				name = ExtractJsonStringField(body, "username");
-			if (name.empty())
-				name = ExtractJsonStringField(body, "displayName");
-			account.name = QString::fromStdString(name);
+			// the helper hides the real name, so the masked one is all there is to show; its username is always empty and its display name only the words signed in
+			account.name = QString::fromStdString(ExtractJsonStringField(body, "maskedUsername"));
 			account.picture = QString::fromStdString(ExtractJsonStringField(body, "picture"));
 		}
 		QMetaObject::invokeMethod(

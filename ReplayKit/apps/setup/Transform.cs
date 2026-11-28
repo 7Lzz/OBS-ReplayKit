@@ -145,17 +145,14 @@ namespace ReplayKitSetup
             return JsonConvert.SerializeObject(encoder.Settings);
         }
 
-        // stable uuid for our custom controls dock entry. repeat applies update the same row instead of stacking duplicates.
-        internal const string CustomControlsDockUuid = "a59ce0ef-5d6f-4a4f-91d9-c7c3c1d4e2b0";
-
         // the controls page must have the helpers loopback origin. a file:// dock cannot call the protected local API after CEFs local-resource policy is applied, which leaves every control in its offline state.
         private static string DockUrl() => HelperEndpoint.Origin + "/controls_app.html";
 
         private static JObject ManagedDockEntry() => new JObject
         {
-            ["title"] = "Controls",
+            ["title"] = ControlsDock.Title,
             ["url"] = DockUrl(),
-            ["uuid"] = CustomControlsDockUuid,
+            ["uuid"] = ControlsDock.Uuid,
         };
 
         // render basicwindow.extrabrowserdocks as json with backslashes double-escaped (obss ini parser unescapes once on read).
@@ -172,9 +169,9 @@ namespace ReplayKitSetup
             string title = (obj.Value<string>("title") ?? "").Trim().ToLowerInvariant();
             string url = (obj.Value<string>("url") ?? "").Replace("\\", "/").ToLowerInvariant();
             string uuid = (obj.Value<string>("uuid") ?? "").Replace("-", "").ToLowerInvariant();
-            string managedUuid = CustomControlsDockUuid.Replace("-", "").ToLowerInvariant();
-            // title match is only for pre-uuid legacy rows; our uuid + the url below identify the current entry (renamed "Custom Controls" -> "Controls" 2026-09-08).
-            return uuid == managedUuid || title == "custom controls" ||
+            string managedUuid = ControlsDock.Uuid.Replace("-", "").ToLowerInvariant();
+            // the stable uuid keeps repeat applies on the same row instead of stacking duplicates; the legacy title match is only for pre-uuid rows, and the url below identifies the current entry
+            return uuid == managedUuid || title == ControlsDock.LegacyTitle.ToLowerInvariant() ||
                    url.Contains("obs-replaykit/obs-custom-dock/controls.html") ||
                    url.Contains("obs-replaykit/obs-custom-dock/controls_app.html");
         }

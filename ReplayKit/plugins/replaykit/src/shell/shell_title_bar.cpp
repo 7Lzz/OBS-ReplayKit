@@ -24,7 +24,6 @@
 #include "shell/shell_projector.hpp"
 #include "shell/shell_quick_menu.hpp"
 #include "shell/shell_state.hpp"
-#include "ui/anchored_panel.hpp"
 #include "shell/shell_types.hpp"
 #include "shell/shell_views.hpp"
 #include "shell/shell_win_button.hpp"
@@ -38,10 +37,6 @@ namespace {
 bool g_recWasActive = false;
 qint64 g_recMs = 0;
 quint64 g_recLastTickMs = 0;
-
-} // namespace
-
-namespace {
 
 constexpr qreal kUpdatePadLeft = 9.0;
 constexpr qreal kUpdateIcon = 14.0;

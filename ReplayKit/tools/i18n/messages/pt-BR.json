@@ -279,10 +279,6 @@
     "source": "ff00bd8355ad9377",
     "text": "A captura de clipes está desativada."
   },
-  "clips.clipsEditor": {
-    "source": "73af8ffeafda4529",
-    "text": "Clipes - Editor"
-  },
   "clips.closeDeletedHistory": {
     "source": "c841203dc5314629",
     "text": "Fechar histórico de excluídos"
@@ -10822,6 +10818,10 @@
   "shell.ifThisStaysAntivirusMayHave": {
     "source": "d0750aedf2e81a9a",
     "text": "Se isto continuar, o antivírus pode ter removido o OBSReplayKit.exe: restaure-o ou execute o instalador do ReplayKit novamente"
+  },
+  "shell.loadingObsSettings": {
+    "source": "b8f54fe795aee89e",
+    "text": "Carregando as configurações do OBS"
   },
   "shell.lockThePreviewSoTheScene": {
     "source": "93011b7da59ae979",

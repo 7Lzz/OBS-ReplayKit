@@ -34,7 +34,4 @@ private:
 	bool m_asking = false;
 };
 
-// the view that shows, the way the helper and the pages name it
-QString ShellViewName();
-
 } // namespace rk

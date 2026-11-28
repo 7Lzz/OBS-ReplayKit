@@ -2,6 +2,8 @@
 #include "prelude.hpp"
 #include "shell/shell_views.hpp"
 
+#include <QJsonArray>
+#include <QJsonDocument>
 #include <QLineEdit>
 
 #include "core/async.hpp"
@@ -53,13 +55,14 @@ bool g_homeEditor = false;
 bool g_clipsEditor = false;
 // the deleted history was picked from another view and opens once the clips page says it is the one showing
 bool g_deletedPending = false;
-int probePending = 0;
-int probeGeneration = 0;
-QElapsedTimer resumeTimer;
+// the ping of the page that is still waiting for its answer, the generation that drops answers to pings sent before a reset, and the time since the window came back, which a restored renderer is given before it is pinged
+int g_hostProbePending = 0;
+int g_hostProbeGen = 0;
+QElapsedTimer g_hostResumeTimer;
 
 bool ShellMainWindowIsForeground();
 
-// obs settings + hidden main window helpers -- the shell has to be able to bring the window forward the same way ToggleClips brings its own window forward
+// shows the window and puts it in front of whatever has the foreground; attaching to the input queue of the foreground thread covers the times windows still refuses
 void ShellForegroundMainWindow()
 {
 	QMainWindow *mw = ObsMainWindowQt();
@@ -139,18 +142,15 @@ bool ShellCloseObsSettings()
 	return !g_obsSettingsDialog || g_obsSettingsDialog->isHidden();
 }
 
-const char *ShellViewName(ShellView view)
+bool ShellViewFromKey(const std::string &key, ShellView *view)
 {
-	switch (view) {
-	case ShellView::Clips:
-		return "clips";
-	case ShellView::Settings:
-		return "settings";
-	case ShellView::Setup:
-		return "setup";
-	default:
-		return "home";
+	for (ShellView each : {ShellView::Home, ShellView::Projector, ShellView::Clips, ShellView::Settings, ShellView::Setup, ShellView::ObsSettings}) {
+		if (key == ShellViewKey(each)) {
+			*view = each;
+			return true;
+		}
 	}
+	return false;
 }
 
 // the page view a fresh shell page starts on: the one that is wanted, or home under a native view
@@ -162,7 +162,7 @@ ShellView ShellBootView()
 // the shell page is told in its address which view to start on, so a page that loads (at the start, after sleep, after a reload) paints the placeholder of that view at once instead of coming up on home and being switched over; its pages share one thread with it, and a page that started loading first keeps that placeholder from being painted
 std::string ShellPageUrl()
 {
-	return HelperUrl((std::string(kShellPagePath) + "?view=" + ShellViewName(ShellBootView())).c_str());
+	return HelperUrl((std::string(kShellPagePath) + "?view=" + ShellViewKey(ShellBootView())).c_str());
 }
 
 // the window goes to the tray when the tray icon is there and to the taskbar when it is not. the position is saved first because obs writes its own copy only on exit, which a hide to the tray never reaches, and the menus that hang off the window go with it
@@ -218,7 +218,7 @@ void ShellSurfacePage()
 	}
 	const ShellView view = g_shellView;
 	const bool alreadyShowing = g_hostShown == view && g_hostRequested == view;
-	std::string js = std::string("RKShell.show('") + ShellViewName(view) + "'";
+	std::string js = std::string("RKShell.show('") + ShellViewKey(view) + "'";
 	if (view == ShellView::Settings && !g_shellSettingsPage.isEmpty())
 		js += ",'" + g_shellSettingsPage.toStdString() + "'";
 	js += ");";
@@ -238,7 +238,7 @@ void ShellSurfacePage()
 	QTimer::singleShot(1500, g_callbacks, [gen, view]() {
 		if (gen != g_hostWaitGen || g_shellView != view || g_hostOnTop)
 			return;
-		blog(LOG_WARNING, "[replaykit] shell browser did not confirm '%s' in time; showing it anyway", ShellViewName(view));
+		blog(LOG_WARNING, "[replaykit] shell browser did not confirm '%s' in time; showing it anyway", ShellViewKey(view));
 		ShellRaiseHost();
 		// a page that says nothing at all may have lost its renderer, which leaves the browser white
 		ShellProbeHost();
@@ -337,7 +337,7 @@ void ShellCreateHost(QMainWindow *mw)
 	status->hide();
 	QObject::connect(browser, SIGNAL(titleChanged(QString)), status, SLOT(setText(QString)));
 	QObject::connect(status, &QLineEdit::textChanged, page, [](const QString &title) {
-		if (title ==QLatin1String("rk-status:home:editor") || title == QLatin1String("rk-status:home:page"))
+		if (title == QLatin1String("rk-status:home:editor") || title == QLatin1String("rk-status:home:page"))
 			ShellSetEditor(ShellView::Home, title.endsWith(QLatin1String(":editor")));
 		else if (title == QLatin1String("rk-status:clips:editor") || title == QLatin1String("rk-status:clips:page"))
 			ShellSetEditor(ShellView::Clips, title.endsWith(QLatin1String(":editor")));
@@ -419,6 +419,25 @@ void ShellSetEditor(ShellView view, bool active)
 bool ShellIsPageView(ShellView view)
 {
 	return view == ShellView::Home || view == ShellView::Clips || view == ShellView::Settings || view == ShellView::Setup;
+}
+
+const char *ShellViewKey(ShellView view)
+{
+	switch (view) {
+	case ShellView::Home:
+		return "home";
+	case ShellView::Projector:
+		return "projector";
+	case ShellView::Clips:
+		return "clips";
+	case ShellView::Settings:
+		return "settings";
+	case ShellView::Setup:
+		return "setup";
+	case ShellView::ObsSettings:
+		return "obs-settings";
+	}
+	return "home";
 }
 
 // the keyboard goes to the host window cef puts around its page, which is what makes cef take the focus for the page the way a click does; focus placed on a window below it did not give the keys to the page until a click. the page that shows is told to take it as well, since the focus of a frame is not the focus of the browser. only while the window itself is in front, so a menu or a dialog that belongs to it keeps the keyboard it has
@@ -521,10 +540,10 @@ void ShellReloadHost()
 
 void ShellResetHostProbe()
 {
-	probePending = 0;
-	++probeGeneration;
+	g_hostProbePending = 0;
+	++g_hostProbeGen;
 	g_hostPingMisses = 0;
-	resumeTimer.restart();
+	g_hostResumeTimer.restart();
 }
 
 // one probe at a time; a restored renderer needs time to page its idle memory back in
@@ -537,17 +556,17 @@ void ShellProbeHost()
 		ShellResetHostProbe();
 		return;
 	}
-	if (probePending || (resumeTimer.isValid() && resumeTimer.elapsed() < 5000))
+	if (g_hostProbePending || (g_hostResumeTimer.isValid() && g_hostResumeTimer.elapsed() < 5000))
 		return;
 	const int n = ++g_hostPingSent;
-	const int generation = probeGeneration;
-	probePending = n;
+	const int generation = g_hostProbeGen;
+	g_hostProbePending = n;
 	ShellRunJs(g_shellHost->browser, "window.RKShell && RKShell.ping && RKShell.ping(" + std::to_string(n) + ");");
 	QPointer<ShellPage> host = g_shellHost;
 	QTimer::singleShot(2000, g_callbacks, [n, host, generation]() {
-		if (generation != probeGeneration || probePending != n)
+		if (generation != g_hostProbeGen || g_hostProbePending != n)
 			return;
-		probePending = 0;
+		g_hostProbePending = 0;
 		QMainWindow *mw = ObsMainWindowQt();
 		if (!mw || !mw->isVisible() || mw->isMinimized()) {
 			ShellResetHostProbe();
@@ -565,7 +584,7 @@ void ShellProbeHost()
 				g_callbacks,
 				[n, host, generation, helperUp]() {
 					QMainWindow *mw = ObsMainWindowQt();
-					if (generation == probeGeneration && host && host == g_shellHost && helperUp && n > g_hostPingAcked && g_hostReady &&
+					if (generation == g_hostProbeGen && host && host == g_shellHost && helperUp && n > g_hostPingAcked && g_hostReady &&
 					    mw && mw->isVisible() && !mw->isMinimized())
 						ShellReloadHost();
 				},
@@ -584,8 +603,8 @@ void ShellHostPong(int n)
 	g_hostPingAcked = qMax(g_hostPingAcked, n);
 	g_hostPingProven = true;
 	g_hostPingMisses = 0;
-	if (probePending && n >= probePending)
-		probePending = 0;
+	if (g_hostProbePending && n >= g_hostProbePending)
+		g_hostProbePending = 0;
 }
 
 // the native side of a clip fullscreen ends without the page having asked, so the page is told to leave its own as well. safe to call when nothing is fullscreen
@@ -754,8 +773,7 @@ bool ShellActivate(ShellView view)
 		return false;
 	// unsaved replaykit settings: the page asks to save or leave first and answers through ShellLeaveSettings; the obs settings open on top of that page, so they are not leaving it
 	if (g_settingsDirty && g_shellView == ShellView::Settings && view != ShellView::Settings && view != ShellView::ObsSettings && g_shellHost && g_hostOnTop) {
-		const char *target = view == ShellView::Projector ? "projector" : ShellViewName(view);
-		ShellRunJs(g_shellHost->browser, std::string("window.RKShell && RKShell.confirmLeave && RKShell.confirmLeave('") + target + "');");
+		ShellRunJs(g_shellHost->browser, std::string("window.RKShell && RKShell.confirmLeave && RKShell.confirmLeave('") + ShellViewKey(view) + "');");
 		return false;
 	}
 	// nothing to show until the dialog exists, and building it is the slow part, so it stays built while the two settings pages trade places
@@ -803,9 +821,9 @@ bool ShellActivate(ShellView view)
 // page confirmations can arrive after a switch or reload; always restore the selected view
 void ShellHostShown(const std::string &name)
 {
-	if (name != "home" && name != "clips" && name != "settings" && name != "setup")
+	ShellView view = ShellView::Home;
+	if (!ShellViewFromKey(name, &view) || !ShellIsPageView(view))
 		return;
-	const ShellView view = name == "clips" ? ShellView::Clips : name == "settings" ? ShellView::Settings : name == "setup" ? ShellView::Setup : ShellView::Home;
 	g_hostShown = view;
 	const bool first = !g_hostReady;
 	g_hostReady = true;
@@ -863,12 +881,14 @@ void ShellEnsureHost()
 	RunAsync([]() {
 		const bool cefReady = EnsureCefReadyBlocking();
 		bool helperUp = false;
-		// a helper that is not listening yet refuses at once, so it is asked again soon; the pages come up the moment it answers
-		for (int i = 0; cefReady && i < 400 && !helperUp; ++i) {
+		// a helper that is not listening yet refuses at once, so it is asked again soon; the pages come up the moment it answers. obs closing stops the wait, since unload waits for every worker
+		for (int i = 0; cefReady && i < 400 && !helperUp && !WorkersStopping(); ++i) {
 			helperUp = !HttpRequest("GET", "/version", nullptr, 800).empty();
 			if (!helperUp)
 				std::this_thread::sleep_for(std::chrono::milliseconds(150));
 		}
+		if (WorkersStopping())
+			return;
 		QMetaObject::invokeMethod(
 			g_callbacks,
 			[cefReady, helperUp]() {
@@ -928,7 +948,7 @@ void ShellOpenView(ShellView view, bool quiet)
 		if (g_shellView != ShellView::Settings)
 			ShellActivate(ShellView::Settings);
 		if (g_shellHost)
-			ShellRunJs(g_shellHost->browser, "window.RKShell && RKShell.busy('Loading OBS settings');");
+			ShellRunJs(g_shellHost->browser, "window.RKShell && RKShell.busy.apply(null, " + QJsonDocument(QJsonArray{TrMessage("shell.loadingObsSettings")}).toJson(QJsonDocument::Compact).toStdString() + ");");
 		g_obsBuildTimer.start();
 		// the action of obs opens and runs the dialog (it blocks in its own event loop until closed), so it is started from a fresh timer callback instead of from inside the click that asked for it. the app filter moves the dialog into the window as it is first polished
 		QTimer::singleShot(120, g_callbacks, []() { OpenObsSettingsRaw(); });
@@ -947,7 +967,7 @@ void ShellReselect(ShellView view)
 {
 	if (!g_shellOn || !g_shellHost || !g_hostOnTop || g_shellView != view || !ShellIsPageView(view))
 		return;
-	ShellRunJs(g_shellHost->browser, std::string("window.RKShell && RKShell.reselect && RKShell.reselect('") + ShellViewName(view) + "');");
+	ShellRunJs(g_shellHost->browser, std::string("window.RKShell && RKShell.reselect && RKShell.reselect('") + ShellViewKey(view) + "');");
 }
 
 // the keybind toggles clips like it toggled the window: pressed on the clips page with the obs window in front it sends the window to the tray, and a page that is open but behind another app is brought forward instead
@@ -992,7 +1012,10 @@ void ShellLeaveSettings(const std::string &target)
 	g_settingsDirty = false;
 	if (g_shellView != ShellView::Settings)
 		return;
-	const ShellView view = target == "projector" ? ShellView::Projector : target == "clips" ? ShellView::Clips : target == "setup" ? ShellView::Setup : ShellView::Home;
+	// only a view that leaves the settings page is asked for here, and anything else lands on home
+	ShellView view = ShellView::Home;
+	if (!ShellViewFromKey(target, &view) || view == ShellView::Settings || view == ShellView::ObsSettings)
+		view = ShellView::Home;
 	ShellActivate(view);
 }
 

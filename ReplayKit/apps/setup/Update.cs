@@ -34,7 +34,7 @@ namespace ReplayKitSetup
         private const uint PROCESS_TERMINATE = 0x0001;
         private const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
         private const uint WAIT_OBJECT_0 = 0;
-        private const string ReleasePage = "https://github.com/7Lzz/OBS-ReplayKit/releases/latest";
+        private const string ReleasePage = ReplayKitRepo.LatestReleasePage;
 
         private static string LogFile() => Path.Combine(Path.GetTempPath(), "OBSReplayKitUpdate.log");
 

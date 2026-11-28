@@ -10,6 +10,8 @@ enum class UiLayout { Classic, Clean };
 
 // the layout selected at startup, see g_shellOn for whether the shell actually loaded
 extern UiLayout g_wantedLayout;
+// the user.ini of obs, which the plugin edits only once obs has written it on exit
+QString ObsUserIniPath();
 QDockWidget *FindSidebarDock(QMainWindow *mw);
 void ApplyLayoutChrome(bool clean);
 void ApplyLayoutDocks(UiLayout wanted);

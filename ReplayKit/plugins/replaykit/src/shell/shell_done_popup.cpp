@@ -1,4 +1,4 @@
-// the popup of a finished job, built like the notification reader: a window of its own over the dimmed obs window, since the preview of the record and projector views is a native window that covers anything the page of the shell draws
+// the popup of a finished job, built like the notification reader: a window of its own over the dimmed obs window, since the preview of the projector view is a native window that covers anything the page of the shell draws
 #include "prelude.hpp"
 #include "shell/shell_done_popup.hpp"
 
