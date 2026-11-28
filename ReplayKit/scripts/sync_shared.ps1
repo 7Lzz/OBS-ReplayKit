@@ -108,7 +108,8 @@ $cppEncoders = ($encoders.Keys | ForEach-Object { "inline constexpr char kEncode
 $settingsFile = Read-Constant 'shared\StateLayout.cs' 'const\s+string\s+SettingsFile\s*=\s*"([^"]+)"\s*;' 'the settings file'
 $shareCardFile = Read-Constant 'shared\StateLayout.cs' 'const\s+string\s+ShareCoverCardFile\s*=\s*"([^"]+)"\s*;' 'the share card file'
 $profilePictureFile = Read-Constant 'shared\StateLayout.cs' 'const\s+string\s+ProfilePictureFile\s*=\s*"([^"]+)"\s*;' 'the profile picture file'
-foreach ($name in $settingsFile, $shareCardFile, $profilePictureFile) { if ($name -notmatch '^[a-z0-9][a-z0-9._-]{0,63}$') { throw "State file must be one plain file name, got '$name'" } }
+$windowStateFile = Read-Constant 'shared\StateLayout.cs' 'const\s+string\s+WindowStateFile\s*=\s*"([^"]+)"\s*;' 'the window state file'
+foreach ($name in $settingsFile, $shareCardFile, $profilePictureFile, $windowStateFile) { if ($name -notmatch '^[a-z0-9][a-z0-9._-]{0,63}$') { throw "State file must be one plain file name, got '$name'" } }
 # the browser dock of the controls page, which the plugin finds and keeps titled, and the repository the obs settings column links to
 $controlsDock = [ordered]@{}
 foreach ($name in 'Uuid', 'Title', 'LegacyTitle') {
@@ -215,6 +216,7 @@ inline constexpr int kIpcMaxLineBytes = $ipcLineBytes;
 inline constexpr char kSettingsFile[] = "$settingsFile";
 inline constexpr char kShareCoverCardFile[] = "$shareCardFile";
 inline constexpr char kProfilePictureFile[] = "$profilePictureFile";
+inline constexpr char kWindowStateFile[] = "$windowStateFile";
 inline constexpr char kControlsDockUuid[] = "$($controlsDock['Uuid'])";
 inline constexpr char kControlsDockTitle[] = "$($controlsDock['Title'])";
 inline constexpr char kControlsDockLegacyTitle[] = "$($controlsDock['LegacyTitle'])";

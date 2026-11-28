@@ -51,8 +51,8 @@ void CreateSettingsWindow()
 	AttachNotifyButton(win);
 	AttachTitleKeybindBadge(win);
 	// re-apply a couple times: winId()/the cef child arent fully realised on the first pass, and a slow RKICON over the pipe can land after this. cheap -- the tag guard skips the taskbar rebuild on the repeats.
-	QTimer::singleShot(500, g_callbacks, []() { if (g_settingsWindow) ApplyAuxWindowIcon(g_settingsWindow, &g_ownedIconSettings, &g_taggedSettings, L"ReplayKit.SettingsWindow"); });
-	QTimer::singleShot(1600, g_callbacks, []() { if (g_settingsWindow) ApplyAuxWindowIcon(g_settingsWindow, &g_ownedIconSettings, &g_taggedSettings, L"ReplayKit.SettingsWindow"); });
+	QTimer::singleShot(500, g_callbacks, []() { if (g_settingsWindow) ApplyAuxWindowIcon(g_settingsWindow, &g_ownedIconSettings, &g_taggedSettings); });
+	QTimer::singleShot(1600, g_callbacks, []() { if (g_settingsWindow) ApplyAuxWindowIcon(g_settingsWindow, &g_ownedIconSettings, &g_taggedSettings); });
 }
 
 } // namespace

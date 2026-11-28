@@ -67,7 +67,7 @@ namespace ReplayKitHelper
                     string stream = "0:a:" + DiscordTrack.ToString(CultureInfo.InvariantCulture);
                     if (!IsSilent(path, ffmpeg, stream)) return false;
 
-                    temporary = Path.Combine(original.DirectoryName, "_replaykit_finalize_" + Guid.NewGuid().ToString("N") + ".rkpart");
+                    temporary = ClipFiles.FinalizeTempPath(original.DirectoryName, ".rkpart");
                     var arguments = new List<string>
                     {
                         "-nostdin", "-hide_banner", "-loglevel", "error", "-xerror", "-copyts", "-i", path,

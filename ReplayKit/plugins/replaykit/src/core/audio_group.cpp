@@ -34,6 +34,8 @@ public:
 	ULONG STDMETHODCALLTYPE Release() override { return 1; }
 	HRESULT STDMETHODCALLTYPE QueryInterface(REFIID iid, void **out) override
 	{
+		if (!out)
+			return E_POINTER;
 		if (iid == __uuidof(IUnknown) || iid == __uuidof(IAudioSessionNotification)) {
 			*out = static_cast<IAudioSessionNotification *>(this);
 			return S_OK;
@@ -50,6 +52,7 @@ public:
 };
 
 std::mutex g_lock;
+bool g_stopped = false;
 std::vector<std::wstring> g_watchedIds;
 std::vector<std::unique_ptr<SessionWatch>> g_watches;
 
@@ -62,6 +65,8 @@ void WatchActiveOutputs()
 	    FAILED(enumerator->EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE, &devices)) || FAILED(devices->GetCount(&count)))
 		return;
 	std::lock_guard<std::mutex> hold(g_lock);
+	if (g_stopped)
+		return;
 	for (UINT i = 0; i < count; i++) {
 		ComPtr<IMMDevice> device;
 		LPWSTR id = nullptr;
@@ -99,6 +104,8 @@ public:
 	ULONG STDMETHODCALLTYPE Release() override { return 1; }
 	HRESULT STDMETHODCALLTYPE QueryInterface(REFIID iid, void **out) override
 	{
+		if (!out)
+			return E_POINTER;
 		if (iid == __uuidof(IUnknown) || iid == __uuidof(IMMNotificationClient)) {
 			*out = static_cast<IMMNotificationClient *>(this);
 			return S_OK;
@@ -129,11 +136,17 @@ ComPtr<IMMDeviceEnumerator> g_outputEnumerator;
 
 void GroupAudioWithHost()
 {
+	{
+		std::lock_guard<std::mutex> hold(g_lock);
+		g_stopped = false;
+	}
 	// the obs main thread already has com, so this only starts it when it does not and never ends it while the watches live
 	CoInitializeEx(nullptr, COINIT_MULTITHREADED);
 	WatchActiveOutputs();
-	if (!g_outputEnumerator && SUCCEEDED(CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL, IID_PPV_ARGS(&g_outputEnumerator))))
-		g_outputEnumerator->RegisterEndpointNotificationCallback(&g_outputWatch);
+	if (!g_outputEnumerator && SUCCEEDED(CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL, IID_PPV_ARGS(&g_outputEnumerator)))) {
+		if (FAILED(g_outputEnumerator->RegisterEndpointNotificationCallback(&g_outputWatch)))
+			g_outputEnumerator.Reset();
+	}
 }
 
 void StopAudioGroup()
@@ -143,6 +156,7 @@ void StopAudioGroup()
 		g_outputEnumerator.Reset();
 	}
 	std::lock_guard<std::mutex> hold(g_lock);
+	g_stopped = true;
 	for (auto &watch : g_watches)
 		watch->manager->UnregisterSessionNotification(watch.get());
 	g_watches.clear();

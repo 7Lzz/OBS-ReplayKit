@@ -18,7 +18,7 @@ extern int g_taggedSetup;
 void ForceTaskbarButton(QWidget *w);
 extern QString g_rkIconPath;
 extern bool g_recordingDotEnabled;
-void ApplyAuxWindowIcon(QWidget *w, HICON *owned, int *tagged, const wchar_t *aumid);
+void ApplyAuxWindowIcon(QWidget *w, HICON *owned, int *tagged);
 void CaptureAppIconDefaults();
 void RefreshAppIcon();
 void RefreshTrayIcon();

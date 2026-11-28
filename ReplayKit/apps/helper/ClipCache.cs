@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace ReplayKitHelper
 {
@@ -12,6 +13,7 @@ namespace ReplayKitHelper
     {
         // what a folder carries once everything in it is made, so one that is still being filled is never taken for an old one
         public const string DoneMarker = "done";
+        private static readonly Regex KeyPattern = new Regex("^[0-9a-f]{16}$", RegexOptions.Compiled);
         // all kinds together; ten minutes of a clip take about ten megabytes of tracks and a few hundred kilobytes of strip
         private const long BudgetBytes = 400L * 1024 * 1024;
         // nothing is kept for longer than this without being used, whatever room is left
@@ -32,6 +34,8 @@ namespace ReplayKitHelper
         }
 
         public static string KindDir(string kind) => Path.Combine(Constants.CACHE_DIR, kind);
+
+        public static bool IsValidKey(string key) => key != null && KeyPattern.IsMatch(key);
 
         // one entry per state of a clip, so an edited or replaced clip never shows what was made from its old self
         public static string KeyFor(string name, FileInfo info, string tag)
@@ -89,7 +93,10 @@ namespace ReplayKitHelper
                 {
                     DateTime last = Directory.GetLastWriteTimeUtc(dir);
                     bool done = File.Exists(Path.Combine(dir, DoneMarker));
-                    bool import = Path.GetFileName(kind) == "imports" || Path.GetFileName(kind) == "media" || Path.GetFileName(kind) == "videos";
+                    string kindName = Path.GetFileName(kind);
+                    bool import = string.Equals(kindName, "imports", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(kindName, "media", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(kindName, "videos", StringComparison.OrdinalIgnoreCase);
                     bool held = import && (editorOpen || referenced == null || referenced.Contains(dir));
                     list.Add(new Entry { Path = dir, IsDir = true, Import = import, Bytes = BytesOf(SafeFiles(dir, SearchOption.AllDirectories)), LastUse = last, Busy = held || !done && now - last < UnfinishedGrace });
                 }

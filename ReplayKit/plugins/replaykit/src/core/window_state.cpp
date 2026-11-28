@@ -2,6 +2,7 @@
 #include "prelude.hpp"
 #include "core/window_state.hpp"
 
+#include "core/shared_values.hpp"
 #include "core/state.hpp"
 #include "core/state_files.hpp"
 
@@ -42,7 +43,7 @@ void PollWindowGeometry()
 // remembers the OBS main window + Clips window position/size across sessions, since obss own geometry save is unreliable here (force-kill restarts skip it, and .NETs window heuristics can grab the wrong window). one ini with the saved state of replaykit; Qts saveGeometry/restoreGeometry handle dpi, maximized state, and multi-monitor, and restoreGeometry refuses a rect that would land fully off-screen.
 QString WindowStateIniPath()
 {
-	return StateFilePath(QStringLiteral("window_state.ini"));
+	return StateFilePath(QString::fromLatin1(kWindowStateFile));
 }
 
 void SaveWindowGeometry(const QString &key, QWidget *w)

@@ -17,7 +17,8 @@ namespace {
 HICON g_ownedIconClips = nullptr;
 int g_taggedClips = -1;
 
-// live app-icon swap (helper Appearance tab): SETICON <path> over the ipc pipe. covers obss title bar, taskbar button and system-tray icon; "-" restores what obs shipped with (captured on first use). SETICONDOT toggles the red recording dot drawn on the tray icon, and only there, while a recording / replay buffer is running; win11 taskbar note: qt6 setWindowIcon (WM_SETICON at 16/32px) updates the title bar + alt-tab but NOT the; win11 taskbar button -- win11 only picks up an icon change when the WM_SETICON payload is large, and it also; reads the window CLASS icon. so we push one 256px HICON to every WM_SETICON slot AND the class, and re-assert; on Show/WindowStateChange (restoring from the tray rebuilds the taskbar button).
+// live app-icon swap (helper Appearance tab): SETICON <path> over the ipc pipe covers obss title bar, taskbar button and system-tray icon, and "-" restores what obs shipped with (captured on first use). SETICONDOT toggles the red recording dot drawn on the tray icon, and only there, while a recording or replay buffer is running. qt6 setWindowIcon (WM_SETICON at 16/32px) updates the title bar and alt-tab but not the win11 taskbar button, which only picks up an icon change when the WM_SETICON payload is large and also reads the window class icon, so we push one 256px HICON to every WM_SETICON slot and the class, and re-assert on Show/WindowStateChange (restoring from the tray rebuilds the taskbar button).
+constexpr wchar_t kCustomIconAumid[] = L"ReplayKit.OBSCustomIcon";
 bool g_appIconDefaultsCaptured = false;
 QIcon g_appIconDefaultMain;
 // the tray icons obs puts on the tray itself, one per state (plain, something is on, recording paused), kept as obs set them
@@ -25,7 +26,7 @@ QIcon g_obsTrayIcon[3];
 // the icon on the tray is one of ours, put there for a custom icon. with the default icon the tray belongs to obs and follows what obs is doing
 bool g_trayIsOurs = false;
 qint64 g_lastTrayIconKey = 0;
-HICON g_classOrigBig = nullptr;   // obs's own class icons, captured once
+HICON g_classOrigBig = nullptr;   // obs own class icons, captured once
 HICON g_classOrigSmall = nullptr;
 HICON g_ownedIcon = nullptr;      // the single 256px HICON we push to every slot + the class; freed on the next change
 QString g_appIconPath;            // "" / "-" == default; last value the helper sent
@@ -56,8 +57,11 @@ HICON HIconFromQIcon(const QIcon &icon, int size)
 	void *bits = nullptr;
 	HBITMAP color = CreateDIBSection(hdc, (BITMAPINFO *)&bi, DIB_RGB_COLORS, &bits, nullptr, 0);
 	ReleaseDC(nullptr, hdc);
-	if (!color)
+	if (!color || !bits) {
+		if (color)
+			DeleteObject(color);
 		return nullptr;
+	}
 	for (int y = 0; y < img.height(); ++y)
 		memcpy((quint8 *)bits + (size_t)y * img.width() * 4, img.constScanLine(y), (size_t)img.width() * 4);
 
@@ -163,7 +167,7 @@ QIcon ObsTrayIconFor(int state)
 	return state == 0 ? g_appIconDefaultMain : ComposeRecordingDot(g_appIconDefaultMain);
 }
 
-// Win11 resolves a running windows taskbar-button icon through obs64.exe / its start-menu shortcut and can ignore WM_SETICON + the class icon. An explicit AppUserModelID makes it consult the icon we set. We only update that property; removing and re-adding the taskbar tab made every icon choice visibly flash.
+// win11 resolves a running windows taskbar-button icon through obs64.exe or its start-menu shortcut and can ignore WM_SETICON and the class icon; an explicit AppUserModelID makes it consult the icon we set without removing and re-adding the taskbar tab (which made every icon choice flash)
 void RetagTaskbarButton(HWND hwnd, bool force, const wchar_t *aumid)
 {
 	// PKEY_AppUserModel_ID = {9F4C2855-9F79-4B39-A8D0-E1D42DE1D5F3}, pid 5 -- inlined to skip the propsys.lib link.
@@ -280,20 +284,20 @@ void ForceTaskbarButton(QWidget *w)
 QString g_rkIconPath;             // RKICON <path> -- the replaykit-branded .ico for our own windows when appIcon is default
 bool g_recordingDotEnabled = true; // helper Appearance toggle (SETICONDOT)
 
-// our own top-level windows (Clips, ReplayKit Settings) -- keep OBSs native icon by default, or use the selected custom icon. Every custom-icon window shares the main OBS taskbar identity so Windows groups them together.
-void ApplyAuxWindowIcon(QWidget *w, HICON *owned, int *tagged, const wchar_t *aumid)
+// our own top-level windows (Clips, ReplayKit Settings, Setup) keep obs native icon by default, or use the selected custom icon and share the main obs taskbar identity so windows groups them together
+void ApplyAuxWindowIcon(QWidget *w, HICON *owned, int *tagged)
 {
 	if (!w)
 		return;
 	bool custom = !(g_appIconPath.isEmpty() || g_appIconPath == "-");
-	// prefer OBSs loaded icon over the bundled fallback; the fallbacks old low-colour frames look distorted in a Windows caption at 16px.
+	// prefer obs loaded icon over the bundled fallback, whose older low-colour frames look distorted in a windows caption at 16px
 	QIcon ic;
 	if (custom)
 		ic = QIcon(g_appIconPath);
 	if (ic.isNull())
 		ic = g_appIconDefaultMain;
 	if (ic.isNull())
-		ic = QGuiApplication::windowIcon(); // obs's own app icon -- always valid once obs is up
+		ic = QGuiApplication::windowIcon(); // obs own app icon -- always valid once obs is up
 	if (ic.isNull() && !g_rkIconPath.isEmpty())
 		ic = QIcon(g_rkIconPath);
 	if (ic.isNull())
@@ -302,7 +306,7 @@ void ApplyAuxWindowIcon(QWidget *w, HICON *owned, int *tagged, const wchar_t *au
 	w->setWindowIcon(ic);
 	HWND hwnd = (HWND)w->winId();
 
-	// only a user-selected icon needs its own taskbar identity. The OBS default keeps OBSs native title-bar and taskbar resolution path, which avoids scaling a 256px fallback image into the caption slot.
+	// only a user-selected icon needs its own taskbar identity; the obs default keeps obs native title-bar and taskbar resolution path, avoiding scaling a 256px fallback into the caption slot
 	bool forced = custom;
 	if (forced) {
 		HICON ni = HIconFromQIcon(ic, 256);
@@ -320,10 +324,10 @@ void ApplyAuxWindowIcon(QWidget *w, HICON *owned, int *tagged, const wchar_t *au
 		*owned = nullptr;
 	}
 
-    if (*tagged != (forced ? 1 : 0)) {
-        RetagTaskbarButton(hwnd, forced, forced ? L"ReplayKit.OBSCustomIcon" : nullptr);
-        *tagged = forced ? 1 : 0;
-    }
+	if (*tagged != (forced ? 1 : 0)) {
+		RetagTaskbarButton(hwnd, forced, forced ? kCustomIconAumid : nullptr);
+		*tagged = forced ? 1 : 0;
+	}
 }
 
 // snapshot obss own window + class + tray icons before we touch anything. safe to call repeatedly.
@@ -400,7 +404,7 @@ void RefreshAppIcon()
 	if (mw)
 		mw->setWindowIcon(baseMain);
 	RefreshTrayIcon();
-	// Windows can use Qts process-wide icon for an existing taskbar button; always restore it too; otherwise a prior preset remains cached there after the user returns to Default.
+	// windows can use qt process-wide icon for an existing taskbar button, so always restore it too or a prior preset stays cached after returning to default
 	if (!baseMain.isNull())
 		QGuiApplication::setWindowIcon(baseMain);
 
@@ -431,15 +435,15 @@ void RefreshAppIcon()
 
 		// only update the per-window identity when its mode changes. RetagTaskbarButton deliberately avoids a DeleteTab/AddTab cycle, so this does not flash the button.
 		if (g_taskbarTaggedCustom != (custom ? 1 : 0)) {
-			RetagTaskbarButton(hwnd, custom, L"ReplayKit.OBSCustomIcon");
+			RetagTaskbarButton(hwnd, custom, kCustomIconAumid);
 			g_taskbarTaggedCustom = custom ? 1 : 0;
 		}
 	}
 
-	// our own windows follow OBSs native default or the selected custom icon. Custom-icon windows share the main OBS custom AUMID so they form one taskbar group instead of separate buttons.
-	ApplyAuxWindowIcon(g_clipsWindow, &g_ownedIconClips, &g_taggedClips, L"ReplayKit.ClipsWindow");
-	ApplyAuxWindowIcon(g_settingsWindow, &g_ownedIconSettings, &g_taggedSettings, L"ReplayKit.SettingsWindow");
-	ApplyAuxWindowIcon(g_setupWindow, &g_ownedIconSetup, &g_taggedSetup, L"ReplayKit.SetupWindow");
+	// our own windows follow obs native default or the selected custom icon, sharing the main obs custom aumid so they form one taskbar group
+	ApplyAuxWindowIcon(g_clipsWindow, &g_ownedIconClips, &g_taggedClips);
+	ApplyAuxWindowIcon(g_settingsWindow, &g_ownedIconSettings, &g_taggedSettings);
+	ApplyAuxWindowIcon(g_setupWindow, &g_ownedIconSetup, &g_taggedSetup);
 
 	const bool recording = obs_frontend_recording_active() || ClipBufferActive();
 	blog(LOG_INFO, "[replaykit] icon refresh: custom=%d recording=%d", custom ? 1 : 0, recording ? 1 : 0);

@@ -118,8 +118,12 @@ public:
 
 	void SetKeybindLabel(const std::string &label)
 	{
-		chipLabel->setVisible(!label.empty());
-		chipLabel->setText(QString::fromStdString(label));
+		const QString text = QString::fromStdString(label);
+		const bool visible = !text.isEmpty();
+		if (chipLabel->isVisible() == visible && chipLabel->text() == text)
+			return;
+		chipLabel->setVisible(visible);
+		chipLabel->setText(text);
 		// this rows sizeHint just changed (chip went from hidden/empty to a real label or back) -- updateGeometry() is qts actual mechanism for "go re-ask for my size", not a manual setMinimumWidth guess; SizePolicy::Minimum from the constructor is what makes sure that re-asked-for size is never shrunk back below.
 		updateGeometry();
 		if (m_menu) {
@@ -127,7 +131,8 @@ public:
 			QResizeEvent fakeResize(QSize(1, 1), m_menu->size());
 			qApp->sendEvent(m_menu, &fakeResize);
 			m_menu->adjustSize();
-			PinMenuAboveTaskbar(m_menu);
+			if (m_menu->isVisible())
+				PinMenuAboveTaskbar(m_menu);
 		}
 	}
 
@@ -213,6 +218,8 @@ void RefreshDynamicMenuState()
 	if (g_clipsRow || g_recordRow || g_replayBufferRow) {
 		RunAsync([]() {
 			std::string settingsBody = HttpRequest("GET", "/settings", nullptr, 500);
+			if (settingsBody.empty() || WorkersStopping())
+				return;
 			std::string clipsLabel = KeybindLabelFromSettingsJson(settingsBody, "openClipsKeybind");
 			std::string clipLabel = KeybindLabelFromSettingsJson(settingsBody, "clipKeybind");
 			std::string recordingLabel = KeybindLabelFromSettingsJson(settingsBody, "recordingKeybind");
@@ -249,11 +256,15 @@ void RefreshDynamicMenuState()
 		return;
 	RunAsync([]() {
 		std::string getBody = HttpRequest("GET", "/share-preview", nullptr, 500);
-		bool available = JsonBoolField(getBody, "available", false);
-		bool enabled = JsonBoolField(getBody, "enabled", false);
+		if (getBody.empty() || WorkersStopping())
+			return;
+		const auto available = JsonBoolIfPresent(getBody, "available");
+		const auto enabled = JsonBoolIfPresent(getBody, "enabled");
+		if (!available || !enabled)
+			return;
 		QMetaObject::invokeMethod(
 			g_callbacks,
-			[available, enabled]() {
+			[available = *available, enabled = *enabled]() {
 				if (!g_sharePreviewAction)
 					return;
 				g_sharePreviewAvailable = available;
@@ -263,6 +274,19 @@ void RefreshDynamicMenuState()
 			},
 			Qt::QueuedConnection);
 	});
+}
+
+TrayActionRow *MakeTrayActionRow(TrayRowKind kind, QMenu *menu, QWidgetAction *&outAction)
+{
+	auto *row = new TrayActionRow(kind, menu);
+	outAction = new QWidgetAction(menu);
+	outAction->setDefaultWidget(row);
+	row->SetAction(outAction);
+	QObject::connect(outAction, &QAction::triggered, menu, [row]() {
+		if (row)
+			row->ProxyTrigger();
+	});
+	return row;
 }
 
 // only pulls the menu up when it would actually overlap the taskbar (y), or back onto the screen when it would run off the right edge (x) -- this used to pin the bottom edge to the taskbar top unconditionally, which was wrong for a tray icon sitting in the hidden-icons flyout (a separate window that floats well above the taskbar): the menu snapped down to the taskbar instead of staying near the flyout it was actually opened from. checking against the menus own natural popup() position instead of always recomputing from the taskbar makes it adapt to wherever the icon actually is. skips the move() entirely when already at the target position -- re-positioning an already-visible native popup is a plausible cause of a reported "clicking outside the menu doesnt close it" bug (moving a shown popups hwnd can desync qts click-outside-to-dismiss tracking on windows), so this only touches geometry when it actually needs correcting.
@@ -307,15 +331,9 @@ void InstallTrayMenu()
 
 	new TrayMenuGuard(trayMenu);
 
-	// obs builds this menu once in SystemTrayInit() and never rebuilds the top level (only the projector submenus contents refresh per click), so anything hidden below stays hidden without needing to be redone on every open View Clips uses the same custom row as recording/clipping so its current ReplayKit binding is visible in the tray.
-	auto *clipsRow = new TrayActionRow(TrayRowKind::Clips, trayMenu);
-	auto *clipsRowAction = new QWidgetAction(trayMenu);
-	clipsRowAction->setDefaultWidget(clipsRow);
-	clipsRow->SetAction(clipsRowAction);
-	QObject::connect(clipsRowAction, &QAction::triggered, trayMenu, [clipsRow]() {
-		if (clipsRow)
-			clipsRow->ProxyTrigger();
-	});
+	// obs builds this menu once in SystemTrayInit() and never rebuilds the top level (only the projector submenus contents refresh per click), so anything hidden below stays hidden without needing to be redone on every open; View Clips uses the same custom row as recording/clipping so its current ReplayKit binding is visible in the tray.
+	QWidgetAction *clipsRowAction = nullptr;
+	auto *clipsRow = MakeTrayActionRow(TrayRowKind::Clips, trayMenu, clipsRowAction);
 	clipsRow->nameLabel->setText(TrMessage("common.viewClips"));
 	g_clipsRow = clipsRow;
 
@@ -345,7 +363,10 @@ void InstallTrayMenu()
 
 		// confirmed 2026-08-16 this alone didnt stick since qts native platform code can finish positioning the menu after aboutToShow returns and silently override an early move() -- kept it anyway (free if it does nothing) and queued a second attempt after native show finishes as the standard workaround. bumped 10ms to 50ms to give qts own positioning more headroom to finish first -- see the comment on PinMenuAboveTaskbar for why an unnecessary post-show move is suspected in a "clicking outside doesnt close the menu" report.
 		PinMenuAboveTaskbar(trayMenu);
-		QTimer::singleShot(50, trayMenu, [trayMenu]() { PinMenuAboveTaskbar(trayMenu); });
+		QTimer::singleShot(50, trayMenu, [trayMenu]() {
+			if (trayMenu->isVisible())
+				PinMenuAboveTaskbar(trayMenu);
+		});
 	});
 
 	// the rows drive their own hover look off HoverEnter/HoverLeave; this only guarantees they end up un-hovered once the menu closes, in case a HoverLeave was missed on the way out
@@ -408,26 +429,14 @@ void InstallTrayMenu()
 		     g_nativeReplayBufferAction->text().toUtf8().constData(), g_nativeReplayBufferAction->isEnabled());
 
 		// hidden, not removed (matches g_previewProjectorAction/g_programProjectorAction above) -- TrayActionRow proxies clicks straight to ToggleRecording/ToggleReplayBuffer (the direct obs_frontend_..._start/stop calls), so the native actions own isEnabled()/triggered() (confirmed untrustworthy earlier) never come into play at all.
-		auto *recordRow = new TrayActionRow(TrayRowKind::Recording, trayMenu);
-		auto *recordRowAction = new QWidgetAction(trayMenu);
-		recordRowAction->setDefaultWidget(recordRow);
-		recordRow->SetAction(recordRowAction);
-		QObject::connect(recordRowAction, &QAction::triggered, trayMenu, [recordRow]() {
-			if (recordRow)
-				recordRow->ProxyTrigger();
-		});
+		QWidgetAction *recordRowAction = nullptr;
+		auto *recordRow = MakeTrayActionRow(TrayRowKind::Recording, trayMenu, recordRowAction);
 		trayMenu->insertAction(g_nativeRecordAction, recordRowAction);
 		g_nativeRecordAction->setVisible(false);
 		g_recordRow = recordRow;
 
-		auto *replayBufferRow = new TrayActionRow(TrayRowKind::ReplayBuffer, trayMenu);
-		auto *replayBufferRowAction = new QWidgetAction(trayMenu);
-		replayBufferRowAction->setDefaultWidget(replayBufferRow);
-		replayBufferRow->SetAction(replayBufferRowAction);
-		QObject::connect(replayBufferRowAction, &QAction::triggered, trayMenu, [replayBufferRow]() {
-			if (replayBufferRow)
-				replayBufferRow->ProxyTrigger();
-		});
+		QWidgetAction *replayBufferRowAction = nullptr;
+		auto *replayBufferRow = MakeTrayActionRow(TrayRowKind::ReplayBuffer, trayMenu, replayBufferRowAction);
 		trayMenu->insertAction(g_nativeReplayBufferAction, replayBufferRowAction);
 		g_nativeReplayBufferAction->setVisible(false);
 		g_replayBufferRow = replayBufferRow;

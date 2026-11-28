@@ -23,14 +23,15 @@ namespace {
 // Bongobs-Cat redrawn through obs graphics: the same Bango Cat folder, modes, sprites and live2d models, every property of its source, and View::Render layer for layer, without its own opengl window
 
 // the opengl window of the plugin is 1280x768 and it reads the source size out of its bottom left corner, so everything is laid out in that frame
-constexpr float FrameWidth = 1280, FrameHeight = 768;
+constexpr float kFrameWidth = 1280, kFrameHeight = 768;
+constexpr int kMaxKeySlots = 32;
 
 // Define.cpp KeyDefine, the names mode configs use, with the virtual key Hook.cpp HookCode reads for each; HookCode gives VK_RIGHT to left and VK_LEFT to right, and that swap is kept
 struct KeyName {
 	const char *name;
 	int vk;
 };
-constexpr std::array<KeyName, 61> KeyDefine = {{
+constexpr std::array<KeyName, 61> kKeyDefine = {{
 	{"a", 'A'}, {"b", 'B'}, {"c", 'C'}, {"d", 'D'}, {"e", 'E'}, {"f", 'F'}, {"g", 'G'}, {"h", 'H'}, {"i", 'I'}, {"j", 'J'}, {"k", 'K'}, {"l", 'L'},
 	{"m", 'M'}, {"n", 'N'}, {"o", 'O'}, {"p", 'P'}, {"q", 'Q'}, {"r", 'R'}, {"s", 'S'}, {"t", 'T'}, {"u", 'U'}, {"v", 'V'}, {"w", 'W'}, {"x", 'X'},
 	{"y", 'Y'}, {"z", 'Z'}, {"0", '0'}, {"1", '1'}, {"2", '2'}, {"3", '3'}, {"4", '4'}, {"5", '5'}, {"6", '6'}, {"7", '7'}, {"8", '8'}, {"9", '9'},
@@ -42,15 +43,15 @@ constexpr std::array<KeyName, 61> KeyDefine = {{
 
 int KeyIndex(const QString &name)
 {
-	for (size_t i = 0; i < KeyDefine.size(); ++i) {
-		if (name == QLatin1String(KeyDefine[i].name))
+	for (size_t i = 0; i < kKeyDefine.size(); ++i) {
+		if (name == QLatin1String(kKeyDefine[i].name))
 			return int(i);
 	}
 	return -1;
 }
 
 // premultiplication stays off like the plugins sprite and cubism shaders; opacity carries the fade of a drawable
-const char *EffectSource = R"(
+const char *kEffectSource = R"(
 uniform float4x4 ViewProj;
 uniform texture2d image;
 uniform float opacity;
@@ -117,7 +118,7 @@ std::vector<int> ParseKeys(const char *text)
 		const int vk = part.trimmed().toInt(&ok);
 		// a key past what windows numbers, or any slot past what a mode could have, is left at the default of the mode
 		out.push_back(ok && vk > 0 && vk < 256 ? vk : 0);
-		if (out.size() >= 32)
+		if (int(out.size()) >= kMaxKeySlots)
 			break;
 	}
 	return out;
@@ -307,7 +308,7 @@ struct Bongo {
 	// graphics thread only from here
 	size_t current = 0;
 	size_t currentFace = 0;
-	std::array<bool, KeyDefine.size()> pressed{};
+	std::array<bool, kKeyDefine.size()> pressed{};
 	// whether each key slot of the current mode is held, for the slots bound to a key of their own; their order is the order of KeyDefine, the virtual key after it for keys it does not name
 	std::vector<bool> slotDown;
 	std::vector<int> slotOrder;
@@ -330,7 +331,7 @@ struct Bongo {
 
 		obs_enter_graphics();
 		char *errors = nullptr;
-		effect = gs_effect_create(EffectSource, "replaykit-bongo.effect", &errors);
+		effect = gs_effect_create(kEffectSource, "replaykit-bongo.effect", &errors);
 		if (!effect)
 			blog(LOG_ERROR, "[replaykit] bongo cat: effect failed: %s", errors ? errors : "");
 		bfree(errors);
@@ -399,8 +400,8 @@ struct Bongo {
 			next.codes = QString::fromUtf8(obs_data_get_string(keySettings, "key_codes")).split(QLatin1Char(','));
 			while (!next.codes.isEmpty() && next.codes.back().isEmpty())
 				next.codes.removeLast();
-			if (next.codes.size() > 32)
-				next.codes = next.codes.mid(0, 32);
+			if (next.codes.size() > kMaxKeySlots)
+				next.codes = next.codes.mid(0, kMaxKeySlots);
 		}
 		if (keySettings != data)
 			obs_data_release(keySettings);
@@ -437,14 +438,14 @@ struct Bongo {
 			int vk = 0, rank = -1;
 			if (custom > 0) {
 				vk = custom;
-				for (size_t i = 0; i < KeyDefine.size() && rank < 0; ++i) {
-					if (KeyDefine[i].vk == custom)
+				for (size_t i = 0; i < kKeyDefine.size() && rank < 0; ++i) {
+					if (kKeyDefine[i].vk == custom)
 						rank = int(i);
 				}
 				if (rank < 0)
-					rank = int(KeyDefine.size()) + custom;
+					rank = int(kKeyDefine.size()) + custom;
 			} else if (mode.keyUse[j] >= 0) {
-				vk = KeyDefine[size_t(mode.keyUse[j])].vk;
+				vk = kKeyDefine[size_t(mode.keyUse[j])].vk;
 				rank = mode.keyUse[j];
 			}
 			if (vk == 0)
@@ -468,11 +469,15 @@ struct Bongo {
 		}
 		const bool showing = obs_source_showing(source) && !modes.empty();
 		input->SetActive(showing && now.relative);
-		if (!showing)
+		if (!showing) {
+			// a mode switch while hidden leaves the previous modes slot indices behind if Render runs before the next visible tick
+			slotDown.clear();
+			slotOrder.clear();
 			return;
+		}
 
-		for (size_t i = 0; i < KeyDefine.size(); ++i)
-			pressed[i] = (GetAsyncKeyState(KeyDefine[i].vk) & 0x8000) != 0;
+		for (size_t i = 0; i < kKeyDefine.size(); ++i)
+			pressed[i] = (GetAsyncKeyState(kKeyDefine[i].vk) & 0x8000) != 0;
 		// GetAsyncKeyState reads the physical buttons while the plugins mouse hook saw the logical ones
 		const bool physicalLeft = (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0, physicalRight = (GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0;
 		const bool swapped = GetSystemMetrics(SM_SWAPBUTTON) != 0;
@@ -504,7 +509,7 @@ struct Bongo {
 		}
 
 		// View::ReanderMask: the first held face hotkey in KeyDefine order picks the face, and it stays picked
-		for (size_t i = 0; i < KeyDefine.size(); ++i) {
+		for (size_t i = 0; i < kKeyDefine.size(); ++i) {
 			if (!pressed[i])
 				continue;
 			const auto it = std::find(faceKeys.begin(), faceKeys.end(), int(i));
@@ -533,7 +538,7 @@ struct Bongo {
 		gs_effect_set_texture(image, picture->texture);
 		gs_effect_set_float(opacity, 1.0f);
 		while (gs_effect_loop(effect, "Draw"))
-			gs_draw_sprite(picture->texture, 0, uint32_t(FrameWidth), uint32_t(FrameHeight));
+			gs_draw_sprite(picture->texture, 0, uint32_t(kFrameWidth), uint32_t(kFrameHeight));
 	}
 
 	void DrawModel(ModelSlot *slot, const Settings &now)
@@ -554,10 +559,10 @@ struct Bongo {
 		BongoModel::Camera camera;
 		camera.scaleX = float(0.615 * now.scale);
 		camera.scaleY = float(1.1 * now.scale);
-		camera.offsetX = float(now.x - (FrameWidth - now.width) / FrameWidth);
-		camera.offsetY = float(now.y - (FrameHeight - now.height) / FrameHeight);
-		camera.width = FrameWidth;
-		camera.height = FrameHeight;
+		camera.offsetX = float(now.x - (kFrameWidth - now.width) / kFrameWidth);
+		camera.offsetY = float(now.y - (kFrameHeight - now.height) / kFrameHeight);
+		camera.width = kFrameWidth;
+		camera.height = kFrameHeight;
 		slot->model.Render(effect, slot->animation.Values(slot->model, slot->blinkIds, motion), camera);
 	}
 
@@ -664,12 +669,14 @@ struct Bongo {
 		gs_blend_function_separate(GS_BLEND_SRCALPHA, GS_BLEND_INVSRCALPHA, GS_BLEND_ONE, GS_BLEND_INVSRCALPHA);
 		// the source is the bottom left width x height of the frame
 		gs_matrix_push();
-		gs_matrix_translate3f(0.0f, float(now.height) - FrameHeight, 0.0f);
+		gs_matrix_translate3f(0.0f, float(now.height) - kFrameHeight, 0.0f);
 
 		Draw(image, opacity, now.live2d && mode.hasModel ? mode.back.get() : mode.catBack.get());
 		const std::vector<int> held = HeldSlots();
-		for (int key : held)
-			Draw(image, opacity, mode.keys[size_t(key)].get());
+		for (int key : held) {
+			if (key >= 0 && size_t(key) < mode.keys.size())
+				Draw(image, opacity, mode.keys[size_t(key)].get());
+		}
 		if (now.live2d && mode.hasModel)
 			DrawModel(mode.cat.get(), now);
 

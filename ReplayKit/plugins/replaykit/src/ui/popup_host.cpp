@@ -17,18 +17,19 @@ namespace rk {
 namespace {
 
 constexpr char kPopupPagePath[] = "/popup-view";
-QPointer<QWidget> window;
-QPointer<QCefWidget> browser;
-QSet<QString> ready;
-bool asleep = false;
+constexpr QLatin1String kReadyPrefix("rk-popup-ready:");
+QPointer<QWidget> g_window;
+QPointer<QCefWidget> g_browser;
+QSet<QString> g_ready;
+bool g_asleep = false;
 // counts the wakes, so a load that waited for the helper is dropped once the browser has gone back to sleep or woken again
-int wakeGen = 0;
-const void *active = nullptr;
-QString activeUrl;
-std::function<void()> suspend;
+int g_wakeGen = 0;
+const void *g_active = nullptr;
+QString g_activeUrl;
+std::function<void()> g_suspend;
 // the window is cloaked from each pick of a page until the page says that pick has been drawn: the page shares its renderer with the pages of the shell, which keep it busy at startup, and the window came up empty until the pick got its turn
-int pick = 0;
-bool held = false;
+int g_pick = 0;
+bool g_held = false;
 // how long a page that never answers can keep the window off the screen
 constexpr int kHoldCapMs = 2500;
 
@@ -46,47 +47,47 @@ QString Page(const QString &url)
 
 void Call(const char *method, const QJsonArray &args)
 {
-	if (!browser)
+	if (!g_browser)
 		return;
 	QByteArray values = QJsonDocument(args).toJson(QJsonDocument::Compact);
 	values = values.mid(1, values.size() - 2);
-	RunBrowserScript(browser, "window.RKPopup && window.RKPopup." + std::string(method) + "(" + values.toStdString() + ");");
+	RunBrowserScript(g_browser, "window.RKPopup && window.RKPopup." + std::string(method) + "(" + values.toStdString() + ");");
 }
 
 void Hold(bool on)
 {
-	if (!window || held == on)
+	if (!g_window || g_held == on)
 		return;
-	held = on;
+	g_held = on;
 	// a cloaked window is still composed and painted, but not put on the screen
 	const BOOL value = on ? TRUE : FALSE;
-	DwmSetWindowAttribute((HWND)window->winId(), DWMWA_CLOAK, &value, sizeof(value));
+	DwmSetWindowAttribute((HWND)g_window->winId(), DWMWA_CLOAK, &value, sizeof(value));
 }
 
 // a popup page that never came up at all (its load failed while the helper was down) answers nothing for the rest of the session, so it is loaded again once the helper answers, at most every half minute
-QElapsedTimer reloadedDead;
+QElapsedTimer g_reloadedDead;
 void ReloadIfDead()
 {
-	if (!ready.isEmpty() || asleep || !browser || (reloadedDead.isValid() && reloadedDead.elapsed() < 30000))
+	if (!g_ready.isEmpty() || g_asleep || !g_browser || (g_reloadedDead.isValid() && g_reloadedDead.elapsed() < 30000))
 		return;
-	reloadedDead.start();
-	const int gen = ++wakeGen;
+	g_reloadedDead.start();
+	const int gen = ++g_wakeGen;
 	WhenHelperAnswers(120000, [gen](bool, int) {
-		if (gen != wakeGen || asleep || !CefOpen() || !browser || !ready.isEmpty())
+		if (gen != g_wakeGen || g_asleep || !CefOpen() || !g_browser || !g_ready.isEmpty())
 			return;
 		blog(LOG_WARNING, "[replaykit] the popup page never came up, loading it again");
-		browser->setURL(HelperUrl(kPopupPagePath));
+		g_browser->setURL(HelperUrl(kPopupPagePath));
 	});
 }
 
 // asks the page for a pick and keeps the window cloaked until the page says that pick is drawn, or the cap runs out
 void Pick(const QString &url)
 {
-	const int seq = ++pick;
+	const int seq = ++g_pick;
 	Hold(true);
 	Call("select", {url, seq});
-	QTimer::singleShot(kHoldCapMs, window, [seq]() {
-		if (seq != pick || !held)
+	QTimer::singleShot(kHoldCapMs, g_window, [seq]() {
+		if (seq != g_pick || !g_held)
 			return;
 		blog(LOG_WARNING, "[replaykit] the popup page did not draw its pick in time, so it is shown as it is");
 		Hold(false);
@@ -100,53 +101,57 @@ QWidget *PopupHost::Prepare(QWidget *owner)
 {
 	if (!CefOpen())
 		return nullptr;
-	if (window)
-		return window;
+	if (g_window)
+		return g_window;
 	if (!owner || !g_cef->initialized())
 		return nullptr;
 	QWidget *host = ObsMainWindowQt();
-	window = new QWidget(host ? host : owner);
-	window->setWindowFlags(Qt::Tool | Qt::FramelessWindowHint | Qt::NoDropShadowWindowHint);
-	window->setAutoFillBackground(true);
-	window->resize(680, 640);
-	QPalette palette = window->palette();
+	g_window = new QWidget(host ? host : owner);
+	g_window->setWindowFlags(Qt::Tool | Qt::FramelessWindowHint | Qt::NoDropShadowWindowHint);
+	g_window->setAutoFillBackground(true);
+	g_window->resize(kDefaultSize);
+	QPalette palette = g_window->palette();
 	palette.setColor(QPalette::Window, g_menuPanel);
-	window->setPalette(palette);
-	auto *layout = new QVBoxLayout(window);
+	g_window->setPalette(palette);
+	auto *layout = new QVBoxLayout(g_window);
 	layout->setContentsMargins(0, 0, 0, 0);
-	browser = g_cef->create_widget(window, HelperUrl(kPopupPagePath), nullptr);
-	layout->addWidget(browser);
-	auto *probe = new QLineEdit(window);
+	g_browser = g_cef->create_widget(g_window, HelperUrl(kPopupPagePath), nullptr);
+	layout->addWidget(g_browser);
+	auto *probe = new QLineEdit(g_window);
 	probe->hide();
-	if (!QObject::connect(browser, SIGNAL(titleChanged(QString)), probe, SLOT(setText(QString)))) {
+	if (!QObject::connect(g_browser, SIGNAL(titleChanged(QString)), probe, SLOT(setText(QString)))) {
 		Destroy();
 		return nullptr;
 	}
 	// the title is the pages that are up, then after a bar the last pick the page has drawn
-	QObject::connect(probe, &QLineEdit::textChanged, window, [](const QString &title) {
+	QObject::connect(probe, &QLineEdit::textChanged, g_window, [](const QString &title) {
 		// a report still on its way from the page that was just put to sleep says nothing about the blank page
-		if (asleep || !title.startsWith(QLatin1String("rk-popup-ready:")))
+		if (g_asleep || !title.startsWith(kReadyPrefix))
 			return;
 		const int bar = title.indexOf(QLatin1Char('|'));
 		QSet<QString> up;
-		for (const QString &path : title.mid(15, bar < 0 ? -1 : bar - 15).split(QLatin1Char(','), Qt::SkipEmptyParts))
+		for (const QString &path : title.mid(kReadyPrefix.size(), bar < 0 ? -1 : bar - kReadyPrefix.size()).split(QLatin1Char(','), Qt::SkipEmptyParts))
 			if (!Page(HelperUrl(path)).isEmpty())
 				up.insert(path);
-		const bool changed = up != ready;
-		ready = up;
-		if (bar >= 0 && title.mid(bar + 1).toInt() == pick)
+		const bool changed = up != g_ready;
+		g_ready = up;
+		if (bar >= 0 && title.mid(bar + 1).toInt() == g_pick)
 			Hold(false);
-		// a page that came back up while it is the one showing is picked again
-		if (changed && active)
-			Call("select", {activeUrl});
+		// a page that came back up while it is the one showing is picked again, carrying the pending pick so a wake uncloaks once it draws instead of waiting for the timeout
+		if (changed && g_active) {
+			if (g_held && g_ready.contains(Page(g_activeUrl)))
+				Call("select", {g_activeUrl, g_pick});
+			else
+				Call("select", {g_activeUrl});
+		}
 	});
-	return window;
+	return g_window;
 }
 
-QCefWidget *PopupHost::Browser() { return browser; }
-bool PopupHost::Ready(const QString &url) { return window && ready.contains(Page(url)); }
-bool PopupHost::Owns(const void *owner) { return owner && active == owner; }
-bool PopupHost::Occupied() { return active != nullptr; }
+QCefWidget *PopupHost::Browser() { return g_browser; }
+bool PopupHost::Ready(const QString &url) { return g_window && g_ready.contains(Page(url)); }
+bool PopupHost::Owns(const void *owner) { return owner && g_active == owner; }
+bool PopupHost::Occupied() { return g_active != nullptr; }
 
 bool PopupHost::Acquire(const void *owner, QWidget *windowOwner, const QString &url, const QSize &size, std::function<void()> suspended)
 {
@@ -154,21 +159,21 @@ bool PopupHost::Acquire(const void *owner, QWidget *windowOwner, const QString &
 		return false;
 	// something that opens while the window is still hidden finds its page loading, which the pick hold covers
 	Wake();
-	if (active && active != owner) {
-		auto previous = std::move(suspend);
+	if (g_active && g_active != owner) {
+		auto previous = std::move(g_suspend);
 		if (previous)
 			previous();
 	}
-	active = owner;
-	activeUrl = url;
-	suspend = std::move(suspended);
-	window->resize(size);
-	window->createWinId();
-	SetWindowRgn((HWND)window->winId(), nullptr, TRUE);
-	const DWORD square = 1;
-	const COLORREF noBorder = 0xfffffffe;
-	DwmSetWindowAttribute((HWND)window->winId(), 33, &square, sizeof(square));
-	DwmSetWindowAttribute((HWND)window->winId(), 34, &noBorder, sizeof(noBorder));
+	g_active = owner;
+	g_activeUrl = url;
+	g_suspend = std::move(suspended);
+	g_window->resize(size);
+	g_window->createWinId();
+	SetWindowRgn((HWND)g_window->winId(), nullptr, TRUE);
+	const DWM_WINDOW_CORNER_PREFERENCE square = DWMWCP_DONOTROUND;
+	const COLORREF noBorder = DWMWA_COLOR_NONE;
+	DwmSetWindowAttribute((HWND)g_window->winId(), DWMWA_WINDOW_CORNER_PREFERENCE, &square, sizeof(square));
+	DwmSetWindowAttribute((HWND)g_window->winId(), DWMWA_BORDER_COLOR, &noBorder, sizeof(noBorder));
 	SetOwner(owner, windowOwner);
 	Pick(url);
 	return true;
@@ -176,16 +181,16 @@ bool PopupHost::Acquire(const void *owner, QWidget *windowOwner, const QString &
 
 void PopupHost::SetOwner(const void *owner, QWidget *windowOwner)
 {
-	if (Owns(owner) && window && windowOwner)
-		SetWindowLongPtrW((HWND)window->winId(), GWLP_HWNDPARENT, (LONG_PTR)windowOwner->winId());
+	if (Owns(owner) && g_window && windowOwner)
+		SetWindowLongPtrW((HWND)g_window->winId(), GWLP_HWNDPARENT, (LONG_PTR)windowOwner->winId());
 }
 
 void PopupHost::SetUrl(const QString &url)
 {
 	if (Page(url).isEmpty())
 		return;
-	if (Page(activeUrl) == Page(url))
-		activeUrl = url;
+	if (Page(g_activeUrl) == Page(url))
+		g_activeUrl = url;
 	Call("url", {url});
 }
 
@@ -200,16 +205,16 @@ void PopupHost::Release(const void *owner)
 	if (!Owns(owner))
 		return;
 	Call("park", {});
-	if (window) {
-		window->hide();
+	if (g_window) {
+		g_window->hide();
 		Hold(false);
 		// the owner it was lent to can be deleted next (a card that is built again deletes its dim), and windows destroys the windows a window owns along with it, the browser inside included, so it goes back to the obs window
-		if (QWidget *host = window->parentWidget())
-			SetWindowLongPtrW((HWND)window->winId(), GWLP_HWNDPARENT, (LONG_PTR)host->winId());
+		if (QWidget *host = g_window->parentWidget())
+			SetWindowLongPtrW((HWND)g_window->winId(), GWLP_HWNDPARENT, (LONG_PTR)host->winId());
 	}
-	active = nullptr;
-	activeUrl.clear();
-	suspend = nullptr;
+	g_active = nullptr;
+	g_activeUrl.clear();
+	g_suspend = nullptr;
 }
 
 void PopupHost::Reload(const QString &url)
@@ -217,56 +222,56 @@ void PopupHost::Reload(const QString &url)
 	const QString path = Page(url);
 	if (path.isEmpty())
 		return;
-	ready.remove(path);
+	g_ready.remove(path);
 	Call("reload", {url});
 }
 
 void PopupHost::Destroy()
 {
-	active = nullptr;
-	activeUrl.clear();
-	suspend = nullptr;
-	ready.clear();
-	held = false;
-	asleep = false;
-	if (window)
-		delete window.data();
-	browser.clear();
+	g_active = nullptr;
+	g_activeUrl.clear();
+	g_suspend = nullptr;
+	g_ready.clear();
+	g_held = false;
+	g_asleep = false;
+	if (g_window)
+		delete g_window.data();
+	g_browser.clear();
 }
 
 void PopupHost::Sleep()
 {
-	if (!CefOpen() || !browser || asleep || active)
+	if (!CefOpen() || !g_browser || g_asleep || g_active)
 		return;
-	asleep = true;
-	++wakeGen;
-	ready.clear();
-	browser->setURL("about:blank");
+	g_asleep = true;
+	++g_wakeGen;
+	g_ready.clear();
+	g_browser->setURL("about:blank");
 	blog(LOG_INFO, "[replaykit] popup browser asleep");
 }
 
 void PopupHost::Wake()
 {
-	if (!asleep || !CefOpen() || !browser)
+	if (!g_asleep || !CefOpen() || !g_browser)
 		return;
-	asleep = false;
-	ready.clear();
-	const int gen = ++wakeGen;
+	g_asleep = false;
+	g_ready.clear();
+	const int gen = ++g_wakeGen;
 	WhenHelperAnswers(120000, [gen](bool, int) {
-		if (gen == wakeGen && !asleep && CefOpen() && browser)
-			browser->setURL(HelperUrl(kPopupPagePath));
+		if (gen == g_wakeGen && !g_asleep && CefOpen() && g_browser)
+			g_browser->setURL(HelperUrl(kPopupPagePath));
 	});
 	blog(LOG_INFO, "[replaykit] popup browser loading again after sleep");
 }
 
-bool PopupHost::Asleep() { return asleep; }
+bool PopupHost::Asleep() { return g_asleep; }
 
-bool PopupHost::Revealed() { return !held; }
+bool PopupHost::Revealed() { return !g_held; }
 
 QJsonObject PopupHost::Probe()
 {
-	return {{"built", !window.isNull()}, {"visible", window && window->isVisible()}, {"parked", false}, {"asleep", asleep}, {"page", Page(activeUrl)},
-		{"readyPages", ready.size()}, {"held", held}, {"surface", window ? QString::number(quintptr(window->internalWinId()), 16) : QString()}};
+	return {{"built", !g_window.isNull()}, {"visible", g_window && g_window->isVisible()}, {"parked", false}, {"asleep", g_asleep}, {"page", Page(g_activeUrl)},
+		{"readyPages", g_ready.size()}, {"held", g_held}, {"surface", g_window ? QString::number(quintptr(g_window->internalWinId()), 16) : QString()}};
 }
 
 } // namespace rk

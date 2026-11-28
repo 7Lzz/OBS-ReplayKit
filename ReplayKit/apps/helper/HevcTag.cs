@@ -36,7 +36,7 @@ namespace ReplayKitHelper
             if (tracks == null) return false;
 
             // beside the clip, so the replace is one rename on the same volume, and under a name the library never lists
-            string temporary = Path.Combine(original.DirectoryName, "_replaykit_finalize_" + Guid.NewGuid().ToString("N") + ".rkpart");
+            string temporary = ClipFiles.FinalizeTempPath(original.DirectoryName, ".rkpart");
             try
             {
                 string format = string.Equals(original.Extension, ".mov", StringComparison.OrdinalIgnoreCase) ? "mov" : "mp4";

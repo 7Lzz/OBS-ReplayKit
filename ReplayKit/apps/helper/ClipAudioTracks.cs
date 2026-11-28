@@ -4,7 +4,6 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
-using System.Text.RegularExpressions;
 using System.Threading;
 using Newtonsoft.Json.Linq;
 
@@ -15,7 +14,6 @@ namespace ReplayKitHelper
     {
         private static readonly string Root = ClipCache.KindDir("tracks");
         private static readonly PreviewJobs Jobs = new PreviewJobs();
-        private static readonly Regex KeyPattern = new Regex("^[0-9a-f]{16}$", RegexOptions.Compiled);
         private const string DoneMarker = ClipCache.DoneMarker;
         // the waveform is read from the track at a low sample rate and kept as the loudest sample of every 40 ms
         private const int PeakSampleRate = 8000;
@@ -92,7 +90,7 @@ namespace ReplayKitHelper
         // the audio file of one track, or null when the key or the number is not one this helper made or the file is not finished
         public static string PathFor(string key, string indexText)
         {
-            if (key == null || !KeyPattern.IsMatch(key)) return null;
+            if (!ClipCache.IsValidKey(key)) return null;
             if (!int.TryParse(indexText, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out int index) || index < 0 || index > 15) return null;
             string dir = Path.Combine(Root, key);
             if (!File.Exists(Path.Combine(dir, DoneMarker))) return null;

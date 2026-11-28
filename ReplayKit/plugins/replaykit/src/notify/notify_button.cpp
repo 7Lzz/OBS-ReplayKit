@@ -16,9 +16,6 @@ namespace rk {
 
 namespace {
 
-
-// chevron beside the bell -- same glyph and flip-on-open behaviour as the clips sort trigger
-
 // keeps one button glued to its window. every one of these events can move the caption, and the safety-net timer alone lagged visibly while dragging
 class NotifyAnchorFilter : public QObject {
 public:

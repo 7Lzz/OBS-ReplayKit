@@ -155,6 +155,8 @@ gs_texture_t *Pass(gs_texrender_t *&target, gs_texture_t *from, uint32_t cx, uin
 		return nullptr;
 	if (!target)
 		target = gs_texrender_create(GS_BGRA, GS_ZS_NONE);
+	if (!target)
+		return nullptr;
 	gs_texrender_reset(target);
 	if (!gs_texrender_begin(target, cx, cy))
 		return nullptr;
@@ -188,16 +190,18 @@ void OnMainRendered(void *)
 	gs_enable_blending(false);
 	if (!g_half)
 		g_half = gs_texrender_create(GS_BGRA, GS_ZS_NONE);
-	gs_texrender_reset(g_half);
 	gs_texture_t *half = nullptr;
-	if (gs_texrender_begin(g_half, Half(ovi.base_width, 1), Half(ovi.base_height, 1))) {
-		struct vec4 clear;
-		vec4_zero(&clear);
-		gs_clear(GS_CLEAR_COLOR, &clear, 0.0f, 0);
-		gs_ortho(0.0f, float(ovi.base_width), 0.0f, float(ovi.base_height), -100.0f, 100.0f);
-		obs_render_main_texture_src_color_only();
-		gs_texrender_end(g_half);
-		half = gs_texrender_get_texture(g_half);
+	if (g_half) {
+		gs_texrender_reset(g_half);
+		if (gs_texrender_begin(g_half, Half(ovi.base_width, 1), Half(ovi.base_height, 1))) {
+			struct vec4 clear;
+			vec4_zero(&clear);
+			gs_clear(GS_CLEAR_COLOR, &clear, 0.0f, 0);
+			gs_ortho(0.0f, float(ovi.base_width), 0.0f, float(ovi.base_height), -100.0f, 100.0f);
+			obs_render_main_texture_src_color_only();
+			gs_texrender_end(g_half);
+			half = gs_texrender_get_texture(g_half);
+		}
 	}
 	if (Pass(g_quarter, half, Half(ovi.base_width, 2), Half(ovi.base_height, 2))) {
 		g_backdropGeneration++;
@@ -214,6 +218,8 @@ gs_texture_t *Blurred()
 		return nullptr;
 	if (g_blurredGeneration != g_backdropGeneration || !g_quarterUp) {
 		gs_texture_t *quarter = gs_texrender_get_texture(g_quarter);
+		if (!quarter)
+			return nullptr;
 		const uint32_t qw = gs_texture_get_width(quarter), qh = gs_texture_get_height(quarter);
 		gs_blend_state_push();
 		gs_enable_blending(false);

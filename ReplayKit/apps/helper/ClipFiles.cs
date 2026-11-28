@@ -85,6 +85,9 @@ namespace ReplayKitHelper
             throw new ArgumentException(Locales.Message("clips.noAvailableNumberedNameWasFound"));
         }
 
+        internal static string FinalizeTempPath(string directory, string extension) =>
+            Path.Combine(directory, "_replaykit_finalize_" + Guid.NewGuid().ToString("N") + extension);
+
         public static string Replace(string requestId, string temporary, string source, long expectedSize, DateTime expectedWriteTime, string expectedVersion = null)
         {
             string staged = temporary;
@@ -96,7 +99,7 @@ namespace ReplayKitHelper
                 if (new FileInfo(temporary).Length == 0) throw new IOException(Locales.Message("clips.encoderOutputIsEmpty"));
                 if (!string.Equals(Path.GetPathRoot(temporary), Path.GetPathRoot(source), StringComparison.OrdinalIgnoreCase))
                 {
-                    staged = Path.Combine(Path.GetDirectoryName(source), "_replaykit_finalize_" + Guid.NewGuid().ToString("N") + Path.GetExtension(source));
+                    staged = FinalizeTempPath(Path.GetDirectoryName(source), Path.GetExtension(source));
                     using (var input = File.OpenRead(temporary))
                     using (var output = new FileStream(staged, FileMode.CreateNew, FileAccess.Write, FileShare.None))
                     {

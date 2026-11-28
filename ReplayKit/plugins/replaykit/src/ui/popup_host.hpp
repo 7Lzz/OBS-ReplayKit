@@ -13,6 +13,8 @@ namespace rk {
 
 class PopupHost {
 public:
+	// initial window size used while building and warming the shared popup browser
+	static constexpr QSize kDefaultSize{680, 640};
 	static QWidget *Prepare(QWidget *owner);
 	static QCefWidget *Browser();
 	static bool Ready(const QString &url);

@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
@@ -15,7 +14,6 @@ namespace ReplayKitHelper
     {
         private static readonly string Root = ClipCache.KindDir("film");
         private static readonly PreviewJobs Jobs = new PreviewJobs();
-        private static readonly Regex KeyPattern = new Regex("^[0-9a-f]{16}$", RegexOptions.Compiled);
         private const string StripFile = "strip.jpg";
         private const string ManifestFile = "strip.json";
         // how many frames the strip holds; the timeline draws every cell of its video row from the nearest of them
@@ -58,7 +56,7 @@ namespace ReplayKitHelper
         // the picture of a finished strip, or null when the key is not one this helper made or the strip is not finished
         public static string PathFor(string key)
         {
-            if (key == null || !KeyPattern.IsMatch(key)) return null;
+            if (!ClipCache.IsValidKey(key)) return null;
             string dir = Path.Combine(Root, key);
             if (!File.Exists(Path.Combine(dir, ClipCache.DoneMarker))) return null;
             string path = Path.Combine(dir, StripFile);

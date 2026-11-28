@@ -102,10 +102,11 @@ void NotifyTip::ShowFor(const QString &text, const QRect &anchorGlobal, Side sid
 		int left = anchorGlobal.right() + 1 + kGap - kArrow;
 		if (QScreen *screen = QGuiApplication::screenAt(anchorGlobal.center())) {
 			QRect avail = screen->availableGeometry();
-			top = qBound(avail.top() + kEdge, top, avail.bottom() - bodyH - kEdge);
+			const int maxTop = avail.bottom() - bodyH - kEdge;
+			top = maxTop >= avail.top() + kEdge ? qBound(avail.top() + kEdge, top, maxTop) : avail.top() + kEdge;
 			left = qMin(left, avail.right() - (w + kArrow) - kEdge);
 		}
-		m_arrowY = qBound(qreal(8.0), qreal(centre - top), qreal(bodyH - 8.0));
+		m_arrowY = bodyH > 16 ? qBound(qreal(8.0), qreal(centre - top), qreal(bodyH - 8.0)) : bodyH / 2.0;
 		move(left - kShadow, top - kShadow);
 	} else {
 		setFixedSize(w + kShadow * 2, bodyH + kArrow + kShadow * 2);
@@ -116,12 +117,13 @@ void NotifyTip::ShowFor(const QString &text, const QRect &anchorGlobal, Side sid
 		int top = anchorGlobal.bottom() + 1 + kGap - kArrow;
 		if (QScreen *screen = QGuiApplication::screenAt(anchorGlobal.center())) {
 			QRect avail = screen->availableGeometry();
-			left = qBound(avail.left() + kEdge, left, avail.right() - w - kEdge);
+			const int maxLeft = avail.right() - w - kEdge;
+			left = maxLeft >= avail.left() + kEdge ? qBound(avail.left() + kEdge, left, maxLeft) : avail.left() + kEdge;
 			top = qMin(top, avail.bottom() - (bodyH + kArrow) - kEdge);
 		}
 		if (within.isValid() && within.width() > w + kEdge * 2)
 			left = qBound(within.left() + kEdge, left, within.right() - w - kEdge);
-		m_arrowX = qBound(qreal(10.0), qreal(centre - left), qreal(w - 10.0));
+		m_arrowX = w > 20 ? qBound(qreal(10.0), qreal(centre - left), qreal(w - 10.0)) : w / 2.0;
 		move(left - kShadow, top - kShadow);
 	}
 
@@ -229,5 +231,11 @@ void NotifyTip::PaintSettled(QPainter &p)
 }
 
 NotifyTip *g_notifyTip = nullptr;
+
+void NotifyTipDestroy()
+{
+	delete g_notifyTip;
+	g_notifyTip = nullptr;
+}
 
 } // namespace rk

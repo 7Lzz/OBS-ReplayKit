@@ -13,6 +13,7 @@ namespace ReplayKitHelper
     // rebuilds clips_index.json (per-clip ffprobe metadata cache: duration/width/height/fps/codec) for whatever in the clip folder isnt already indexed at its current size+mtime. runs as an in-process background task kicked off by Clips.StartClipIndexRepairIfNeeded; it stays self-contained (no Server.State access) so the slow ffprobe work needs no locking of its own
     internal static class ClipIndexWorker
     {
+        private const long FailedRetrySeconds = 21600;
         private static readonly UTF8Encoding Utf8NoBom = new UTF8Encoding(false);
 
         private static double ConvertRateToDouble(string rate)
@@ -48,7 +49,7 @@ namespace ReplayKitHelper
             return entries;
         }
 
-        private static bool TestEntryCurrent(JToken entry, FileInfo file)
+        internal static bool IsEntryCurrent(JToken entry, FileInfo file)
         {
             if (entry == null) return false;
             if (!string.Equals(entry["path"]?.Value<string>(), file.FullName, StringComparison.OrdinalIgnoreCase)) return false;
@@ -58,16 +59,16 @@ namespace ReplayKitHelper
             return size.Value<long>() == file.Length && mtimeTicks.Value<long>() == file.LastWriteTimeUtc.Ticks;
         }
 
-        private static bool TestEntryReusable(JToken entry, FileInfo file)
+        internal static bool IsEntryReusable(JToken entry, FileInfo file)
         {
-            if (!TestEntryCurrent(entry, file)) return false;
+            if (!IsEntryCurrent(entry, file)) return false;
             var duration = entry["duration"];
             string codec = entry["codec"]?.Value<string>();
             if (duration != null && duration.Value<double>() > 0 && !string.IsNullOrWhiteSpace(codec)) return true;
             var failedAt = entry["failedAt"];
             if (failedAt == null) return false;
             long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-            return (now - failedAt.Value<long>()) < 21600;
+            return (now - failedAt.Value<long>()) < FailedRetrySeconds;
         }
 
         private static JObject ReadFfprobeMetadata(string ffprobe, string path)
@@ -88,19 +89,27 @@ namespace ReplayKitHelper
                 UseShellExecute = false,
                 CreateNoWindow = true,
             };
-            using (var proc = Process.Start(psi))
+            try
             {
-                var stdoutTask = proc.StandardOutput.ReadToEndAsync();
-                var stderrTask = proc.StandardError.ReadToEndAsync();
-                if (!proc.WaitForExit(15000))
+                using (var proc = Process.Start(psi))
                 {
-                    try { proc.Kill(); } catch (InvalidOperationException) { } catch (System.ComponentModel.Win32Exception) { }
-                    return null;
+                    if (proc == null) return null;
+                    var stdoutTask = proc.StandardOutput.ReadToEndAsync();
+                    var stderrTask = proc.StandardError.ReadToEndAsync();
+                    if (!proc.WaitForExit(15000))
+                    {
+                        try { proc.Kill(); } catch (InvalidOperationException) { } catch (System.ComponentModel.Win32Exception) { }
+                        return null;
+                    }
+                    string stdout = stdoutTask.GetAwaiter().GetResult();
+                    stderrTask.GetAwaiter().GetResult();
+                    if (proc.ExitCode != 0 || string.IsNullOrWhiteSpace(stdout)) return null;
+                    try { return JObject.Parse(stdout); } catch (JsonException) { return null; }
                 }
-                string stdout = stdoutTask.GetAwaiter().GetResult();
-                stderrTask.GetAwaiter().GetResult();
-                if (proc.ExitCode != 0 || string.IsNullOrWhiteSpace(stdout)) return null;
-                try { return JObject.Parse(stdout); } catch (JsonException) { return null; }
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is System.ComponentModel.Win32Exception || ex is InvalidOperationException)
+            {
+                return null;
             }
         }
 
@@ -154,7 +163,7 @@ namespace ReplayKitHelper
             return entry;
         }
 
-        // tmp lands in the shared scratch dir, not next to $path, so a crash mid-write never leaves a stray .tmp beside clips_index.json; the atomic MoveFileReplace closes the crash window a delete-then-move would reopen.
+        // writes through a temp file in the shared scratch dir and atomic MoveFileReplace so a crash mid-write never leaves a stray .tmp beside clips_index.json
         private static void WriteIndexFile(string path, JObject entries)
         {
             string parent = Path.GetDirectoryName(path);
@@ -192,7 +201,7 @@ namespace ReplayKitHelper
                 foreach (var file in Candidates(files, maxFiles > 0 ? maxFiles : int.MaxValue))
                 {
                     var old = existing[file.Name];
-                    if (TestEntryReusable(old, file))
+                    if (IsEntryReusable(old, file))
                     {
                         entries[file.Name] = old;
                         continue;

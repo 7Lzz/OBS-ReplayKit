@@ -21,6 +21,7 @@
 #include "core/window_state.hpp"
 #include "layout/ui_layout.hpp"
 #include "notify/clip_toast.hpp"
+#include "notify/notify_tip.hpp"
 #include "overlays/bongo.hpp"
 #include "overlays/focus_card.hpp"
 #include "shell/shell.hpp"
@@ -78,6 +79,7 @@ void obs_module_unload(void)
 	StopGraphicsWatch();
 	ClipBufferShutdown();
 	ClipToastDestroy();
+	NotifyTipDestroy();
 	// destroy queued callbacks before their code is unloaded with this module.
 	delete g_callbacks;
 	g_callbacks = nullptr;

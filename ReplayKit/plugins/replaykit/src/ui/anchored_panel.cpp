@@ -82,7 +82,6 @@ bool AnchoredPanel::IsShown() const
 bool AnchoredPanel::EnsureBuilt()
 {
 	m_window = PopupHost::Prepare(m_owner);
-	m_browser = PopupHost::Browser();
 	return !m_window.isNull();
 }
 
@@ -109,7 +108,7 @@ void AnchoredPanel::Warm()
 	QWidget *owner = m_owner;
 	if (!owner || !owner->isVisible() || owner->isMinimized() || !EnsureBuilt())
 		return;
-	if (!PopupHost::Acquire(this, owner, m_url, QSize(680, 640), [this]() {
+	if (!PopupHost::Acquire(this, owner, m_url, PopupHost::kDefaultSize, [this]() {
 		m_warming = false;
 		++m_warmRun;
 		m_pendingOpen = nullptr;
@@ -126,17 +125,13 @@ void AnchoredPanel::Warm()
 	panel->show();
 	PopupHost::SetOwner(this, owner);
 	WaitForPage(run);
-	blog(LOG_INFO, "[replaykit] panel warm-up started: %s%s", m_title.toUtf8().constData(), m_blind ? " (its page cannot report, waiting a fixed time)" : "");
+	blog(LOG_INFO, "[replaykit] panel warm-up started: %s", m_title.toUtf8().constData());
 	// the wait is bounded, so a page that never says it is up cannot hold an open back for long
-	QTimer::singleShot(m_blind ? kCefWarmBlindMs : kCefWarmCapMs, this, [this, run]() {
+	QTimer::singleShot(kCefWarmCapMs, this, [this, run]() {
 		if (!m_warming || run != m_warmRun)
 			return;
-		if (m_blind) {
-			m_ready = true;
-		} else {
-			m_gaveUp = true;
-			blog(LOG_WARNING, "[replaykit] the page of a panel did not say it was up in time, so it opens as it is: %s", m_title.toUtf8().constData());
-		}
+		m_gaveUp = true;
+		blog(LOG_WARNING, "[replaykit] the page of a panel did not say it was up in time, so it opens as it is: %s", m_title.toUtf8().constData());
 		EndWarm();
 	});
 }
@@ -154,7 +149,6 @@ void AnchoredPanel::WaitForPage(int run)
 
 void AnchoredPanel::OnPageReady()
 {
-	m_ready = true;
 	if (!m_warming)
 		return;
 	m_warmMs = m_warmClock.elapsed();
@@ -190,7 +184,6 @@ QJsonArray AnchoredPanel::WarmReport()
 		one["shared"] = true;
 		one["warming"] = panel->m_warming;
 		one["gaveUp"] = panel->m_gaveUp;
-		one["blind"] = panel->m_blind;
 		one["warmMs"] = double(panel->m_warmMs);
 		out.append(one);
 	}
@@ -296,7 +289,6 @@ bool AnchoredPanel::PlaceFromWindowRect(const QRect &tab)
 	const int tabWidth = qRound(tab.width() * dpr);
 	const int tabHeight = qRound(tab.height() * dpr);
 	const int panelWidth = qRound(panel->width() * panelDpr);
-	const int panelHeight = qRound(panel->height() * panelDpr);
 	int x = m_anchor.edge == Edge::Right ? tabLeft + tabWidth - panelWidth : tabLeft;
 	const int y = tabTop + tabHeight - qRound(m_anchor.seam * dpr);
 	// the panel stays on its button and inside the obs window: it is never moved up off the button to clear the taskbar or the bottom of the window, it is made shorter instead and its page scrolls, and it keeps between the sides of the window. the part of the screen the taskbar leaves is a limit as well, for a window that runs under it

@@ -57,8 +57,8 @@ void CreateSetupWindow(bool quiet)
 	g_setupWindow = win;
 	SyncSetupWindowClose();
 	RefreshAppIcon();
-	QTimer::singleShot(500, g_callbacks, []() { if (g_setupWindow) ApplyAuxWindowIcon(g_setupWindow, &g_ownedIconSetup, &g_taggedSetup, L"ReplayKit.SetupWindow"); });
-	QTimer::singleShot(1600, g_callbacks, []() { if (g_setupWindow) ApplyAuxWindowIcon(g_setupWindow, &g_ownedIconSetup, &g_taggedSetup, L"ReplayKit.SetupWindow"); });
+	QTimer::singleShot(500, g_callbacks, []() { if (g_setupWindow) ApplyAuxWindowIcon(g_setupWindow, &g_ownedIconSetup, &g_taggedSetup); });
+	QTimer::singleShot(1600, g_callbacks, []() { if (g_setupWindow) ApplyAuxWindowIcon(g_setupWindow, &g_ownedIconSetup, &g_taggedSetup); });
 }
 
 } // namespace

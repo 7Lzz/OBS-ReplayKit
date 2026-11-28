@@ -128,7 +128,7 @@ namespace ReplayKitHelper
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is JsonException)
                 {
                     // a file the history has no record of could never be restored, so the delete is undone and fails the way it would have
-                    File.Move(stored, path);
+                    ClipFiles.MoveWhenFree(stored, path);
                     throw;
                 }
             }
@@ -231,7 +231,7 @@ namespace ReplayKitHelper
                 // a game folder that was removed once it was empty joins the library again
                 if (!screenshot && !string.Equals(Path.GetFullPath(folder).TrimEnd('\\'), Path.GetFullPath(root).TrimEnd('\\'), StringComparison.OrdinalIgnoreCase))
                     Clips.RegisterFolder(root, Path.GetFileName(folder.TrimEnd('\\')));
-                string restored = FreeName(folder, name, screenshot);
+                string restored = FreeName(folder, root, name, screenshot);
                 if (restored == null) return Fail(Locales.Message("storage.thereIsNoFreeNameTo"));
                 string target = Path.Combine(folder, restored);
                 // a rename or a save can take the name between the check and the move
@@ -255,7 +255,7 @@ namespace ReplayKitHelper
         }
 
         // the name the item had, or the first "(restored)" one that no clip of the library and no file of the folder has
-        private static string FreeName(string folder, string name, bool screenshot)
+        private static string FreeName(string folder, string root, string name, bool screenshot)
         {
             string stem = Path.GetFileNameWithoutExtension(name), ext = Path.GetExtension(name);
             for (int n = 1; n <= 100; n++)
@@ -263,7 +263,7 @@ namespace ReplayKitHelper
                 string candidate = n == 1 ? name : stem + (n == 2 ? " (restored)" : " (restored " + (n - 1) + ")") + ext;
                 if (Path.Combine(folder, candidate).Length >= 260) return null;
                 if (File.Exists(Path.Combine(folder, candidate))) continue;
-                if (!screenshot && Clips.NameTaken(candidate)) continue;
+                if (!screenshot && Clips.NameTaken(candidate, root)) continue;
                 return candidate;
             }
             return null;
@@ -285,19 +285,27 @@ namespace ReplayKitHelper
 
         public static JObject Empty()
         {
-            int removed = 0;
+            var gone = new List<string>();
             lock (Gate)
             {
                 Heal();
                 var db = ClipStore.Read(StorePath(), data => (JObject)data.DeepClone());
-                foreach (var prop in db.Properties().ToList())
+                try
                 {
-                    if (prop.Value is JObject entry) DeleteStored(entry);
-                    removed++;
+                    foreach (var prop in db.Properties().ToList())
+                    {
+                        if (prop.Value is JObject entry) DeleteStored(entry);
+                        gone.Add(prop.Name);
+                    }
                 }
-                ClipStore.Update(StorePath(), data => { bool any = data.HasValues; data.RemoveAll(); return any; });
+                finally
+                {
+                    // drop the records already deleted even if a later file is open in another program
+                    if (gone.Count > 0)
+                        ClipStore.Update(StorePath(), data => { bool changed = false; foreach (string id in gone) changed |= data.Remove(id); return changed; });
+                }
             }
-            return new JObject { ["ok"] = true, ["removed"] = removed };
+            return new JObject { ["ok"] = true, ["removed"] = gone.Count };
         }
 
         // a stored file that cannot be deleted right now (open in another program) throws, and its record stays for the next try

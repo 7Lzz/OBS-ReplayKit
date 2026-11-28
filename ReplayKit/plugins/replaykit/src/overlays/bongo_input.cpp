@@ -9,8 +9,8 @@ namespace rk {
 namespace {
 
 // raw input allows one target window per process, so every bongo source shares this one; nothing else in obs takes the mouse (cef only does for pointer lock, which no replaykit page asks for)
-constexpr UINT RefreshMessage = WM_APP + 1;
-constexpr wchar_t WindowClass[] = L"ReplayKitBongoRawMouse";
+constexpr UINT kRefreshMessage = WM_APP + 1;
+constexpr wchar_t kWindowClass[] = L"ReplayKitBongoRawMouse";
 
 std::mutex g_lock;
 std::condition_variable g_started;
@@ -69,9 +69,9 @@ void Run()
 	WNDCLASSW type{};
 	type.lpfnWndProc = WindowProc;
 	type.hInstance = instance;
-	type.lpszClassName = WindowClass;
+	type.lpszClassName = kWindowClass;
 	RegisterClassW(&type);
-	HWND window = CreateWindowExW(0, WindowClass, L"", 0, 0, 0, 0, 0, HWND_MESSAGE, nullptr, instance, nullptr);
+	HWND window = CreateWindowExW(0, kWindowClass, L"", 0, 0, 0, 0, 0, HWND_MESSAGE, nullptr, instance, nullptr);
 	if (!window)
 		blog(LOG_WARNING, "[replaykit] bongo cat: raw mouse window failed, error %lu", GetLastError());
 	MSG message;
@@ -85,7 +85,7 @@ void Run()
 
 	bool registered = false;
 	while (GetMessageW(&message, nullptr, 0, 0) > 0) {
-		if (message.message != RefreshMessage) {
+		if (message.message != kRefreshMessage) {
 			DispatchMessageW(&message);
 			continue;
 		}
@@ -117,7 +117,7 @@ void Run()
 	}
 	if (window)
 		DestroyWindow(window);
-	UnregisterClassW(WindowClass, instance);
+	UnregisterClassW(kWindowClass, instance);
 }
 
 void Refresh()
@@ -128,7 +128,7 @@ void Refresh()
 		thread = g_threadId;
 	}
 	if (thread)
-		PostThreadMessageW(thread, RefreshMessage, 0, 0);
+		PostThreadMessageW(thread, kRefreshMessage, 0, 0);
 }
 
 } // namespace
@@ -156,7 +156,7 @@ BongoInput::~BongoInput()
 			g_threadId = 0;
 			finished = std::move(g_thread);
 		} else {
-			PostThreadMessageW(g_threadId, RefreshMessage, 0, 0);
+			PostThreadMessageW(g_threadId, kRefreshMessage, 0, 0);
 		}
 	}
 	if (finished.joinable())

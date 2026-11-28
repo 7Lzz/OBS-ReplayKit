@@ -10,11 +10,9 @@
 #include <QRect>
 #include <QSize>
 #include <QString>
-#include <QVariantAnimation>
 #include <QWidget>
 #include <functional>
 
-#include "browser-panel.hpp"
 #include "core/win32.hpp"
 
 class QJsonArray;
@@ -116,7 +114,6 @@ private:
 
 	QPointer<QWidget> m_owner;
 	QPointer<QWidget> m_window;
-	QPointer<QCefWidget> m_browser;
 	QString m_title;
 	QString m_url;
 	QSize m_size;
@@ -137,11 +134,9 @@ private:
 	int m_rollFrames = 0;
 	qint64 m_rollLastMs = 0;
 	qint64 m_rollWorstGapMs = 0;
-	// the page of the panel has said it is up, the window is up out of sight for it right now, the wait for it was given up on, and its widget could not report its page so the wait is for a fixed time
-	bool m_ready = false;
+	// the window is up out of sight for its page to start right now, or the wait for it was given up on
 	bool m_warming = false;
 	bool m_gaveUp = false;
-	bool m_blind = false;
 	QElapsedTimer m_warmClock;
 	qint64 m_warmMs = -1;
 	// counts the warm-ups, so a timer of an earlier one does nothing

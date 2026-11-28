@@ -78,9 +78,9 @@ public:
 		setGeometry(area.left(), area.top() + kTopOffset, width, kHeight);
 		m_icon = ShellLogoPixmap(kIconSize, devicePixelRatioF());
 
-		// the display affinity belongs to the window, so it is set before the card is first drawn; 0x11 is WDA_EXCLUDEFROMCAPTURE, the flag obs uses for its own hide from capture option
+		// the display affinity belongs to the window, so it is set before the card is first drawn; WDA_EXCLUDEFROMCAPTURE is the flag obs uses for its own hide from capture option
 		const HWND hwnd = reinterpret_cast<HWND>(winId());
-		if (!SetWindowDisplayAffinity(hwnd, hideFromCapture ? 0x11 : 0) && hideFromCapture)
+		if (!SetWindowDisplayAffinity(hwnd, hideFromCapture ? WDA_EXCLUDEFROMCAPTURE : WDA_NONE) && hideFromCapture)
 			return false;
 
 		m_timer.stop();

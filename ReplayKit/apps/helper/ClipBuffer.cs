@@ -189,12 +189,12 @@ namespace ReplayKitHelper
             if (segments == null || segments.Count == 0 || segments.Count > MaxSegments) return Fail(Locales.Message("clips.thereIsNoBufferedVideoTo"));
             if (seconds < 1 || seconds > 3600) return Fail(Locales.Message("clips.theClipLengthIsNotValid"));
             string ext = Path.GetExtension(name).ToLowerInvariant();
-            if (name.Length == 0 || name.Length > 200 || name != Path.GetFileName(name) || name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 || (ext != ".mp4" && ext != ".mkv" && ext != ".mov"))
+            if (name.Length == 0 || name.Length > 200 || name != Path.GetFileName(name) || name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 || !Constants.ALLOWED_EXTS.Contains(ext))
                 return Fail(Locales.Message("clips.theClipNameIsNotValid"));
             bool discordClosed = ext == ".mp4" && SavedClipAudio.DiscordClosed();
             // the game folder the clip goes in, empty for the clip folder itself; its name is the one the clip name starts with
             string folder = body?["folder"]?.Value<string>() ?? "";
-            if (folder.Length > 0 && (!Clips.IsGameFolderName(folder) || !name.StartsWith(folder + " ", StringComparison.OrdinalIgnoreCase)))
+            if (folder.Length > 0 && (!Clips.IsGameFolderName(folder) || !Clips.NamedAfterFolder(name, folder)))
                 return Fail(Locales.Message("clips.theGameFolderIsNotValid"));
 
             Directory.CreateDirectory(DiskDir);
@@ -312,9 +312,10 @@ namespace ReplayKitHelper
                 {
                     using (new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.None)) return;
                 }
+                catch (FileNotFoundException) { return; }
                 catch (IOException)
                 {
-                    if (DateTime.UtcNow >= until) return;
+                    if (!File.Exists(path) || DateTime.UtcNow >= until) return;
                     Thread.Sleep(100);
                 }
             }

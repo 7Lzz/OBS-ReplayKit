@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Security;
@@ -96,14 +97,16 @@ namespace ReplayKitHelper
             return names;
         }
 
+        private static readonly long GameFolderCacheTicks = 2 * Stopwatch.Frequency;
+
         // the game folders of a clip folder that exist right now, in name order
         public static List<string> GameFolders(string root = null)
         {
             root = Path.GetFullPath(root ?? AppConfig.GetClipDir()).TrimEnd(Path.DirectorySeparatorChar);
             var names = GameFolderNames(root);
             string key = root.ToUpperInvariant() + "|" + string.Join("|", names);
-            long now = Environment.TickCount;
-            lock (GameFolderGate) if (key == gameFolderDirsSig && now - gameFolderDirsAt < 2000) return new List<string>(gameFolderDirs);
+            long now = Stopwatch.GetTimestamp();
+            lock (GameFolderGate) if (key == gameFolderDirsSig && now - gameFolderDirsAt < GameFolderCacheTicks) return new List<string>(gameFolderDirs);
             var folders = new List<string>();
             foreach (string name in names)
             {
@@ -197,7 +200,7 @@ namespace ReplayKitHelper
             return full;
         }
 
-        public static bool NameTaken(string name) => File.Exists(LocateClip(name));
+        public static bool NameTaken(string name, string root = null) => File.Exists(LocateClip(name, root));
 
         // the files of the clip folder and its game folders; a name already seen in the clip folder or an earlier game folder hides a later one, so every name stands for one file
         public static List<FileInfo> LibraryFiles(string root)
@@ -313,7 +316,7 @@ namespace ReplayKitHelper
             return string.Join("|", parts);
         }
 
-        // read-ClipsDb/Save-ClipsDb lock their whole body, not just the file i/o -- a cache-hit read returns the live cached JObject, so two callers touching it at once would be concurrent unsynchronized mutation, not just a stale-read risk.
+        // read-ClipsDb and UpdateLibraryDb share ClipsMetaLock so the in-memory cache stays consistent with disk writes, and reads hand back a clone so callers can never mutate the cache.
         public static JObject ReadClipsDb(string folder = null)
         {
             lock (Server.State.ClipsMetaLock)
@@ -501,7 +504,7 @@ namespace ReplayKitHelper
             {
                 if (!(db[name] is JObject entry)) return false;
                 if (expectedUrl != null && !string.Equals(entry.Value<string>("url"), expectedUrl, StringComparison.Ordinal)) return false;
-                foreach (var k in new[] { "url", "uploaded_at", "retention_days", "shortcode", "ready", "transcode_status", "transcode_percent", "failed", "transcode_error" })
+                foreach (var k in new[] { "url", "uploaded_at", "retention_days", "shortcode", ClipRenames.LinkIdentityKey, "ready", "transcode_status", "transcode_percent", "failed", "transcode_error" })
                     entry.Remove(k);
                 if (entry.Count > 0) db[name] = entry;
                 else db.Remove(name);
@@ -582,21 +585,11 @@ namespace ReplayKitHelper
             }
         }
 
-        private static bool TestClipIndexEntryCurrent(JToken entry, FileInfo file)
-        {
-            if (entry == null) return false;
-            if (!string.Equals(entry["path"]?.Value<string>(), file.FullName, StringComparison.OrdinalIgnoreCase)) return false;
-            var size = entry["size"];
-            var mtimeTicks = entry["mtimeTicks"];
-            if (size == null || mtimeTicks == null) return false;
-            return size.Value<long>() == file.Length && mtimeTicks.Value<long>() == file.LastWriteTimeUtc.Ticks;
-        }
-
         private static JObject GetCurrentClipIndexEntry(FileInfo file, JObject index)
         {
             if (file == null || index == null) return null;
             var entry = index[file.Name] as JObject;
-            return TestClipIndexEntryCurrent(entry, file) ? entry : null;
+            return ClipIndexWorker.IsEntryCurrent(entry, file) ? entry : null;
         }
 
         private static void AddClipIndexFields(JObject item, JObject entry)
@@ -618,18 +611,8 @@ namespace ReplayKitHelper
             item["indexed"] = true;
         }
 
-        private static bool TestClipNeedsIndexRepair(FileInfo file, JObject index)
-        {
-            if (file == null) return false;
-            var entry = GetCurrentClipIndexEntry(file, index);
-            if (entry == null) return true;
-            var duration = entry["duration"];
-            string codec = entry["codec"]?.Value<string>();
-            if (duration != null && duration.Value<double>() > 0 && !string.IsNullOrWhiteSpace(codec)) return false;
-            var failedAt = entry["failedAt"];
-            if (failedAt != null && (DateTimeOffset.UtcNow.ToUnixTimeSeconds() - failedAt.Value<long>()) < 21600) return false;
-            return true;
-        }
+        private static bool TestClipNeedsIndexRepair(FileInfo file, JObject index) =>
+            file != null && !ClipIndexWorker.IsEntryReusable(index?[file.Name], file);
 
         private static string ResolveClipIndexFfprobe()
         {
@@ -648,7 +631,7 @@ namespace ReplayKitHelper
             return "";
         }
 
-        // claims ClipIndexRepairRunning under the lock before doing any slow work (ffprobe resolution, which can hit Get-HelperCapabilitiess multi-second cold-cache probe), then does that slow work lock-free so it cant hold up every other ClipsMetaLock user. the Task.ContinueWith below resets the claim on completion, so a bail-out before the task actually starts must reset it directly.
+        // claims ClipIndexRepairRunning under the lock before doing any slow work (ffprobe resolution, which can hit GetToolPaths on a cold cache), then does that slow work lock-free so it cant hold up every other ClipsMetaLock user. the Task.ContinueWith below resets the claim on completion, so a bail-out before the task actually starts must reset it directly.
         private static void StartClipIndexRepairIfNeeded(string clipDir, List<FileInfo> files, JObject index)
         {
             if (!string.Equals(clipDir, AppConfig.GetClipDir(), StringComparison.OrdinalIgnoreCase)) return;
@@ -991,7 +974,7 @@ namespace ReplayKitHelper
             return string.Join("|", parts);
         }
 
-        // holds ClipsMetaLock across the whole enumeration, not just the ReadClipsDb/ReadClipIndex calls -- both return live cached objects and this walks the folder doing many scattered reads into them, so a concurrent MarkUploaded/SaveClipsDb writing to that same live object mid-enumeration would be real corruption, not just staleness. only runs on a clips-cache miss, so its not the hot per-poll path.
+        // holds ClipsMetaLock across the whole enumeration so ReadClipIndex (which returns the live cached object) and rename reconciliation stay consistent with concurrent metadata writes; only runs on a clips-cache miss, so its not the hot per-poll path.
         public static List<JObject> GetClipsListUncached(string root = null)
         {
             List<JObject> items;
@@ -1155,7 +1138,7 @@ namespace ReplayKitHelper
                 int end = Math.Min(total - 1, safeOffset + safeLimit - 1);
                 page = items.GetRange(safeOffset, end - safeOffset + 1);
             }
-            int linked = items.Count(c => !string.IsNullOrEmpty(c["streamable_url"]?.Value<string>()));
+            int linked = (game == "all" && !linkedOnly) ? snapshot.Linked : items.Count(c => !string.IsNullOrEmpty(c["streamable_url"]?.Value<string>()));
             var payload = new JObject
             {
                 ["version"] = snapshot.Version + "|sort:" + safeSort + "|game:" + game + "|linked:" + linkedOnly,

@@ -66,5 +66,7 @@ private:
 };
 
 extern NotifyTip *g_notifyTip;
+// before the code of the tip is unloaded with the module
+void NotifyTipDestroy();
 
 } // namespace rk

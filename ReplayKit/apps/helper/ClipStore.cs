@@ -78,7 +78,11 @@ namespace ReplayKitHelper
                 }
                 Native.MoveFileReplace(temporary, path);
             }
-            finally { if (File.Exists(temporary)) File.Delete(temporary); }
+            finally
+            {
+                try { if (File.Exists(temporary)) File.Delete(temporary); }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { Log.Write("ClipStore temp cleanup: " + ex.Message); }
+            }
         }
 
         internal static string FolderKey(string folder)

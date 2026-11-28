@@ -117,11 +117,17 @@ public:
 			g_confirmDialog = nullptr;
 	}
 
-	// from the native message of a move or a resize of the obs window, before qt has taken in the new rectangle
+	// from the native message of a move or a resize of the obs window, before qt has taken in the new rectangle; in classic layout (no shell hwnd) falls back to qt geometry
 	void FollowWindow()
 	{
+		if (!m_host)
+			return;
+		if (m_host != ObsMainWindowQt() || !g_shellHwnd) {
+			syncToHost();
+			return;
+		}
 		RECT wr = {};
-		if (!m_host || m_host != ObsMainWindowQt() || !g_shellHwnd || IsIconic(g_shellHwnd) || !GetWindowRect(g_shellHwnd, &wr))
+		if (IsIconic(g_shellHwnd) || !GetWindowRect(g_shellHwnd, &wr))
 			return;
 		SetWindowPos((HWND)winId(), nullptr, int(wr.left), int(wr.top), int(wr.right - wr.left), int(wr.bottom - wr.top), SWP_NOZORDER | SWP_NOACTIVATE);
 	}
