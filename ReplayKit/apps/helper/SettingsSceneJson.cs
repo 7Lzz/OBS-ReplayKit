@@ -28,21 +28,21 @@ namespace ReplayKitHelper
     // the scene collection file half of the settings: the overlay geometry, the scene source and scene item json, and the motion blur and overlay opacity filters as written into the file
     internal static class SettingsSceneJson
     {
-        // -- overlay geometry: the rules live in shared/OverlayScene.cs, which the installer uses too; these read the settings json and the preset and pass plain values in.
+        // the overlay geometry rules live in shared/OverlayScene.cs, which the installer uses too; these read the settings json and the preset and pass plain values in
 
         internal static int OverlayOpacityValue(JObject settings)
         {
             var value = settings?["overlayOpacity"];
-            if (value == null || value.Type == JTokenType.Null) return 100;
+            if (value == null || value.Type == JTokenType.Null) return SettingDefaults.OverlayOpacity;
             return OverlayScene.Opacity(value.Value<int>());
         }
 
         internal static double OverlayHueShiftValue(JObject settings)
         {
             var value = settings?["overlayHueShift"];
-            if (value == null || value.Type == JTokenType.Null) return 0.0;
+            if (value == null || value.Type == JTokenType.Null) return SettingDefaults.OverlayHueShift;
             double v;
-            try { v = value.Value<double>(); } catch (FormatException) { v = 0.0; } catch (InvalidCastException) { v = 0.0; }
+            try { v = value.Value<double>(); } catch (FormatException) { v = SettingDefaults.OverlayHueShift; } catch (InvalidCastException) { v = SettingDefaults.OverlayHueShift; }
             return OverlayScene.HueShift(v);
         }
 
@@ -56,12 +56,12 @@ namespace ReplayKitHelper
         internal static int OverlayColorValue(string value, string defaultValue) => OverlayScene.ColorValue(value, defaultValue);
 
         internal static bool HasOverlayColorAdjustments(JObject settings) =>
-            OverlayScene.HasColorAdjustments(OverlayHueShiftValue(settings), OverlayHexColor(settings, "overlayColorMultiply", "#ffffff"), OverlayHexColor(settings, "overlayColorAdd", "#000000"));
+            OverlayScene.HasColorAdjustments(OverlayHueShiftValue(settings), OverlayHexColor(settings, "overlayColorMultiply", SettingDefaults.OverlayColorMultiply), OverlayHexColor(settings, "overlayColorAdd", SettingDefaults.OverlayColorAdd));
 
         internal static double OverlayScaleFactor(JObject settings)
         {
             var value = settings?["overlayScale"];
-            if (value == null || value.Type == JTokenType.Null) return 1.0;
+            if (value == null || value.Type == JTokenType.Null) return OverlayScene.ScaleFactor(SettingDefaults.OverlayScale);
             return OverlayScene.ScaleFactor(value.Value<int>());
         }
 
@@ -192,7 +192,7 @@ namespace ReplayKitHelper
         {
             double canvasW = preset["video"]?["baseWidth"]?.Value<double>() ?? 0.0;
             double canvasH = preset["video"]?["baseHeight"]?.Value<double>() ?? 0.0;
-            if (canvasW <= 0.0 || canvasH <= 0.0) { canvasW = 1920.0; canvasH = 1080.0; }
+            if (canvasW <= 0.0 || canvasH <= 0.0) { canvasW = OverlayScene.FallbackCanvasWidth; canvasH = OverlayScene.FallbackCanvasHeight; }
 
             if (name == OverlayScene.DisplayCaptureSourceName)
             {
@@ -227,7 +227,7 @@ namespace ReplayKitHelper
         // resolves which live scene collection file obs currently has active. no Setup equivalent -- Setup always targets the single fixed bundled path at install time and never has to ask a running obs.
         internal static string GetSceneCollectionPath()
         {
-            string scenesRoot = Path.Combine(Environment.GetEnvironmentVariable("APPDATA") ?? "", "obs-studio", "basic", "scenes");
+            string scenesRoot = Constants.OBS_SCENES_DIR;
             string collectionName = "Untitled";
             var list = ObsWebSocket.InvokeRequest("GetSceneCollectionList", null, 3000);
             if (list.Ok && !string.IsNullOrEmpty(list.Data?["currentSceneCollectionName"]?.Value<string>()))
@@ -272,7 +272,7 @@ namespace ReplayKitHelper
             return null;
         }
 
-        // -- json-file scene-source/scene-item builders. the fields every source and filter carries come from OverlayScene.SetSourceFields, shared with the installer. unlike Transform.cs (which always mints a fresh BongoCatSourceUuid constant for a brand-new template file), the live-apply functions below preserve whatever uuid an existing source already has and only mint a new one when creating from scratch -- callers pass whichever uuid is appropriate, these functions never generate one themselves.
+        // the scene source and scene item builders of the scene file; the fields every source and filter carries come from OverlayScene.SetSourceFields, shared with the installer. Transform.cs writes the fixed uuids of OverlayScene into a new template file, while these keep the uuid an existing source has: callers pass the uuid and these never make one
 
         internal const string BongoInputKind = OverlayScene.BongoSourceKind;
         internal const string LegacyBongoInputKind = OverlayScene.LegacyBongoSourceKind;
@@ -348,7 +348,7 @@ namespace ReplayKitHelper
             var sourceSettings = source["settings"] as JObject;
             if (sourceSettings == null) { sourceSettings = new JObject(); source["settings"] = sourceSettings; }
             string mode = settings?["bongoMode"]?.Value<string>();
-            if (!BongoModes.Contains(mode)) mode = "standard";
+            if (!BongoModes.Contains(mode)) mode = SettingDefaults.BongoMode;
             sourceSettings["mode"] = mode;
             sourceSettings["Mode"] = mode; sourceSettings["width"] = (int)OverlayScene.BongoSourceWidth; sourceSettings["height"] = (int)OverlayScene.BongoSourceHeight;
             sourceSettings["x"] = 0.0; sourceSettings["y"] = 0.02; sourceSettings["scale"] = 1.83;
@@ -390,7 +390,7 @@ namespace ReplayKitHelper
 
         internal static void SetWindowCaptureSourceJson(JObject source, string uuid, JObject settings)
         {
-            OverlayScene.SetSourceFields(source, OverlayScene.WindowCaptureSourceName, uuid, "window_capture", "window_capture", null, true);
+            OverlayScene.SetSourceFields(source, OverlayScene.WindowCaptureSourceName, uuid, OverlayScene.WindowCaptureSourceKind, OverlayScene.WindowCaptureSourceKind, null, true);
             source["settings"] = GetWindowCaptureInputSettings(settings);
         }
 
@@ -401,19 +401,20 @@ namespace ReplayKitHelper
             return source;
         }
 
+        // the input-overlay source reads the keyboard and mouse of this pc rather than one sent over its network feature
+        internal static JObject InputOverlaySourceSettings(string image, string layout) => new JObject
+        {
+            ["io.input_source"] = "This computer",
+            ["io.overlay_image"] = image,
+            ["io.layout_file"] = layout,
+        };
+
         internal static void SetInputOverlaySourceJson(JObject source, string name, string uuid, string image, string layout)
         {
             if (string.IsNullOrWhiteSpace(image) || string.IsNullOrWhiteSpace(layout))
-                throw new InvalidOperationException("Input overlay assets are missing for " + name + ".");
-            OverlayScene.SetSourceFields(source, name, uuid, "input-overlay", "input-overlay", null, true);
-
-            var sourceSettings = new JObject
-            {
-                ["io.input_source"] = "This computer",
-                ["io.overlay_image"] = image.Replace('\\', '/'),
-                ["io.layout_file"] = layout.Replace('\\', '/'),
-            };
-            source["settings"] = sourceSettings;
+                throw new InvalidOperationException(Locales.Message("settings.inputOverlayFilesAreMissing"));
+            OverlayScene.SetSourceFields(source, name, uuid, OverlayScene.InputOverlaySourceKind, OverlayScene.InputOverlaySourceKind, null, true);
+            source["settings"] = InputOverlaySourceSettings(image.Replace('\\', '/'), layout.Replace('\\', '/'));
         }
 
         internal static JObject NewInputOverlaySourceJson(string name, string uuid, string image, string layout)
@@ -440,7 +441,7 @@ namespace ReplayKitHelper
         {
             double canvasW = preset["video"]?["baseWidth"]?.Value<double>() ?? 0.0;
             double canvasH = preset["video"]?["baseHeight"]?.Value<double>() ?? 0.0;
-            if (canvasW <= 0.0 || canvasH <= 0.0) { canvasW = 1920.0; canvasH = 1080.0; }
+            if (canvasW <= 0.0 || canvasH <= 0.0) { canvasW = OverlayScene.FallbackCanvasWidth; canvasH = OverlayScene.FallbackCanvasHeight; }
             bool visible = item["visible"]?.Value<bool>() ?? true;
             var transform = MainCaptureTransform(name, preset);
             SetSceneItemBaseJson(item, name, visible);
@@ -535,7 +536,7 @@ namespace ReplayKitHelper
         // builds the group-kind source that wraps WASD+Mouse together, with its own nested items array using canvas-relative 2560x1440 reference geometry independent of the real canvas size. inputSources maps "WASD Overlay"/"Mouse Overlay" -> {uuid, id} for whichever of the two are actually present.
         internal static void SetInputOverlayGroupSourceJson(JObject group, string groupUuid, Dictionary<string, InputOverlaySourceRef> inputSources, JObject preset, JObject overlaySettings)
         {
-            group["prev_ver"] = 536936450; group["name"] = "Group"; group["uuid"] = groupUuid;
+            group["prev_ver"] = 536936450; group["name"] = OverlayScene.InputOverlayGroupName; group["uuid"] = groupUuid;
             group["id"] = "group"; group["versioned_id"] = "group";
 
             InputOverlayLayouts.GroupSize(overlaySettings, out double groupW, out double groupH);
@@ -574,7 +575,7 @@ namespace ReplayKitHelper
             var transform = InputOverlayGroupTransform(preset, settings);
             double scaleX = transform["scaleX"].Value<double>(), scaleY = transform["scaleY"].Value<double>();
             double x = transform["positionX"].Value<double>(), y = transform["positionY"].Value<double>();
-            SetSceneItemBaseJson(item, "Group", visible);
+            SetSceneItemBaseJson(item, OverlayScene.InputOverlayGroupName, visible);
             item["rot"] = transform["rotation"];
             item["source_uuid"] = groupUuid;
             item["scale_ref"] = new JObject { ["x"] = canvasW, ["y"] = canvasH };
@@ -621,7 +622,7 @@ namespace ReplayKitHelper
             items.Insert(insertAt, target);
         }
 
-        // -- motion blur filter (Display/Game/Window Capture) --
+        // the motion blur filter of the display, game and window capture
 
         internal static string MotionBlurFilterUuid(string sourceName) =>
             sourceName != null && OverlayScene.MotionBlurFilterUuids.TryGetValue(sourceName, out string uuid) ? uuid : "";
@@ -643,11 +644,11 @@ namespace ReplayKitHelper
         internal static string ShaderfilterMotionBlurPath() =>
             Path.Combine(GetObsInstallRoot(), "data\\obs-plugins\\obs-shaderfilter\\examples\\motion_blur.shader").Replace('\\', '/');
 
-        internal static double MotionBlurStrength(JObject settings)
-        {
-            double value = settings["motionBlurStrength"]?.Value<double>() ?? 0.0;
-            return value < 0.0 ? 0.0 : value > 1.0 ? 1.0 : value;
-        }
+        // a shader filter of any name that runs the motion blur example of obs-shaderfilter is one replaykit made
+        internal static bool IsMotionBlurShaderFile(string shaderFile) =>
+            (shaderFile ?? "").Replace('\\', '/').ToLowerInvariant().EndsWith("/motion_blur.shader", StringComparison.Ordinal);
+
+        internal static double MotionBlurStrength(JObject settings) => OverlayScene.MotionBlurStrength(settings["motionBlurStrength"]?.Value<double>() ?? SettingDefaults.MotionBlurStrength);
 
         internal static JObject MotionBlurFilterSettingsLive(double strength) => OverlayScene.MotionBlurFilterSettings(ShaderfilterMotionBlurPath(), strength);
 
@@ -671,8 +672,7 @@ namespace ReplayKitHelper
             if (filter["id"]?.Value<string>() != OverlayScene.MotionBlurFilterKind) return false;
             var filterSettings = filter["settings"];
             if (filterSettings == null) return false;
-            string shaderFile = filterSettings["shader_file_name"]?.Value<string>() ?? "";
-            return shaderFile.Replace('\\', '/').ToLowerInvariant().EndsWith("/motion_blur.shader");
+            return IsMotionBlurShaderFile(filterSettings["shader_file_name"]?.Value<string>());
         }
 
         internal static bool IsManagedMotionBlurJson(JObject filter, string uuid)
@@ -718,15 +718,15 @@ namespace ReplayKitHelper
             source["filters"] = filters;
         }
 
-        // -- overlay opacity/color filter (WASD/Mouse/Bongo Cat) --
+        // the opacity and colour filter of the wasd, mouse and bongo cat overlays
 
         internal static string OverlayOpacityFilterUuid(string sourceName) =>
             sourceName != null && OverlayScene.OpacityFilterUuids.TryGetValue(sourceName, out string uuid) ? uuid : "";
 
         internal static JObject OverlayOpacityFilterSettingsLive(int opacityPercent, bool legacyPercent, JObject settings = null) =>
             OverlayScene.OpacityFilterSettings(opacityPercent, OverlayHueShiftValue(settings),
-                OverlayColorValue(OverlayHexColor(settings, "overlayColorMultiply", "#ffffff"), "#ffffff"),
-                OverlayColorValue(OverlayHexColor(settings, "overlayColorAdd", "#000000"), "#000000"), legacyPercent);
+                OverlayColorValue(OverlayHexColor(settings, "overlayColorMultiply", SettingDefaults.OverlayColorMultiply), SettingDefaults.OverlayColorMultiply),
+                OverlayColorValue(OverlayHexColor(settings, "overlayColorAdd", SettingDefaults.OverlayColorAdd), SettingDefaults.OverlayColorAdd), legacyPercent);
 
         internal static bool OverlayOpacityFilterUsesLegacyPercent(string kind, JObject settings = null)
         {
@@ -801,7 +801,7 @@ namespace ReplayKitHelper
                 managedFilter["settings"] = filterSettings;
                 managedFilter["enabled"] = true;
             }
-            else if (opacity < 100 || hasColorAdjustments)
+            else if (opacity < SettingLimits.OverlayOpacityMax || hasColorAdjustments)
             {
                 filters.Add(NewOverlayOpacityFilterJson(sourceName, opacity, settings));
             }

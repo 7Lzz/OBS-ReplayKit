@@ -375,13 +375,13 @@ namespace ReplayKitHelper
                                 }
                                 if (!changed) return;
                                 // the already-running Replay Buffer output caches its dir from init -- update it live too.
-                                var rb = ObsWebSocket.InvokeRequest("GetOutputSettings", new JObject { ["outputName"] = "Replay Buffer" }, 3000);
+                                var rb = ObsWebSocket.InvokeRequest("GetOutputSettings", new JObject { ["outputName"] = ReplayBufferOutputName }, 3000);
                                 if (rb.Ok && rb.Data?["outputSettings"] is JObject rbSettings)
                                 {
                                     var next = (JObject)rbSettings.DeepClone();
                                     next["directory"] = resolved;
                                     next["path"] = resolved;
-                                    ObsWebSocket.InvokeRequest("SetOutputSettings", new JObject { ["outputName"] = "Replay Buffer", ["outputSettings"] = next }, 5000);
+                                    ObsWebSocket.InvokeRequest("SetOutputSettings", new JObject { ["outputName"] = ReplayBufferOutputName, ["outputSettings"] = next }, 5000);
                                 }
                             }
                             return;
@@ -543,7 +543,7 @@ namespace ReplayKitHelper
                 var after = ObsWebSocket.InvokeRequest("GetVideoSettings", null, 3000);
                 bool videoMatches = after.Ok && after.Data is JObject result && result["outputWidth"]?.Value<int>() == outputWidth && result["outputHeight"]?.Value<int>() == outputHeight &&
                     result["fpsNumerator"]?.Value<int>() == fpsNumerator && result["fpsDenominator"]?.Value<int>() == fpsDenominator;
-                var bufferAfter = ObsWebSocket.InvokeRequest("GetOutputSettings", new JObject { ["outputName"] = "Replay Buffer" }, 3000);
+                var bufferAfter = ObsWebSocket.InvokeRequest("GetOutputSettings", new JObject { ["outputName"] = ReplayBufferOutputName }, 3000);
                 Log.Write("EnsureObsVideoMatchesSettings: " + (videoMatches ? "OBS now records at " + outputWidth + "x" + outputHeight + " " + fpsNumerator + "/" + fpsDenominator + "." : "OBS did not take the saved video settings.") +
                     " The replay buffer cap is " + (bufferAfter.Ok ? bufferAfter.Data?["outputSettings"]?["max_size_mb"]?.ToString() : "unknown") + " MB.");
             }

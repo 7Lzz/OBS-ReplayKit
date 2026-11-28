@@ -30,10 +30,11 @@ namespace ReplayKitShared
     {
         public string ObsEncoderId { get; set; }
         public Dictionary<string, object> Settings { get; set; }
-        public string Codec { get; set; } // "h264" / "h265" -- for the menu
-        public string Backend { get; set; } // "nvenc" / "amf" / "qsv" / "x264"
+        // h264 or h265, compared with the codec the settings ask for
+        public string Codec { get; set; }
+        // nvenc, amf, qsv or x264
+        public string Backend { get; set; }
         public string Label { get; set; }
-        public string Description { get; set; }
 
         public bool IsHardware => Backend != "x264";
     }
@@ -224,7 +225,6 @@ namespace ReplayKitShared
             public string Codec;
             public string Backend;
             public string Label;
-            public string Description;
             public Func<int, string, Dictionary<string, object>> Builder;
         }
 
@@ -245,7 +245,6 @@ namespace ReplayKitShared
                     Codec = "h264",
                     Backend = "nvenc",
                     Label = "NVENC H.264",
-                    Description = "NVIDIA hardware H.264 - plays anywhere, biggest files of these options.",
                     Builder = (cqp, mode) => BuildNvencH264(cqp, gen, mode),
                 },
             };
@@ -257,7 +256,6 @@ namespace ReplayKitShared
                     Codec = "h265",
                     Backend = "nvenc",
                     Label = $"NVENC HEVC / H.265 ({GenLabel(genStr)})",
-                    Description = "NVIDIA hardware HEVC - ~half the file size of H.264 at the same quality.",
                     Builder = (cqp, mode) => BuildNvencHevc(cqp, gen, mode),
                 };
             }
@@ -276,7 +274,6 @@ namespace ReplayKitShared
                     Codec = "h264",
                     Backend = "amf",
                     Label = "AMF H.264",
-                    Description = "AMD hardware H.264 - plays anywhere, modest compression.",
                     Builder = (cqp, mode) => BuildAmfH264(cqp, gen, mode),
                 },
             };
@@ -288,7 +285,6 @@ namespace ReplayKitShared
                     Codec = "h265",
                     Backend = "amf",
                     Label = $"AMF HEVC / H.265 ({genStr.ToUpperInvariant()})",
-                    Description = "AMD hardware HEVC - significantly smaller files than H.264.",
                     Builder = (cqp, mode) => BuildAmfHevc(cqp, gen, mode),
                 };
             }
@@ -307,7 +303,6 @@ namespace ReplayKitShared
                     Codec = "h264",
                     Backend = "qsv",
                     Label = "Quick Sync H.264",
-                    Description = "Intel iGPU H.264 - low CPU/GPU cost, larger files.",
                     Builder = (cqp, mode) => BuildQsvH264(cqp, mode),
                 },
             };
@@ -319,7 +314,6 @@ namespace ReplayKitShared
                     Codec = "h265",
                     Backend = "qsv",
                     Label = $"Quick Sync HEVC / H.265 ({GenLabel(genStr)})",
-                    Description = "Intel iGPU HEVC - smaller files, low overhead.",
                     Builder = (cqp, mode) => BuildQsvHevc(cqp, mode),
                 };
             }
@@ -334,7 +328,6 @@ namespace ReplayKitShared
                 Codec = "h264",
                 Backend = "x264",
                 Label = "x264 (software)",
-                Description = "CPU-only H.264 - works on any machine, uses CPU not GPU.",
                 Builder = (cqp, mode) => BuildX264(cqp, mode),
             };
         }
@@ -374,7 +367,7 @@ namespace ReplayKitShared
         };
 
         // resolve codec preference + gpu + compression_mode into a concrete encoder choice. cqp is on the nvenc scale (0-51, lower = better); the chosen builder translates as needed (crf for x264, icq for qsv, etc.). compression_mode controls encoder effort (lower_gpu/balanced/smaller_files/tiniest).
-        public static EncoderChoice PickEncoder(GpuInfo gpu, string codecPreference, int cqp, string compressionMode = "balanced")
+        public static EncoderChoice PickEncoder(GpuInfo gpu, string codecPreference, int cqp, string compressionMode = SettingDefaults.CompressionMode)
         {
             var pref = CodecPreferenceExt.Parse(codecPreference);
             var candidates = AvailableCandidates(gpu);
@@ -389,11 +382,10 @@ namespace ReplayKitShared
                     Codec = cand.Codec,
                     Backend = cand.Backend,
                     Label = cand.Label,
-                    Description = cand.Description,
                 };
             }
 
-            // unreachable: fallback_order always ends in "software" and AvailableCandidates always includes it. defensive last-ditch so callers never get null.
+            // unreachable: FallbackOrder always ends in "software" and AvailableCandidates always includes it. defensive last-ditch so callers never get null.
             var sw = SoftwareCandidate();
             return new EncoderChoice
             {
@@ -402,7 +394,6 @@ namespace ReplayKitShared
                 Codec = sw.Codec,
                 Backend = sw.Backend,
                 Label = sw.Label,
-                Description = sw.Description,
             };
         }
 

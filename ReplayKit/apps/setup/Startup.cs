@@ -8,8 +8,8 @@ namespace ReplayKitSetup
     // windows startup integration for launching obs with replaykit: a shortcut in the startup folder of the user, written in-process thru com with no script or shell started for it, since that shape is what av heuristics flag
     public static class Startup
     {
-        private const string ValueName = "OBS ReplayKit";
-        private const string ShortcutName = "OBS ReplayKit.lnk";
+        private const string ValueName = ReplayKitShared.ObsLaunch.LegacyRunValueName;
+        private const string ShortcutName = ReplayKitShared.ObsLaunch.StartupShortcutName;
 
         private static string StartupFolder()
         {
@@ -82,7 +82,7 @@ namespace ReplayKitSetup
                 shortcutType.InvokeMember("Arguments", BindingFlags.SetProperty, null, shortcut, new object[] { ReplayKitShared.ObsLaunch.Arguments });
                 shortcutType.InvokeMember("WorkingDirectory", BindingFlags.SetProperty, null, shortcut, new object[] { Path.GetDirectoryName(obsExe) });
                 shortcutType.InvokeMember("IconLocation", BindingFlags.SetProperty, null, shortcut, new object[] { obsExe + ",0" });
-                shortcutType.InvokeMember("Description", BindingFlags.SetProperty, null, shortcut, new object[] { "Start OBS ReplayKit when Windows signs in." });
+                shortcutType.InvokeMember("Description", BindingFlags.SetProperty, null, shortcut, new object[] { SetupLocale.Message("settings.startObsReplaykitWhenWindowsSigns") });
                 shortcutType.InvokeMember("Save", BindingFlags.InvokeMethod, null, shortcut, null);
             }
             catch (Exception exc) when (exc is COMException || exc is TargetInvocationException || exc is MissingMemberException)

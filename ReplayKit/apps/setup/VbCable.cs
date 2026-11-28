@@ -269,32 +269,7 @@ namespace ReplayKitSetup
             }
         }
 
-        // sound/media device setup class; one NNNN subkey per installed audio driver, DriverDesc is the same string Win32_SoundDevice.Name returned.
-        private const string MediaClassKey = @"SYSTEM\CurrentControlSet\Control\Class\{4d36e96c-e325-11ce-bfc1-08002be10318}";
-
-        // true iff the bundled virtual audio driver is registered, read from the media-class driver descriptions so the setup carries no System.Management.
-        public static bool IsVbcableInstalled()
-        {
-            try
-            {
-                using (var classKey = Registry.LocalMachine.OpenSubKey(MediaClassKey))
-                {
-                    if (classKey == null) return false;
-                    foreach (string sub in classKey.GetSubKeyNames())
-                    {
-                        if (sub.Length != 4 || !sub.All(char.IsDigit)) continue;
-                        using (var dev = classKey.OpenSubKey(sub))
-                        {
-                            string desc = dev?.GetValue("DriverDesc") as string;
-                            if (!string.IsNullOrEmpty(desc) && desc.IndexOf("VB-Audio Virtual Cable", StringComparison.OrdinalIgnoreCase) >= 0)
-                                return true;
-                        }
-                    }
-                }
-            }
-            catch (Exception ex) when (ex is System.Security.SecurityException || ex is UnauthorizedAccessException || ex is IOException) { }
-            return false;
-        }
+        public static bool IsVbcableInstalled() => ReplayKitShared.VbCableDriver.IsInstalled();
 
         // true when the cable is installed AND its render endpoint already carries the "OBS Stream Audio" name -- i.e. EnsureVbcable has nothing to do, so the setup step can skip it (no installer, no audiosrv bounce).
         public static bool IsShareAudioReady()

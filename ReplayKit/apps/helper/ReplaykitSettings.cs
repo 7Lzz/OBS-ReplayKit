@@ -39,6 +39,11 @@ namespace ReplayKitHelper
         internal const bool DefaultSeparateAudioTracks = SettingDefaults.RecordingSeparateAudioTracks;
         internal const string DefaultCodecPreference = SettingDefaults.CodecPreference;
         internal const string OutputDeviceRecordingMode = "output_device";
+        internal const int DefaultFps = 60;
+        internal const int DefaultDownscaleHeight = 1080;
+        internal const string DefaultDownscaleFilter = "lanczos";
+        internal const int DefaultDeletedHistoryDays = 7;
+        internal const int DefaultGifFrameDelay = 3;
 
         internal static bool UsesOutputDeviceRecording(JObject settings) =>
             settings["recordingAudioMode"]?.Value<string>() == OutputDeviceRecordingMode;
@@ -51,13 +56,13 @@ namespace ReplayKitHelper
                 ["compressionMode"] = SettingDefaults.CompressionMode,
                 ["codecPreference"] = DefaultCodecPreference,
                 ["replaySeconds"] = SettingDefaults.ReplaySeconds,
-                ["fps"] = 60,
-                ["fpsNumerator"] = 60,
+                ["fps"] = DefaultFps,
+                ["fpsNumerator"] = DefaultFps,
                 ["fpsDenominator"] = 1,
                 // recording output resolution: "native" = encode at the canvas (monitor) size, no downscale; "downscale" = scale the output down to downscaleHeight using downscaleFilter. default is canvas-aware -- native at/below 1080p, downscale-to-1080 above. the performance preset always caps at 720 regardless.
                 ["recordingScaleMode"] = DefaultRecordingScaleMode(),
-                ["downscaleHeight"] = 1080,
-                ["downscaleFilter"] = "lanczos",
+                ["downscaleHeight"] = DefaultDownscaleHeight,
+                ["downscaleFilter"] = DefaultDownscaleFilter,
                 // where the clip buffer is kept: disk unless memory is picked, see ClipBuffer
                 ["recordingBuffer"] = ClipBuffer.Disk,
                 // which kinds of capture show the mouse cursor in recordings and clips
@@ -71,7 +76,7 @@ namespace ReplayKitHelper
                 ["storageLimitGb"] = 0,
                 ["storageCompressionType"] = "fast",
                 // the days a deleted clip or screenshot stays in Deleted before it is gone for good; 0 = deletes are final at once
-                ["deletedHistoryDays"] = 7,
+                ["deletedHistoryDays"] = DefaultDeletedHistoryDays,
                 ["clipKeybind"] = new JObject { ["key"] = SettingDefaults.ClipKey },
                 ["recordingKeybind"] = new JObject(),
                 ["openClipsKeybind"] = new JObject { [SettingDefaults.OpenClipsModifier] = true, ["key"] = SettingDefaults.OpenClipsKey },
@@ -159,7 +164,7 @@ namespace ReplayKitHelper
                 ["editorAutoplay"] = false,
                 ["editorLoopPreview"] = false,
                 ["editorSeekStep"] = 5,
-                ["gifFrameDelay"] = 3,
+                ["gifFrameDelay"] = DefaultGifFrameDelay,
                 ["editorWheelZoom"] = true,
                 ["editorZoomScaling"] = "smooth",
                 // how a clip is smoothed while it plays large in the theater view, full screen and the editor: none, msaa or fxaa
@@ -184,7 +189,7 @@ namespace ReplayKitHelper
                 ["recordingSeparateAudioTracks"] = DefaultSeparateAudioTracks,
                 ["motionBlurEnabled"] = SettingDefaults.MotionBlurEnabled,
                 ["motionBlurStrength"] = SettingDefaults.MotionBlurStrength,
-                // legacy shareMode is kept only so older settings files dont break parsing; discord output uses the obs windowed projector directly.
+                // shareMode and discord_output_mode are kept only so older settings files still parse; both always read projector, and discord is shown the share window
                 ["shareMode"] = SettingDefaults.ShareMode,
                 ["discord_screenshare_enabled"] = SettingDefaults.DiscordScreenshareEnabled,
                 ["discord_output_mode"] = SettingDefaults.DiscordOutputMode,
@@ -244,15 +249,15 @@ namespace ReplayKitHelper
                 if (s == "true" || s == "1" || s == "yes" || s == "on") return true;
                 if (s == "false" || s == "0" || s == "no" || s == "off") return false;
             }
-            throw new InvalidOperationException("Invalid boolean setting: " + key);
+            throw InvalidSetting(key);
         }
 
         internal static int GetIntSetting(JObject data, string key, int defaultValue, int min, int max)
         {
             var token = data[key];
             if (token == null) return defaultValue;
-            if (!int.TryParse(token.ToString(), out int n)) throw new InvalidOperationException("Invalid number setting: " + key);
-            if (n < min || n > max) throw new InvalidOperationException(key + " must be between " + min + " and " + max + ".");
+            if (!int.TryParse(token.ToString(), out int n)) throw InvalidSetting(key);
+            if (n < min || n > max) throw SettingOutOfRange(key, min, max);
             return n;
         }
 
@@ -261,9 +266,8 @@ namespace ReplayKitHelper
             var token = data[key];
             if (token == null) return defaultValue;
             string text = token is JValue scalar ? Convert.ToString(scalar.Value, CultureInfo.InvariantCulture) : "";
-            if (!double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out double n))
-                throw new InvalidOperationException("Invalid number setting: " + key);
-            if (double.IsNaN(n) || double.IsInfinity(n) || n < min || n > max) throw new InvalidOperationException(key + " must be between " + min + " and " + max + ".");
+            if (!double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out double n)) throw InvalidSetting(key);
+            if (double.IsNaN(n) || double.IsInfinity(n) || n < min || n > max) throw SettingOutOfRange(key, min, max);
             return n;
         }
 
@@ -273,7 +277,7 @@ namespace ReplayKitHelper
             if (token == null) return defaultValue;
             string v = token.ToString().Trim().ToLowerInvariant();
             if (Regex.IsMatch(v, "^#[0-9a-f]{6}$")) return v;
-            throw new InvalidOperationException("Invalid color setting: " + key);
+            throw InvalidSetting(key);
         }
 
         internal static string GetEnumSetting(JObject data, string key, string defaultValue, string[] allowed)
@@ -282,7 +286,7 @@ namespace ReplayKitHelper
             if (token == null) return defaultValue;
             string v = token.ToString().Trim();
             if (allowed.Contains(v)) return v;
-            throw new InvalidOperationException("Invalid option for " + key + ": " + v);
+            throw InvalidSetting(key);
         }
 
         internal static string GetTextSetting(JObject data, string key, string defaultValue, int maxLength)
@@ -291,7 +295,7 @@ namespace ReplayKitHelper
             if (token == null) return defaultValue;
             string v = token.ToString().Trim();
             if (string.IsNullOrWhiteSpace(v)) return defaultValue;
-            if (v.Length > maxLength || Regex.IsMatch(v, @"[\x00-\x1F]")) throw new InvalidOperationException("Invalid text setting: " + key);
+            if (v.Length > maxLength || Regex.IsMatch(v, @"[\x00-\x1F]")) throw InvalidSetting(key);
             return v;
         }
 
@@ -301,9 +305,16 @@ namespace ReplayKitHelper
             if (token == null) return defaultValue;
             string v = token.ToString().Trim();
             if (string.IsNullOrWhiteSpace(v)) return "";
-            if (v.Length > 32 || !Regex.IsMatch(v, @"^\d+(?:\.\d+){0,3}$")) throw new InvalidOperationException("Invalid version setting: " + key);
+            if (v.Length > 32 || !Regex.IsMatch(v, @"^\d+(?:\.\d+){0,3}$")) throw InvalidSetting(key);
             return v;
         }
+
+        // a page of another release can still send a value this one refuses, so the reason reaches it as a message
+        internal static InvalidOperationException InvalidSetting(string key) =>
+            new InvalidOperationException(Locales.Message("settings.settingValueNotValid", "name", key));
+
+        internal static InvalidOperationException SettingOutOfRange(string key, double min, double max) =>
+            new InvalidOperationException(Locales.Message("settings.settingMustBeBetween", "name", key, "min", min, "max", max));
 
         // drops a single pair of wrapping quotes -- explorers "copy as path" gives "C:\...\file", and users paste that verbatim.
         public static string StripWrappingQuotes(string value)
@@ -332,7 +343,7 @@ namespace ReplayKitHelper
             var keyToken = data["key"];
             if (keyToken == null || string.IsNullOrWhiteSpace(keyToken.Value<string>())) return new JObject();
             string key = keyToken.Value<string>().Trim();
-            if (!Regex.IsMatch(key, "^OBS_KEY_[A-Z0-9_]{1,48}$")) throw new InvalidOperationException("Invalid " + settingName + ".");
+            if (!Regex.IsMatch(key, "^OBS_KEY_[A-Z0-9_]{1,48}$")) throw InvalidSetting(settingName);
             var outObj = new JObject { ["key"] = key };
             foreach (var mod in HotkeyModifiers.Order)
             {
@@ -342,13 +353,13 @@ namespace ReplayKitHelper
         }
 
         internal static JObject NormalizeClipKeybind(JToken value) =>
-            NormalizeHotkeyCombo(value, new JObject { ["key"] = SettingDefaults.ClipKey }, "clip keybind");
+            NormalizeHotkeyCombo(value, new JObject { ["key"] = SettingDefaults.ClipKey }, "clipKeybind");
 
         internal static JObject NormalizeRecordingKeybind(JToken value) =>
-            NormalizeHotkeyCombo(value, new JObject(), "recording keybind");
+            NormalizeHotkeyCombo(value, new JObject(), "recordingKeybind");
 
         internal static JObject NormalizeOpenClipsKeybind(JToken value) =>
-            NormalizeHotkeyCombo(value, new JObject { [SettingDefaults.OpenClipsModifier] = true, ["key"] = SettingDefaults.OpenClipsKey }, "open clips keybind");
+            NormalizeHotkeyCombo(value, new JObject { [SettingDefaults.OpenClipsModifier] = true, ["key"] = SettingDefaults.OpenClipsKey }, "openClipsKeybind");
 
         // a display that is unplugged right now still counts, so a choice survives the monitor being off; only the shape of an obs monitor_id is checked, the way obs itself writes it
         internal static string NormalizeCaptureDisplay(JToken value)
@@ -461,8 +472,8 @@ namespace ReplayKitHelper
             List<JToken> items;
             if (value.Type == JTokenType.String) items = new List<JToken> { value };
             else if (value is JArray arr) items = arr.ToList();
-            else throw new InvalidOperationException("screenshareGameOverrides must be a list.");
-            if (items.Count > 32) throw new InvalidOperationException("screenshareGameOverrides cannot contain more than 32 games.");
+            else throw InvalidSetting("screenshareGameOverrides");
+            if (items.Count > ScreenshareGameOverridesMax) throw new InvalidOperationException(Locales.Message("settings.autoGameListIsFull"));
 
             var seen = new HashSet<string>();
             var outArr = new JArray();
@@ -496,6 +507,15 @@ namespace ReplayKitHelper
         internal const double SwitchDelaySecondsMax = 5.0;
         internal const double BongoSpeedMin = 0.1;
         internal const double BongoSpeedMax = 3.0;
+        internal const int DeletedHistoryDaysMax = 30;
+        internal const int ScreenshareGameOverridesMax = 32;
+        internal const int FpsDenominatorMax = 1000;
+        // older builds took an fps up to 1000, so a saved one above FpsMax is lowered to it rather than refused
+        internal const int FpsLegacyMax = 1000;
+        // the parts of a saved game window: its title, window class and exe name
+        internal const int GameWindowTitleMax = 160;
+        internal const int GameWindowClassMax = 120;
+        internal const int GameWindowExeMax = 96;
         // 0 is no limit, the default
         internal const int StorageLimitGbMax = 1000000;
         // the share card layout: each item centre in percent of the card, its size in percent of the size the default card draws it at, and its turn in degrees
@@ -511,7 +531,7 @@ namespace ReplayKitHelper
         {
             var token = raw?["share_cover_text"];
             string text = token == null || token.Type == JTokenType.Null ? null : token.ToString().Trim();
-            if (text != null && (text.Length > SettingLimits.ShareCoverTextMaxLength || Regex.IsMatch(text, @"[\x00-\x1F]"))) throw new InvalidOperationException("Invalid text setting: share_cover_text");
+            if (text != null && (text.Length > SettingLimits.ShareCoverTextMaxLength || Regex.IsMatch(text, @"[\x00-\x1F]"))) throw InvalidSetting("share_cover_text");
             var shown = raw?["share_cover_show_text"];
             if (shown != null)
             {
@@ -531,7 +551,7 @@ namespace ReplayKitHelper
             if (v.Length == 0) return defaultValue;
             if (Regex.IsMatch(v, "^#[0-9a-f]{6}$")) return v;
             if (Regex.IsMatch(v, "^#[0-9a-f]{8}$")) return v.EndsWith("ff", StringComparison.Ordinal) ? v.Substring(0, 7) : v;
-            throw new InvalidOperationException("Invalid color setting: " + key);
+            throw InvalidSetting(key);
         }
 
         // the default card: the text in the middle and the logo in the lower left, large enough that its outline still shows on a 720p stream
@@ -612,13 +632,13 @@ namespace ReplayKitHelper
             string shareMode = GetEnumSetting(data, "shareMode", defaults["shareMode"].Value<string>(), new[] { "projector", "share_bridge", "virtual_camera_legacy", "vcam", "screenshare" });
             if (shareMode != "projector")
             {
-                Log.Write("Discord shareMode '" + shareMode + "' ignored; ReplayKit now uses OBS projector mode.");
+                Log.Write("Discord shareMode '" + shareMode + "' ignored; it always reads projector now.");
                 shareMode = "projector";
             }
             string discordOutputMode = GetEnumSetting(data, "discord_output_mode", defaults["discord_output_mode"].Value<string>(), new[] { "projector", "share_bridge", "virtual_camera_legacy" });
             if (discordOutputMode != "projector")
             {
-                Log.Write("Discord output mode '" + discordOutputMode + "' ignored; ReplayKit now uses OBS projector mode.");
+                Log.Write("Discord output mode '" + discordOutputMode + "' ignored; it always reads projector now.");
                 discordOutputMode = "projector";
             }
 
@@ -644,10 +664,9 @@ namespace ReplayKitHelper
                 ["compressionMode"] = compression,
                 ["codecPreference"] = codecPreference,
                 ["replaySeconds"] = replaySeconds,
-                // older builds allowed a single FPS value above the current 240 cap; clamp that legacy value during migration so it cannot block the settings page from loading.
-                ["fps"] = Math.Min(SettingLimits.FpsMax, GetIntSetting(data, "fps", defaults["fps"].Value<int>(), SettingLimits.FpsMin, 1000)),
-                ["fpsNumerator"] = Math.Min(SettingLimits.FpsMax, GetIntSetting(data, "fpsNumerator", GetIntSetting(data, "fps", defaults["fps"].Value<int>(), SettingLimits.FpsMin, 1000), SettingLimits.FpsMin, 1000)),
-                ["fpsDenominator"] = GetIntSetting(data, "fpsDenominator", defaults["fpsDenominator"].Value<int>(), 1, 1000),
+                ["fps"] = Math.Min(SettingLimits.FpsMax, GetIntSetting(data, "fps", defaults["fps"].Value<int>(), SettingLimits.FpsMin, FpsLegacyMax)),
+                ["fpsNumerator"] = Math.Min(SettingLimits.FpsMax, GetIntSetting(data, "fpsNumerator", GetIntSetting(data, "fps", defaults["fps"].Value<int>(), SettingLimits.FpsMin, FpsLegacyMax), SettingLimits.FpsMin, FpsLegacyMax)),
+                ["fpsDenominator"] = GetIntSetting(data, "fpsDenominator", defaults["fpsDenominator"].Value<int>(), 1, FpsDenominatorMax),
                 ["recordingScaleMode"] = GetEnumSetting(data, "recordingScaleMode", defaults["recordingScaleMode"].Value<string>(), new[] { "native", "downscale" }),
                 ["downscaleHeight"] = GetIntSetting(data, "downscaleHeight", defaults["downscaleHeight"].Value<int>(), DownscaleHeightMin, DownscaleHeightMax),
                 ["downscaleFilter"] = GetEnumSetting(data, "downscaleFilter", defaults["downscaleFilter"].Value<string>(), new[] { "bilinear", "area", "bicubic", "lanczos" }),
@@ -659,17 +678,17 @@ namespace ReplayKitHelper
                 ["clipDir"] = clipDir,
                 ["storageLimitGb"] = GetIntSetting(data, "storageLimitGb", defaults["storageLimitGb"].Value<int>(), 0, StorageLimitGbMax),
                 ["storageCompressionType"] = GetEnumSetting(data, "storageCompressionType", defaults["storageCompressionType"].Value<string>(), new[] { "fast", "smaller" }),
-                ["deletedHistoryDays"] = GetIntSetting(data, "deletedHistoryDays", defaults["deletedHistoryDays"].Value<int>(), 0, 30),
+                ["deletedHistoryDays"] = GetIntSetting(data, "deletedHistoryDays", defaults["deletedHistoryDays"].Value<int>(), 0, DeletedHistoryDaysMax),
                 ["clipKeybind"] = NormalizeClipKeybind(data["clipKeybind"]),
                 ["recordingKeybind"] = NormalizeRecordingKeybind(data["recordingKeybind"]),
                 ["openClipsKeybind"] = NormalizeOpenClipsKeybind(data["openClipsKeybind"]),
-                ["clipKeybindExtra"] = NormalizeExtraKeybind(data["clipKeybindExtra"], "extra clip keybind"),
-                ["recordingKeybindExtra"] = NormalizeExtraKeybind(data["recordingKeybindExtra"], "extra recording keybind"),
+                ["clipKeybindExtra"] = NormalizeExtraKeybind(data["clipKeybindExtra"], "clipKeybindExtra"),
+                ["recordingKeybindExtra"] = NormalizeExtraKeybind(data["recordingKeybindExtra"], "recordingKeybindExtra"),
                 ["recordingStopKeybind"] = data["recordingStopKeybind"] is JObject ? (JToken)NormalizeRecordingKeybind(data["recordingStopKeybind"]) : JValue.CreateNull(),
-                ["recordingStopKeybindExtra"] = data["recordingStopKeybindExtra"] is JObject ? (JToken)NormalizeExtraKeybind(data["recordingStopKeybindExtra"], "extra stop recording keybind") : JValue.CreateNull(),
-                ["openClipsKeybindExtra"] = NormalizeExtraKeybind(data["openClipsKeybindExtra"], "extra open clips keybind"),
-                ["screenshotKeybind"] = NormalizeExtraKeybind(data["screenshotKeybind"], "screenshot keybind"),
-                ["screenshotKeybindExtra"] = NormalizeExtraKeybind(data["screenshotKeybindExtra"], "extra screenshot keybind"),
+                ["recordingStopKeybindExtra"] = data["recordingStopKeybindExtra"] is JObject ? (JToken)NormalizeExtraKeybind(data["recordingStopKeybindExtra"], "recordingStopKeybindExtra") : JValue.CreateNull(),
+                ["openClipsKeybindExtra"] = NormalizeExtraKeybind(data["openClipsKeybindExtra"], "openClipsKeybindExtra"),
+                ["screenshotKeybind"] = NormalizeExtraKeybind(data["screenshotKeybind"], "screenshotKeybind"),
+                ["screenshotKeybindExtra"] = NormalizeExtraKeybind(data["screenshotKeybindExtra"], "screenshotKeybindExtra"),
                 ["overlayStyle"] = GetEnumSetting(data, "overlayStyle", defaults["overlayStyle"].Value<string>(), SettingLimits.OverlayStyles),
                 ["overlayOpacity"] = GetIntSetting(data, "overlayOpacity", defaults["overlayOpacity"].Value<int>(), SettingLimits.OverlayOpacityMin, SettingLimits.OverlayOpacityMax),
                 ["overlayScale"] = GetIntSetting(data, "overlayScale", defaults["overlayScale"].Value<int>(), SettingLimits.OverlayScaleMin, SettingLimits.OverlayScaleMax),
@@ -712,7 +731,7 @@ namespace ReplayKitHelper
                 ["sdkMode"] = GetBoolSetting(data, "sdkMode", defaults["sdkMode"].Value<bool>()),
                 ["checkObsUpdates"] = GetBoolSetting(data, "checkObsUpdates", defaults["checkObsUpdates"].Value<bool>()),
                 ["logInterfaceEvents"] = GetBoolSetting(data, "logInterfaceEvents", defaults["logInterfaceEvents"].Value<bool>()),
-                ["trimPreciseDefault"] = true,
+                ["trimPreciseDefault"] = SettingDefaults.TrimPreciseDefault,
                 ["trimGpuEncode"] = GetBoolSetting(data, "trimGpuEncode", defaults["trimGpuEncode"].Value<bool>()),
                 ["showCodecTags"] = GetBoolSetting(data, "showCodecTags", defaults["showCodecTags"].Value<bool>()),
                 ["gameRecognition"] = GetBoolSetting(data, "gameRecognition", defaults["gameRecognition"].Value<bool>()),
@@ -752,7 +771,7 @@ namespace ReplayKitHelper
                 ["discord_projector_monitor_index"] = GetIntSetting(data, "discord_projector_monitor_index", defaults["discord_projector_monitor_index"].Value<int>(), 0, SettingLimits.DiscordProjectorMonitorIndexMax),
                 ["discord_projector_edge"] = GetEnumSetting(data, "discord_projector_edge", defaults["discord_projector_edge"].Value<string>(), SettingLimits.DiscordProjectorEdges),
                 ["discord_projector_title_hint"] = GetTextSetting(data, "discord_projector_title_hint", defaults["discord_projector_title_hint"].Value<string>(), SettingLimits.DiscordProjectorTitleHintMaxLength),
-                ["discord_projector_hide_taskbar"] = true,
+                ["discord_projector_hide_taskbar"] = SettingDefaults.DiscordProjectorHideTaskbar,
                 ["share_window_keep"] = GetEnumSetting(data, "share_window_keep", defaults["share_window_keep"].Value<string>(), SettingLimits.ShareWindowKeepChoices),
                 ["share_cover_background"] = GetEnumSetting(data, "share_cover_background", defaults["share_cover_background"].Value<string>(), SettingLimits.ShareCoverBackgrounds),
                 ["share_cover_fit"] = GetEnumSetting(data, "share_cover_fit", defaults["share_cover_fit"].Value<string>(), SettingLimits.ShareCoverFits),
@@ -983,27 +1002,8 @@ namespace ReplayKitHelper
             return token == null || token.Value<bool>();
         }
 
-        // sound/media device setup class; one NNNN subkey per installed audio driver. mirrors VbCable.IsVbcableInstalled in the setup exe -- the settings dock uses this to show Install vs Uninstall on the Share Preview audio row.
-        internal const string MediaClassKey = @"SYSTEM\CurrentControlSet\Control\Class\{4d36e96c-e325-11ce-bfc1-08002be10318}";
-
-        public static bool IsShareAudioDriverInstalled()
-        {
-            try
-            {
-                using var classKey = Registry.LocalMachine.OpenSubKey(MediaClassKey);
-                if (classKey == null) return false;
-                foreach (string sub in classKey.GetSubKeyNames())
-                {
-                    if (sub.Length != 4 || !sub.All(char.IsDigit)) continue;
-                    using var dev = classKey.OpenSubKey(sub);
-                    string desc = dev?.GetValue("DriverDesc") as string;
-                    if (!string.IsNullOrEmpty(desc) && desc.IndexOf("VB-Audio Virtual Cable", StringComparison.OrdinalIgnoreCase) >= 0)
-                        return true;
-                }
-            }
-            catch (Exception ex) when (ex is System.Security.SecurityException || ex is UnauthorizedAccessException || ex is IOException) { }
-            return false;
-        }
+        // the settings dock shows Install or Uninstall on the Share Preview audio row by it
+        public static bool IsShareAudioDriverInstalled() => VbCableDriver.IsInstalled();
 
         public static JObject ReadSettings()
         {
@@ -1061,19 +1061,15 @@ namespace ReplayKitHelper
 
         public static int GetGifFrameDelay()
         {
-            try
-            {
-                string v = ReadSettings()["gifFrameDelay"]?.ToString() ?? "3";
-                return GifFrameDelays.Contains(v) ? int.Parse(v, CultureInfo.InvariantCulture) : 3;
-            }
-            catch (InvalidOperationException) { return 3; }
+            try { return ReadSettings()["gifFrameDelay"].Value<int>(); }
+            catch (InvalidOperationException) { return DefaultGifFrameDelay; }
         }
 
         // the days deleted clips and screenshots are kept, 0 when deleted history is off; a settings file that cannot be read keeps the default, so a delete is never made final by a read error
         public static int GetDeletedHistoryDays()
         {
-            try { return Math.Max(0, Math.Min(30, ReadSettings()["deletedHistoryDays"]?.Value<int>() ?? 7)); }
-            catch (InvalidOperationException) { return 7; }
+            try { return ReadSettings()["deletedHistoryDays"].Value<int>(); }
+            catch (InvalidOperationException) { return DefaultDeletedHistoryDays; }
         }
 
         // whether the saves that make the video again may use the graphics card encoder
@@ -1083,7 +1079,7 @@ namespace ReplayKitHelper
             catch (InvalidOperationException) { return true; }
         }
 
-        // the recording codec the saves follow: auto, h264 or h265
+        // the recording codec the saves follow: h264 or h265
         public static string GetCodecPreference()
         {
             try { return ReadSettings()["codecPreference"]?.Value<string>() ?? DefaultCodecPreference; }
@@ -1180,15 +1176,15 @@ namespace ReplayKitHelper
         {
             string raw = (token ?? "").Trim();
             if (string.IsNullOrWhiteSpace(raw)) return null;
-            if (raw.Length > 512 || Regex.IsMatch(raw, @"[\x00-\x1F]")) throw new InvalidOperationException("Invalid game window token.");
+            if (raw.Length > 512 || Regex.IsMatch(raw, @"[\x00-\x1F]")) throw new InvalidOperationException(Locales.Message("settings.invalidGameWindowToken"));
             var parts = raw.Split(new[] { ':' }, 3);
             if (parts.Length < 3) throw new InvalidOperationException(Locales.Message("settings.invalidGameWindowToken"));
 
             string title = ConvertFromObsWindowTokenPart(parts[0]).Trim();
             string className = ConvertFromObsWindowTokenPart(parts[1]).Trim();
             string exe = ConvertFromObsWindowTokenPart(parts[2]).Trim();
-            if (title.Length > 160 || className.Length > 120 || exe.Length > 96) throw new InvalidOperationException(Locales.Message("settings.invalidGameWindowToken"));
-            if (Regex.IsMatch(title + className + exe, @"[\x00-\x1F]")) throw new InvalidOperationException("Invalid game window token.");
+            if (title.Length > GameWindowTitleMax || className.Length > GameWindowClassMax || exe.Length > GameWindowExeMax || Regex.IsMatch(title + className + exe, @"[\x00-\x1F]"))
+                throw new InvalidOperationException(Locales.Message("settings.invalidGameWindowToken"));
             if (!Regex.IsMatch(exe, @"^[^\\/:*?""<>|]+\.exe$")) throw new InvalidOperationException(Locales.Message("settings.invalidGameWindowExecutable"));
             if (TestBlockedGameWindowExe(exe)) throw new InvalidOperationException(Locales.Message("settings.thatApplicationCannotBeAddedTo"));
 
@@ -1271,6 +1267,8 @@ namespace ReplayKitHelper
             return new JObject { ["ok"] = true };
         }
 
+        internal const string ReplayBufferOutputName = "Replay Buffer";
+
         internal static ObsWebSocketResult SetVideoSettingsLive(JObject preset) => ObsWebSocket.InvokeRequest("SetVideoSettings", preset["video"], 5000);
 
         internal static void SetFractionalFpsProfile(JObject preset, List<string> warnings)
@@ -1293,7 +1291,7 @@ namespace ReplayKitHelper
         internal static ObsWebSocketResult SetReplayBufferOutputLive(JObject settings, JObject preset)
         {
             JObject outputSettings = new JObject();
-            var existing = ObsWebSocket.InvokeRequest("GetOutputSettings", new JObject { ["outputName"] = "Replay Buffer" }, 3000);
+            var existing = ObsWebSocket.InvokeRequest("GetOutputSettings", new JObject { ["outputName"] = ReplayBufferOutputName }, 3000);
             if (existing.Ok && existing.Data?["outputSettings"] is JObject existingSettings) outputSettings = (JObject)existingSettings.DeepClone();
 
             string clipDir = settings["clipDir"]?.Value<string>();
@@ -1303,7 +1301,7 @@ namespace ReplayKitHelper
             outputSettings["directory"] = clipDir;
             outputSettings["path"] = clipDir;
 
-            return ObsWebSocket.InvokeRequest("SetOutputSettings", new JObject { ["outputName"] = "Replay Buffer", ["outputSettings"] = outputSettings }, 5000);
+            return ObsWebSocket.InvokeRequest("SetOutputSettings", new JObject { ["outputName"] = ReplayBufferOutputName, ["outputSettings"] = outputSettings }, 5000);
         }
 
         internal static JObject GetSceneName()
@@ -1407,7 +1405,7 @@ namespace ReplayKitHelper
         internal static string OverlayItemNameForStyle(string style)
         {
             if (style == "bongo_cat") return OverlayScene.BongoSourceName;
-            if (style == "input_overlay") return "Group";
+            if (style == "input_overlay") return OverlayScene.InputOverlayGroupName;
             return null;
         }
 
@@ -1420,7 +1418,7 @@ namespace ReplayKitHelper
                 w = GetDoubleValue(r.Data, "baseWidth", 0.0);
                 h = GetDoubleValue(r.Data, "baseHeight", 0.0);
             }
-            if (w <= 0.0 || h <= 0.0) { w = 1920.0; h = 1080.0; }
+            if (w <= 0.0 || h <= 0.0) { w = OverlayScene.FallbackCanvasWidth; h = OverlayScene.FallbackCanvasHeight; }
             return new JObject { ["width"] = w, ["height"] = h };
         }
 
@@ -1428,7 +1426,7 @@ namespace ReplayKitHelper
         internal static JObject ResolveOverlayItemLive(out string sceneName, out string style)
         {
             sceneName = null;
-            style = Normalize(ReadSettings())["overlayStyle"]?.Value<string>() ?? "";
+            style = ReadSettings()["overlayStyle"]?.Value<string>() ?? "";
             string itemName = OverlayItemNameForStyle(style);
             if (itemName == null) return null;
             var scene = GetSceneName();
@@ -1469,7 +1467,7 @@ namespace ReplayKitHelper
                     // which overlay this rect belongs to -- the preview ignores it while the style dropdown shows a different one, since that item is not in the scene until apply
                     ["style"] = style,
                     // the saved overlayScale this rect was produced at -- the preview divides by it so an unapplied size edit can grow the box from the real one
-                    ["scalePct"] = OverlayScaleFactor(Normalize(ReadSettings())) * 100.0,
+                    ["scalePct"] = OverlayScaleFactor(ReadSettings()) * 100.0,
                     ["rotation"] = GetDoubleValue(t, "rotation", 0.0),
                 };
             }

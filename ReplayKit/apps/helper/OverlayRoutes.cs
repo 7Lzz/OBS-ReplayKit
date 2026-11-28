@@ -49,8 +49,7 @@ namespace ReplayKitHelper
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
                 try
                 {
-                    string mode = Q("mode", "preview");
-                    HttpResponse.SendJson(stream, 200, SettingsOverlayLive.OverlayPreviewFromRequest(req.Body, mode));
+                    HttpResponse.SendJson(stream, 200, SettingsOverlayLive.OverlayPreviewFromRequest(req.Body));
                 }
                 catch (Exception ex) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = ex.Message }); }
                 return false;

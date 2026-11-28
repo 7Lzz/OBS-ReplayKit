@@ -6867,10 +6867,6 @@
     "source": "4a40427ac0a56d3c",
     "text": "{name} を削除できませんでした: {error}"
   },
-  "settings.couldNotRemovePreviewOpacityFilter": {
-    "source": "1079fc0b421ab421",
-    "text": "{sourceName} から不透明度プレビュー用のフィルタを削除できませんでした: {error}"
-  },
   "settings.couldNotRemoveRetiredSourcenameComposite": {
     "source": "29be9143b02415f1",
     "text": "使われなくなった {sourceName} の Composite Blur フィルタを削除できませんでした: {error}"
@@ -6898,18 +6894,6 @@
   "settings.couldNotResizeNameError": {
     "source": "b7342712822c2a08",
     "text": "{name} のサイズを変更できませんでした: {error}"
-  },
-  "settings.couldNotRestoreNameError": {
-    "source": "6d856a324c76586e",
-    "text": "{name} を元に戻せませんでした: {error}"
-  },
-  "settings.couldNotRestoreSourcenameOpacityFilter": {
-    "source": "7632753a19589475",
-    "text": "{sourceName} の不透明度フィルタの有効状態を元に戻せませんでした: {error}"
-  },
-  "settings.couldNotRestoreSourcenameOpacityFilter2": {
-    "source": "ab904747cfb5d9ce",
-    "text": "{sourceName} の不透明度フィルタの設定を元に戻せませんでした: {error}"
   },
   "settings.couldNotRotateNameError": {
     "source": "7242dd2355e59408",
@@ -7587,10 +7571,6 @@
     "source": "785d5850577fd88e",
     "text": "ゲームウィンドウのトークンが不正です。"
   },
-  "settings.invalidOverlayPreviewRevision": {
-    "source": "d2a15b6b0fa2a3c3",
-    "text": "オーバーレイのプレビューのリビジョンが不正です。"
-  },
   "settings.invalidPowerConfigurationRequest": {
     "source": "ce5d8715f66fd10a",
     "text": "電源設定のリクエストが不正です。"
@@ -8098,10 +8078,6 @@
   "settings.obsCloseWarningWasSavedBut": {
     "source": "94c3eb442c03af73",
     "text": "OBS の終了時の警告は保存されましたが、OBS の設定を更新できませんでした: {error}"
-  },
-  "settings.obsConfigRootDidNotResolve": {
-    "source": "c4f389887ab2d357",
-    "text": "OBS の設定フォルダーが想定した AppData のパスに解決されませんでした。"
   },
   "settings.obsCouldNotApplyRecordingAudio": {
     "source": "d6521c33f14f0d7a",
@@ -11888,6 +11864,46 @@
   "capture.videoUnavailable": {
     "source": "1371e9f5bfce72a0",
     "text": "ビデオは利用できません"
+  },
+  "settings.autoGameListIsFull": {
+    "source": "ddf3dca3007a5da5",
+    "text": "自動ゲームリストにはこれ以上ゲームを追加できません。"
+  },
+  "settings.inputOverlayFilesAreMissing": {
+    "source": "f76497d96b92ec86",
+    "text": "ReplayKit のインストールに入力オーバーレイのファイルがありません。"
+  },
+  "settings.layoutNumbers": {
+    "source": "82d69e39ea8b19f2",
+    "text": "WASD 数字付き"
+  },
+  "settings.layoutNumbersSmall": {
+    "source": "115360a295aeb980",
+    "text": "WASD 数字付き 小"
+  },
+  "settings.layoutValorant": {
+    "source": "61e48fdf41886315",
+    "text": "Valorant"
+  },
+  "settings.layoutValorantSmall": {
+    "source": "e9eb2c49ccefcf63",
+    "text": "Valorant 小"
+  },
+  "settings.layoutWasd": {
+    "source": "cfa35cc99d6ca28e",
+    "text": "WASD"
+  },
+  "settings.layoutWasdFull": {
+    "source": "5b0310ddfc2f0cb4",
+    "text": "WASD フル"
+  },
+  "settings.settingMustBeBetween": {
+    "source": "5e65408ec63e27b6",
+    "text": "設定 {name} は {min} から {max} の間にする必要があります。"
+  },
+  "settings.settingValueNotValid": {
+    "source": "8b8b4a3ed49f1cb2",
+    "text": "設定 {name} の値が無効です。"
   },
   "settings.showGameOutOfFocus": {
     "source": "abd2f59f183da4cd",

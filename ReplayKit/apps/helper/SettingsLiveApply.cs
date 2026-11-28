@@ -28,7 +28,7 @@ namespace ReplayKitHelper
     // applying saved settings to a running obs: the runtime outputs, the desktop audio mixer, the discord output, the live motion blur filter, and the orchestrator that does the least work a change needs
     internal static class SettingsLiveApply
     {
-        // -- runtime output stop/apply/restart orchestration + projector audio-monitoring toggle --
+        // stopping, applying and restarting the obs outputs, and the desktop audio monitoring Share Preview turns on
 
         internal static JObject NewInactiveOutputState() => new JObject { ["ok"] = true, ["wasActive"] = false };
 
@@ -172,7 +172,7 @@ namespace ReplayKitHelper
             return new JObject { ["ok"] = true, ["applied"] = new JArray(applied), ["message"] = "" };
         }
 
-        // -- desktop audio mixer: retry-with-verification wrappers, since obs does not always apply an audio monitor-type/mute change instantly, plus a deliberate mute-then-unmute "flap" to force the obs mixer icon to visually refresh after a monitor-type change.
+        // the desktop audio mixer: each change is retried until obs reports it, since obs does not always apply a monitor type or mute change at once, and a short mute and unmute makes the obs mixer redraw its icon after a monitor type change
 
         internal static JObject SetDesktopAudioMixerState(string inputName, string monitorType, bool ensureUnmuted = true)
         {
@@ -567,22 +567,13 @@ namespace ReplayKitHelper
             };
         }
 
-        internal static JObject ApplyShareModeLive(string shareMode)
-        {
-            var settings = ReadSettings();
-            settings["discord_output_mode"] = "projector";
-            settings["shareMode"] = "projector";
-            return ApplyDiscordOutputLive(settings);
-        }
-
-        // -- motion blur: live-websocket half (create/update/remove the filter on a running obs, including cleanup of the retired obs_composite_blur-kind filter left over from older ReplayKit versions) --
+        // the motion blur filter on a running obs: created, updated or removed over obs-websocket, and the retired obs_composite_blur filter of older releases removed
 
         internal static bool TestShaderfilterPluginInstalled()
         {
             string root = GetObsInstallRoot();
             string dll = Path.Combine(root, "obs-plugins\\64bit\\obs-shaderfilter.dll");
-            string shader = Path.Combine(root, "data\\obs-plugins\\obs-shaderfilter\\examples\\motion_blur.shader");
-            return File.Exists(dll) && File.Exists(shader);
+            return File.Exists(dll) && File.Exists(ShaderfilterMotionBlurPath());
         }
 
         internal static string GetMotionBlurLiveFilterName(JArray filters)
@@ -595,9 +586,7 @@ namespace ReplayKitHelper
                 string kind = filter["filterKind"]?.Value<string>() ?? "";
                 if (kind == OverlayScene.MotionBlurFilterKind)
                 {
-                    var filterSettings = filter["filterSettings"];
-                    string shaderFile = filterSettings?["shader_file_name"]?.Value<string>() ?? "";
-                    if (shaderFile.Replace('\\', '/').ToLowerInvariant().EndsWith("/motion_blur.shader")) return name;
+                    if (IsMotionBlurShaderFile(filter["filterSettings"]?["shader_file_name"]?.Value<string>())) return name;
                 }
             }
             return "";
@@ -681,7 +670,7 @@ namespace ReplayKitHelper
         // microphone input and its OBS filters.
 
         internal const string MicInputName = OverlayScene.MicSourceName;
-        internal const string MicNoiseFilterName = "ReplayKit Noise Suppression";
+        internal const string MicNoiseFilterName = OverlayScene.MicNoiseFilterName;
         internal const string NoiseSuppressFilterKind = "noise_suppress_filter_v2";
         internal const string MicGateFilterName = "ReplayKit Noise Gate";
         internal const string NoiseGateFilterKind = "noise_gate_filter";
@@ -689,7 +678,7 @@ namespace ReplayKitHelper
         internal const double NoiseGateDefaultCloseDb = -32.0;
         internal const double GateHysteresisDb = 5.0;
         // nonzero levels use a named gain filter; zero also silences the input fader without changing its mute state.
-        internal const string GainFilterKind = "gain_filter";
+        internal const string GainFilterKind = AudioVolume.GainFilterKind;
         internal const string MicGainFilterName = AudioVolume.MicFilterName;
         internal const string DesktopGainFilterName = AudioVolume.DesktopFilterName;
         internal const string DiscordGainFilterName = AudioVolume.DiscordFilterName;
@@ -963,7 +952,7 @@ namespace ReplayKitHelper
         }
 
         internal static List<JToken> FindNoiseSuppressFilters(JArray filters) =>
-            filters.Where(f => (f["filterKind"]?.Value<string>() ?? "").StartsWith("noise_suppress_filter", StringComparison.Ordinal)).ToList();
+            filters.Where(f => (f["filterKind"]?.Value<string>() ?? "").StartsWith(OverlayScene.MicNoiseFilterKindPrefix, StringComparison.Ordinal)).ToList();
 
         internal static List<JToken> FindNoiseGateFilters(JArray filters) =>
             filters.Where(f => (f["filterKind"]?.Value<string>() ?? "") == NoiseGateFilterKind).ToList();

@@ -6873,10 +6873,6 @@
     "source": "4a40427ac0a56d3c",
     "text": "Не удалось удалить {name}: {error}"
   },
-  "settings.couldNotRemovePreviewOpacityFilter": {
-    "source": "1079fc0b421ab421",
-    "text": "Не удалось удалить фильтр непрозрачности предпросмотра из {sourceName}: {error}"
-  },
   "settings.couldNotRemoveRetiredSourcenameComposite": {
     "source": "29be9143b02415f1",
     "text": "Не удалось удалить устаревший фильтр Composite Blur из {sourceName}: {error}"
@@ -6904,18 +6900,6 @@
   "settings.couldNotResizeNameError": {
     "source": "b7342712822c2a08",
     "text": "Не удалось изменить размер {name}: {error}"
-  },
-  "settings.couldNotRestoreNameError": {
-    "source": "6d856a324c76586e",
-    "text": "Не удалось восстановить {name}: {error}"
-  },
-  "settings.couldNotRestoreSourcenameOpacityFilter": {
-    "source": "7632753a19589475",
-    "text": "Не удалось восстановить состояние фильтра непрозрачности {sourceName}: {error}"
-  },
-  "settings.couldNotRestoreSourcenameOpacityFilter2": {
-    "source": "ab904747cfb5d9ce",
-    "text": "Не удалось восстановить настройки фильтра непрозрачности {sourceName}: {error}"
   },
   "settings.couldNotRotateNameError": {
     "source": "7242dd2355e59408",
@@ -7593,10 +7577,6 @@
     "source": "785d5850577fd88e",
     "text": "Некорректный токен окна игры."
   },
-  "settings.invalidOverlayPreviewRevision": {
-    "source": "d2a15b6b0fa2a3c3",
-    "text": "Некорректная ревизия предпросмотра оверлея."
-  },
   "settings.invalidPowerConfigurationRequest": {
     "source": "ce5d8715f66fd10a",
     "text": "Некорректный запрос настроек питания."
@@ -8104,10 +8084,6 @@
   "settings.obsCloseWarningWasSavedBut": {
     "source": "94c3eb442c03af73",
     "text": "Предупреждение о закрытии OBS сохранено, но конфигурацию OBS не удалось обновить: {error}"
-  },
-  "settings.obsConfigRootDidNotResolve": {
-    "source": "c4f389887ab2d357",
-    "text": "Корень конфигурации OBS не совпал с ожидаемым путём AppData."
   },
   "settings.obsCouldNotApplyRecordingAudio": {
     "source": "d6521c33f14f0d7a",
@@ -11915,6 +11891,46 @@
   "capture.videoUnavailable": {
     "source": "1371e9f5bfce72a0",
     "text": "Видео недоступно"
+  },
+  "settings.autoGameListIsFull": {
+    "source": "ddf3dca3007a5da5",
+    "text": "В автоматический список игр больше нельзя добавить игры."
+  },
+  "settings.inputOverlayFilesAreMissing": {
+    "source": "f76497d96b92ec86",
+    "text": "В установке ReplayKit нет файлов оверлея ввода."
+  },
+  "settings.layoutNumbers": {
+    "source": "82d69e39ea8b19f2",
+    "text": "WASD с цифрами"
+  },
+  "settings.layoutNumbersSmall": {
+    "source": "115360a295aeb980",
+    "text": "WASD с цифрами маленький"
+  },
+  "settings.layoutValorant": {
+    "source": "61e48fdf41886315",
+    "text": "Valorant"
+  },
+  "settings.layoutValorantSmall": {
+    "source": "e9eb2c49ccefcf63",
+    "text": "Valorant маленький"
+  },
+  "settings.layoutWasd": {
+    "source": "cfa35cc99d6ca28e",
+    "text": "WASD"
+  },
+  "settings.layoutWasdFull": {
+    "source": "5b0310ddfc2f0cb4",
+    "text": "WASD полный"
+  },
+  "settings.settingMustBeBetween": {
+    "source": "5e65408ec63e27b6",
+    "text": "Параметр {name} должен быть в диапазоне от {min} до {max}."
+  },
+  "settings.settingValueNotValid": {
+    "source": "8b8b4a3ed49f1cb2",
+    "text": "Недопустимое значение параметра {name}."
   },
   "settings.showGameOutOfFocus": {
     "source": "abd2f59f183da4cd",

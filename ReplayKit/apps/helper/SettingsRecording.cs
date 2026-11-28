@@ -28,12 +28,13 @@ namespace ReplayKitHelper
     // the canvas size, the recording presets and the encoder spec the profile gets
     internal static class SettingsRecording
     {
-        // -- canvas sizing + recording preset/encoder spec --
+        // the largest canvas side replaykit sets
+        internal const int CanvasMax = 4096;
 
         internal static int GetEvenDimension(double value)
         {
             int n = (int)Math.Round(value);
-            n = Math.Max(2, Math.Min(4096, n));
+            n = Math.Max(2, Math.Min(CanvasMax, n));
             if (n % 2 != 0) n -= 1;
             return Math.Max(2, n);
         }
@@ -41,7 +42,7 @@ namespace ReplayKitHelper
         internal static JObject GetScaledEvenSize(int sourceWidth, int sourceHeight, int maxWidth, int maxHeight)
         {
             if (sourceWidth < 2 || sourceHeight < 2 || maxWidth < 2 || maxHeight < 2)
-                return new JObject { ["width"] = 1920, ["height"] = 1080 };
+                return new JObject { ["width"] = OverlayScene.FallbackCanvasWidth, ["height"] = OverlayScene.FallbackCanvasHeight };
             double scale = Math.Min(1.0, Math.Min(maxWidth / (double)sourceWidth, maxHeight / (double)sourceHeight));
             return new JObject { ["width"] = GetEvenDimension(sourceWidth * scale), ["height"] = GetEvenDimension(sourceHeight * scale) };
         }
@@ -62,9 +63,7 @@ namespace ReplayKitHelper
         internal static JArray BuildDownscaleResolutionList()
         {
             var mon = GetPrimaryMonitorCanvasSize();
-            var baseSize = GetScaledEvenSize(
-                mon["ok"]?.Value<bool>() == true ? mon["width"].Value<int>() : 1920,
-                mon["ok"]?.Value<bool>() == true ? mon["height"].Value<int>() : 1080, 4096, 4096);
+            var baseSize = GetScaledEvenSize(mon["width"].Value<int>(), mon["height"].Value<int>(), CanvasMax, CanvasMax);
             int bw = baseSize["width"].Value<int>(), bh = baseSize["height"].Value<int>();
             // exact same scale steps + rounding OBSs Video settings use: width truncated to a multiple of 4, height to a multiple of 2.
             double[] scales = { 1.0, 1.25, 1.0 / 0.75, 1.5, 1.0 / 0.6, 1.75, 2.0, 2.25, 2.5, 2.75, 3.0 };
@@ -74,7 +73,7 @@ namespace ReplayKitHelper
             {
                 int cw = (int)(bw / s) & ~3;
                 int ch = (int)(bh / s) & ~1;
-                if (ch < 240 || !seen.Add(ch)) continue;
+                if (ch < DownscaleHeightMin || !seen.Add(ch)) continue;
                 list.Add(new JObject { ["label"] = cw + "x" + ch, ["height"] = ch });
             }
             return list;
@@ -86,16 +85,16 @@ namespace ReplayKitHelper
             if (primary == null) Log.Write("Primary monitor size detection failed: windows reported no primary monitor");
             else if (primary.Bounds.Width >= 320 && primary.Bounds.Height >= 240)
                 return new JObject { ["ok"] = true, ["width"] = primary.Bounds.Width, ["height"] = primary.Bounds.Height };
-            return new JObject { ["ok"] = false, ["width"] = 1920, ["height"] = 1080 };
+            return new JObject { ["ok"] = false, ["width"] = OverlayScene.FallbackCanvasWidth, ["height"] = OverlayScene.FallbackCanvasHeight };
         }
 
         // outputHeightCap of 8192 means "never downscale" (output == base); a real value scales the output down to that height, aspect preserved from the canvas. scaleType is the OBS downscale filter, ignored by OBS when base==output.
         internal static JObject ResolvePresetVideoSpec(int outputHeightCap, string scaleType, int fpsNumerator, int fpsDenominator)
         {
             var monitor = GetPrimaryMonitorCanvasSize();
-            int sourceWidth = monitor["ok"]?.Value<bool>() == true ? monitor["width"].Value<int>() : 1920;
-            int sourceHeight = monitor["ok"]?.Value<bool>() == true ? monitor["height"].Value<int>() : 1080;
-            var baseSize = GetScaledEvenSize(sourceWidth, sourceHeight, 4096, 4096);
+            int sourceWidth = monitor["width"].Value<int>();
+            int sourceHeight = monitor["height"].Value<int>();
+            var baseSize = GetScaledEvenSize(sourceWidth, sourceHeight, CanvasMax, CanvasMax);
             var output = GetScaledEvenSize(baseSize["width"].Value<int>(), baseSize["height"].Value<int>(), 8192, outputHeightCap);
 
             return new JObject
@@ -116,7 +115,7 @@ namespace ReplayKitHelper
                     new JArray("Video", "FPSType", "2"),
                     new JArray("Video", "FPSNum", fpsNumerator.ToString()),
                     new JArray("Video", "FPSDen", fpsDenominator.ToString()),
-                    new JArray("Video", "ScaleType", string.IsNullOrEmpty(scaleType) ? "lanczos" : scaleType)
+                    new JArray("Video", "ScaleType", string.IsNullOrEmpty(scaleType) ? DefaultDownscaleFilter : scaleType)
                 ),
                 ["source"] = new JObject { ["width"] = sourceWidth, ["height"] = sourceHeight },
             };
@@ -128,7 +127,7 @@ namespace ReplayKitHelper
         internal static JObject GetPresetSpec(string name, int fpsNumerator, int fpsDenominator, string scaleMode, int downscaleHeight, string downscaleFilter)
         {
             int cap = OutputHeightCap(name, scaleMode, downscaleHeight);
-            string scaleType = string.IsNullOrEmpty(downscaleFilter) ? "lanczos" : downscaleFilter;
+            string scaleType = string.IsNullOrEmpty(downscaleFilter) ? DefaultDownscaleFilter : downscaleFilter;
             int cqp;
             switch (name)
             {
@@ -141,19 +140,19 @@ namespace ReplayKitHelper
         }
 
         internal static JObject GetPresetSpec(string name, JObject settings) => GetPresetSpec(name,
-            settings?["fpsNumerator"]?.Value<int>() ?? settings?["fps"]?.Value<int>() ?? 60,
+            settings?["fpsNumerator"]?.Value<int>() ?? settings?["fps"]?.Value<int>() ?? DefaultFps,
             settings?["fpsDenominator"]?.Value<int>() ?? 1,
             settings?["recordingScaleMode"]?.Value<string>() ?? "native",
-            settings?["downscaleHeight"]?.Value<int>() ?? 1080,
-            settings?["downscaleFilter"]?.Value<string>() ?? "lanczos");
+            settings?["downscaleHeight"]?.Value<int>() ?? DefaultDownscaleHeight,
+            settings?["downscaleFilter"]?.Value<string>() ?? DefaultDownscaleFilter);
 
-        // vendor/generation candidate table, effort tuning, and cqp->icq/crf conversion live in Encoder.PickEncoder (shared/Encoder.cs, which the setup compiles too) so both agree on the same tuning tables; this just adapts that shared choice into the shape Write-ReplayKitRecordEncoderJson expects, plus the "requested codec unavailable on this gpu" warning that PickEncoder itself has no concept of (Setup never surfaces that warning to a user, since it has no way to ask one at install time).
+        // the candidate tables, effort tuning and cqp conversion live in Encoder.PickEncoder (shared/Encoder.cs, which the setup compiles too) so both pick the same encoder; this shapes that choice for WriteRecordEncoderJson and adds the warning for a codec or encoder this machine cannot use, which the setup never shows
         internal static JObject GetEncoderSpec(JObject settings, JObject preset)
         {
             var gpu = Gpu.PrimaryGpu();
             string codecPreference = settings["codecPreference"]?.Value<string>() ?? DefaultCodecPreference;
             int cqp = preset["cqp"]?.Value<int>() ?? 22;
-            string compressionMode = settings["compressionMode"]?.Value<string>() ?? "balanced";
+            string compressionMode = settings["compressionMode"]?.Value<string>() ?? SettingDefaults.CompressionMode;
             var choice = Encoder.PickEncoder(gpu, codecPreference, cqp, compressionMode);
             string unloaded = null;
             // an encoder obs could not load this session (an outdated driver) is never written to the profile: the best one that did load takes its place, one of another gpu first, then the processor
@@ -173,7 +172,7 @@ namespace ReplayKitHelper
                     }
                     if (alternative != null) break;
                 }
-                choice = alternative ?? Encoder.PickEncoder(null, "auto", cqp, compressionMode);
+                choice = alternative ?? Encoder.PickEncoder(null, DefaultCodecPreference, cqp, compressionMode);
             }
 
             var result = new JObject
@@ -193,7 +192,7 @@ namespace ReplayKitHelper
 
         internal static string GetCurrentProfileDir()
         {
-            string profilesRoot = Path.Combine(Environment.GetEnvironmentVariable("APPDATA") ?? "", "obs-studio", "basic", "profiles");
+            string profilesRoot = Constants.OBS_PROFILES_DIR;
             var profileList = ObsWebSocket.InvokeRequest("GetProfileList", null, 3000);
             string profileName = profileList.Ok ? profileList.Data?["currentProfileName"]?.Value<string>() : null;
             string folder = ObsUserIni.Read("Basic", "ProfileDir");
@@ -241,7 +240,7 @@ namespace ReplayKitHelper
             string Kind(string name)
             {
                 var result = ObsWebSocket.InvokeRequest("GetInputSettings", new JObject { ["inputName"] = name }, 3000);
-                if (!result.Ok) throw new InvalidOperationException("Could not inspect Bongo Cat: " + result.Message);
+                if (!result.Ok) throw new InvalidOperationException(Locales.Message("settings.couldNotSetUpBongoCat", "error", result.Message));
                 return result.Data?["inputKind"]?.Value<string>();
             }
             bool Rename(string from, string to)
@@ -334,14 +333,14 @@ namespace ReplayKitHelper
         // a member already in Group is moved to where the picked layouts put it, and the mouse hidden while it is off; obs-websocket takes the group by its name like a scene
         internal static void PlaceInputOverlayMember(string name, JObject settings, List<string> warnings)
         {
-            var list = ObsWebSocket.InvokeRequest("GetGroupSceneItemList", new JObject { ["sceneName"] = "Group" }, 3000);
+            var list = ObsWebSocket.InvokeRequest("GetGroupSceneItemList", new JObject { ["sceneName"] = OverlayScene.InputOverlayGroupName }, 3000);
             if (!list.Ok) { warnings.Add(Locales.Message("settings.couldNotReadTheOverlayGroup", "error", list.Message)); return; }
             var member = (list.Data?["sceneItems"] as JArray ?? new JArray()).OfType<JObject>().FirstOrDefault(i => i["sourceName"]?.Value<string>() == name);
             if (member == null) return;
-            var moved = SetSceneItemTransform("Group", member, InputOverlayMemberTransform(name, settings));
+            var moved = SetSceneItemTransform(OverlayScene.InputOverlayGroupName, member, InputOverlayMemberTransform(name, settings));
             if (moved["ok"]?.Value<bool>() != true) warnings.Add(Locales.Message("settings.couldNotPlaceNameError", "name", name, "error", moved["message"]));
             if (name != OverlayScene.MouseSourceName) return;
-            var shown = SetSceneItemEnabled("Group", member, InputOverlayMouseShown(settings));
+            var shown = SetSceneItemEnabled(OverlayScene.InputOverlayGroupName, member, InputOverlayMouseShown(settings));
             if (shown["ok"]?.Value<bool>() != true) warnings.Add(Locales.Message("settings.couldNotShowOrHideName", "name", name, "error", shown["message"]));
         }
 
@@ -356,7 +355,7 @@ namespace ReplayKitHelper
                 if (result.Ok) removed = true;
                 else warnings.Add(Locales.Message("settings.couldNotRemoveNameError", "name", name, "error", result.Message));
             }
-            var group = FindSceneItem(items, "Group");
+            var group = FindSceneItem(items, OverlayScene.InputOverlayGroupName);
             if (group != null)
             {
                 var result = RemoveSceneItem(sceneName, group);
@@ -384,7 +383,7 @@ namespace ReplayKitHelper
             return removed;
         }
 
-        // the parallel live-websocket version of Set-OverlaySceneFile, used when obs must not be restarted: toggle visibility, refresh the bongo settings and reposition.
+        // the obs-websocket twin of SetOverlaySceneFile, used when obs must not be restarted: toggle visibility, refresh the bongo settings and reposition.
         internal static JObject ApplyOverlayLive(JObject settings, JObject preset, bool recreateBongo = true, bool rebuildInputOverlay = false)
         {
             var warnings = new List<string>();
@@ -416,7 +415,7 @@ namespace ReplayKitHelper
             }
 
             // SetOverlaySceneFile builds WASD/Mouse Overlay as members of "Group". GetSceneItemList only returns top-level items, so a prior ApplyOverlayLive that ran EnsureInputSceneItem on them saw them as missing and its CreateInput->CreateSceneItem fallback added a duplicate top-level copy every apply ("two Mouse Overlays"). If the Group is present, any top-level WASD/Mouse item is a stray -- drop it (the source survives).
-            if (FindSceneItem(items, "Group") != null)
+            if (FindSceneItem(items, OverlayScene.InputOverlayGroupName) != null)
             {
                 foreach (var stray in items.OfType<JObject>()
                              .Where(i => { var n = i["sourceName"]?.Value<string>(); return n == OverlayScene.WasdSourceName || n == OverlayScene.MouseSourceName; })
@@ -458,7 +457,7 @@ namespace ReplayKitHelper
 
             if (overlayStyle == "input_overlay")
             {
-                var group = FindSceneItem(items, "Group");
+                var group = FindSceneItem(items, OverlayScene.InputOverlayGroupName);
                 if (group != null)
                 {
                     var rGroupTransform = SetSceneItemTransform(sceneName, group, InputOverlayGroupTransform(preset, settings));
@@ -481,10 +480,7 @@ namespace ReplayKitHelper
                     // with a "Group" the two overlays are its members -- only refresh the source settings; adding them as standalone scene items is exactly the duplicate-stacking bug. without one (the overlay was just picked) they are built the way SetOverlaySceneFile builds them: members at their spots inside the group, grouped by the plugin, then the group placed
                     foreach (var entry in entries)
                     {
-                        var io = new JObject
-                        {
-                            ["io.input_source"] = "This computer", ["io.overlay_image"] = entry.image, ["io.layout_file"] = entry.layout,
-                        };
+                        var io = InputOverlaySourceSettings(entry.image, entry.layout);
                         if (group != null)
                         {
                             var s = ObsWebSocket.InvokeRequest("SetInputSettings", new JObject { ["inputName"] = entry.name, ["inputSettings"] = io, ["overlay"] = true }, 3000);
@@ -492,7 +488,7 @@ namespace ReplayKitHelper
                             PlaceInputOverlayMember(entry.name, settings, warnings);
                             continue;
                         }
-                        var created = EnsureInputSceneItem(sceneName, entry.name, "input-overlay", io, true);
+                        var created = EnsureInputSceneItem(sceneName, entry.name, OverlayScene.InputOverlaySourceKind, io, true);
                         if (created["ok"]?.Value<bool>() != true) { warnings.Add(Locales.Message("settings.couldNotCreateNameError", "name", entry.name, "error", created["message"])); continue; }
                         var rTransform = SetSceneItemTransform(sceneName, created["item"] as JObject, InputOverlayMemberTransform(entry.name, settings));
                         if (rTransform["ok"]?.Value<bool>() != true) warnings.Add(Locales.Message("settings.couldNotPositionNameError", "name", entry.name, "error", rTransform["message"]));
@@ -504,7 +500,7 @@ namespace ReplayKitHelper
                         {
                             Thread.Sleep(100);
                             var grouped = GetSceneItems(sceneName);
-                            if (grouped["ok"]?.Value<bool>() == true) group = FindSceneItem(grouped["items"] as JArray, "Group");
+                            if (grouped["ok"]?.Value<bool>() == true) group = FindSceneItem(grouped["items"] as JArray, OverlayScene.InputOverlayGroupName);
                         }
                         if (group == null) warnings.Add(Locales.Message("settings.couldNotGroupTheWasdAnd"));
                         else

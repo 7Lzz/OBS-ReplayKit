@@ -28,23 +28,14 @@ namespace ReplayKitHelper
     // the obs config files the settings reach: the close warning, sleep and startup shortcut in the obs ini files, the profile parameters of basic.ini and the hotkey json of basic.ini
     internal static class SettingsObsConfig
     {
-        // -- obs ini config: close-warning + sleep override + windows startup shortcut --
-
-        internal static string GetObsConfigRoot()
-        {
-            string appData = Environment.GetEnvironmentVariable("APPDATA");
-            if (!string.IsNullOrEmpty(appData)) return Path.Combine(appData, "obs-studio");
-            return Path.Combine(AppConfig.GetUserProfile(), "AppData", "Roaming", "obs-studio");
-        }
+        // the close warning, the sleep override and the windows startup shortcut
 
         // the start minimized switch of obs as its user.ini holds it, or null when the file or the key is not there
         internal static bool? ReadObsStartMinimized()
         {
             try
             {
-                string path = Path.Combine(GetObsConfigRoot(), "user.ini");
-                if (!File.Exists(path)) return null;
-                string value = ObsIni.Get(File.ReadAllText(path), "BasicWindow", "SysTrayWhenStarted");
+                string value = ObsUserIni.Read("BasicWindow", "SysTrayWhenStarted");
                 if (value != null) return string.Equals(value.Trim(), "true", StringComparison.OrdinalIgnoreCase);
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException)
@@ -57,16 +48,8 @@ namespace ReplayKitHelper
         {
             try
             {
-                string root = GetObsConfigRoot();
-                if (!Directory.Exists(root)) Directory.CreateDirectory(root);
-                string resolvedRoot = Path.GetFullPath(root);
-                string appData = Environment.GetEnvironmentVariable("APPDATA");
-                string expectedRoot = !string.IsNullOrEmpty(appData)
-                    ? Path.GetFullPath(Path.Combine(appData, "obs-studio"))
-                    : Path.GetFullPath(Path.Combine(AppConfig.GetUserProfile(), "AppData", "Roaming", "obs-studio"));
-                if (!string.Equals(resolvedRoot, expectedRoot, StringComparison.OrdinalIgnoreCase))
-                    throw new InvalidOperationException(Locales.Message("settings.obsConfigRootDidNotResolve"));
-
+                string resolvedRoot = Constants.OBS_CONFIG_DIR;
+                Directory.CreateDirectory(resolvedRoot);
                 string confirmOnExit = disabled ? "false" : "true";
                 var changed = new List<string>();
                 var paths = new[] { Path.Combine(resolvedRoot, "user.ini"), Path.Combine(resolvedRoot, "global.ini") };
@@ -120,7 +103,7 @@ namespace ReplayKitHelper
                 if (process.ExitCode != 0)
                 {
                     string line = output.Split('\n').Select(l => l.TrimEnd('\r')).FirstOrDefault(l => !string.IsNullOrWhiteSpace(l));
-                    if (string.IsNullOrWhiteSpace(line)) line = "powercfg exited " + process.ExitCode + ".";
+                    if (string.IsNullOrWhiteSpace(line)) line = Locales.Message("settings.powercfgExitedCode", "code", process.ExitCode);
                     return new JObject { ["ok"] = false, ["message"] = line, ["exitCode"] = process.ExitCode };
                 }
                 return new JObject { ["ok"] = true, ["message"] = output, ["exitCode"] = 0 };
@@ -181,7 +164,7 @@ namespace ReplayKitHelper
                 if (!string.IsNullOrEmpty(appData)) folder = Path.Combine(appData, "Microsoft", "Windows", "Start Menu", "Programs", "Startup");
             }
             if (string.IsNullOrWhiteSpace(folder)) throw new InvalidOperationException(Locales.Message("settings.windowsStartupFolderWasNotFound"));
-            return Path.Combine(folder, "OBS ReplayKit.lnk");
+            return Path.Combine(folder, ObsLaunch.StartupShortcutName);
         }
 
         internal static string GetObsStartupTarget()
@@ -195,7 +178,7 @@ namespace ReplayKitHelper
         {
             using (var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run", writable: true))
             {
-                if (key?.GetValue("OBS ReplayKit") != null) key.DeleteValue("OBS ReplayKit", throwOnMissingValue: false);
+                if (key?.GetValue(ObsLaunch.LegacyRunValueName) != null) key.DeleteValue(ObsLaunch.LegacyRunValueName, throwOnMissingValue: false);
             }
         }
 
@@ -245,7 +228,7 @@ namespace ReplayKitHelper
             }
         }
 
-        // persists a dock-picked clip dir into the shared helper config json (the same file the lua bootstrap and this process both read) -- psHelper is not written here since the c# port has no separate worker script for it to point at.
+        // writes the clip folder picked in settings into helper_config.json, the file the lua bootstrap and the helper both read
         internal static void UpdateHelperConfigClipDir(string clipDir)
         {
             AppConfig.LoadConfig();
@@ -261,7 +244,7 @@ namespace ReplayKitHelper
             AppConfig.LoadConfig();
         }
 
-        // -- obs profile parameters (basic.ini) + monitoring device --
+        // the profile parameters of basic.ini and the monitoring device
 
         internal static ObsWebSocketResult SetObsProfileParameterSafe(string category, string name, string value) =>
             ObsWebSocket.InvokeRequest("SetProfileParameter", new JObject { ["parameterCategory"] = category, ["parameterName"] = name, ["parameterValue"] = value }, 3000);
@@ -292,7 +275,8 @@ namespace ReplayKitHelper
                 return new JObject { ["ok"] = false, ["applied"] = new JArray(), ["message"] = Locales.Message("settings.monitoringDeviceNotConfirmed", "device", deviceName) };
             return new JObject { ["ok"] = true, ["applied"] = new JArray("OBS monitoring device verified"), ["message"] = "" };
         }
-        // -- keybind <-> basic.ini hotkey json --
+
+        // the hotkeys of the settings as the hotkey json of basic.ini and back
 
         internal static JObject ConvertKeybindToObsBinding(JObject combo)
         {
@@ -331,7 +315,7 @@ namespace ReplayKitHelper
                 var data = JObject.Parse(json);
                 var bindings = data["bindings"] as JArray;
                 if (bindings == null || bindings.Count <= index || bindings[index] == null || bindings[index].Type == JTokenType.Null) return new JObject();
-                return index == 0 ? NormalizeRecordingKeybind(bindings[index]) : NormalizeExtraKeybind(bindings[index], "extra recording keybind");
+                return index == 0 ? NormalizeRecordingKeybind(bindings[index]) : NormalizeExtraKeybind(bindings[index], "recordingKeybindExtra");
             }
             catch (JsonException) { return new JObject(); }
         }
@@ -344,7 +328,7 @@ namespace ReplayKitHelper
                 var data = JObject.Parse(json);
                 var bindings = (data["bindings"] ?? data["ReplayBuffer.Save"]) as JArray;
                 if (bindings == null || bindings.Count <= index || bindings[index] == null || bindings[index].Type == JTokenType.Null) return new JObject();
-                return index == 0 ? NormalizeClipKeybind(bindings[index]) : NormalizeExtraKeybind(bindings[index], "extra clip keybind");
+                return index == 0 ? NormalizeClipKeybind(bindings[index]) : NormalizeExtraKeybind(bindings[index], "clipKeybindExtra");
             }
             catch (JsonException) { return new JObject(); }
         }

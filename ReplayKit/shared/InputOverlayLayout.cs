@@ -24,25 +24,25 @@ namespace ReplayKitShared
 
         public sealed class Layout
         {
-            public string Id, Label, Json, Sheet;
+            public string Id, Json, Sheet;
         }
 
-        // the json and sheet paths are relative to the input-overlay-presets folder
+        // the json and sheet paths are relative to the input-overlay-presets folder; the names the pages show are messages of the helper (InputOverlayLayouts.ShownLabel)
         public static readonly Layout[] Keyboards =
         {
-            new Layout { Id = "wasd-minimal", Label = "WASD", Json = "wasd/wasd-minimal.json", Sheet = "wasd/wasd.png" },
-            new Layout { Id = "wasd-full", Label = "WASD Full", Json = "wasd/wasd-full.json", Sheet = "wasd/wasd.png" },
-            new Layout { Id = "wasd-valorant", Label = "Valorant", Json = "wasd/wasd-valorant.json", Sheet = "wasd/wasd.png" },
-            new Layout { Id = "wasd-valorant-micro", Label = "Valorant Small", Json = "wasd/wasd-valorant-micro.json", Sheet = "wasd/wasd.png" },
-            new Layout { Id = "wasd-numbers", Label = "WASD Numbers", Json = "wasd-extended-numeric/wasd-extended-numeric.json", Sheet = "wasd-extended-numeric/wasd-extended-numeric.png" },
-            new Layout { Id = "wasd-numbers-small", Label = "WASD Numbers Small", Json = "wasd-extended-numeric/wasd-extended-numeric-min.json", Sheet = "wasd/wasd.png" },
-            new Layout { Id = Custom, Label = "Custom", Json = null, Sheet = null },
+            new Layout { Id = "wasd-minimal", Json = "wasd/wasd-minimal.json", Sheet = "wasd/wasd.png" },
+            new Layout { Id = "wasd-full", Json = "wasd/wasd-full.json", Sheet = "wasd/wasd.png" },
+            new Layout { Id = "wasd-valorant", Json = "wasd/wasd-valorant.json", Sheet = "wasd/wasd.png" },
+            new Layout { Id = "wasd-valorant-micro", Json = "wasd/wasd-valorant-micro.json", Sheet = "wasd/wasd.png" },
+            new Layout { Id = "wasd-numbers", Json = "wasd-extended-numeric/wasd-extended-numeric.json", Sheet = "wasd-extended-numeric/wasd-extended-numeric.png" },
+            new Layout { Id = "wasd-numbers-small", Json = "wasd-extended-numeric/wasd-extended-numeric-min.json", Sheet = "wasd/wasd.png" },
+            new Layout { Id = Custom, Json = null, Sheet = null },
         };
 
         public static readonly Layout[] Mice =
         {
-            new Layout { Id = "buttons", Label = "Buttons", Json = "mouse/mouse-no-movement.json", Sheet = "mouse/mouse.png" },
-            new Layout { Id = "off", Label = "Off", Json = null, Sheet = null },
+            new Layout { Id = "buttons", Json = "mouse/mouse-no-movement.json", Sheet = "mouse/mouse.png" },
+            new Layout { Id = "off", Json = null, Sheet = null },
         };
 
         public static Layout FindKeyboard(string id) => Keyboards.FirstOrDefault(l => l.Id == id) ?? Keyboards[0];

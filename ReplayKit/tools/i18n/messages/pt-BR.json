@@ -6871,10 +6871,6 @@
     "source": "4a40427ac0a56d3c",
     "text": "Não foi possível remover {name}: {error}"
   },
-  "settings.couldNotRemovePreviewOpacityFilter": {
-    "source": "1079fc0b421ab421",
-    "text": "Não foi possível remover o filtro de opacidade de pré-visualização de {sourceName}: {error}"
-  },
   "settings.couldNotRemoveRetiredSourcenameComposite": {
     "source": "29be9143b02415f1",
     "text": "Não foi possível remover o filtro Composite Blur aposentado de {sourceName}: {error}"
@@ -6902,18 +6898,6 @@
   "settings.couldNotResizeNameError": {
     "source": "b7342712822c2a08",
     "text": "Não foi possível redimensionar {name}: {error}"
-  },
-  "settings.couldNotRestoreNameError": {
-    "source": "6d856a324c76586e",
-    "text": "Não foi possível restaurar {name}: {error}"
-  },
-  "settings.couldNotRestoreSourcenameOpacityFilter": {
-    "source": "7632753a19589475",
-    "text": "Não foi possível restaurar o estado ativado do filtro de opacidade de {sourceName}: {error}"
-  },
-  "settings.couldNotRestoreSourcenameOpacityFilter2": {
-    "source": "ab904747cfb5d9ce",
-    "text": "Não foi possível restaurar as configurações do filtro de opacidade de {sourceName}: {error}"
   },
   "settings.couldNotRotateNameError": {
     "source": "7242dd2355e59408",
@@ -7591,10 +7575,6 @@
     "source": "785d5850577fd88e",
     "text": "Token da janela de jogo inválido."
   },
-  "settings.invalidOverlayPreviewRevision": {
-    "source": "d2a15b6b0fa2a3c3",
-    "text": "Revisão de pré-visualização de sobreposição inválida."
-  },
   "settings.invalidPowerConfigurationRequest": {
     "source": "ce5d8715f66fd10a",
     "text": "Solicitação de configuração de energia inválida."
@@ -8102,10 +8082,6 @@
   "settings.obsCloseWarningWasSavedBut": {
     "source": "94c3eb442c03af73",
     "text": "O aviso ao fechar o OBS foi salvo, mas a configuração do OBS não pôde ser atualizada: {error}"
-  },
-  "settings.obsConfigRootDidNotResolve": {
-    "source": "c4f389887ab2d357",
-    "text": "A raiz de configuração do OBS não resolveu para o caminho AppData esperado."
   },
   "settings.obsCouldNotApplyRecordingAudio": {
     "source": "d6521c33f14f0d7a",
@@ -11906,6 +11882,46 @@
   "capture.videoUnavailable": {
     "source": "1371e9f5bfce72a0",
     "text": "Vídeo indisponível"
+  },
+  "settings.autoGameListIsFull": {
+    "source": "ddf3dca3007a5da5",
+    "text": "A lista automática de jogos não comporta mais jogos."
+  },
+  "settings.inputOverlayFilesAreMissing": {
+    "source": "f76497d96b92ec86",
+    "text": "Os arquivos da sobreposição de entrada estão faltando na instalação do ReplayKit."
+  },
+  "settings.layoutNumbers": {
+    "source": "82d69e39ea8b19f2",
+    "text": "WASD com números"
+  },
+  "settings.layoutNumbersSmall": {
+    "source": "115360a295aeb980",
+    "text": "WASD com números pequeno"
+  },
+  "settings.layoutValorant": {
+    "source": "61e48fdf41886315",
+    "text": "Valorant"
+  },
+  "settings.layoutValorantSmall": {
+    "source": "e9eb2c49ccefcf63",
+    "text": "Valorant pequeno"
+  },
+  "settings.layoutWasd": {
+    "source": "cfa35cc99d6ca28e",
+    "text": "WASD"
+  },
+  "settings.layoutWasdFull": {
+    "source": "5b0310ddfc2f0cb4",
+    "text": "WASD completo"
+  },
+  "settings.settingMustBeBetween": {
+    "source": "5e65408ec63e27b6",
+    "text": "A configuração {name} deve estar entre {min} e {max}."
+  },
+  "settings.settingValueNotValid": {
+    "source": "8b8b4a3ed49f1cb2",
+    "text": "O valor da configuração {name} não é válido."
   },
   "settings.showGameOutOfFocus": {
     "source": "abd2f59f183da4cd",

@@ -21,6 +21,9 @@ namespace ReplayKitShared
         public const double BongoSourceHeight = 768.0;
         public const string WasdSourceName = "WASD Overlay";
         public const string MouseSourceName = "Mouse Overlay";
+        // the group that holds the wasd and mouse overlays, which the plugin makes and obs-websocket addresses by its name like a scene; scripts/sync_shared.ps1 writes it out for the plugin
+        public const string InputOverlayGroupName = "Group";
+        public const string InputOverlaySourceKind = "input-overlay";
         public const string OpacityFilterName = "ReplayKit Overlay Opacity";
         public const string OpacityFilterKind = "color_filter";
         public const string OpacityFilterVersionedKind = "color_filter_v2";
@@ -33,13 +36,23 @@ namespace ReplayKitShared
         public const string GameCaptureSourceName = "Game Capture";
         public const string WindowCaptureSourceName = "Window Capture";
         public const string WindowCaptureSourceUuid = "edb2d9d4-7b53-4f3a-a760-61cd03ce9b6c";
+        public const string DisplayCaptureSourceKind = "monitor_capture";
+        public const string GameCaptureSourceKind = "game_capture";
+        public const string WindowCaptureSourceKind = "window_capture";
         // the three audio sources of the scene collection: the pc audio without discord, discord on its own for the recording only, and the microphone
         public const string DesktopAudioSourceName = "Desktop Audio (excl. Discord)";
         public const string DiscordAudioSourceName = "Discord Audio (record only)";
         public const string MicSourceName = "Audio Input Capture";
+        // the rnnoise filter of the microphone, matched by the start of its kind since obs keeps a versioned one
+        public const string MicNoiseFilterName = "ReplayKit Noise Suppression";
+        public const string MicNoiseFilterKindPrefix = "noise_suppress_filter";
         // the card the capture switch script shows over the captures while a game of the auto game list is open but not in front; the plugin registers its kind and puts it into every scene with a capture, and scripts/sync_shared.ps1 writes both names out for the plugin and lua
         public const string FocusCardSourceName = "Game Out of Focus";
         public const string FocusCardSourceKind = "replaykit-focus-card";
+
+        // the canvas a missing or unreadable video size counts as
+        public const int FallbackCanvasWidth = 1920;
+        public const int FallbackCanvasHeight = 1080;
 
         // the bongo cat is sized against a 1080 high content area, the input overlay group against a 1440 high one, and the input overlay keeps a 15 px left and 16 px bottom margin at 1080
         private const double BongoRefHeight = 1080.0;
@@ -66,11 +79,13 @@ namespace ReplayKitShared
             [WindowCaptureSourceName] = "9b73d6cb-b65e-44a1-895f-4e2f326a8d77",
         };
 
-        public static int Opacity(int percent) => percent < 0 ? 0 : percent > 100 ? 100 : percent;
+        public static int Opacity(int percent) => Math.Max(SettingLimits.OverlayOpacityMin, Math.Min(SettingLimits.OverlayOpacityMax, percent));
 
-        public static double HueShift(double degrees) => degrees < -180.0 ? -180.0 : degrees > 180.0 ? 180.0 : degrees;
+        public static double HueShift(double degrees) => Math.Max(SettingLimits.OverlayHueShiftMin, Math.Min(SettingLimits.OverlayHueShiftMax, degrees));
 
-        public static double ScaleFactor(int percent) => (percent < 50 ? 50 : percent > 200 ? 200 : percent) / 100.0;
+        public static double ScaleFactor(int percent) => Math.Max(SettingLimits.OverlayScaleMin, Math.Min(SettingLimits.OverlayScaleMax, percent)) / 100.0;
+
+        public static double MotionBlurStrength(double strength) => Math.Max(SettingLimits.MotionBlurStrengthMin, Math.Min(SettingLimits.MotionBlurStrengthMax, strength));
 
         // a #rrggbb colour in lower case, or the fallback for anything else
         public static string HexColor(string raw, string fallback)
@@ -91,7 +106,7 @@ namespace ReplayKitShared
 
         // takes the already clamped and normalized values
         public static bool HasColorAdjustments(double hueShift, string multiply, string add) =>
-            Math.Abs(hueShift) >= 0.001 || multiply != "#ffffff" || add != "#000000";
+            Math.Abs(hueShift) >= 0.001 || multiply != SettingDefaults.OverlayColorMultiply || add != SettingDefaults.OverlayColorAdd;
 
         public struct ContentRect
         {
@@ -101,7 +116,7 @@ namespace ReplayKitShared
         // where the capture shows inside the canvas, letterboxed to its own aspect; a missing canvas counts as 1920x1080 and a missing capture size as the canvas
         public static ContentRect Content(double canvasW, double canvasH, double sourceW, double sourceH)
         {
-            if (canvasW <= 0.0 || canvasH <= 0.0) { canvasW = 1920.0; canvasH = 1080.0; }
+            if (canvasW <= 0.0 || canvasH <= 0.0) { canvasW = FallbackCanvasWidth; canvasH = FallbackCanvasHeight; }
             sourceW = sourceW > 0.0 ? sourceW : canvasW;
             sourceH = sourceH > 0.0 ? sourceH : canvasH;
             double scale = Math.Min(canvasW / sourceW, canvasH / sourceH);
@@ -164,7 +179,7 @@ namespace ReplayKitShared
             ["from_file"] = true,
             ["shader_file_name"] = shaderPath,
             ["override_entire_effect"] = false,
-            ["strength"] = Math.Max(0.0, Math.Min(1.0, strength)),
+            ["strength"] = MotionBlurStrength(strength),
         };
 
         // the fields obs saves for every source and filter, in the order obs writes them; settings goes right after the ids when given, and a caller that keeps an existing settings object passes null and sets it itself

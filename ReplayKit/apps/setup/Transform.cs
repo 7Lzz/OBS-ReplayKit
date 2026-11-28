@@ -348,7 +348,7 @@ namespace ReplayKitSetup
 
         // scenes json editing
 
-        private const string InputOverlaySourceId = "input-overlay";
+        private const string InputOverlaySourceId = OverlayScene.InputOverlaySourceKind;
         private const string InputOverlayWasdName = OverlayScene.WasdSourceName;
         private const string InputOverlayMouseName = OverlayScene.MouseSourceName;
         private const string OverlayOpacityFilterName = OverlayScene.OpacityFilterName;
@@ -361,14 +361,14 @@ namespace ReplayKitSetup
         private const double BongoCatSourceH = OverlayScene.BongoSourceHeight;
         private const int BongoCatItemId = 13;
         private const string MicSourceId = "wasapi_input_capture";
-        private const string MonitorSourceId = "monitor_capture";
+        private const string MonitorSourceId = OverlayScene.DisplayCaptureSourceKind;
         private const string MotionBlurFilterName = OverlayScene.MotionBlurFilterName;
         private const string MotionBlurFilterId = OverlayScene.MotionBlurFilterKind;
         private const string RetiredMotionBlurFilterId = OverlayScene.RetiredMotionBlurFilterKind;
-        private const string GameCaptureSourceId = "game_capture";
+        private const string GameCaptureSourceId = OverlayScene.GameCaptureSourceKind;
         private const string GameCaptureSourceName = OverlayScene.GameCaptureSourceName;
         private const int GameCaptureHookRateFast = 2;
-        private const string WindowCaptureSourceId = "window_capture";
+        private const string WindowCaptureSourceId = OverlayScene.WindowCaptureSourceKind;
         private const string WindowCaptureSourceName = OverlayScene.WindowCaptureSourceName;
         private const string WindowCaptureSourceUuid = OverlayScene.WindowCaptureSourceUuid;
         private const string DesktopAudioSourceName = OverlayScene.DesktopAudioSourceName;

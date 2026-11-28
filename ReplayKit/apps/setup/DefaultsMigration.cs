@@ -18,8 +18,8 @@ namespace ReplayKitSetup
         private const string OpenClipsKeyStep = "open-clips-alt-z-v1";
 
         private const string MicSourceName = OverlayScene.MicSourceName;
-        private const string NoiseFilterName = "ReplayKit Noise Suppression";
-        private const string NoiseFilterKindPrefix = "noise_suppress_filter";
+        private const string NoiseFilterName = OverlayScene.MicNoiseFilterName;
+        private const string NoiseFilterKindPrefix = OverlayScene.MicNoiseFilterKindPrefix;
 
         public static string MarkerPath => ReplayKitShared.StateLayout.Resolve(Config.REPLAYKIT_CONFIG, ReplayKitShared.StateLayout.DefaultsAppliedFile);
 

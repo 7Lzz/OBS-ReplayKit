@@ -6871,10 +6871,6 @@
     "source": "4a40427ac0a56d3c",
     "text": "No se pudo quitar {name}: {error}"
   },
-  "settings.couldNotRemovePreviewOpacityFilter": {
-    "source": "1079fc0b421ab421",
-    "text": "No se pudo quitar el filtro de opacidad de vista previa de {sourceName}: {error}"
-  },
   "settings.couldNotRemoveRetiredSourcenameComposite": {
     "source": "29be9143b02415f1",
     "text": "No se pudo quitar el filtro Desenfoque compuesto obsoleto de {sourceName}: {error}"
@@ -6902,18 +6898,6 @@
   "settings.couldNotResizeNameError": {
     "source": "b7342712822c2a08",
     "text": "No se pudo cambiar el tamaño de {name}: {error}"
-  },
-  "settings.couldNotRestoreNameError": {
-    "source": "6d856a324c76586e",
-    "text": "No se pudo restaurar {name}: {error}"
-  },
-  "settings.couldNotRestoreSourcenameOpacityFilter": {
-    "source": "7632753a19589475",
-    "text": "No se pudo restaurar el estado activado del filtro de opacidad de {sourceName}: {error}"
-  },
-  "settings.couldNotRestoreSourcenameOpacityFilter2": {
-    "source": "ab904747cfb5d9ce",
-    "text": "No se pudieron restaurar los ajustes del filtro de opacidad de {sourceName}: {error}"
   },
   "settings.couldNotRotateNameError": {
     "source": "7242dd2355e59408",
@@ -7591,10 +7575,6 @@
     "source": "785d5850577fd88e",
     "text": "Token de ventana de juego no válido."
   },
-  "settings.invalidOverlayPreviewRevision": {
-    "source": "d2a15b6b0fa2a3c3",
-    "text": "Revisión de vista previa de superposición no válida."
-  },
   "settings.invalidPowerConfigurationRequest": {
     "source": "ce5d8715f66fd10a",
     "text": "Solicitud de configuración de energía no válida."
@@ -8102,10 +8082,6 @@
   "settings.obsCloseWarningWasSavedBut": {
     "source": "94c3eb442c03af73",
     "text": "Se guardó la advertencia de cierre de OBS, pero no se pudo actualizar la configuración de OBS: {error}"
-  },
-  "settings.obsConfigRootDidNotResolve": {
-    "source": "c4f389887ab2d357",
-    "text": "La raíz de la configuración de OBS no se resolvió en la ruta de AppData esperada."
   },
   "settings.obsCouldNotApplyRecordingAudio": {
     "source": "d6521c33f14f0d7a",
@@ -11906,6 +11882,46 @@
   "capture.videoUnavailable": {
     "source": "1371e9f5bfce72a0",
     "text": "Vídeo no disponible"
+  },
+  "settings.autoGameListIsFull": {
+    "source": "ddf3dca3007a5da5",
+    "text": "La lista automática de juegos no admite más juegos."
+  },
+  "settings.inputOverlayFilesAreMissing": {
+    "source": "f76497d96b92ec86",
+    "text": "Faltan los archivos de la superposición de entrada en la instalación de ReplayKit."
+  },
+  "settings.layoutNumbers": {
+    "source": "82d69e39ea8b19f2",
+    "text": "WASD con números"
+  },
+  "settings.layoutNumbersSmall": {
+    "source": "115360a295aeb980",
+    "text": "WASD con números pequeño"
+  },
+  "settings.layoutValorant": {
+    "source": "61e48fdf41886315",
+    "text": "Valorant"
+  },
+  "settings.layoutValorantSmall": {
+    "source": "e9eb2c49ccefcf63",
+    "text": "Valorant pequeño"
+  },
+  "settings.layoutWasd": {
+    "source": "cfa35cc99d6ca28e",
+    "text": "WASD"
+  },
+  "settings.layoutWasdFull": {
+    "source": "5b0310ddfc2f0cb4",
+    "text": "WASD completo"
+  },
+  "settings.settingMustBeBetween": {
+    "source": "5e65408ec63e27b6",
+    "text": "El ajuste {name} debe estar entre {min} y {max}."
+  },
+  "settings.settingValueNotValid": {
+    "source": "8b8b4a3ed49f1cb2",
+    "text": "El valor del ajuste {name} no es válido."
   },
   "settings.showGameOutOfFocus": {
     "source": "abd2f59f183da4cd",

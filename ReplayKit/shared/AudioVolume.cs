@@ -11,6 +11,7 @@ namespace ReplayKitShared
         public const string MicFilterName = "ReplayKit Mic Volume";
         public const string DesktopFilterName = "ReplayKit Desktop Volume";
         public const string DiscordFilterName = "ReplayKit Discord Volume";
+        public const string GainFilterKind = "gain_filter";
 
         public static double ToDb(int percent)
         {
@@ -75,7 +76,7 @@ namespace ReplayKitShared
             }
             foreach (var token in source["filters"] as JArray ?? new JArray())
             {
-                if (!(token is JObject filter) || filter.Value<string>("name") != filterName || filter.Value<string>("id") != "gain_filter" ||
+                if (!(token is JObject filter) || filter.Value<string>("name") != filterName || filter.Value<string>("id") != GainFilterKind ||
                     filter["enabled"]?.Value<bool>() == false || !(filter["settings"] is JObject settings)) continue;
                 int volume = FromDb(settings.Value<double>("db"));
                 if (volume != 0 && settings[SavedLevel] == null) return false;

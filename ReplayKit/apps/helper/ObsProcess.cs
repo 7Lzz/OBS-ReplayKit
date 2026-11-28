@@ -179,7 +179,7 @@ namespace ReplayKitHelper
                             return 3;
                         }
                     }
-                    if (Relaunch(path)) return 0;
+                    if (Relaunch(path, DateTime.FromFileTimeUtc(started))) return 0;
                     LogRestartStopped("OBS could not be started from '" + path + "'.");
                     return 2;
                 }
@@ -200,12 +200,12 @@ namespace ReplayKitHelper
         // the --relaunch-obs mode: waits for the obs that is closing, then puts the staged files in place and starts obs again. a relaunch never stops a process that still owns graphics or output resources, so an obs that does not exit leaves the restart undone
         internal static int RunRelauncher(string obsPath, string obsPidText)
         {
-            if (!int.TryParse(obsPidText, NumberStyles.None, CultureInfo.InvariantCulture, out int obsPid) || obsPid <= 0 || !WaitForExit(obsPid, RelaunchExitWaitMs))
+            if (!int.TryParse(obsPidText, NumberStyles.None, CultureInfo.InvariantCulture, out int obsPid) || obsPid <= 0 || !WaitForExit(obsPid, RelaunchExitWaitMs, out DateTime? obsStartedUtc))
             {
                 LogRestartStopped("OBS did not exit safely.");
                 return 3;
             }
-            if (Relaunch(obsPath)) return 0;
+            if (Relaunch(obsPath, obsStartedUtc)) return 0;
             LogRestartStopped("OBS could not be started from '" + obsPath + "'.");
             return 2;
         }
@@ -214,13 +214,17 @@ namespace ReplayKitHelper
         private static void LogRestartStopped(string why) =>
             Log.AppendCapped(Path.Combine(Constants.LOG_DIR, "restart_obs.log"), "[" + DateTime.Now.ToString("s", CultureInfo.InvariantCulture) + "] Restart stopped: " + why);
 
-        private static bool WaitForExit(int pid, int timeoutMs)
+        // the start time of the obs that is closing is null when it was gone before it could be read
+        private static bool WaitForExit(int pid, int timeoutMs, out DateTime? startedUtc)
         {
+            startedUtc = null;
             Process process;
             try { process = Process.GetProcessById(pid); }
             catch (ArgumentException) { return true; }
             using (process)
             {
+                try { startedUtc = process.StartTime.ToUniversalTime(); }
+                catch (Exception ex) when (ex is InvalidOperationException || ex is Win32Exception || ex is NotSupportedException) { }
                 try { return process.WaitForExit(timeoutMs); }
                 catch (InvalidOperationException) { return true; }
                 catch (Win32Exception) { return false; }
@@ -228,10 +232,10 @@ namespace ReplayKitHelper
         }
 
         // what has to happen between the exit of obs and its next start: the crash marker of the obs that was force-stopped goes, and the scene and theme edits staged for after its exit-save are put in place
-        internal static bool Relaunch(string obsPath)
+        internal static bool Relaunch(string obsPath, DateTime? closedObsStartedUtc)
         {
             try { ClearCrashSentinel(); } catch (Exception ex) { Log.Write("ClearCrashSentinel: " + ex.Message); }
-            try { ApplyPendingOverlayScene(); } catch (Exception ex) { Log.Write("ApplyPendingOverlayScene: " + ex.Message); }
+            try { ApplyPendingOverlayScene(closedObsStartedUtc); } catch (Exception ex) { Log.Write("ApplyPendingOverlayScene: " + ex.Message); }
             try { Themes.ApplyPendingTheme(); } catch (Exception ex) { Log.Write("Themes.ApplyPendingTheme: " + ex.Message); }
             if (string.IsNullOrEmpty(obsPath) || !File.Exists(obsPath))
             {
@@ -278,16 +282,27 @@ namespace ReplayKitHelper
             }
         }
 
-        // move any <name>.json.replaykit-pending staged by SetOverlaySceneFile onto the real scene collection. only safe once obs is gone (its own exit-save would clobber it otherwise)
-        private static void ApplyPendingOverlayScene()
+        // move any scene staged by SetOverlaySceneFile onto the real scene collection, only once obs is gone since its own exit-save would write over it. a scene staged before the closing obs started is from a session that ended without this restart, whose exit-save kept everything changed since, so it is dropped instead of put back over that; with no start time known a staged scene is left for a later restart
+        private static void ApplyPendingOverlayScene(DateTime? closedObsStartedUtc)
         {
-            string scenesDir = Path.Combine(Environment.GetEnvironmentVariable("APPDATA") ?? "", "obs-studio", "basic", "scenes");
+            string scenesDir = Constants.OBS_SCENES_DIR;
             if (!Directory.Exists(scenesDir)) return;
-            foreach (var staged in Directory.GetFiles(scenesDir, "*.json.replaykit-pending"))
+            foreach (var staged in Directory.GetFiles(scenesDir, "*.json" + Constants.PENDING_SCENE_SUFFIX))
             {
-                string target = staged.Substring(0, staged.Length - ".replaykit-pending".Length);
+                string target = staged.Substring(0, staged.Length - Constants.PENDING_SCENE_SUFFIX.Length);
                 try
                 {
+                    if (closedObsStartedUtc == null)
+                    {
+                        Log.Write("ApplyPendingOverlayScene: left " + Path.GetFileName(staged) + ", the start of the closing OBS is not known");
+                        continue;
+                    }
+                    if (File.GetLastWriteTimeUtc(staged) < closedObsStartedUtc.Value)
+                    {
+                        File.Delete(staged);
+                        Log.Write("ApplyPendingOverlayScene: dropped " + Path.GetFileName(staged) + ", staged before the closing OBS started");
+                        continue;
+                    }
                     if (File.Exists(target)) File.Replace(staged, target, null);
                     else File.Move(staged, target);
                     Log.Write("ApplyPendingOverlayScene: applied " + Path.GetFileName(target));

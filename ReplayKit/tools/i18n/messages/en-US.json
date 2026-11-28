@@ -6870,10 +6870,6 @@
     "context": "Warning shown after settings are applied in a ReplayKit window, sent by the background helper. Keep {error}, {name} as written.",
     "text": "Could not remove {name}: {error}"
   },
-  "settings.couldNotRemovePreviewOpacityFilter": {
-    "context": "Warning shown after settings are applied in a ReplayKit window, sent by the background helper. Keep {error}, {sourceName} as written.",
-    "text": "Could not remove preview opacity filter from {sourceName}: {error}"
-  },
   "settings.couldNotRemoveRetiredSourcenameComposite": {
     "context": "Warning shown after settings are applied in a ReplayKit window, sent by the background helper. Keep {error}, {sourceName} as written.",
     "text": "Could not remove retired {sourceName} Composite Blur filter: {error}"
@@ -6901,18 +6897,6 @@
   "settings.couldNotResizeNameError": {
     "context": "Warning shown after settings are applied in a ReplayKit window, sent by the background helper. Keep {error}, {name} as written.",
     "text": "Could not resize {name}: {error}"
-  },
-  "settings.couldNotRestoreNameError": {
-    "context": "Warning shown after settings are applied in a ReplayKit window, sent by the background helper. Keep {error}, {name} as written.",
-    "text": "Could not restore {name}: {error}"
-  },
-  "settings.couldNotRestoreSourcenameOpacityFilter": {
-    "context": "Warning shown after settings are applied in a ReplayKit window, sent by the background helper. Keep {error}, {sourceName} as written.",
-    "text": "Could not restore {sourceName} opacity filter enabled state: {error}"
-  },
-  "settings.couldNotRestoreSourcenameOpacityFilter2": {
-    "context": "Warning shown after settings are applied in a ReplayKit window, sent by the background helper. Keep {error}, {sourceName} as written.",
-    "text": "Could not restore {sourceName} opacity filter settings: {error}"
   },
   "settings.couldNotRotateNameError": {
     "context": "Warning shown after settings are applied in a ReplayKit window, sent by the background helper. Keep {error}, {name} as written.",
@@ -7590,10 +7574,6 @@
     "context": "Error message in a ReplayKit window, sent by the background helper.",
     "text": "Invalid game window token."
   },
-  "settings.invalidOverlayPreviewRevision": {
-    "context": "Error message in a ReplayKit window, sent by the background helper.",
-    "text": "Invalid overlay preview revision."
-  },
   "settings.invalidPowerConfigurationRequest": {
     "context": "Message the helper shows when an action fails or finishes in a ReplayKit window, sent by the background helper.",
     "text": "Invalid power configuration request."
@@ -8101,10 +8081,6 @@
   "settings.obsCloseWarningWasSavedBut": {
     "context": "Warning shown after settings are applied in a ReplayKit window, sent by the background helper. Keep {error} as written.",
     "text": "OBS close warning was saved, but OBS config could not be updated: {error}"
-  },
-  "settings.obsConfigRootDidNotResolve": {
-    "context": "Error message in a ReplayKit window, sent by the background helper.",
-    "text": "OBS config root did not resolve to the expected AppData path."
   },
   "settings.obsCouldNotApplyRecordingAudio": {
     "context": "Warning shown after settings are applied in a ReplayKit window, sent by the background helper. Keep {error} as written.",
@@ -11898,6 +11874,46 @@
   "capture.videoUnavailable": {
     "context": "Smaller line under 'Game Out of Focus' on the recording, the clips and the Discord stream, while a game from the Auto Game List is open but not in focus.",
     "text": "Video Unavailable"
+  },
+  "settings.autoGameListIsFull": {
+    "context": "Error message on the Screenshare page of ReplayKit Settings, sent by the background helper when one more game is added to the Auto Game List than it can hold.",
+    "text": "The Auto Game List cannot hold more games."
+  },
+  "settings.inputOverlayFilesAreMissing": {
+    "context": "Warning shown after settings are applied in a ReplayKit window, sent by the background helper, when the keyboard or mouse picture of the input overlay is missing from the install.",
+    "text": "The input overlay files are missing from the ReplayKit install."
+  },
+  "settings.layoutNumbers": {
+    "context": "Option in a dropdown of the Settings window, the name of a keyboard layout of the input overlay, sent by the background helper. WASD names the keys; Numbers means the number row is shown too.",
+    "text": "WASD Numbers"
+  },
+  "settings.layoutNumbersSmall": {
+    "context": "Option in a dropdown of the Settings window, the name of a keyboard layout of the input overlay, sent by the background helper. WASD names the keys; Numbers means the number row is shown too.",
+    "text": "WASD Numbers Small"
+  },
+  "settings.layoutValorant": {
+    "context": "Option in a dropdown of the Settings window, the name of a keyboard layout of the input overlay, sent by the background helper. Valorant is the name of a game, left as it is.",
+    "text": "Valorant"
+  },
+  "settings.layoutValorantSmall": {
+    "context": "Option in a dropdown of the Settings window, the name of a keyboard layout of the input overlay, sent by the background helper. Valorant is the name of a game, left as it is.",
+    "text": "Valorant Small"
+  },
+  "settings.layoutWasd": {
+    "context": "Option in a dropdown of the Settings window, the name of a keyboard layout of the input overlay, sent by the background helper. WASD names the keys and is usually left as it is.",
+    "text": "WASD"
+  },
+  "settings.layoutWasdFull": {
+    "context": "Option in a dropdown of the Settings window, the name of a keyboard layout of the input overlay, sent by the background helper. WASD names the keys; Full means the whole keyboard.",
+    "text": "WASD Full"
+  },
+  "settings.settingMustBeBetween": {
+    "context": "Error message in a ReplayKit window, sent by the background helper when a page saves a setting. {name} is the internal name of the setting, left as it is. Keep {min} and {max} as written.",
+    "text": "The setting {name} must be between {min} and {max}."
+  },
+  "settings.settingValueNotValid": {
+    "context": "Error message in a ReplayKit window, sent by the background helper when a page saves a setting. {name} is the internal name of the setting, left as it is.",
+    "text": "The value of the setting {name} is not valid."
   },
   "settings.showGameOutOfFocus": {
     "context": "Switch in Settings > Screenshare > Discord Screenshare, under the Auto Game List. 'Game Out of Focus' is the card the stream and clips show, translated the way that card is.",

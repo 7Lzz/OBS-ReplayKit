@@ -6867,10 +6867,6 @@
     "source": "4a40427ac0a56d3c",
     "text": "无法移除 {name}：{error}"
   },
-  "settings.couldNotRemovePreviewOpacityFilter": {
-    "source": "1079fc0b421ab421",
-    "text": "无法从 {sourceName} 移除预览透明度滤镜：{error}"
-  },
   "settings.couldNotRemoveRetiredSourcenameComposite": {
     "source": "29be9143b02415f1",
     "text": "无法移除已弃用的 {sourceName} Composite Blur 滤镜：{error}"
@@ -6898,18 +6894,6 @@
   "settings.couldNotResizeNameError": {
     "source": "b7342712822c2a08",
     "text": "无法调整 {name} 的大小：{error}"
-  },
-  "settings.couldNotRestoreNameError": {
-    "source": "6d856a324c76586e",
-    "text": "无法还原 {name}：{error}"
-  },
-  "settings.couldNotRestoreSourcenameOpacityFilter": {
-    "source": "7632753a19589475",
-    "text": "无法还原 {sourceName} 透明度滤镜的启用状态：{error}"
-  },
-  "settings.couldNotRestoreSourcenameOpacityFilter2": {
-    "source": "ab904747cfb5d9ce",
-    "text": "无法还原 {sourceName} 透明度滤镜的设置：{error}"
   },
   "settings.couldNotRotateNameError": {
     "source": "7242dd2355e59408",
@@ -7587,10 +7571,6 @@
     "source": "785d5850577fd88e",
     "text": "游戏窗口令牌无效。"
   },
-  "settings.invalidOverlayPreviewRevision": {
-    "source": "d2a15b6b0fa2a3c3",
-    "text": "叠加层预览修订号无效。"
-  },
   "settings.invalidPowerConfigurationRequest": {
     "source": "ce5d8715f66fd10a",
     "text": "电源配置请求无效。"
@@ -8098,10 +8078,6 @@
   "settings.obsCloseWarningWasSavedBut": {
     "source": "94c3eb442c03af73",
     "text": "OBS 关闭提示已保存，但无法更新 OBS 配置：{error}"
-  },
-  "settings.obsConfigRootDidNotResolve": {
-    "source": "c4f389887ab2d357",
-    "text": "OBS 配置根目录未解析到预期的 AppData 路径。"
   },
   "settings.obsCouldNotApplyRecordingAudio": {
     "source": "d6521c33f14f0d7a",
@@ -11888,6 +11864,46 @@
   "capture.videoUnavailable": {
     "source": "1371e9f5bfce72a0",
     "text": "视频不可用"
+  },
+  "settings.autoGameListIsFull": {
+    "source": "ddf3dca3007a5da5",
+    "text": "自动游戏列表无法再添加更多游戏。"
+  },
+  "settings.inputOverlayFilesAreMissing": {
+    "source": "f76497d96b92ec86",
+    "text": "ReplayKit 安装中缺少输入叠加层的文件。"
+  },
+  "settings.layoutNumbers": {
+    "source": "82d69e39ea8b19f2",
+    "text": "WASD 数字"
+  },
+  "settings.layoutNumbersSmall": {
+    "source": "115360a295aeb980",
+    "text": "WASD 数字 小"
+  },
+  "settings.layoutValorant": {
+    "source": "61e48fdf41886315",
+    "text": "Valorant"
+  },
+  "settings.layoutValorantSmall": {
+    "source": "e9eb2c49ccefcf63",
+    "text": "Valorant 小"
+  },
+  "settings.layoutWasd": {
+    "source": "cfa35cc99d6ca28e",
+    "text": "WASD"
+  },
+  "settings.layoutWasdFull": {
+    "source": "5b0310ddfc2f0cb4",
+    "text": "WASD 完整"
+  },
+  "settings.settingMustBeBetween": {
+    "source": "5e65408ec63e27b6",
+    "text": "设置 {name} 必须介于 {min} 和 {max} 之间。"
+  },
+  "settings.settingValueNotValid": {
+    "source": "8b8b4a3ed49f1cb2",
+    "text": "设置 {name} 的值无效。"
   },
   "settings.showGameOutOfFocus": {
     "source": "abd2f59f183da4cd",

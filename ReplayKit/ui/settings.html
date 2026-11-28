@@ -2876,7 +2876,7 @@
       overlayColorAdd: settingOr("overlayColorAdd"),
     };
     const sent = clone(state);
-    const data = await helperJson("settings/overlay-preview?mode=commit", {
+    const data = await helperJson("settings/overlay-preview", {
       method:"POST",
       headers:{ "Content-Type":"application/json" },
       body:JSON.stringify(payload),
@@ -2892,7 +2892,7 @@
     return true;
   }
 
-  // nothing is previewed at the obs source any more, so closing without applying has nothing to undo -- kept as the single place that would need to change if live preview ever comes back.
+  // the preview draws in the page only and obs changes on the save, so closing without applying has nothing to undo
   async function cancelOverlayPreview() {
     overlayPreviewTouched = false;
   }

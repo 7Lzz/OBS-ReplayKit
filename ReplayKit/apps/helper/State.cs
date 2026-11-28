@@ -42,6 +42,10 @@ namespace ReplayKitHelper
         public static readonly string USER_ICONS_DIR = Path.Combine(APP_ICONS_DIR, "user");
         // %APPDATA%\obs-studio -- APP_ICONS_DIR is ...\obs-replayKit\icons, so up two.
         public static readonly string OBS_CONFIG_DIR = Path.GetFullPath(Path.Combine(APP_ICONS_DIR, "..", ".."));
+        public static readonly string OBS_SCENES_DIR = Path.Combine(OBS_CONFIG_DIR, "basic", "scenes");
+        public static readonly string OBS_PROFILES_DIR = Path.Combine(OBS_CONFIG_DIR, "basic", "profiles");
+        // a scene file staged for after the exit-save of obs, with an extension the scene scan of obs ignores
+        public const string PENDING_SCENE_SUFFIX = ".replaykit-pending";
         // custom themes the user saved from the Appearance tab, one <name>.json of colour tokens each. per-user, gitignored.
         public static readonly string USER_THEMES_DIR = Path.GetFullPath(Path.Combine(APP_ICONS_DIR, "..", "themes-user"));
 
@@ -250,11 +254,6 @@ namespace ReplayKitHelper
         public readonly object CapabilitiesLock = new object();
         public JObject Capabilities;
         public DateTime CapabilitiesAt;
-
-        // guarded by OverlayPreviewLock
-        public readonly object OverlayPreviewLock = new object();
-        public JObject ReplaykitOverlayPreviewState;
-        public long ReplaykitOverlayPreviewRevision;
 
         // guarded by HotkeyCaptureLock
         public readonly object HotkeyCaptureLock = new object();

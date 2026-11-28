@@ -367,7 +367,7 @@ namespace ReplayKitSetup
         {
             string id = src.Value<string>("id") ?? "";
             string name = src.Value<string>("name") ?? "";
-            if (string.Equals(id, "input-overlay", StringComparison.OrdinalIgnoreCase)) return true;
+            if (string.Equals(id, OverlayScene.InputOverlaySourceKind, StringComparison.OrdinalIgnoreCase)) return true;
             if (IsFocusCard(src)) return true;
             if (name == OverlayScene.DesktopAudioSourceName || name == OverlayScene.DiscordAudioSourceName) return true;
             var settings = src["settings"];

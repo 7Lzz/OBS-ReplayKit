@@ -207,7 +207,6 @@ namespace ReplayKitHelper
 
             try { DiscordProjector.StartKeepAlive(); } catch (Exception ex) { Log.Write("warn: Discord projector startup threw: " + ex.Message); }
             try { AuthCore.RestoreAuthAtStartup(); } catch (Exception ex) { Log.Write("RestoreAuthAtStartup: " + ex.Message); }
-            try { SettingsOverlayLive.RevertAbandonedOverlayPreviewAtStartup(); } catch (Exception ex) { Log.Write("RevertAbandonedOverlayPreviewAtStartup: " + ex.Message); }
             try { SettingsHttp.ApplyAppIconAtStartup(); } catch (Exception ex) { Log.Write("ApplyAppIconAtStartup: " + ex.Message); }
             try { SettingsHttp.EnsureObsRecordingFolderAtStartup(); } catch (Exception ex) { Log.Write("EnsureObsRecordingFolderAtStartup: " + ex.Message); }
             try { SettingsHttp.EnsureObsVideoMatchesSettingsAtStartup(); } catch (Exception ex) { Log.Write("EnsureObsVideoMatchesSettingsAtStartup: " + ex.Message); }

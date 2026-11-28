@@ -72,9 +72,9 @@ foreach ($kind in 'Mic', 'DesktopAudio', 'DiscordAudio') {
     if ($value -notmatch '^[A-Za-z0-9][A-Za-z0-9 ._()-]{0,63}$') { throw "$kind source name has an unexpected shape: '$value'" }
     $audioSources[$kind] = $value
 }
-# the input overlay sources the plugin hides together and the source kind of the bongo cat it registers
+# the input overlay sources the plugin groups and hides together, their group, and the source kind of the bongo cat it registers
 $overlayNames = [ordered]@{}
-foreach ($name in 'WasdSourceName', 'MouseSourceName', 'BongoSourceKind') {
+foreach ($name in 'WasdSourceName', 'MouseSourceName', 'InputOverlayGroupName', 'BongoSourceKind') {
     $value = Read-Constant 'shared\OverlayScene.cs' ('const\s+string\s+' + $name + '\s*=\s*"([^"]+)"\s*;') "the $name"
     if ($value -notmatch '^[A-Za-z0-9][A-Za-z0-9 ._-]{0,63}$') { throw "$name has an unexpected shape: '$value'" }
     $overlayNames[$name] = $value
@@ -181,6 +181,7 @@ inline constexpr char kGameCaptureSourceName[] = "$($captures['Game'])";
 inline constexpr char kWindowCaptureSourceName[] = "$($captures['Window'])";
 inline constexpr char kWasdSourceName[] = "$($overlayNames['WasdSourceName'])";
 inline constexpr char kMouseSourceName[] = "$($overlayNames['MouseSourceName'])";
+inline constexpr char kInputOverlayGroupName[] = "$($overlayNames['InputOverlayGroupName'])";
 inline constexpr char kBongoSourceKind[] = "$($overlayNames['BongoSourceKind'])";
 $cppWindows
 

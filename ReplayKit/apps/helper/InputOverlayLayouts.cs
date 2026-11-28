@@ -303,15 +303,20 @@ namespace ReplayKitHelper
             return full.StartsWith(root, StringComparison.OrdinalIgnoreCase) && File.Exists(full) ? full : null;
         }
 
-        // game and key names stay as the shared table writes them, the plain words are in the language of obs
         private static string ShownLabel(Layout l)
         {
             switch (l.Id)
             {
+                case "wasd-minimal": return Locales.Message("settings.layoutWasd");
+                case "wasd-full": return Locales.Message("settings.layoutWasdFull");
+                case "wasd-valorant": return Locales.Message("settings.layoutValorant");
+                case "wasd-valorant-micro": return Locales.Message("settings.layoutValorantSmall");
+                case "wasd-numbers": return Locales.Message("settings.layoutNumbers");
+                case "wasd-numbers-small": return Locales.Message("settings.layoutNumbersSmall");
                 case Custom: return Locales.Message("settings.layoutCustom");
                 case "buttons": return Locales.Message("settings.layoutButtons");
                 case "off": return Locales.Message("settings.off");
-                default: return l.Label;
+                default: return l.Id;
             }
         }
 

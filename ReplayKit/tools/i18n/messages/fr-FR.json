@@ -6871,10 +6871,6 @@
     "source": "4a40427ac0a56d3c",
     "text": "Impossible de supprimer {name} : {error}"
   },
-  "settings.couldNotRemovePreviewOpacityFilter": {
-    "source": "1079fc0b421ab421",
-    "text": "Impossible de retirer le filtre d'opacité d'aperçu de {sourceName} : {error}"
-  },
   "settings.couldNotRemoveRetiredSourcenameComposite": {
     "source": "29be9143b02415f1",
     "text": "Impossible de retirer l'ancien filtre Flou composite de {sourceName} : {error}"
@@ -6902,18 +6898,6 @@
   "settings.couldNotResizeNameError": {
     "source": "b7342712822c2a08",
     "text": "Impossible de redimensionner {name} : {error}"
-  },
-  "settings.couldNotRestoreNameError": {
-    "source": "6d856a324c76586e",
-    "text": "Impossible de restaurer {name} : {error}"
-  },
-  "settings.couldNotRestoreSourcenameOpacityFilter": {
-    "source": "7632753a19589475",
-    "text": "Impossible de restaurer l'état d'activation du filtre d'opacité de {sourceName} : {error}"
-  },
-  "settings.couldNotRestoreSourcenameOpacityFilter2": {
-    "source": "ab904747cfb5d9ce",
-    "text": "Impossible de restaurer les paramètres du filtre d'opacité de {sourceName} : {error}"
   },
   "settings.couldNotRotateNameError": {
     "source": "7242dd2355e59408",
@@ -7591,10 +7575,6 @@
     "source": "785d5850577fd88e",
     "text": "Jeton de fenêtre de jeu invalide."
   },
-  "settings.invalidOverlayPreviewRevision": {
-    "source": "d2a15b6b0fa2a3c3",
-    "text": "Révision d'aperçu d'incrustation invalide."
-  },
   "settings.invalidPowerConfigurationRequest": {
     "source": "ce5d8715f66fd10a",
     "text": "Demande de configuration d'alimentation invalide."
@@ -8102,10 +8082,6 @@
   "settings.obsCloseWarningWasSavedBut": {
     "source": "94c3eb442c03af73",
     "text": "L'avertissement de fermeture d'OBS a été enregistré, mais la configuration d'OBS n'a pas pu être mise à jour : {error}"
-  },
-  "settings.obsConfigRootDidNotResolve": {
-    "source": "c4f389887ab2d357",
-    "text": "Le dossier de configuration d'OBS ne correspond pas au chemin AppData attendu."
   },
   "settings.obsCouldNotApplyRecordingAudio": {
     "source": "d6521c33f14f0d7a",
@@ -11906,6 +11882,46 @@
   "capture.videoUnavailable": {
     "source": "1371e9f5bfce72a0",
     "text": "Vidéo indisponible"
+  },
+  "settings.autoGameListIsFull": {
+    "source": "ddf3dca3007a5da5",
+    "text": "La liste automatique de jeux ne peut pas contenir plus de jeux."
+  },
+  "settings.inputOverlayFilesAreMissing": {
+    "source": "f76497d96b92ec86",
+    "text": "Les fichiers de la superposition des entrées sont absents de l’installation de ReplayKit."
+  },
+  "settings.layoutNumbers": {
+    "source": "82d69e39ea8b19f2",
+    "text": "WASD avec chiffres"
+  },
+  "settings.layoutNumbersSmall": {
+    "source": "115360a295aeb980",
+    "text": "WASD avec chiffres petit"
+  },
+  "settings.layoutValorant": {
+    "source": "61e48fdf41886315",
+    "text": "Valorant"
+  },
+  "settings.layoutValorantSmall": {
+    "source": "e9eb2c49ccefcf63",
+    "text": "Valorant petit"
+  },
+  "settings.layoutWasd": {
+    "source": "cfa35cc99d6ca28e",
+    "text": "WASD"
+  },
+  "settings.layoutWasdFull": {
+    "source": "5b0310ddfc2f0cb4",
+    "text": "WASD complet"
+  },
+  "settings.settingMustBeBetween": {
+    "source": "5e65408ec63e27b6",
+    "text": "Le paramètre {name} doit être compris entre {min} et {max}."
+  },
+  "settings.settingValueNotValid": {
+    "source": "8b8b4a3ed49f1cb2",
+    "text": "La valeur du paramètre {name} n’est pas valide."
   },
   "settings.showGameOutOfFocus": {
     "source": "abd2f59f183da4cd",
