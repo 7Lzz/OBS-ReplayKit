@@ -65,6 +65,7 @@ ffi.cdef[[
 -- a module of its own may declare it as well
 pcall(ffi.cdef, [[ void *ShellExecuteW(void *hwnd, const wchar_t *lpOperation, const wchar_t *lpFile, const wchar_t *lpParameters, const wchar_t *lpDirectory, int nShowCmd); ]])
 pcall(ffi.cdef, [[ int TerminateProcess(void *process, unsigned int exitCode); ]])
+pcall(ffi.cdef, [[ int GetExitCodeProcess(void *process, unsigned long *exitCode); ]])
 
 local kernel32 = ffi.load("kernel32")
 local ws2_32 = ffi.load("ws2_32")
@@ -338,10 +339,13 @@ end
 
 -- set to true once weve successfully launched the helper this session. re-spawn attempts are skipped while its true (the os port-bind would just fail anyway). stays false if the launch errored so the next helper_request() retries after a failed helper launch.
 local helper_started = false
+-- whether helper_process runs under the role host, and whether the host refused or ended a helper this session, after which the helper runs without it until obs starts again
+local helper_hosted = false
+local role_host_refused = false
 
 local function helper_command()
     local module = kernel32.GetModuleHandleA(nil)
-    if module ~= nil then
+    if module ~= nil and not role_host_refused then
         local buffer = ffi.new("char[32768]")
         local length = kernel32.GetModuleFileNameA(module, buffer, ffi.sizeof(buffer))
         if length == 0 or length >= ffi.sizeof(buffer) then
@@ -361,6 +365,18 @@ local function helper_command()
     return win_quote(helper_path()), false
 end
 
+-- antivirus can block the role host while the helper exe still runs on its own, so a hosted launch windows refuses is made once more without the host
+local function spawn_helper_command(arguments, keep_handle)
+    local command, hosted = helper_command()
+    if not command then return false end
+    local ok, err, process = spawn_hidden(command .. arguments, hosted, keep_handle)
+    if ok or not hosted then return ok, err, process, hosted end
+    role_host_refused = true
+    log(obs.LOG_WARNING, "The OBS role host could not start the helper (Win32 error " .. tostring(err) .. "), starting the helper without it")
+    ok, err, process = spawn_hidden(win_quote(helper_path()) .. arguments, false, keep_handle)
+    return ok, err, process, false
+end
+
 -- runs the startup update check in the compiled helper, so the prompt also appears while obs is minimized
 local update_bootstrap_started = false
 local function start_update_bootstrap()
@@ -370,10 +386,7 @@ local function start_update_bootstrap()
         log(obs.LOG_INFO, "Helper missing; skipping startup update check: " .. helper)
         return false
     end
-    local command, hosted = helper_command()
-    if not command then return false end
-    local cmd = command .. ' --update-startup-check'
-    local ok, err = spawn_hidden(cmd, hosted)
+    local ok, err = spawn_helper_command(' --update-startup-check')
     if not ok then
         log(obs.LOG_ERROR, "Update bootstrap spawn failed. Win32 error: " .. tostring(err))
         return false
@@ -384,6 +397,14 @@ end
 
 local function release_exited_helper()
     if not helper_process or kernel32.WaitForSingleObject(helper_process, 0) ~= 0 then return end
+    -- antivirus that stops the role host after it started ends the helper with an error code, and the next helper is started without the host; the watchdog stop of an unresponsive helper sets helper_shutdown_since and does not count
+    if helper_hosted and not helper_shutdown_since then
+        local code = ffi.new("unsigned long[1]")
+        if kernel32.GetExitCodeProcess(helper_process, code) ~= 0 and code[0] ~= 0 then
+            role_host_refused = true
+            log(obs.LOG_WARNING, "The ReplayKit helper under the OBS role host ended with code " .. tostring(code[0]) .. ", the next helper starts without the host")
+        end
+    end
     kernel32.CloseHandle(helper_process)
     helper_process = nil
     helper_shutdown_since = nil
@@ -400,15 +421,13 @@ local function spawn_helper()
     end
     if not write_helper_config() then return false end
 
-    local command, hosted = helper_command()
-    if not command then return false end
-    local cmd = command .. ' -ConfigPath ' .. win_quote(helper_config_path())
-    local ok, err, process = spawn_hidden(cmd, hosted, true)
+    local ok, err, process, hosted = spawn_helper_command(' -ConfigPath ' .. win_quote(helper_config_path()), true)
     if not ok then
         log(obs.LOG_ERROR, "Could not start ReplayKit helper. Win32 error: " .. tostring(err))
         return false
     end
     helper_process = process
+    helper_hosted = hosted
     return true
 end
 

@@ -111,7 +111,6 @@ namespace ReplayKitSetup
                     var reason = SetupLocale.Pair("setup.obsVersionNeeded", "version", ObsVersions.Install.Tested);
                     throw new InvalidOperationException(reason.Shown).WithEnglish(reason);
                 }
-                ProcessHost.Validate();
                 return (object)true;
             });
             bool obsClosed = false;
@@ -134,11 +133,22 @@ namespace ReplayKitSetup
             Add(SetupLocale.Pair("setup.installObsProcessRoles"), SetupLocale.Pair("setup.preparesObsBrowserAndReplaykitHelper"), () =>
             {
                 if (externalRuntimeWriting) Update.MarkUpdatePending();
-                ProcessHost.Install(progress.LogLine, () =>
+                ProcessHost.ForgetStopped(progress.LogLine);
+                // antivirus can remove the role host from the bundle or block its copy; the copy is rolled back so obs keeps the browser it had, and the step is reported as incomplete while setup goes on; a rollback that failed as well stops setup, since the obs browser files are then in no known state
+                try
                 {
-                    Update.MarkUpdatePending();
-                    externalRuntimeWriting = true;
-                });
+                    ProcessHost.Install(progress.LogLine, () =>
+                    {
+                        Update.MarkUpdatePending();
+                        externalRuntimeWriting = true;
+                    });
+                }
+                catch (AggregateException) { throw; }
+                catch (Exception ex)
+                {
+                    progress.LogLine("warn: OBS process roles not installed: " + ex.Message);
+                    return (object)false;
+                }
                 return (object)true;
             });
             Add(SetupLocale.Pair("setup.prepareObsSettingsFolder"), SetupLocale.Pair("setup.createsTheConfigFolder"), () =>

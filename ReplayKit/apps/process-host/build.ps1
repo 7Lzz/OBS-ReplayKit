@@ -53,6 +53,9 @@ foreach ($line in $lines) {
     if ($LASTEXITCODE -ne 0 -or $revision -ne $expected) { throw 'The source checkout does not match the selected OBS release.' }
     git -C $source submodule update --init --depth 1 plugins/obs-browser plugins/obs-websocket
     if ($LASTEXITCODE -ne 0) { throw 'OBS component checkout failed.' }
+    # prepare.ps1 skips a browser source an older prepare.ps1 already patched, so the browser starts from its release files on every build
+    git -C (Join-Path $source 'plugins/obs-browser') checkout -- .
+    if ($LASTEXITCODE -ne 0) { throw 'OBS browser source reset failed.' }
     & (Join-Path $PSScriptRoot 'prepare.ps1') -Source $source
     $build = Join-Path $WorkDir ('build-' + $version)
     $modern = if ($line.pluginLayout -eq 'modern') { 'ON' } else { 'OFF' }

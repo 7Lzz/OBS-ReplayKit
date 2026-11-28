@@ -38,6 +38,8 @@ namespace ReplayKitShared
         public const string ShareCoverSoundFile = "share_cover_sound.wav";
         public const string ShareCoverDefaultSoundFile = "share_cover_default_sound.wav";
         public const string ShareCoverCardFile = "share_cover_card.png";
+        // written by the patched obs browser when antivirus stops a page process of the role host, holding the stamp of the host files it stopped, so the next start of obs runs the pages without the host until those files change or the setup window runs again; new, so it has no old places
+        public const string RoleHostStoppedFile = "role_host_stopped.txt";
         // the hand-off between the installer and a helper that can still be the one of the release before, so it keeps its place in the folder root
         public const string UpdatePendingFile = "update_pending.json";
 

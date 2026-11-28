@@ -83,7 +83,14 @@ namespace ReplayKitSetup
             return (folder, manifest);
         }
 
-        public static void Validate() => Bundle();
+        // the patched browser saves a stop of the role host and then runs the pages without it, so running the setup window is how the host gets tried again
+        public static void ForgetStopped(Action<string> log = null)
+        {
+            string path = Path.Combine(ReplayKitShared.StateLayout.FolderPath(Config.REPLAYKIT_CONFIG), ReplayKitShared.StateLayout.RoleHostStoppedFile);
+            if (!File.Exists(path)) return;
+            File.Delete(path);
+            log?.Invoke("cleared the saved stop of the OBS role host, OBS tries the host again on its next start");
+        }
 
         private static void RequireClosed()
         {
@@ -268,6 +275,8 @@ namespace ReplayKitSetup
                 string original = (string)file["OriginalSha256"];
                 string target = PathAt(Root, relative);
                 string current = File.Exists(target) ? Hash(target) : null;
+                // antivirus can remove the role host files, and gone is what restoring makes of them anyway
+                if (current == null && original == null) continue;
                 if (current != (string)file["Sha256"] && current != original && current != (string)Entry(interrupted, relative)?["Sha256"])
                     throw SetupLocale.Error("setup.anObsHostFileChangedOutsideReplaykit", m => new IOException(m), "path", target);
                 if (original != null && Hash(PathAt(backup, relative)) != original)

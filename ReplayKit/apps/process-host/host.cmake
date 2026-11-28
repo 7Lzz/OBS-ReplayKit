@@ -19,3 +19,5 @@ target_link_directories(replaykit-host PRIVATE "C:/Program Files (x86)/Windows K
 target_link_libraries(replaykit-host PRIVATE shell32 ole32 mscoree)
 set_target_properties(replaykit-host PROPERTIES OUTPUT_NAME obs64 RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/host/$<CONFIG>")
 add_dependencies(replaykit-host obs-browser obs-browser-helper)
+# the patched browser reads the replaykit folder and the role host stop file from the generated header
+target_include_directories(obs-browser PRIVATE "${REPLAYKIT_GENERATED_DIR}")
