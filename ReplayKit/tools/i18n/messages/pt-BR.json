@@ -3079,10 +3079,6 @@
     "source": "03dfc233b2d16ca5",
     "text": "Altera todas as legendas desta linha."
   },
-  "editor.changesTheSoundSSpeedAlong": {
-    "source": "9f8819744a60b1b2",
-    "text": "Altera a velocidade do som junto com o vídeo, para que o som continue alinhado com a imagem. O salvamento leva quase o mesmo tempo do clipe quando você altera a velocidade, divide o vídeo em partes ou deixa o áudio passar do vídeo."
-  },
   "editor.channels": {
     "source": "dd66de3ebcac10f1",
     "text": "Canais"
@@ -3963,14 +3959,6 @@
     "source": "b9fb352bd2e8a142",
     "text": "Manter como está"
   },
-  "editor.keepsTheSoundAtItsNormal": {
-    "source": "5c45c1d530500cb9",
-    "text": "Mantém o som no tom normal ao alterar a velocidade, para que as partes mais rápidas não fiquem agudas e esganiçadas."
-  },
-  "editor.keepsTheSoundAtItsNormal2": {
-    "source": "d5c2cb58a85fa799",
-    "text": "Mantém o som no tom normal quando o vídeo é acelerado, para que as vozes não fiquem agudas e esganiçadas."
-  },
   "editor.keyframeScanTimedOutUsingNormal": {
     "source": "65ffda8299f12f9b",
     "text": "A varredura de quadros-chave expirou; usando o corte rápido normal"
@@ -4311,17 +4299,9 @@
     "source": "ba968987218d089b",
     "text": "100 perfeito"
   },
-  "editor.n100pxFredokaOne": {
-    "source": "a65599fc0ba8b4c0",
-    "text": "100px \"Fredoka One\""
-  },
   "editor.n10Mbps": {
     "source": "447ea49d1b5ce294",
     "text": "10 Mbps"
-  },
-  "editor.n120pxFredokaOne": {
-    "source": "5210f53c53f6dee3",
-    "text": "120px \"Fredoka One\""
   },
   "editor.n15Mbps": {
     "source": "760d6a55b6cc58bd",

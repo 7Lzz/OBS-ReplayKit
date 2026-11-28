@@ -529,6 +529,9 @@
   var SPEED_MAX = EDITOR_LIMITS.videoSpeed.max;
   var AUDIO_SPEED_MIN = EDITOR_LIMITS.audioSpeed.min;
   var AUDIO_SPEED_MAX = EDITOR_LIMITS.audioSpeed.max;
+  var PIC_SCALE = EDITOR_LIMITS.pictureScale;
+  var LAYER_POS = EDITOR_LIMITS.layerPos;
+  var ASPECTS = EDITOR_LIMITS.aspects.map(function (a) { return a.value; });
   var SPEED_STEP = 0.05;
 
   function icon(name) { return (window.RK_ICONS && window.RK_ICONS[name]) || ""; }
@@ -866,7 +869,7 @@
         if (event.target.closest(".lay-rot")) { rotateLayer(event, handles, mainTransform, paintMainPicture); return; }
         var box = handles.getBoundingClientRect();
         var start = {x:event.clientX,y:event.clientY,rx:box.left + box.width / 2,ry:box.top + box.height / 2,w:mainTransform.w};
-        function move(e) { mainTransform.w = scaleFromPointer(start, e, .1, 3); paintMainPicture(); }
+        function move(e) { mainTransform.w = scaleFromPointer(start, e, PIC_SCALE.min, PIC_SCALE.max); paintMainPicture(); }
         function up() {
           window.removeEventListener("pointermove", move);
           window.removeEventListener("pointerup", up);
@@ -930,10 +933,10 @@
       st.layers = cleanLayers(snap.layers);
       // a snapshot or a draft from before the look had none
       st.fx = RKEditorFx.cleanFx(snap.fx);
-      mainTransform = {w:clamp(Number(snap.mainTransform?.w) || 1,.1,3),
+      mainTransform = {w:clamp(Number(snap.mainTransform?.w) || 1, PIC_SCALE.min, PIC_SCALE.max),
         rotate:clamp(Number(snap.mainTransform?.rotate) || 0,-180,180)};
       paintMainPicture();
-      st.aspect = ["9:16", "16:9", "16:10", "21:9", "4:3", "1:1"].indexOf(snap.aspect) >= 0 ? snap.aspect : "original";
+      st.aspect = ASPECTS.indexOf(snap.aspect) >= 0 ? snap.aspect : "original";
       if (opts.onFrame) opts.onFrame();
       st.vpitch = snap.vpitch;
       st.vlink = snap.vlink;
@@ -1477,9 +1480,10 @@
         var dt = (ev.clientX - startX) / pps;
         if (!moved && Math.abs(ev.clientX - startX) < 3) return;
         moved = true;
+        var maxT = Math.max(D(), timelineEnd());
         if (mode === "move") {
-          // the whole pick moves by one amount, held so that none of it leaves the video
-          dt = clamp(dt, -first, Math.max(-first, D() - last));
+          // the whole pick moves by one amount, held so that none of it leaves the timeline
+          dt = clamp(dt, -first, Math.max(-first, maxT - last));
           origs.forEach(function (o) {
             o.cue.at = r3(o.at + dt);
             o.cue.end = r3(o.end + dt);
@@ -1488,7 +1492,7 @@
         } else if (mode === "l") {
           cue.at = r3(clamp(origs[0].at + dt, 0, origs[0].end - SUB_MIN));
         } else {
-          cue.end = r3(clamp(origs[0].end + dt, origs[0].at + SUB_MIN, D()));
+          cue.end = r3(clamp(origs[0].end + dt, origs[0].at + SUB_MIN, maxT));
         }
         subsChanged();
       };
@@ -1786,7 +1790,7 @@
     // layers: other clips of the folder, pictures and gifs laid over the video, each for a stretch of the timeline, in a row of its own; the last one is on top. a layer is placed by its centre and its width as fractions of the picture, keeps the shape of what it shows, and has an opacity. a clip layer plays its own file from src, muted, since its sound comes in as a row of audio
     var LAYER_MIN = 0.2;
     var LAYER_MAX = EDITOR_LIMITS.layers;
-    var LAYER_RANGES = { w: [0.02, 4], opacity: [0, 1] };
+    var LAYER_RANGES = { w: [EDITOR_LIMITS.layerWidth.min, EDITOR_LIMITS.layerWidth.max], opacity: [0, 1] };
 
     function findLayer(id) {
       if (!id) return null;
@@ -1810,7 +1814,7 @@
           kind: l.kind, ref: l.ref, name: String(l.name || (l.kind === "clip" ? RK_M("common.clip") : RK_M("editor.image"))).slice(0, 80),
           at: r3(at), end: r3(end), src: r3(num(l.src, 0, 86400, 0)), dur: r3(num(l.dur, 0, 86400, 0)),
           speed: l.kind === "clip" && l.speed != null ? num(l.speed, SPEED_MIN, SPEED_MAX, 1) : 1, pitch: l.pitch !== false,
-          x: num(l.x, -0.5, 1.5, 0.5), y: num(l.y, -0.5, 1.5, 0.5), w: num(l.w, LAYER_RANGES.w[0], LAYER_RANGES.w[1], 1),
+          x: num(l.x, LAYER_POS.min, LAYER_POS.max, 0.5), y: num(l.y, LAYER_POS.min, LAYER_POS.max, 0.5), w: num(l.w, LAYER_RANGES.w[0], LAYER_RANGES.w[1], 1),
           aspect: num(l.aspect, 0.01, 100, 0.5625), opacity: num(l.opacity, 0, 1, 1), gif: !!l.gif, rotate: Math.round(num(l.rotate, -180, 180, 0)),
           // the row the layer sits in, shared by the halves of a split; a clip has a look of its own like the video
           row: typeof l.row === "string" && /^[EV]\d+$/.test(l.row) ? l.row : "",
@@ -2139,14 +2143,14 @@
         var guide = -1;
         var r = mode === "move" && l.kind === "clip" && dom.timeline ? dom.timeline.getBoundingClientRect() : null;
         var targetVideo = !!r && ev.clientY >= r.top && ev.clientY <= r.bottom;
-        var restoreGroup = group && targetVideo && !intoVideo;
+        var resetGroup = group && targetVideo && !intoVideo;
         if (group && !targetVideo) {
           intoVideo = false;
           if (dom.timeline) dom.timeline.classList.remove("is-drop-target");
           moveTogether(group, dt);
           return;
         }
-        if (restoreGroup) placeGroup(group, 0);
+        if (resetGroup) restoreGroup(group);
         if (mode === "move") {
           // keep a handhold in the empty room after the last piece
           var len = o.end - o.at;
@@ -2187,7 +2191,7 @@
         if (mode !== "move" && (l.kind === "clip" || l.gif)) previewEdge(l.at, l.end, mode === "l");
         layersChanged();
         followLinked(l.id);
-        if (restoreGroup) {
+        if (resetGroup) {
           syncLinked();
           syncDom();
         }
@@ -2257,8 +2261,8 @@
             cx = snapPlace(cx, start.hw, area.width, 0, area.width);
             cy = snapPlace(cy, start.hh, area.height, 0, area.height);
           }
-          l.x = Math.round(clamp(cx / area.width, -0.5, 1.5) * 10000) / 10000;
-          l.y = Math.round(clamp(cy / area.height, -0.5, 1.5) * 10000) / 10000;
+          l.x = Math.round(clamp(cx / area.width, LAYER_POS.min, LAYER_POS.max) * 10000) / 10000;
+          l.y = Math.round(clamp(cy / area.height, LAYER_POS.min, LAYER_POS.max) * 10000) / 10000;
         }
         paintLayers();
         renderProps();
@@ -2318,11 +2322,12 @@
 
     function addLayer(l) {
       if (st.layers.length >= LAYER_MAX) return "";
-      // a clip goes in after everything on the timeline so it plays after the video instead of over it; a picture goes in at the playhead and has to start inside the video, since it stops at its end
-      var at = l.kind === "clip" ? r3(timelineEnd()) : clamp(nowT(), 0, Math.max(0, D() - LAYER_MIN));
+      // a clip goes in after everything on the timeline so it plays after the video instead of over it; a picture goes in at the playhead and stops at the end of the timeline
+      var span = Math.max(D(), timelineEnd());
+      var at = l.kind === "clip" ? r3(timelineEnd()) : clamp(nowT(), 0, Math.max(0, span - LAYER_MIN));
       var len = l.len > 0 ? l.len : 5;
       // a clip runs its whole length, past the end of the video if it has to; a picture stops at the end
-      var end = l.kind === "clip" ? at + len : Math.min(D(), at + len);
+      var end = l.kind === "clip" ? at + len : Math.min(span, at + len);
       if (end - at < LAYER_MIN) return "";
       var made = cleanLayers([Object.assign({ x: 0.5, y: 0.5, opacity: 1, src: 0 }, l, { id: newId("E"), at: at, end: end })])[0];
       if (!made) return "";
@@ -4037,8 +4042,7 @@
       };
     }
 
-    // keep the explanation beneath the switch label.
-    function checkRow(box, text, onChange, tip) {
+    function checkRow(box, text, onChange) {
       var label = el("div", "trim-mode-row");
       var input = el("input", "rk-switch");
       input.type = "checkbox";
@@ -4047,9 +4051,6 @@
       span.textContent = text;
       label.appendChild(input);
       label.appendChild(span);
-      if (tip) {
-        span.appendChild(el("span", "control-note", tip));
-      }
       input.addEventListener("change", function () { onChange(input.checked); });
       box.appendChild(label);
       return input;
@@ -4099,7 +4100,7 @@
         reset: 0,
       });
       els.speed = makeSpeedRow(audio, function (v) { editPiece(function (s) { setSpeed(s, v); }); });
-      els.pitch = checkRow(audio, RK_M("editor.preservePitch"), function (on) { editPiece(function (s) { s.pitch = on; }); commit(); }, RK_M("editor.keepsTheSoundAtItsNormal"));
+      els.pitch = checkRow(audio, RK_M("editor.preservePitch"), function (on) { editPiece(function (s) { s.pitch = on; }); commit(); });
 
       // the properties of a layer
       var lay = el("div", "tl-box");
@@ -4107,7 +4108,6 @@
       lay.hidden = true;
       root.appendChild(lay);
       var pct = function (v) { return Math.round(v) + "%"; };
-      var same = function (v) { return v; };
       els.lsize = makeRow(lay, {
         label: RK_M("common.size"), min: 2, max: 200, step: 1, format: pct, toSlide: same, fromSlide: same,
         write: function (v) { editLayer(function (l) { l.w = clamp(v / 100, LAYER_RANGES.w[0], LAYER_RANGES.w[1]); }); },
@@ -4159,12 +4159,12 @@
         if (st.vspeed !== 1 && st.vlink) allSegs().forEach(function (h) { h.seg.pitch = on; });
         commit();
         tick(true);
-      }, RK_M("editor.keepsTheSoundAtItsNormal2"));
-      els.vlinkRow = checkRow(vid, RK_M("editor.changeTheAudioSpeedToo"), function (on) { relink(on); }, RK_M("editor.changesTheSoundSSpeedAlong"));
+      });
+      els.vlinkRow = checkRow(vid, RK_M("editor.changeTheAudioSpeedToo"), function (on) { relink(on); });
     }
 
     // the furthest a layer may reach: the end of the timeline, and for a clip the end of its file
-    function layerEndMax(l) { return l.kind === "clip" && l.dur > 0 ? l.at + (l.dur - l.src) / layerRate(l) : D(); }
+    function layerEndMax(l) { return l.kind === "clip" && l.dur > 0 ? l.at + (l.dur - l.src) / layerRate(l) : Math.max(D(), timelineEnd()); }
 
     // a change to the selected layer shows at once, the history waits for the change to end
     function editLayer(fn) {
@@ -5377,7 +5377,7 @@
       });
       eng.pool = {};
       eng.busy = {};
-      if (eng.ctx) { try { eng.ctx.close(); } catch (e) { /* already closed */ } eng.ctx = null; eng.master = null; }
+      if (eng.ctx) { try { var closed = eng.ctx.close(); if (closed && closed.catch) closed.catch(function () {}); } catch (e) { /* already closed */ } eng.ctx = null; eng.master = null; }
       if (video._tracksActive) {
         video._tracksActive = false;
         video._applyTrackMaster = null;
@@ -5700,7 +5700,7 @@
 
     function askImport(id) {
       return fetch(opts.helper + "/import-audio/status?id=" + encodeURIComponent(id) + "&t=" + Date.now(), { cache: "no-store" })
-        .then(function (res) { return res.json(); });
+        .then(function (res) { return res.json().catch(function () { return null; }); });
     }
 
     // waits until the helper is done with a file: its answer when it is ready, null when the editor moved on to another clip, and the reason as an error when it failed
@@ -5804,7 +5804,7 @@
       refreshToolbar();
       notifyBusy();
       fetch(opts.helper + "/import-audio/pick?max=" + room, { method: "POST", cache: "no-store" })
-        .then(function (res) { return res.json(); })
+        .then(function (res) { return res.json().catch(function () { return null; }); })
         .then(function (data) {
           if (mine !== seq) return null;
           st.picking = false;
@@ -6036,6 +6036,8 @@
       });
       refThumbs = {};
       if (dom.subOverlay) { dom.subOverlay.hidden = true; dom.subOverlay._key = ""; dom.subOverlay._lit = []; dom.subOverlay.textContent = ""; }
+      if (frameQueued) { cancelAnimationFrame(frameQueued); frameQueued = 0; }
+      if (rulerQueued) { cancelAnimationFrame(rulerQueued); rulerQueued = 0; }
       if (layerRaf) { cancelAnimationFrame(layerRaf); layerRaf = 0; }
       Object.keys(layerViews).forEach(function (id) { destroyLayerView(layerViews[id]); });
       layerViews = {};
@@ -6385,13 +6387,14 @@
         else if (!id && findSub(st.selected)) select("");
       },
       now: function () { return nowT(); },
-      seek: function (t) { seekT(clamp(t, 0, D())); },
+      seek: function (t) { seekT(clamp(t, 0, Math.max(D(), timelineEnd()))); },
       bounds: function () { return videoEdited() ? windowT() : boundsT(); },
       duration: function () { return D(); },
       // a new cue at the playhead in a row of its own, as long as there is room for it, and selected
       add: function (text) {
-        var at = clamp(nowT(), 0, Math.max(0, D() - SUB_MIN));
-        var end = Math.min(D(), at + 2);
+        var maxT = Math.max(D(), timelineEnd());
+        var at = clamp(nowT(), 0, Math.max(0, maxT - SUB_MIN));
+        var end = Math.min(maxT, at + 2);
         if (end - at < SUB_MIN) return "";
         var row = { id: newId("R"), auto: false, title: "", style: {...defaultRowStyle(), wordOn:false} };
         st.subRows.push(row);
@@ -6419,8 +6422,9 @@
       setTimes: function (id, at, end) {
         var cue = findSub(id);
         if (!cue || !isFinite(at) || !isFinite(end)) return;
-        at = clamp(at, 0, D());
-        end = clamp(end, at + SUB_MIN, D());
+        var maxT = Math.max(D(), timelineEnd());
+        at = clamp(at, 0, maxT);
+        end = clamp(end, at + SUB_MIN, maxT);
         if (cue.words && Math.abs((end - at) - (cue.end - cue.at)) < ROUND_STEP) cue.words = shiftWords(cue.words, r3(at) - cue.at);
         cue.at = r3(at);
         cue.end = r3(end);
@@ -6592,7 +6596,7 @@
       resetMainPicture: function () { mainTransform = {w:1, rotate:0}; paintMainPicture(); commit(); },
       aspect: function (value) {
         if (arguments.length) {
-          if (["original", "9:16", "16:9", "16:10", "21:9", "4:3", "1:1"].indexOf(value) < 0 || value === (st.aspect || "original")) return;
+          if (value !== "original" && ASPECTS.indexOf(value) < 0 || value === (st.aspect || "original")) return;
           st.aspect = value;
           commit();
           if (opts.onFrame) opts.onFrame();

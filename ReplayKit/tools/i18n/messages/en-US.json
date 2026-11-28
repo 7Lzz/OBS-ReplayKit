@@ -3079,10 +3079,6 @@
     "context": "Text in the tools panel of the clip editor (subtitles, elements, audio).",
     "text": "Changes every subtitle in this row."
   },
-  "editor.changesTheSoundSSpeedAlong": {
-    "context": "Text in the timeline of the clip editor.",
-    "text": "Changes the sound's speed along with the video, so the sound stays lined up with the picture. Saving takes about as long as the clip when you change the speed, cut the video into pieces, or let the audio run past the video."
-  },
   "editor.channels": {
     "context": "Label in the Color tab of the clip editor.",
     "text": "Channels"
@@ -3963,14 +3959,6 @@
     "context": "Text in the look and effects panel of the clip editor.",
     "text": "Keep as it is"
   },
-  "editor.keepsTheSoundAtItsNormal": {
-    "context": "Text in the timeline of the clip editor.",
-    "text": "Keeps the sound at its normal pitch when you change the speed, so faster parts don't sound high and squeaky."
-  },
-  "editor.keepsTheSoundAtItsNormal2": {
-    "context": "Text in the timeline of the clip editor.",
-    "text": "Keeps the sound at its normal pitch when the video speeds up, so voices don't sound high and squeaky."
-  },
   "editor.keyframeScanTimedOutUsingNormal": {
     "context": "Message the helper shows when an action fails or finishes in a ReplayKit window, sent by the background helper.",
     "text": "Keyframe scan timed out; using normal fast trim"
@@ -4311,17 +4299,9 @@
     "context": "Text in the tools panel of the clip editor (subtitles, elements, audio).",
     "text": "100 perfect"
   },
-  "editor.n100pxFredokaOne": {
-    "context": "Text in the tools panel of the clip editor (subtitles, elements, audio).",
-    "text": "100px \"Fredoka One\""
-  },
   "editor.n10Mbps": {
     "context": "Text in the clip editor.",
     "text": "10 Mbps"
-  },
-  "editor.n120pxFredokaOne": {
-    "context": "Text in the tools panel of the clip editor (subtitles, elements, audio).",
-    "text": "120px \"Fredoka One\""
   },
   "editor.n15Mbps": {
     "context": "Text in the clip editor.",

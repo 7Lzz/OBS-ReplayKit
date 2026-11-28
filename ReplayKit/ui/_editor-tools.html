@@ -11,7 +11,7 @@
   }
   .ed-tab svg { width: 20px; height: 20px; fill: currentColor; }
   .ed-tab:hover, .ed-tab.is-active { background: rgba(var(--text-rgb), .08); color: var(--text); }
-  .ed-tab.is-recording svg { color: #e33b57; }
+  .ed-tab.is-recording svg { color: var(--red); }
   .ed-tools {
     display: flex; flex-direction: column; width: clamp(250px, 21vw, 310px); min-height: 0;
     background: var(--ed-panel, var(--grey6));
@@ -32,7 +32,7 @@
   .ed-x, .tl-x { width: 26px; height: 26px; padding: 0; border: 0; border-radius: var(--border_radius); background: transparent; color: var(--text_muted); display: grid; place-items: center; cursor: pointer; flex: 0 0 auto; }
   .ed-x:hover, .tl-x:hover { background: var(--button_bg_hover); color: var(--text); }
   .ed-x svg, .tl-x svg { width: 14px; height: 14px; fill: currentColor; }
-  /* the panels scroll without a bar*/
+  /* the panels scroll without a bar */
   .ed-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; scrollbar-width: none; padding: 0 14px 14px; }
   .ed-scroll::-webkit-scrollbar { display: none; }
   .ed-pane { display: flex; flex-direction: column; gap: 22px; }
@@ -117,7 +117,7 @@
   .ed-colorfield { display: flex; align-items: center; gap: 8px; flex: 1 1 auto; min-width: 0; }
   .ed-colorfield input { flex: 1 1 auto; min-width: 0; height: 30px; box-sizing: border-box; padding: 0 9px; border: 1px solid var(--grey4); border-radius: 4px; background: var(--grey8); color: var(--text); font: inherit; font-size: 12px; text-transform: uppercase; outline: none; }
   .ed-colorfield input:focus { border-color: var(--primary_light); }
-  .ed-colorfield input.is-bad { border-color: #e33b57; }
+  .ed-colorfield input.is-bad { border-color: var(--red); }
   .ed-colordot { flex: 0 0 26px; width: 26px; height: 26px; padding: 0; border: 0; border-radius: 50%; cursor: pointer; position: relative; overflow: hidden; background: repeating-conic-gradient(#777 0 25%, #bbb 0 50%) 0 0 / 8px 8px; box-shadow: 0 0 0 1px rgba(255, 255, 255, .18); }
   .ed-colordot::after { content: ""; position: absolute; inset: 0; background: var(--dot, #000); }
   .ed-colordot:hover { box-shadow: 0 0 0 2px rgba(255, 255, 255, .4); }
@@ -188,7 +188,7 @@
   .ed-rec-btn i { width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: transform 160ms var(--ease_pop), border-radius 140ms ease, background-color 140ms ease, width 140ms ease, height 140ms ease; }
   .ed-rec-btn:hover:not(:disabled) { background: var(--primary); border-color: var(--primary_light); }
   .ed-rec-btn:hover:not(:disabled) i { transform: scale(1.22); background: var(--on-accent); }
-  .ed-rec-btn.is-on i { width: 14px; height: 14px; border-radius: 3px; background: #e33b57; }
+  .ed-rec-btn.is-on i { width: 14px; height: 14px; border-radius: 3px; background: var(--red); }
   .ed-rec-btn.is-on:hover:not(:disabled) i { background: #fff; }
   .ed-rec-btn:disabled { opacity: .45; cursor: default; }
   .ed-rec-label { font-size: 12px; color: var(--text_muted); }
@@ -231,11 +231,12 @@
   // everything this puts on the window or the document goes when the clips page unloads the editor
   var EDITOR_SIGNAL = window.__rkEditorScope && window.__rkEditorScope.signal;
 
-  var LANGUAGES = [
-    ["auto", RK_M("editor.detectAutomatically")], ["en", RK_M("wizard.english")], ["es", RK_M("editor.langSpanish")], ["pt", RK_M("editor.langPortuguese")], ["fr", RK_M("editor.langFrench")], ["de", RK_M("editor.langGerman")], ["it", RK_M("editor.langItalian")],
-    ["nl", RK_M("editor.langDutch")], ["pl", RK_M("editor.langPolish")], ["ru", RK_M("editor.langRussian")], ["uk", RK_M("editor.langUkrainian")], ["tr", RK_M("editor.langTurkish")], ["ar", RK_M("editor.langArabic")], ["hi", RK_M("editor.langHindi")], ["ja", RK_M("editor.langJapanese")],
-    ["ko", RK_M("editor.langKorean")], ["zh", RK_M("editor.langChinese")], ["vi", RK_M("editor.langVietnamese")], ["id", RK_M("editor.langIndonesian")], ["th", RK_M("editor.langThai")], ["sv", RK_M("editor.langSwedish")],
-  ];
+  var LANGUAGE_LABELS = {
+    auto: RK_M("editor.detectAutomatically"), en: RK_M("wizard.english"), es: RK_M("editor.langSpanish"), pt: RK_M("editor.langPortuguese"), fr: RK_M("editor.langFrench"), de: RK_M("editor.langGerman"), it: RK_M("editor.langItalian"),
+    nl: RK_M("editor.langDutch"), pl: RK_M("editor.langPolish"), ru: RK_M("editor.langRussian"), uk: RK_M("editor.langUkrainian"), tr: RK_M("editor.langTurkish"), ar: RK_M("editor.langArabic"), hi: RK_M("editor.langHindi"), ja: RK_M("editor.langJapanese"),
+    ko: RK_M("editor.langKorean"), zh: RK_M("editor.langChinese"), vi: RK_M("editor.langVietnamese"), id: RK_M("editor.langIndonesian"), th: RK_M("editor.langThai"), sv: RK_M("editor.langSwedish"),
+  };
+  var LANGUAGES = window.RK_EDITOR_LIMITS.speechLanguages.map(function (code) { return [code, LANGUAGE_LABELS[code] || code]; });
   // how much goes on screen at once: a few words, a short phrase, or close to a sentence
   var LENGTHS = { short: { chars: 16, dur: 1.6 }, normal: { chars: 32, dur: 3 }, long: { chars: 48, dur: 5 } };
   var PREFS_KEY = "rk-editor-tools";
@@ -472,7 +473,7 @@
   var measureCtx = null;
   var layoutCache = new Map();
   if (document.fonts && document.fonts.load) {
-    document.fonts.load(RK_M("editor.n100pxFredokaOne")).then(function () { layoutCache.clear(); }).catch(function () {});
+    document.fonts.load('100px "Fredoka One"').then(function () { layoutCache.clear(); }).catch(function () {});
   }
   function layoutText(text, style, aspect) {
     var key = [text, style.font, style.size, style.bold, style.italic, style.padX, hexAlpha(style.bg) > 0, aspect.toFixed(4)].join("|");
@@ -547,6 +548,7 @@
     var editing = "";
     var editRow = "";
     var closeTimer = 0;
+    var subCloseTimer = 0;
     var view = "home";
     var elView = "home";
     var lastTrack = null;
@@ -745,7 +747,7 @@
     }
 
     function addManual() {
-      if (!subs.add("Text")) return;
+      if (!subs.add(RK_M("common.text"))) return;
       // the new subtitle is typed into at once
       requestAnimationFrame(function () { els.subText.focus(); els.subText.select(); });
     }
@@ -773,7 +775,7 @@
 
     function paintFill(slide) {
       var min = Number(slide.min), max = Number(slide.max);
-      slide.style.setProperty("--fill", ((Number(slide.value) - min) / (max - min) * 100) + "%");
+      slide.style.setProperty("--fill", (max > min ? (Number(slide.value) - min) / (max - min) * 100 : 0) + "%");
     }
 
     function slider(key, label) {
@@ -924,7 +926,7 @@
       var text = section(RK_M("common.text"));
       els.textSec = text;
       els.subText = el("textarea", "ed-sub-text");
-      els.subText.maxLength = 300;
+      els.subText.maxLength = window.RK_EDITOR_LIMITS.subtitleText;
       els.subText.placeholder = RK_M("editor.typeTheSubtitle");
       // typing changes the subtitle at once, and becomes one step of undo once it pauses or the box is left
       els.subText.addEventListener("input", function () {
@@ -1595,7 +1597,7 @@
       img.alt = "";
       img.loading = "lazy";
       if (x.kind === "text") {
-        (document.fonts ? document.fonts.load(RK_M("editor.n120pxFredokaOne")) : Promise.resolve()).catch(function () {}).then(function () { img.src = drawTextSticker(x.data, 220).toDataURL("image/png"); });
+        (document.fonts ? document.fonts.load('120px "Fredoka One"') : Promise.resolve()).catch(function () {}).then(function () { img.src = drawTextSticker(x.data, 220).toDataURL("image/png"); });
       } else if (x.kind === "3d") {
         img.src = fluentUrl(x.data);
       } else {
@@ -1622,9 +1624,9 @@
       if (clip !== owner) return;
       if (!blob) throw new Error(RK_M("editor.thePictureCouldNotBeMade"));
       var res = await fetch(o.helper + "/import-media/upload?name=" + encodeURIComponent(name), { method: "POST", cache: "no-store", body: blob });
-      var r = await res.json();
+      var r = await res.json().catch(function () { return null; });
       if (clip !== owner) return;
-      if (!r || !r.ok) throw new Error((r && r.message) || RK_M("editor.theElementCouldNotBeAdded"));
+      if (!res.ok || !r || !r.ok) throw new Error((r && r.message) || RK_M("editor.theElementCouldNotBeAdded"));
       if (!lanes.addLayer({ kind: "media", ref: r.id, name: name, aspect: aspect, w: 0.25 })) throw new Error(RK_M("editor.thereIsNoRoomForAnother"));
     }
 
@@ -1657,7 +1659,7 @@
       var failed = function () { throw new Error(RK_M("editor.theStickerCouldNotBeLoaded")); };
       var made;
       if (x.kind === "text") {
-        made = (document.fonts ? document.fonts.load(RK_M("editor.n120pxFredokaOne")) : Promise.resolve()).catch(function () {}).then(function () {
+        made = (document.fonts ? document.fonts.load('120px "Fredoka One"') : Promise.resolve()).catch(function () {}).then(function () {
           var c = drawTextSticker(x.data, 720);
           return new Promise(function (resolve) { c.toBlob(resolve, "image/png"); }).then(function (b) { return { blob: b, aspect: c.height / c.width }; });
         });
@@ -1669,10 +1671,11 @@
         if (clip !== owner) return;
         if (!m.blob) throw new Error(RK_M("editor.theStickerCouldNotBeMade"));
         return fetch(o.helper + "/import-media/upload?name=" + encodeURIComponent(x.name), { method: "POST", cache: "no-store", body: m.blob })
-          .then(function (res) { return res.json(); })
-          .then(function (r) {
+          .then(function (res) { return res.json().catch(function () { return null; }).then(function (r) { return { ok: res.ok, data: r }; }); })
+          .then(function (res) {
             if (clip !== owner) return;
-            if (!r || !r.ok) throw new Error((r && r.message) || RK_M("editor.theStickerCouldNotBeAdded"));
+            var r = res.data;
+            if (!res.ok || !r || !r.ok) throw new Error((r && r.message) || RK_M("editor.theStickerCouldNotBeAdded"));
             if (!lanes.addLayer({ kind: "media", ref: r.id, name: x.name, aspect: m.aspect, w: x.kind === "text" ? 0.28 : 0.2, gif: !!r.gif })) throw new Error(RK_M("editor.thereIsNoRoomForAnother"));
           });
       }));
@@ -1831,13 +1834,17 @@
         // the card slides out before the panel goes
         if (!card.hidden && !card.classList.contains("is-closing")) {
           card.classList.add("is-closing");
-          setTimeout(function () {
+          clearTimeout(subCloseTimer);
+          subCloseTimer = setTimeout(function () {
+            subCloseTimer = 0;
             card.classList.remove("is-closing");
             if (!editing) card.hidden = true;
           }, 130);
         }
         return;
       }
+      clearTimeout(subCloseTimer);
+      subCloseTimer = 0;
       card.classList.remove("is-closing");
       card.hidden = false;
       var many = subs.picked().length;
@@ -1966,7 +1973,7 @@
       job.waitingForInstall = false;
       var range = subs.sourceRange();
       var tracks = els.listenRow.hidden ? "0" : els.listen.value() || "0";
-      var names = tracks.split(",").map(function (v) { var t = (clip.tracks || []).find(function (x) { return String(x.index) === v; }); return t ? t.label : ""; });
+      var names = tracks.split(",").map(function (v) { var t = (clip.tracks || []).find(function (x) { return String(x.index) === v; }); return t ? (t.name || t.label) : ""; });
       var title = tracks === "0" || names.indexOf("") >= 0 ? RK_M("editor.subtitles") : names.join(" + ");
       // a guess at how long listening takes until the engine reports, from a two minute clip taking about 5 seconds on fast and 19 on accurate
       job.listenAt = performance.now();
@@ -2159,6 +2166,8 @@
 
     function closed() {
       if (!built) return;
+      clearTimeout(subCloseTimer);
+      subCloseTimer = 0;
       if (els.lib && !els.lib.veil.hidden) closeLibrary();
       if (rec.on) stopRecording(false);
       if (job.busy) cancelJob();

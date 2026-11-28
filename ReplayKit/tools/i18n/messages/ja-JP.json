@@ -3077,10 +3077,6 @@
     "source": "03dfc233b2d16ca5",
     "text": "この行のすべての字幕を変更します。"
   },
-  "editor.changesTheSoundSSpeedAlong": {
-    "source": "9f8819744a60b1b2",
-    "text": "音声の速度を映像と一緒に変更するため、音声と映像のずれはありません。速度を変えたり、映像を分割したり、音声を映像より長く流したりすると、保存にはクリップとほぼ同じ時間がかかります。"
-  },
   "editor.channels": {
     "source": "dd66de3ebcac10f1",
     "text": "チャンネル"
@@ -3961,14 +3957,6 @@
     "source": "b9fb352bd2e8a142",
     "text": "そのままにする"
   },
-  "editor.keepsTheSoundAtItsNormal": {
-    "source": "5c45c1d530500cb9",
-    "text": "速度を変更しても音声の音程を保ち、速い部分が高く甲高くならないようにします。"
-  },
-  "editor.keepsTheSoundAtItsNormal2": {
-    "source": "d5c2cb58a85fa799",
-    "text": "映像を早送りしても音声の音程を保ち、声が高く甲高くならないようにします。"
-  },
   "editor.keyframeScanTimedOutUsingNormal": {
     "source": "65ffda8299f12f9b",
     "text": "キーフレームの検索が時間切れになったため、通常の高速トリミングを使用します"
@@ -4309,17 +4297,9 @@
     "source": "ba968987218d089b",
     "text": "100 完璧"
   },
-  "editor.n100pxFredokaOne": {
-    "source": "a65599fc0ba8b4c0",
-    "text": "100px \"Fredoka One\""
-  },
   "editor.n10Mbps": {
     "source": "447ea49d1b5ce294",
     "text": "10 Mbps"
-  },
-  "editor.n120pxFredokaOne": {
-    "source": "5210f53c53f6dee3",
-    "text": "120px \"Fredoka One\""
   },
   "editor.n15Mbps": {
     "source": "760d6a55b6cc58bd",

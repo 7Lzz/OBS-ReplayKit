@@ -13,7 +13,6 @@ namespace ReplayKitHelper
     internal static class EditorPresets
     {
         private const int MaxPresets = 100;
-        private const int MaxNameLength = 40;
         private const int MaxDataBytes = 16 * 1024;
         private static readonly string[] Kinds = { "subtitle", "video" };
         private static readonly Regex Id = new Regex(@"\A[A-Za-z0-9_-]{1,40}\z", RegexOptions.CultureInvariant);
@@ -29,7 +28,7 @@ namespace ReplayKitHelper
             string id = p["id"]?.Type == JTokenType.String ? p.Value<string>("id") : null;
             string name = p["name"]?.Type == JTokenType.String ? new string(p.Value<string>("name").Where(c => !char.IsControl(c)).ToArray()).Trim() : null;
             if (id == null || !Id.IsMatch(id) || !ids.Add(id)) return null;
-            if (string.IsNullOrEmpty(name) || name.Length > MaxNameLength) return null;
+            if (string.IsNullOrEmpty(name) || name.Length > EditorLimits.PresetNameMax) return null;
             if (Encoding.UTF8.GetByteCount(data.ToString(Formatting.None)) > MaxDataBytes) return null;
             return new JObject { ["id"] = id, ["name"] = name, ["data"] = data };
         }

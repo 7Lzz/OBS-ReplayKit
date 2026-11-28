@@ -3080,10 +3080,6 @@
     "source": "03dfc233b2d16ca5",
     "text": "Изменяет каждый субтитр в этой строке."
   },
-  "editor.changesTheSoundSSpeedAlong": {
-    "source": "9f8819744a60b1b2",
-    "text": "Меняет скорость звука вместе с видео, чтобы звук оставался синхронным с картинкой. Сохранение при изменении скорости, нарезке видео на части или когда звук длиннее видео занимает примерно столько же времени, сколько клип."
-  },
   "editor.channels": {
     "source": "dd66de3ebcac10f1",
     "text": "Каналы"
@@ -3964,14 +3960,6 @@
     "source": "b9fb352bd2e8a142",
     "text": "Оставить как есть"
   },
-  "editor.keepsTheSoundAtItsNormal": {
-    "source": "5c45c1d530500cb9",
-    "text": "Сохраняет нормальную высоту тона звука при изменении скорости, чтобы быстрые части не звучали высоко и пискляво."
-  },
-  "editor.keepsTheSoundAtItsNormal2": {
-    "source": "d5c2cb58a85fa799",
-    "text": "Сохраняет нормальную высоту тона звука при ускорении видео, чтобы голоса не звучали высоко и пискляво."
-  },
   "editor.keyframeScanTimedOutUsingNormal": {
     "source": "65ffda8299f12f9b",
     "text": "Истекло время сканирования ключевых кадров; используется обычная быстрая обрезка"
@@ -4312,17 +4300,9 @@
     "source": "ba968987218d089b",
     "text": "100 — идеально"
   },
-  "editor.n100pxFredokaOne": {
-    "source": "a65599fc0ba8b4c0",
-    "text": "100px \"Fredoka One\""
-  },
   "editor.n10Mbps": {
     "source": "447ea49d1b5ce294",
     "text": "10 Mbps"
-  },
-  "editor.n120pxFredokaOne": {
-    "source": "5210f53c53f6dee3",
-    "text": "120px \"Fredoka One\""
   },
   "editor.n15Mbps": {
     "source": "760d6a55b6cc58bd",

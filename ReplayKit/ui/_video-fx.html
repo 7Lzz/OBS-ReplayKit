@@ -199,7 +199,7 @@
     var video = state.video;
     var canvas = state.canvas;
     // a frame asked for in the middle of a seek is not there yet, and the seeked event that follows draws it
-    if (!state.alive || !visible() || !video.videoWidth || video.readyState < 2 || video.seeking) return;
+    if (!state.alive || !visible() || !video.videoWidth || !video.videoHeight || video.readyState < 2 || video.seeking) return;
     // zoomed in, the video itself is shown, since a picture drawn at the size of the box would only be enlarged
     var zoomed = !!video.style.transform;
     canvas.style.visibility = zoomed ? "hidden" : "visible";
@@ -321,6 +321,7 @@
     if (mode === "none" || !visible()) { suspend(); return; }
     if (supported === false) return;
     document.querySelectorAll("video").forEach(function (video) {
+      if (supported === false) return;
       var has = attached.has(video);
       var wanted = eligible(video);
       if (wanted && !has) attach(video);

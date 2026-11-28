@@ -527,7 +527,7 @@
     g.poll = 0;
     if (g.shaders) g.shaders.forEach(function (shader) { g.gl.deleteShader(shader); });
     g.shaders = null;
-    // A current program remains alive after deletion until it is unbound.
+    // a current program remains alive after deletion until it is unbound.
     g.gl.useProgram(null);
     g.gl.bindVertexArray(null);
     g.gl.bindTexture(g.gl.TEXTURE_2D, null);
@@ -628,7 +628,7 @@
   }
 
   // the preview of the editor: a canvas over the video that follows its frames while there is a look to show and steps aside when there is none; the antialiasing of the page leaves a video it owns alone
-  function attachPreview(video) {
+  function attachPreview(video, onUnsupported) {
     var canvas = document.createElement("canvas");
     canvas.className = "ed-fx-canvas";
     canvas.hidden = true;
@@ -640,7 +640,7 @@
       if (!result) {
         g = null; capable = false; context = null; current = null;
         canvas.hidden = true; delete video.dataset.rkFxOwned;
-        if (els.support) els.support.textContent = RK_M("editor.thisComputerCannotShowTheLook");
+        if (onUnsupported) onUnsupported();
         return;
       }
       context = result.gl;
@@ -707,12 +707,17 @@
     function lost(e) {
       e.preventDefault();
       release(); capable = false; current = null; canvas.hidden = true; delete video.dataset.rkFxOwned;
+      if (onUnsupported) onUnsupported();
     }
     function set(resolved) {
       if (destroyed) return;
-      current = resolved && !isIdentity(resolved) && ensure() ? resolved : null;
+      current = resolved && !isIdentity(resolved) ? resolved : null;
       if (!current || document.hidden) {
         release(); canvas.hidden = true; delete video.dataset.rkFxOwned;
+        return;
+      }
+      if (!ensure()) {
+        current = null; canvas.hidden = true; delete video.dataset.rkFxOwned;
         return;
       }
       if (!g || !g.ready) { canvas.hidden = true; return; }
@@ -817,21 +822,23 @@
   function icon(name) { return (window.RK_ICONS && window.RK_ICONS[name]) || ""; }
   function paintFill(slide) {
     var min = Number(slide.min), max = Number(slide.max);
-    slide.style.setProperty("--fill", ((Number(slide.value) - min) / (max - min) * 100) + "%");
+    slide.style.setProperty("--fill", (max > min ? (Number(slide.value) - min) / (max - min) * 100 : 0) + "%");
   }
 
   // the tabs of the video on the right and the panels they open; o.lanes owns the state, o.side is the right panel, o.rail the bar for the tabs and o.video the preview
   function createPanel(o) {
     var lanes = o.lanes;
     var video = o.video;
-    var preview = attachPreview(video);
+    var PRESET_NAME_MAX = window.RK_EDITOR_LIMITS.presetNameMax;
+    var SUB_TEXT_MAX = window.RK_EDITOR_LIMITS.subtitleText;
+    var els = { tabs: {}, panes: {}, color: {}, lookTiles: {}, effectTiles: {}, kindTabs: {}, editing: null, lastPane: "" };
+    var preview = attachPreview(video, function () { if (els.support) els.support.textContent = RK_M("editor.thisComputerCannotShowTheLook"); });
     var thumbs = thumbRenderer();
     // every edit starts on general, so the tab picked last is not kept
     var pane = "general";
     // what is selected on the timeline: video, audio, subtitle or nothing; the bar shows the tabs of that and the panels of the look are only for the video
     var kind = "";
     var shown = false;
-    var els = { tabs: {}, panes: {}, color: {}, lookTiles: {}, effectTiles: {}, kindTabs: {}, editing: null, lastPane: "" };
     var thumbQueued = 0;
     var fxTimer = 0;
     // a selected subtitle shows its own card ("edit") or the presets of subtitles here ("presets")
@@ -1422,10 +1429,13 @@
     function loadPresets() {
       if (!o.helper) return;
       presetsReadFailed = false;
-      fetch(o.helper + "/editor-presets", { cache: "no-store" }).then(function (r) { return r.json(); }).then(function (j) {
-        if (!j || !j.ok || !Array.isArray(j.subtitle) || !Array.isArray(j.video)) {
-          throw new Error((j && j.message) || RK_M("editor.thePresetsCouldNotBeRead"));
-        }
+      fetch(o.helper + "/editor-presets", { cache: "no-store" })
+        .then(function (r) { return r.json().catch(function () { return null; }).then(function (j) { return { ok: r.ok, j: j }; }); })
+        .then(function (res) {
+          var j = res.j;
+          if (!res.ok || !j || !j.ok || !Array.isArray(j.subtitle) || !Array.isArray(j.video)) {
+            throw new Error((j && j.message) || RK_M("editor.thePresetsCouldNotBeRead"));
+          }
         confirmedPresets = { subtitle: j.subtitle, video: j.video };
         presets = Object.assign({}, confirmedPresets);
         presetsKey = "";
@@ -1446,9 +1456,10 @@
       paint();
       presetsSaving = presetsSaving.then(function () {
         return fetch(o.helper + "/editor-presets/save?kind=" + k, { method: "POST", cache: "no-store", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ presets: list }) })
-          .then(function (r) { return r.json(); })
-          .then(function (j) {
-            if (!j || !j.ok || !Array.isArray(j[k])) throw new Error((j && j.message) || RK_M("editor.thePresetsCouldNotBeSaved"));
+          .then(function (r) { return r.json().catch(function () { return null; }).then(function (j) { return { ok: r.ok, j: j }; }); })
+          .then(function (res) {
+            var j = res.j;
+            if (!res.ok || !j || !j.ok || !Array.isArray(j[k])) throw new Error((j && j.message) || RK_M("editor.thePresetsCouldNotBeSaved"));
             confirmedPresets[k] = j[k];
             if (presets[k] === list) { presets[k] = j[k]; presetsKey = ""; paint(); }
           });
@@ -1485,7 +1496,7 @@
     function saveNewPreset(k) {
       var data = current(k);
       if (!data) return;
-      var name = els.presetName.value.replace(/[\u0000-\u001f]/g, "").trim().slice(0, 40);
+      var name = els.presetName.value.replace(/[\u0000-\u001f]/g, "").trim().slice(0, PRESET_NAME_MAX);
       if (!name) {
         var names = presets[k].map(function (p) { return p.name; });
         var n = presets[k].length + 1;
@@ -1507,7 +1518,7 @@
 
     function renamePreset(k, id, typed) {
       var target = findPreset(k, id);
-      var name = String(typed || "").replace(/[\u0000-\u001f]/g, "").trim().slice(0, 40);
+      var name = String(typed || "").replace(/[\u0000-\u001f]/g, "").trim().slice(0, PRESET_NAME_MAX);
       if (!target || !name || name === target.name) return false;
       storePresets(k, presets[k].map(function (p) { return p.id === target.id ? { id: p.id, name: name, data: p.data } : p; }));
       return true;
@@ -1521,7 +1532,7 @@
       var flipTargets = [row.querySelector(".ed-preset-use"), row.querySelector(".edit-btn"), row.querySelector(".delete-btn")];
       var input = el("input", "name-edit-input");
       input.type = "text";
-      input.maxLength = 40;
+      input.maxLength = PRESET_NAME_MAX;
       input.spellcheck = false;
       input.value = p.name;
       input.setAttribute("aria-label", RK_M("editor.presetName"));
@@ -1578,7 +1589,7 @@
       var named = el("div", "ed-preset-name-row");
       els.presetName = el("input", "ed-text-input");
       els.presetName.type = "text";
-      els.presetName.maxLength = 40;
+      els.presetName.maxLength = PRESET_NAME_MAX;
       els.presetName.spellcheck = false;
       els.presetName.placeholder = RK_M("editor.nameThisPreset");
       els.presetName.setAttribute("aria-label", RK_M("editor.presetName"));
@@ -1755,7 +1766,7 @@
         var typed = el("div", "ed-check-type");
         var field = el("input", "ed-text-input");
         field.type = "text";
-        field.maxLength = 300;
+        field.maxLength = SUB_TEXT_MAX;
         field.spellcheck = false;
         field.placeholder = RK_M("editor.whatWasSaid");
         field.setAttribute("aria-label", RK_M("editor.whatWasSaid"));
@@ -1833,7 +1844,6 @@
         shown = false; kind = ""; pane = "general"; els.editing = null;
         subPane = "edit"; renaming = null; chosen = { subtitle: "", video: "" }; presetsKey = "";
         if (els.presetName) els.presetName.value = "";
-        presetsKey = "";
         clearTimeout(fxTimer);
         preview.set(null); clearThumbs();
         paint();

@@ -299,7 +299,7 @@ namespace ReplayKitHelper
             public bool Any => Height > 0 || Fps > 0 || BitrateKbps > 0;
 
             private static readonly int[] Heights = { 0, 720, 1080, 1440, 2160 };
-            private static readonly int[] Rates = { 0, 24, 30, 60, 120, 144 };
+            internal static readonly int[] Rates = { 0, 24, 30, 60, 120, 144 };
 
             public static bool Valid(RenderOptions o) => o != null && Array.IndexOf(Heights, o.Height) >= 0 && Array.IndexOf(Rates, o.Fps) >= 0 && o.BitrateKbps >= 0 && o.BitrateKbps <= 200000;
 
@@ -577,7 +577,7 @@ namespace ReplayKitHelper
             if (!EditorFrame.Valid(aspect)) return new TrimResult { Ok = false, Message = Locales.Message("editor.unknownAspectRatio") };
             bool screenshot = string.Equals(mode, "screenshot", StringComparison.OrdinalIgnoreCase);
             if (double.IsNaN(pictureScale) || double.IsNaN(pictureRotation) ||
-                pictureScale < .1 || pictureScale > 3 || pictureRotation < -180 || pictureRotation > 180)
+                pictureScale < EditorLimits.PictureScaleMin || pictureScale > EditorLimits.PictureScaleMax || pictureRotation < -180 || pictureRotation > 180)
                 return new TrimResult { Ok = false, Message = Locales.Message("editor.invalidVideoTransform") };
             bool transformed = pictureScale != 1 || pictureRotation != 0;
             bool framed = aspect != "original" || transformed;

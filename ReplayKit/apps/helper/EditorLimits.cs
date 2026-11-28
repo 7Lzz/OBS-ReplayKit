@@ -16,8 +16,15 @@ namespace ReplayKitHelper
         internal const int CombinedTracksMax = 8;
         internal const int LayersMax = 50;
         internal const int SubtitleTextMax = 300;
+        internal const int PresetNameMax = 40;
         internal const double ClipSecondsMin = 0.5;
         internal const int VoiceoverSecondsMax = 15 * 60;
+        internal const double PictureScaleMin = 0.1;
+        internal const double PictureScaleMax = 3;
+        internal const double LayerWidthMin = 0.02;
+        internal const double LayerWidthMax = 4;
+        internal const double LayerPosMin = -0.5;
+        internal const double LayerPosMax = 1.5;
 
         internal static bool VideoSpeed(double speed) => speed >= VideoSpeedMin && speed <= VideoSpeedMax;
         internal static bool AudioSpeed(double speed) => speed >= AudioSpeedMin && speed <= AudioSpeedMax;
@@ -30,8 +37,15 @@ namespace ReplayKitHelper
             ["combinedTracks"] = CombinedTracksMax,
             ["layers"] = LayersMax,
             ["subtitleText"] = SubtitleTextMax,
+            ["presetNameMax"] = PresetNameMax,
             ["clipSecondsMin"] = ClipSecondsMin,
             ["voiceoverSecondsMax"] = VoiceoverSecondsMax,
+            ["pictureScale"] = new JObject { ["min"] = PictureScaleMin, ["max"] = PictureScaleMax },
+            ["layerWidth"] = new JObject { ["min"] = LayerWidthMin, ["max"] = LayerWidthMax },
+            ["layerPos"] = new JObject { ["min"] = LayerPosMin, ["max"] = LayerPosMax },
+            ["aspects"] = EditorFrame.Json(),
+            ["renderFps"] = new JArray(Trim.RenderOptions.Rates),
+            ["speechLanguages"] = new JArray(Speech.LanguageOrder),
             ["importBase"] = AudioPlan.ImportBase,
             ["importBytes"] = AudioImports.MaxUploadBytes,
         };

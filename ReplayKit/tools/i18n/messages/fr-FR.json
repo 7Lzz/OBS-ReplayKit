@@ -3079,10 +3079,6 @@
     "source": "03dfc233b2d16ca5",
     "text": "Modifie tous les sous-titres de cette ligne."
   },
-  "editor.changesTheSoundSSpeedAlong": {
-    "source": "9f8819744a60b1b2",
-    "text": "Modifie la vitesse du son en même temps que celle de la vidéo, pour que le son reste synchronisé avec l'image. L'enregistrement dure à peu près aussi longtemps que le clip quand vous changez la vitesse, découpez la vidéo en morceaux ou laissez l'audio dépasser la vidéo."
-  },
   "editor.channels": {
     "source": "dd66de3ebcac10f1",
     "text": "Canaux"
@@ -3963,14 +3959,6 @@
     "source": "b9fb352bd2e8a142",
     "text": "Garder tel quel"
   },
-  "editor.keepsTheSoundAtItsNormal": {
-    "source": "5c45c1d530500cb9",
-    "text": "Garde le son à sa hauteur normale quand vous changez la vitesse, pour que les passages rapides ne soient pas aigus."
-  },
-  "editor.keepsTheSoundAtItsNormal2": {
-    "source": "d5c2cb58a85fa799",
-    "text": "Garde le son à sa hauteur normale quand la vidéo accélère, pour que les voix ne soient pas aiguës."
-  },
   "editor.keyframeScanTimedOutUsingNormal": {
     "source": "65ffda8299f12f9b",
     "text": "Délai d'analyse des images clés dépassé ; utilisation du rognage rapide normal"
@@ -4311,17 +4299,9 @@
     "source": "ba968987218d089b",
     "text": "100 parfait"
   },
-  "editor.n100pxFredokaOne": {
-    "source": "a65599fc0ba8b4c0",
-    "text": "100px \"Fredoka One\""
-  },
   "editor.n10Mbps": {
     "source": "447ea49d1b5ce294",
     "text": "10 Mbps"
-  },
-  "editor.n120pxFredokaOne": {
-    "source": "5210f53c53f6dee3",
-    "text": "120px \"Fredoka One\""
   },
   "editor.n15Mbps": {
     "source": "760d6a55b6cc58bd",

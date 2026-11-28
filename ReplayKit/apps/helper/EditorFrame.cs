@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Newtonsoft.Json.Linq;
 
 namespace ReplayKitHelper
 {
@@ -12,6 +13,14 @@ namespace ReplayKitHelper
         };
 
         public static bool Valid(string aspect) => aspect == "original" || aspect != null && Ratios.ContainsKey(aspect);
+
+        internal static JArray Json()
+        {
+            var list = new JArray();
+            foreach (var entry in Ratios)
+                list.Add(new JObject { ["value"] = entry.Key, ["w"] = entry.Value.W, ["h"] = entry.Value.H });
+            return list;
+        }
 
         // the size of the picture once it is cut to the aspect, which is what the look, the layers and the subtitles are laid out on; the editor works it out the same way
         public static (int W, int H) Size(string aspect, int width, int height)

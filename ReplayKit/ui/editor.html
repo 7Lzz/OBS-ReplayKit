@@ -207,14 +207,15 @@ window.__rkEditorApi = (function () {
   const screenshotBtn = document.getElementById("editor-screenshot");
   let aspectControl = null;
   let aspectOptions = "";
-  const editorFrames = [
-    { value:"9:16", name:RK_M("editor.portrait"), w:9, h:16 },
-    { value:"16:9", name:RK_M("editor.landscape"), w:16, h:9 },
-    { value:"16:10", name:RK_M("editor.widescreen"), w:8, h:5 },
-    { value:"21:9", name:RK_M("editor.ultrawide"), w:7, h:3 },
-    { value:"4:3", name:RK_M("common.standard"), w:4, h:3 },
-    { value:"1:1", name:RK_M("editor.square"), w:1, h:1 },
-  ];
+  const ASPECT_NAMES = {
+    "9:16": RK_M("editor.portrait"),
+    "16:9": RK_M("editor.landscape"),
+    "16:10": RK_M("editor.widescreen"),
+    "21:9": RK_M("editor.ultrawide"),
+    "4:3": RK_M("common.standard"),
+    "1:1": RK_M("editor.square"),
+  };
+  const editorFrames = window.RK_EDITOR_LIMITS.aspects.map((item) => ({ value:item.value, name:ASPECT_NAMES[item.value] || item.value, w:item.w, h:item.h }));
 
   function sourceEditorFrame() {
     const width = trimVideo.videoWidth || 1920, height = trimVideo.videoHeight || 1080;
@@ -434,7 +435,7 @@ window.__rkEditorApi = (function () {
         showToast(Array.isArray(text) ? text.map(escapeHtml).join("<br>") : escapeHtml(text), "bad", title);
         return;
       }
-      showToast(text, "info");
+      showToast(escapeHtml(text), "info");
       scheduleToastHide(3500);
     },
   });
@@ -585,17 +586,6 @@ window.__rkEditorApi = (function () {
   let trimStallRecovering = false;
   const trimSnapFetchCache = new Map();
 
-  function fmtTrimTime(s) {
-    if (!isFinite(s)) s = 0;
-    const sign = s < -0.005 ? "-" : "";
-    s = Math.abs(s);
-    const minutes = Math.floor(s / 60);
-    const seconds = s - minutes * 60;
-    // m:ss.cc -- centiseconds give the user a sense of precision without overwhelming the display.
-    const ss = seconds.toFixed(2).padStart(5, "0");
-    return sign + minutes + ":" + ss;
-  }
-
   function fmtTimelineTime(s) {
     if (!isFinite(s) || s < 0) s = 0;
     const minutes = Math.floor(s / 60);
@@ -640,7 +630,7 @@ window.__rkEditorApi = (function () {
         });
       };
       trimVideo.addEventListener("seeked", finish, { once: true });
-      // A cold range request for a long local recording can take longer than the old 700ms limit. wait long enough for a decodable frame, then keep a real thumbnail fallback rather than leaving a gray canvas behind.
+      // a cold range request for a long local recording can take longer than the old 700ms limit. wait long enough for a decodable frame, then keep a real thumbnail fallback rather than leaving a gray canvas behind.
       timer = setTimeout(finish, 1500);
       try { trimVideo.currentTime = time; } catch (_) { finish(); }
     });
@@ -980,7 +970,7 @@ window.__rkEditorApi = (function () {
   function pickVisibleTrimSnapMarks(width) {
     const drawable = trimSnapPoints.filter((value) => value > 0.001 && value < trimSnapDuration - 0.001);
     if (!drawable.length || width <= 0) return [];
-    // every keyframe stays visible on short clips. Long clips are downsampled to one mark per readable on-screen slot so the ruler remains a guide instead of turning into a solid blue stripe.
+    // every keyframe stays visible on short clips. long clips are downsampled to one mark per readable on-screen slot so the ruler remains a guide instead of turning into a solid blue stripe.
     const maxMarks = Math.max(24, Math.min(TRIM_SNAP_MAX_MARKS, Math.floor(width / TRIM_SNAP_MIN_GAP_PX)));
     const stride = Math.max(1, Math.ceil(drawable.length / maxMarks));
     const marks = [];
@@ -1187,8 +1177,6 @@ window.__rkEditorApi = (function () {
     const rawEnd = Number(trimEnd.value);
     // the handles move on a grid of hundredths and a clip hardly ever ends on one, so a handle that was left at the end rests a hair short of it; that hair is the end, and shown as a gap it would read as a dark bar at the end of the tracks
     const e = max - rawEnd > 0 && max - rawEnd < 0.0105 ? max : rawEnd;
-    // the cut is shown on the timeline of the saved copy, which is the video divided by its speed
-    const rate = trimLanes.videoSpeed();
     trimSeek.min = "0";
     trimSeek.max = String(max);
     trimSeek.value = String(clampVideoTime(trimSeek.value));
@@ -1401,6 +1389,8 @@ window.__rkEditorApi = (function () {
     cancelEditorLoading();
     trimSession?.abort();
     trimSession = null;
+    trimStallRecovering = false;
+    if (trimClockRaf) { cancelAnimationFrame(trimClockRaf); trimClockRaf = 0; }
     endTrimScrub(false);
     trimLanes.cancelDrag();
     // the edit stays behind as a draft wherever the editor is left from: the cancel button, escape, another view, a closed obs
@@ -1553,6 +1543,7 @@ window.__rkEditorApi = (function () {
     trimClockRaf = requestAnimationFrame(trimClockFrame);
   }
   trimVideo.addEventListener("playing", () => { if (!trimClockRaf) trimClockRaf = requestAnimationFrame(trimClockFrame); });
+  EDITOR_SIGNAL.addEventListener("abort", () => { if (trimClockRaf) { cancelAnimationFrame(trimClockRaf); trimClockRaf = 0; } }, { once:true });
   trimVideo.addEventListener("ended", syncTrimPlayIcon);
   ["play", "playing", "pause", "ended", "waiting"].forEach((name) => trimVideo.addEventListener(name, () => trimLanes.onPlayState()));
   ["seeking", "seeked"].forEach((name) => trimVideo.addEventListener(name, () => trimLanes.onSeek()));
@@ -1596,14 +1587,25 @@ window.__rkEditorApi = (function () {
     const resumeTime = trimVideo.currentTime;
     const wasPreviewing = trimPreviewActive;
     const clip = trimSourceClip;
+    const cleanup = () => {
+      trimVideo.removeEventListener("loadedmetadata", onRecovered);
+      trimVideo.removeEventListener("error", onFailed);
+    };
     const onRecovered = () => {
+      cleanup();
       trimVideo.currentTime = resumeTime;
       trimPreviewActive = wasPreviewing;
       trimVideo.play().catch(() => {});
       trimLastProgressAt = Date.now();
       trimStallRecovering = false;
     };
+    const onFailed = () => {
+      cleanup();
+      trimLastProgressAt = Date.now();
+      trimStallRecovering = false;
+    };
     trimVideo.addEventListener("loadedmetadata", onRecovered, { once: true, signal:trimSession.signal });
+    trimVideo.addEventListener("error", onFailed, { once: true, signal:trimSession.signal });
     // fresh cache-bust, not clip.mtime -- this is specifically forcing a brand new connection rather than any chance of the browser reusing whatever the failed one left behind.
     trimVideo.src = HELPER + "/file/" + encodeURIComponent(clip.name) + "?v=" + Date.now();
   }
@@ -1703,7 +1705,7 @@ window.__rkEditorApi = (function () {
 
   // rename the source and its draft in place so the prepared timeline and undo history stay loaded
   function startClipRename() {
-    if (trimSaving || trimRenaming || !trimSourceClip) return;
+    if (trimSaving || trimRenaming || trimDraftLeaving || !trimSourceClip) return;
     const clip = trimSourceClip;
     const nameSpan = trimClipName;
     const dot = clip.name.lastIndexOf(".");
@@ -2082,7 +2084,7 @@ window.__rkEditorApi = (function () {
 
   // single submit helper -- both buttons funnel thru here with a diffrent mode.
   async function submitTrim(mode, render) {
-    if (trimSaving || trimRenaming || !trimSourceClip || trimDuration() < TRIM_MIN_SECONDS) return;
+    if (trimSaving || trimRenaming || trimDraftLeaving || !trimSourceClip || trimDuration() < TRIM_MIN_SECONDS) return;
     const sourceName = trimSourceClip.name;
     const screenshot = mode === "screenshot";
     const videoPlan = trimLanes.videoPlan(screenshot);
@@ -2186,7 +2188,7 @@ window.__rkEditorApi = (function () {
     } catch (e) {
       if (save && save.abandoned) return;
       endTrimSave(save || trimSaving);
-      showToast(RK_M("editor.trimFailedError", { error: e.message || e }));
+      showToast(RK_M("editor.trimFailedError", { error: escapeHtml(e.message || String(e)) }));
       scheduleToastHide(TOAST_ERROR_MS);
     }
   }
@@ -2210,7 +2212,7 @@ window.__rkEditorApi = (function () {
   // the render settings: the size of the picture by its short side, the frame rate and the bitrate, each Original to keep what the video has, and whether the render replaces the clip. what was picked stays for the next render while the editor is loaded
   const renderFps = RKCombo.bind(document.getElementById("render-fps"), () => paintRenderSettings(), { menuKeys:true, signal:EDITOR_SIGNAL });
   const renderBitrate = RKCombo.bind(document.getElementById("render-bitrate"), () => paintRenderSettings(), { menuKeys:true, signal:EDITOR_SIGNAL });
-  renderFps.setOptions([["0", RK_M("editor.original")], ["24", "24 FPS"], ["30", "30 FPS"], ["60", "60 FPS"], ["120", "120 FPS"], ["144", "144 FPS"]].map(([value, label]) => ({ value, label })));
+  renderFps.setOptions(window.RK_EDITOR_LIMITS.renderFps.map((rate) => ({ value: String(rate), label: rate ? rate + " FPS" : RK_M("editor.original") })));
   renderBitrate.setOptions([["0", RK_M("editor.autoBitrate"), RK_M("editor.theSameQualityAsTheClip")], ["5", RK_M("editor.n5Mbps")], ["10", RK_M("editor.n10Mbps")], ["15", RK_M("editor.n15Mbps")], ["20", RK_M("editor.n20Mbps")], ["30", RK_M("editor.n30Mbps")], ["50", RK_M("editor.n50Mbps")]].map(([value, label, description]) => ({ value, label, description:description || "" })));
   renderFps.value = "0";
   renderBitrate.value = "0";

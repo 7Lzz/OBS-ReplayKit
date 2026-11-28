@@ -3078,10 +3078,6 @@
     "source": "03dfc233b2d16ca5",
     "text": "Ändert alle Untertitel in dieser Zeile."
   },
-  "editor.changesTheSoundSSpeedAlong": {
-    "source": "9f8819744a60b1b2",
-    "text": "Ändert die Tonwiedergabe zusammen mit dem Video, damit der Ton synchron zum Bild bleibt. Beim Ändern der Geschwindigkeit, beim Zerschneiden des Videos oder wenn der Ton über das Video hinausläuft, dauert das Speichern etwa so lange wie der Clip selbst."
-  },
   "editor.channels": {
     "source": "dd66de3ebcac10f1",
     "text": "Kanäle"
@@ -3962,14 +3958,6 @@
     "source": "b9fb352bd2e8a142",
     "text": "Unverändert lassen"
   },
-  "editor.keepsTheSoundAtItsNormal": {
-    "source": "5c45c1d530500cb9",
-    "text": "Behält die normale Tonhöhe bei, wenn die Geschwindigkeit geändert wird, damit schnellere Passagen nicht hoch und quietschig klingen."
-  },
-  "editor.keepsTheSoundAtItsNormal2": {
-    "source": "d5c2cb58a85fa799",
-    "text": "Behält die normale Tonhöhe bei, wenn das Video schneller läuft, damit Stimmen nicht hoch und quietschig klingen."
-  },
   "editor.keyframeScanTimedOutUsingNormal": {
     "source": "65ffda8299f12f9b",
     "text": "Keyframe-Suche hat das Zeitlimit überschritten; normales schnelles Zuschneiden wird verwendet"
@@ -4310,17 +4298,9 @@
     "source": "ba968987218d089b",
     "text": "100 perfekt"
   },
-  "editor.n100pxFredokaOne": {
-    "source": "a65599fc0ba8b4c0",
-    "text": "100px \"Fredoka One\""
-  },
   "editor.n10Mbps": {
     "source": "447ea49d1b5ce294",
     "text": "10 Mbps"
-  },
-  "editor.n120pxFredokaOne": {
-    "source": "5210f53c53f6dee3",
-    "text": "120px \"Fredoka One\""
   },
   "editor.n15Mbps": {
     "source": "760d6a55b6cc58bd",

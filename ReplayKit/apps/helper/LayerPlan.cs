@@ -67,9 +67,9 @@ namespace ReplayKitHelper
                         At = Num(o, "at", 0, length),
                         End = Num(o, "end", 0, length + 0.01),
                         Src = Num(o, "src", 0, 86400),
-                        X = Num(o, "x", -0.5, 1.5),
-                        Y = Num(o, "y", -0.5, 1.5),
-                        W = Num(o, "w", 0.02, 4),
+                        X = Num(o, "x", EditorLimits.LayerPosMin, EditorLimits.LayerPosMax),
+                        Y = Num(o, "y", EditorLimits.LayerPosMin, EditorLimits.LayerPosMax),
+                        W = Num(o, "w", EditorLimits.LayerWidthMin, EditorLimits.LayerWidthMax),
                         Opacity = Num(o, "opacity", 0, 1),
                         Rotate = Num(o, "rotate", -180, 180),
                     };

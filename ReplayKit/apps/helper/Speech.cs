@@ -48,10 +48,11 @@ namespace ReplayKitHelper
         private const string EngineCpuPrefix = "ggml-cpu-";
 
         // auto detects the language after non-speech audio has been removed
-        private static readonly HashSet<string> Languages = new HashSet<string>(StringComparer.Ordinal)
+        internal static readonly string[] LanguageOrder =
         {
             "auto", "en", "es", "pt", "fr", "de", "it", "nl", "pl", "ru", "uk", "tr", "ar", "hi", "ja", "ko", "zh", "vi", "id", "th", "sv",
         };
+        private static readonly HashSet<string> Languages = new HashSet<string>(LanguageOrder, StringComparer.Ordinal);
 
         private static readonly HttpClient Http = new HttpClient(new HttpClientHandler
         {
