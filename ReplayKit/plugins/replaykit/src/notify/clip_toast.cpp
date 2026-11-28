@@ -13,6 +13,7 @@
 #include <QPropertyAnimation>
 #include <QVariantAnimation>
 #include <QScreen>
+#include <QThread>
 
 #include "core/app_icon.hpp"
 #include "core/json_lite.hpp"
@@ -240,12 +241,11 @@ void ClipToastShow(ClipToastKind kind, double duration)
 {
 	if (!g_callbacks)
 		return;
+	if (QThread::currentThread() == g_callbacks->thread()) {
+		ShowNow(kind, duration);
+		return;
+	}
 	QMetaObject::invokeMethod(g_callbacks, [kind, duration]() { ShowNow(kind, duration); }, Qt::QueuedConnection);
-}
-
-bool ClipToastEnabled()
-{
-	return g_clipOn.value_or(false) && g_hideFromCapture.has_value();
 }
 
 void ClipToastApplySettings(const std::string &settingsBody)

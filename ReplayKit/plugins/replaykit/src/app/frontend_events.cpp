@@ -123,6 +123,9 @@ NotifyTrackFilter *g_notifyTrackFilter = nullptr;
 // the notify and dock ticks stopped while the window is hidden, which showing it again starts; never set again once obs is closing
 bool g_hiddenHeld = false;
 bool g_exiting = false;
+bool g_recStartNotified = false;
+bool g_recStopNotified = false;
+bool g_recRunning = false;
 
 // a slow re-position pass so a caption move no qt event covered (dpi change, a snap) still settles; the unread count comes from the helper, which says when it changes
 void NotifyTick()
@@ -132,18 +135,13 @@ void NotifyTick()
 }
 
 // the helper finishes a file obs has just written (the silent discord track, the hevc tag); a helper that is down at that moment finds the clip on its next pass through the library
-void TellHelperFileSaved(const char *path, bool clip = false)
+void TellHelperFileSaved(const char *path)
 {
 	const QString file = QString::fromUtf8(path ? path : "");
 	if (file.isEmpty())
 		return;
-	const bool readDuration = clip && ClipToastEnabled();
-	const std::string body = QJsonDocument(QJsonObject{{"path", QDir::toNativeSeparators(file)}, {"readDuration", readDuration}}).toJson(QJsonDocument::Compact).toStdString();
-	RunAsync([body, readDuration]() {
-		const auto answer = HttpRequest("POST", "/clips/saved", body.c_str(), 3500);
-		if (readDuration)
-			ClipToastShow(ClipToastKind::Clip, JsonDoubleField(answer, "duration", 0));
-	});
+	const std::string body = QJsonDocument(QJsonObject{{"path", QDir::toNativeSeparators(file)}}).toJson(QJsonDocument::Compact).toStdString();
+	RunAsync([body]() { HttpRequest("POST", "/clips/saved", body.c_str(), 3500); });
 }
 
 } // namespace
@@ -195,19 +193,39 @@ void OnFrontendEvent(enum obs_frontend_event event, void *)
 	if (event == OBS_FRONTEND_EVENT_SCENE_COLLECTION_CHANGED)
 		FocusCardEnsureScenes();
 	if (event == OBS_FRONTEND_EVENT_REPLAY_BUFFER_SAVED) {
-		ClipSoundPlay(ClipSound::ClipSaved);
+		if (!ClipBufferConsumePredictedSave()) {
+			const double duration = ClipBufferPredictedMemoryDuration();
+			ClipSoundPlay(ClipSound::ClipSaved, [duration]() { ClipToastShow(ClipToastKind::Clip, duration); });
+		}
 		char *path = obs_frontend_get_last_replay();
 		CaptureContextReplayFile(path ? path : "");
-		TellHelperFileSaved(path, true);
+		TellHelperFileSaved(path);
 		bfree(path);
 	}
+	if (event == OBS_FRONTEND_EVENT_RECORDING_STARTING) {
+		g_recStartNotified = true;
+		g_recStopNotified = false;
+		ClipSoundPlay(ClipSound::RecordingStarted, []() { ClipToastShow(ClipToastKind::RecordingStarted); });
+	}
 	if (event == OBS_FRONTEND_EVENT_RECORDING_STARTED) {
-		ClipSoundPlay(ClipSound::RecordingStarted);
-		ClipToastShow(ClipToastKind::RecordingStarted);
+		if (!g_recStartNotified)
+			ClipSoundPlay(ClipSound::RecordingStarted, []() { ClipToastShow(ClipToastKind::RecordingStarted); });
+		g_recStartNotified = false;
+		g_recStopNotified = false;
+		g_recRunning = true;
+	}
+	if (event == OBS_FRONTEND_EVENT_RECORDING_STOPPING) {
+		if (!g_recStopNotified) {
+			ClipSoundPlay(ClipSound::RecordingStopped, []() { ClipToastShow(ClipToastKind::RecordingStopped); });
+			g_recStopNotified = true;
+		}
 	}
 	if (event == OBS_FRONTEND_EVENT_RECORDING_STOPPED) {
-		ClipSoundPlay(ClipSound::RecordingStopped);
-		ClipToastShow(ClipToastKind::RecordingStopped);
+		if (g_recRunning && !g_recStopNotified)
+			ClipSoundPlay(ClipSound::RecordingStopped, []() { ClipToastShow(ClipToastKind::RecordingStopped); });
+		g_recStartNotified = false;
+		g_recStopNotified = false;
+		g_recRunning = false;
 		char *path = obs_frontend_get_last_recording();
 		TellHelperFileSaved(path);
 		bfree(path);

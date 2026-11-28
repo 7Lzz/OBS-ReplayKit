@@ -122,6 +122,8 @@ obs_hotkey_id g_saveHotkey = OBS_INVALID_HOTKEY_ID;
 std::vector<obs_key_combination_t> g_mirrored;
 QString g_gameName, g_saveFormat, g_saveFolder;
 qint64 g_memoryNameUntil = 0;
+qint64 g_memoryStartedMs = 0;
+qint64 g_memoryPredictedUntilMs = 0;
 
 qint64 NowMs()
 {
@@ -786,7 +788,6 @@ void SendSave()
 					return;
 				}
 				const std::string path = ExtractJsonStringField(answer, "path");
-				ClipToastShow(ClipToastKind::Clip, JsonDoubleField(answer, "duration", 0));
 				TellPagesClipSaving("done", path);
 				blog(LOG_INFO, "[replaykit] disk clip buffer saved a clip");
 				calldata_t cd = {};
@@ -796,6 +797,41 @@ void SendSave()
 			},
 			Qt::QueuedConnection);
 	});
+}
+
+// how much footage the disk buffer currently holds in its latest group, capped at the clip length, so the toast appears on the press without waiting for the split and mux
+double PredictedDiskDuration()
+{
+	qint64 ms = 0;
+	const std::uint64_t group = !g_current.path.empty() ? g_current.group : (g_pieces.empty() ? 0 : g_pieces.back().group);
+	for (auto it = g_pieces.rbegin(); it != g_pieces.rend(); ++it) {
+		if (it->group != group)
+			break;
+		ms += qMax<qint64>(0, it->endMs - it->startMs);
+		if (ms >= qint64(g_clipSeconds) * 1000)
+			return double(g_clipSeconds);
+	}
+	if (DiskCapturing() && !g_current.path.empty() && g_current.startMs > 0)
+		ms += qMax<qint64>(0, NowMs() - g_current.startMs);
+	return qMin(double(ms) / 1000.0, double(g_clipSeconds));
+}
+
+double PredictedMemoryDuration()
+{
+	const int cap = ClipBufferNameWindow();
+	if (g_memoryStartedMs <= 0)
+		return double(cap);
+	const double elapsed = double(qMax<qint64>(0, NowMs() - g_memoryStartedMs)) / 1000.0;
+	return cap > 0 ? qMin(elapsed, double(cap)) : elapsed;
+}
+
+void PredictMemorySave()
+{
+	if (g_mode != Mode::Memory || !obs_frontend_replay_buffer_active())
+		return;
+	g_memoryPredictedUntilMs = NowMs() + 15000;
+	const double duration = PredictedMemoryDuration();
+	ClipSoundPlay(ClipSound::ClipSaved, [duration]() { ClipToastShow(ClipToastKind::Clip, duration); });
 }
 
 void SaveDisk()
@@ -814,8 +850,9 @@ void SaveDisk()
 	g_awaitingSplit = capturing;
 	const int gen = ++g_saveGen;
 	g_saveStamp = QDateTime::currentMSecsSinceEpoch();
-	// the save sound plays on the press; the confirmation waits for the finished file
-	ClipSoundPlay(ClipSound::ClipSaved);
+	// show the toast in sync with the save sound on the press, assuming the save will finish
+	const double duration = PredictedDiskDuration();
+	ClipSoundPlay(ClipSound::ClipSaved, [duration]() { ClipToastShow(ClipToastKind::Clip, duration); });
 	TellPagesClipSaving("start");
 	TellHelperClipSaving(g_saveStamp, "start");
 	if (!capturing) {
@@ -900,6 +937,8 @@ void OnSaveHotkey(void *, obs_hotkey_id, obs_hotkey_t *, bool pressed)
 		CaptureContextRequested();
 		if (g_mode == Mode::Disk)
 			SaveDisk();
+		else
+			PredictMemorySave();
 	}, Qt::QueuedConnection);
 }
 
@@ -1081,10 +1120,24 @@ void ClipBufferToggle()
 void ClipBufferSave()
 {
 	CaptureContextRequested();
-	if (g_mode == Mode::Disk)
+	if (g_mode == Mode::Disk) {
 		SaveDisk();
-	else if (obs_frontend_replay_buffer_active())
+	} else if (obs_frontend_replay_buffer_active()) {
+		PredictMemorySave();
 		obs_frontend_replay_buffer_save();
+	}
+}
+
+bool ClipBufferConsumePredictedSave()
+{
+	const bool predicted = g_memoryPredictedUntilMs > NowMs();
+	g_memoryPredictedUntilMs = 0;
+	return predicted;
+}
+
+double ClipBufferPredictedMemoryDuration()
+{
+	return PredictedMemoryDuration();
 }
 
 void ClipBufferApplySettings(const std::string &settingsBody)
@@ -1156,6 +1209,12 @@ void ClipBufferOnFrontendEvent(enum obs_frontend_event event)
 {
 	if (g_shuttingDown)
 		return;
+	if (event == OBS_FRONTEND_EVENT_REPLAY_BUFFER_STARTED)
+		g_memoryStartedMs = NowMs();
+	if (event == OBS_FRONTEND_EVENT_REPLAY_BUFFER_STOPPED) {
+		g_memoryStartedMs = 0;
+		g_memoryPredictedUntilMs = 0;
+	}
 	if (event == OBS_FRONTEND_EVENT_REPLAY_BUFFER_STARTED || event == OBS_FRONTEND_EVENT_REPLAY_BUFFER_STOPPED || event == OBS_FRONTEND_EVENT_REPLAY_BUFFER_SAVED || event == OBS_FRONTEND_EVENT_PROFILE_CHANGED) {
 		g_memoryNameUntil = 0;
 		ApplyMemoryName();

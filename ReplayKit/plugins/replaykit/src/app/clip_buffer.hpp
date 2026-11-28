@@ -20,6 +20,8 @@ void ClipBufferStart(bool deferUntilReady = false);
 void ClipBufferStop();
 void ClipBufferToggle();
 void ClipBufferSave();
+bool ClipBufferConsumePredictedSave();
+double ClipBufferPredictedMemoryDuration();
 void ClipBufferGameName(const QString &name);
 void ClipBufferPrepareName();
 int ClipBufferNameWindow();

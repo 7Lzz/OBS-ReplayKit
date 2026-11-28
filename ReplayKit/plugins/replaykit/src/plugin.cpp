@@ -85,9 +85,9 @@ void obs_module_unload(void)
 	StopWorkers();
 	StopGraphicsWatch();
 	ClipBufferShutdown();
+	ClipSoundStop();
 	ClipToastDestroy();
 	NotifyTipDestroy();
-	ClipSoundStop();
 	ToolsActionsUnregister();
 	// destroy queued callbacks before their code is unloaded with this module.
 	delete g_callbacks;
