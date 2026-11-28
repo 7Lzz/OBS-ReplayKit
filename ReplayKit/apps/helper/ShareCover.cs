@@ -54,10 +54,10 @@ namespace ReplayKitHelper
         {
             var selection = new FileInfo(VideoSelectionPath);
             if (!selection.Exists) return (VideoPath, VideoSoundPath);
-            if (selection.Length > 32) throw new IOException("Invalid share cover video selection.");
+            if (selection.Length > 32) throw new IOException(Locales.Message("screenshare.theCardVideoChoiceIsDamaged"));
             string value = File.ReadAllText(selection.FullName);
             if (value == NoVideo) return (null, null);
-            if (!Guid.TryParseExact(value, "N", out var revision)) throw new IOException("Invalid share cover video selection.");
+            if (!Guid.TryParseExact(value, "N", out var revision)) throw new IOException(Locales.Message("screenshare.theCardVideoChoiceIsDamaged"));
             string token = revision.ToString("N");
             return (VersionPath(VideoPath, token), VersionPath(VideoSoundPath, token));
         }

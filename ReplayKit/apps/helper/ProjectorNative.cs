@@ -17,12 +17,10 @@ namespace ReplayKitHelper
         [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern bool SetWindowText(IntPtr hWnd, string text);
         [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint pid);
         [DllImport("user32.dll")] private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
-        [DllImport("user32.dll")] private static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);
         [DllImport("user32.dll")] private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int x, int y, int cx, int cy, uint uFlags);
         [DllImport("user32.dll")] private static extern bool BringWindowToTop(IntPtr hWnd);
         [DllImport("user32.dll")] private static extern bool SetForegroundWindow(IntPtr hWnd);
         [DllImport("user32.dll")] private static extern bool SetLayeredWindowAttributes(IntPtr hwnd, uint crKey, byte bAlpha, uint dwFlags);
-        [DllImport("user32.dll")] private static extern bool PostMessage(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
         [DllImport("user32.dll")] private static extern IntPtr GetWindow(IntPtr hWnd, uint uCmd);
         [DllImport("user32.dll")] private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
         [DllImport("user32.dll")] private static extern bool GetClientRect(IntPtr hWnd, out RECT lpRect);
@@ -54,7 +52,6 @@ namespace ReplayKitHelper
         private const uint GW_OWNER = 4;
         private const int SW_SHOWNOACTIVATE = 4;
         private const int SW_RESTORE = 9;
-        private const uint WM_CLOSE = 0x0010;
         private const long WS_CAPTION = 0x00C00000L;
         private const long WS_THICKFRAME = 0x00040000L;
         private const long WS_SYSMENU = 0x00080000L;
@@ -123,7 +120,7 @@ namespace ReplayKitHelper
             lock (OperationGate) return pendingOperation != null && !pendingOperation.IsCompleted;
         }
 
-        // A timed-out Win32 call can still be running. Keep its slot until it finishes, and stop the remaining steps when it returns.
+        // a timed-out win32 call can still be running, so it keeps its slot until it finishes and the remaining steps stop once it returns
         private static bool RunWithTimeout(Func<CancellationToken, bool> action, int timeoutMs)
         {
             var cancellation = new CancellationTokenSource();
@@ -188,16 +185,6 @@ namespace ReplayKitHelper
             return SetWindowRgn(hWnd, IntPtr.Zero, true) != 0;
         }
 
-        public static bool SetProjectorVisibleRegion(long hwndValue, int x, int y, int width, int height)
-        {
-            IntPtr hWnd = new IntPtr(hwndValue);
-            if (!IsProjectorWindow(hwndValue) || width < 1 || height < 1 || x < 0 || y < 0) return false;
-            IntPtr region = CreateRectRgn(x, y, x + width, y + height);
-            if (region == IntPtr.Zero) return false;
-            if (SetWindowRgn(hWnd, region, true) == 0) { DeleteObject(region); return false; }
-            return true;
-        }
-
         public static bool SetProjectorGhosted(long hwndValue, bool ghosted, byte alpha)
         {
             IntPtr hWnd = new IntPtr(hwndValue);
@@ -243,20 +230,6 @@ namespace ReplayKitHelper
             BringWindowToTop(hWnd);
             SetForegroundWindow(hWnd);
             return IsWindowVisible(hWnd) && !IsIconic(hWnd) && IsWindowAtRectAndTitle(hwndValue, title, x, y, width, height);
-        }
-
-        public static bool RestoreResizeTitleChromeAndRegion(long hwndValue, string title, int x, int y, int width, int height, bool borderless, int regionX, int regionY, int regionWidth, int regionHeight)
-        {
-            IntPtr hWnd = new IntPtr(hwndValue);
-            if (!IsProjectorWindow(hwndValue) || width < 1 || height < 1) return false;
-            if (!SetProjectorVisibleRegion(hwndValue, regionX, regionY, regionWidth, regionHeight)) return false;
-            ShowWindow(hWnd, SW_RESTORE);
-            ShowWindowAsync(hWnd, SW_RESTORE);
-            if (!string.IsNullOrWhiteSpace(title)) SetWindowText(hWnd, title);
-            if (!SetProjectorChrome(hwndValue, borderless)) return false;
-            if (!SetWindowPos(hWnd, HWND_NOTOPMOST, x, y, width, height, SWP_NOACTIVATE | SWP_FRAMECHANGED | SWP_SHOWWINDOW)) return false;
-            if (!SetWindowPos(hWnd, HWND_TOP, x, y, width, height, SWP_FRAMECHANGED | SWP_SHOWWINDOW)) return false;
-            return SetProjectorVisibleRegion(hwndValue, regionX, regionY, regionWidth, regionHeight);
         }
 
         public static bool RestoreResizeTitleChromeGhosted(long hwndValue, string title, int x, int y, int width, int height, bool borderless)

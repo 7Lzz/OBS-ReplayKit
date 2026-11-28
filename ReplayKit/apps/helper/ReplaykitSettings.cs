@@ -225,12 +225,7 @@ namespace ReplayKitHelper
                 // "default" (obs yami) / a bundled preset id (see Themes.PresetOrder) / "custom" / "user/<name>" (a saved custom). drives the dock, replaykit window chrome, and a generated obs theme variant.
                 ["theme"] = "default",
                 // the custom-editor working palette; the second gradient stop is optional.
-                ["themeCustom"] = new JObject
-                {
-                    ["bg"] = "#161617", ["panel"] = "#1D1F26", ["field"] = "#2F323C",
-                    ["text"] = "#FFFFFF", ["accent"] = "#284CB8", ["border"] = "#3C404D",
-                    ["danger"] = "#E33B57", ["gradient"] = "", ["gradients"] = new JObject(), ["dark"] = true,
-                },
+                ["themeCustom"] = Themes.DefaultCustom(),
                 // "clean" = the sidebar layout (menu bar folded into the title-bar menu, only the controls sidebar docked); "classic" = the stock obs dock layout. the native plugin polls this and re-lays the main window live, no restart.
                 ["interfaceLayout"] = "clean",
                 // armed by the installer on a genuine first install; the dock opens the setup wizard on the next obs launch and /setup/complete clears it.

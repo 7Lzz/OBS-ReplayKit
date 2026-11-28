@@ -429,7 +429,7 @@ namespace ReplayKitHelper
                 double secs = double.Parse(m.Groups[3].Value, CultureInfo.InvariantCulture);
                 return (hours * 3600.0) + (mins * 60.0) + secs;
             }
-            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is System.ComponentModel.Win32Exception)
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is System.ComponentModel.Win32Exception || ex is TimeoutException)
             {
                 Log.Write("Get-VideoDurationSec failed: " + ex.Message);
                 return 0;
@@ -461,7 +461,7 @@ namespace ReplayKitHelper
                         }
                     }
                 }
-                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is JsonException || ex is FormatException)
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is JsonException || ex is FormatException || ex is TimeoutException)
                 {
                     Log.Write("ffprobe metadata failed: " + ex.Message);
                 }
@@ -507,7 +507,10 @@ namespace ReplayKitHelper
             return output.Text.Trim();
         }
 
-        // reads the hidden compress-history marker that CompressOverwrite writes into the mp4s comment metadata atom. empty Mode = no marker found / not one of ours. cheap: ffprobe with -show_entries format_tags=comment touches only the header atoms, no decode -- about 30-60ms per file on a local ssd. the marker prefix is "obs-replaykit_compress_v2_" -- the v2 bump invalidates every clip processed by the old (broken) pipeline so it becomes eligible for re-compression under the dynamic/av1-aware pipeline; v1 markers are intentionally treated as "no marker" so those clips show as compressable again.
+        // the start of the comment CompressOverwriteWorker writes; the v2 bump invalidates every clip processed by the old (broken) pipeline so it becomes eligible for re-compression, and v1 markers are intentionally treated as "no marker" so those clips show as compressable again
+        internal const string MarkerPrefix = "obs-replaykit_compress_v2_";
+
+        // reads the hidden compress-history marker that CompressOverwrite writes into the mp4s comment metadata atom. empty Mode = no marker found / not one of ours. cheap: ffprobe with -show_entries format_tags=comment touches only the header atoms, no decode -- about 30-60ms per file on a local ssd.
         public static CompressMarker GetCompressMarker(string path)
         {
             var result = new CompressMarker();
@@ -519,10 +522,8 @@ namespace ReplayKitHelper
                 string raw = ReadCompressComment(ffprobe, path);
                 if (raw == null) return result;
                 result.Ok = true;
-                const string prefix = "obs-replaykit_compress_v2_";
-                if (!raw.StartsWith(prefix)) return result;
-                var parts = raw.Substring(prefix.Length).Split(new[] { ':' }, 3);
-                if (parts.Length < 1) return result;
+                if (!raw.StartsWith(MarkerPrefix, StringComparison.Ordinal)) return result;
+                var parts = raw.Substring(MarkerPrefix.Length).Split(new[] { ':' }, 3);
                 string mode = parts[0].Trim().ToLowerInvariant();
                 if (mode != "fast" && mode != "slow") return result;
                 result.Mode = mode;

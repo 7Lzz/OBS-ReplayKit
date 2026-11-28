@@ -6192,6 +6192,26 @@
     "source": "6753d9127bc1caff",
     "text": "Окно демонстрации экрана не закрылось, даже после команды завершиться."
   },
+  "screenshare.theShareWindowSideIsNotValid": {
+    "source": "22165b3b95acbc66",
+    "text": "Сторона экрана, у которой размещается окно демонстрации экрана, недопустима."
+  },
+  "screenshare.theCardVideoChoiceIsDamaged": {
+    "source": "f11f04351edff948",
+    "text": "Выбор видео для карточки повреждён. Выберите видео снова."
+  },
+  "screenshare.theShareWindowDidNotAnswer": {
+    "source": "323f9360032987b3",
+    "text": "Окно демонстрации экрана не ответило."
+  },
+  "screenshare.theShareWindowIsNotRunning": {
+    "source": "e85e518b4741ae3e",
+    "text": "Окно демонстрации экрана не запущено."
+  },
+  "screenshare.theConnectionToTheShareWindowFailed": {
+    "source": "750b041c9a9834d6",
+    "text": "Не удалось подключиться к окну демонстрации экрана: {error}"
+  },
   "screenshare.coverDefaultText": {
     "source": "a99e83da4583ab31",
     "text": "Скоро вернусь"
@@ -11527,6 +11547,18 @@
   "update.latestReleaseIsMissingFile": {
     "source": "b5458347e05a8f44",
     "text": "В последнем выпуске нет файла {file}."
+  },
+  "update.versionIsNotValid": {
+    "source": "386a71c8032dcb74",
+    "text": "{version} — недопустимый номер версии."
+  },
+  "update.githubAnsweredWithError": {
+    "source": "cca166664f451d9f",
+    "text": "GitHub ответил ошибкой {status}."
+  },
+  "update.checksumFileHasNoHashFor": {
+    "source": "f87af48e9b6461c4",
+    "text": "В {checksums} нет хеша для {file}."
   },
   "update.missingUninstallConfirmation": {
     "source": "ef570a14262e0cc3",

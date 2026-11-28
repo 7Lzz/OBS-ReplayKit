@@ -6189,6 +6189,26 @@
     "source": "6753d9127bc1caff",
     "text": "即使已要求结束，屏幕共享窗口仍未关闭。"
   },
+  "screenshare.theShareWindowSideIsNotValid": {
+    "source": "22165b3b95acbc66",
+    "text": "放置屏幕共享窗口的屏幕边缘无效。"
+  },
+  "screenshare.theCardVideoChoiceIsDamaged": {
+    "source": "f11f04351edff948",
+    "text": "卡片视频的选择已损坏。请重新选择视频。"
+  },
+  "screenshare.theShareWindowDidNotAnswer": {
+    "source": "323f9360032987b3",
+    "text": "屏幕共享窗口没有响应。"
+  },
+  "screenshare.theShareWindowIsNotRunning": {
+    "source": "e85e518b4741ae3e",
+    "text": "屏幕共享窗口未运行。"
+  },
+  "screenshare.theConnectionToTheShareWindowFailed": {
+    "source": "750b041c9a9834d6",
+    "text": "连接屏幕共享窗口失败：{error}"
+  },
   "screenshare.coverDefaultText": {
     "source": "a99e83da4583ab31",
     "text": "马上回来"
@@ -11500,6 +11520,18 @@
   "update.latestReleaseIsMissingFile": {
     "source": "b5458347e05a8f44",
     "text": "最新版本缺少 {file}。"
+  },
+  "update.versionIsNotValid": {
+    "source": "386a71c8032dcb74",
+    "text": "{version} 不是有效的版本号。"
+  },
+  "update.githubAnsweredWithError": {
+    "source": "cca166664f451d9f",
+    "text": "GitHub 返回了错误 {status}。"
+  },
+  "update.checksumFileHasNoHashFor": {
+    "source": "f87af48e9b6461c4",
+    "text": "{checksums} 中没有 {file} 的哈希。"
   },
   "update.missingUninstallConfirmation": {
     "source": "ef570a14262e0cc3",

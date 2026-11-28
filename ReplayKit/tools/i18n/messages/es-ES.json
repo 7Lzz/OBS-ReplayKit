@@ -6191,6 +6191,26 @@
     "source": "6753d9127bc1caff",
     "text": "La ventana de Compartir pantalla no se cerró, ni siquiera después de indicarle que terminara."
   },
+  "screenshare.theShareWindowSideIsNotValid": {
+    "source": "22165b3b95acbc66",
+    "text": "El lado de la pantalla donde se coloca la ventana de Compartir pantalla no es válido."
+  },
+  "screenshare.theCardVideoChoiceIsDamaged": {
+    "source": "f11f04351edff948",
+    "text": "La elección del video de la tarjeta está dañada. Vuelve a elegir el video."
+  },
+  "screenshare.theShareWindowDidNotAnswer": {
+    "source": "323f9360032987b3",
+    "text": "La ventana de Compartir pantalla no respondió."
+  },
+  "screenshare.theShareWindowIsNotRunning": {
+    "source": "e85e518b4741ae3e",
+    "text": "La ventana de Compartir pantalla no se está ejecutando."
+  },
+  "screenshare.theConnectionToTheShareWindowFailed": {
+    "source": "750b041c9a9834d6",
+    "text": "Falló la conexión con la ventana de Compartir pantalla: {error}"
+  },
   "screenshare.coverDefaultText": {
     "source": "a99e83da4583ab31",
     "text": "Ahora vuelvo"
@@ -11518,6 +11538,18 @@
   "update.latestReleaseIsMissingFile": {
     "source": "b5458347e05a8f44",
     "text": "Falta {file} en la última versión."
+  },
+  "update.versionIsNotValid": {
+    "source": "386a71c8032dcb74",
+    "text": "{version} no es un número de versión válido."
+  },
+  "update.githubAnsweredWithError": {
+    "source": "cca166664f451d9f",
+    "text": "GitHub respondió con el error {status}."
+  },
+  "update.checksumFileHasNoHashFor": {
+    "source": "f87af48e9b6461c4",
+    "text": "{checksums} no tiene ningún hash para {file}."
   },
   "update.missingUninstallConfirmation": {
     "source": "ef570a14262e0cc3",

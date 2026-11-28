@@ -5,7 +5,6 @@ using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
-using Microsoft.Win32;
 using Newtonsoft.Json.Linq;
 
 namespace ReplayKitHelper
@@ -32,7 +31,7 @@ namespace ReplayKitHelper
             const string defaultTitle = "OBS ReplayKit Discord Share";
             if (settings == null) return defaultTitle;
             string value = (settings["discord_projector_title_hint"]?.ToString() ?? "").Trim();
-            if (string.IsNullOrWhiteSpace(value) || value.Length > 128 || Regex.IsMatch(value, @"[\x00-\x1F]")) return defaultTitle;
+            if (string.IsNullOrWhiteSpace(value) || value.Length > ReplayKitShared.SettingLimits.DiscordProjectorTitleHintMaxLength || Regex.IsMatch(value, @"[\x00-\x1F]")) return defaultTitle;
             return value;
         }
 
@@ -52,7 +51,6 @@ namespace ReplayKitHelper
             public int Height;
             public string Source;
             public string Message;
-            public List<string> Warnings = new List<string>();
         }
 
         public static SizeResult GetObsCanvasSize()
@@ -71,7 +69,8 @@ namespace ReplayKitHelper
             return new SizeResult { Ok = false, Message = Locales.Message("screenshare.obsVideoSettingsDidNotInclude") };
         }
 
-        public static SizeResult ResolveProjectorWindowSize(JObject settings, MonitorWorkArea workArea, bool preferSourceMonitor)
+        // the size from the settings, else the main monitor, else the canvas of obs when windows names no main monitor
+        public static SizeResult ResolveProjectorWindowSize(JObject settings, MonitorWorkArea workArea)
         {
             int width = settings["discord_projector_width"]?.Value<int>() ?? 0;
             int height = settings["discord_projector_height"]?.Value<int>() ?? 0;
@@ -79,7 +78,7 @@ namespace ReplayKitHelper
 
             int sourceWidth = workArea.HasSourceBounds ? workArea.SourceBoundsWidth : 0;
             int sourceHeight = workArea.HasSourceBounds ? workArea.SourceBoundsHeight : 0;
-            if (preferSourceMonitor && sourceWidth > 0 && sourceHeight > 0)
+            if (sourceWidth > 0 && sourceHeight > 0)
             {
                 if (width <= 0) width = sourceWidth;
                 if (height <= 0) height = sourceHeight;
@@ -93,12 +92,7 @@ namespace ReplayKitHelper
                 if (height <= 0) height = canvas.Height;
                 return new SizeResult { Ok = true, Width = width, Height = height, Source = canvas.Source };
             }
-
-            string fallbackWarning = canvas.Message + " Falling back to Windows primary monitor size.";
-            if (width <= 0) width = sourceWidth;
-            if (height <= 0) height = sourceHeight;
-            if (width < 1 || height < 1) return new SizeResult { Ok = false, Message = Locales.Message("screenshare.couldNotResolveAValidProjector") };
-            return new SizeResult { Ok = true, Width = width, Height = height, Source = "primary_monitor_fallback", Warnings = new List<string> { fallbackWarning } };
+            return new SizeResult { Ok = false, Message = Locales.Message("screenshare.couldNotResolveAValidProjector") };
         }
 
         public sealed class ScreenBounds
@@ -198,8 +192,8 @@ namespace ReplayKitHelper
             if (workArea.Right <= workArea.Left || workArea.Bottom <= workArea.Top) throw new InvalidOperationException(Locales.Message("screenshare.monitorWorkAreaIsInvalid"));
 
             string edgeValue = (edge ?? "").Trim().ToLowerInvariant();
-            if (edgeValue != "right" && edgeValue != "left" && edgeValue != "top" && edgeValue != "bottom")
-                throw new InvalidOperationException("Invalid projector edge: " + edge);
+            if (Array.IndexOf(ReplayKitShared.SettingLimits.DiscordProjectorEdges, edgeValue) < 0)
+                throw new InvalidOperationException(Locales.Message("screenshare.theShareWindowSideIsNotValid"));
 
             int mainLeft = workArea.HasSourceBounds ? workArea.SourceBoundsLeft : workArea.BoundsLeft;
             int mainTop = workArea.HasSourceBounds ? workArea.SourceBoundsTop : workArea.BoundsTop;
@@ -356,13 +350,12 @@ namespace ReplayKitHelper
                     return new JObject { ["ok"] = false, ["message"] = workArea.Message, ["warnings"] = new JArray(warnings) };
                 }
 
-                var size = ResolveProjectorWindowSize(settings, workArea, true);
+                var size = ResolveProjectorWindowSize(settings, workArea);
                 if (!size.Ok)
                 {
                     warnings.Add(size.Message);
                     return new JObject { ["ok"] = false, ["message"] = size.Message, ["warnings"] = new JArray(warnings) };
                 }
-                warnings.AddRange(size.Warnings);
 
                 ParkedRect rect;
                 try { rect = GetDiscordProjectorParkedRect(workArea, size.Width, size.Height, settings["discord_projector_edge"]?.Value<string>() ?? "", settings["discord_projector_visible_pixels"]?.Value<int>() ?? 0); }
@@ -385,8 +378,7 @@ namespace ReplayKitHelper
                 }
 
                 // explorer puts the button back whenever it builds a taskbar again (an explorer restart, a monitor that wakes or comes back), so the hide is applied on every park rather than once per window
-                const bool hideProjectorTaskbar = true;
-                if (hideProjectorTaskbar && !ProjectorNative.SetProjectorTaskbarHidden(open.Hwnd, true))
+                if (!ProjectorNative.SetProjectorTaskbarHidden(open.Hwnd, true))
                 {
                     string msg = Locales.Message("screenshare.obsProjectorWindowWasMovedBut");
                     warnings.Add(msg);
@@ -447,13 +439,12 @@ namespace ReplayKitHelper
                     return new JObject { ["ok"] = false, ["message"] = workArea.Message, ["warnings"] = new JArray(warnings) };
                 }
 
-                var size = ResolveProjectorWindowSize(settings, workArea, true);
+                var size = ResolveProjectorWindowSize(settings, workArea);
                 if (!size.Ok)
                 {
                     warnings.Add(size.Message);
                     return new JObject { ["ok"] = false, ["message"] = size.Message, ["warnings"] = new JArray(warnings) };
                 }
-                warnings.AddRange(size.Warnings);
 
                 InspectRect rect;
                 try { rect = GetDiscordProjectorInspectRect(workArea, size.Width, size.Height); }
@@ -546,59 +537,22 @@ namespace ReplayKitHelper
 
         public static AudioDeviceResult GetObsStreamAudioRenderDevice()
         {
-            const string renderPath = @"SOFTWARE\Microsoft\Windows\CurrentVersion\MMDevices\Audio\Render";
-            const string friendlyKey = "{a45c254e-df1c-4efd-8020-67d146a850e0},2";
-            const int activeFlag = 0x1;
-            var candidates = new List<(string Id, string Name, int Rank)>();
-            try
-            {
-                using (var renderKey = Registry.LocalMachine.OpenSubKey(renderPath))
-                {
-                    if (renderKey == null) throw new InvalidOperationException("registry key not found");
-                    foreach (var childName in renderKey.GetSubKeyNames())
-                    {
-                        using (var child = renderKey.OpenSubKey(childName))
-                        {
-                            if (child == null) continue;
-                            var state = child.GetValue("DeviceState");
-                            if (state == null || (Convert.ToInt32(state) & activeFlag) == 0) continue;
-                            using (var props = child.OpenSubKey("Properties"))
-                            {
-                                var name = props?.GetValue(friendlyKey) as string;
-                                if (string.IsNullOrWhiteSpace(name)) continue;
-                                string displayName = name.Trim();
-                                string canonical = Regex.Replace(displayName, @"^\s*\d+\s*-\s*", "").Trim();
-                                string lower = canonical.ToLowerInvariant();
-                                if (Regex.IsMatch(lower, "surround|16ch|loopback|do not select")) continue;
-
-                                int rank = 999;
-                                if (lower == "obs stream audio") rank = 0;
-                                else if (lower.StartsWith("obs stream audio")) rank = 1;
-                                else if (lower.StartsWith("cable input")) rank = 2;
-                                if (rank == 999) continue;
-
-                                candidates.Add(("{0.0.0.00000000}." + childName, displayName, rank));
-                            }
-                        }
-                    }
-                }
-            }
-            catch (Exception ex) when (ex is System.Security.SecurityException || ex is IOException || ex is InvalidOperationException)
+            (string DeviceId, string Name)? cable;
+            try { cable = ReplayKitShared.AudioEndpoints.FindShareCable(); }
+            catch (Exception ex) when (ex is System.Security.SecurityException || ex is IOException || ex is UnauthorizedAccessException)
             {
                 return new AudioDeviceResult { Ok = false, Message = Locales.Message("screenshare.couldNotInspectObsStreamAudio", "error", ex.Message) };
             }
-
-            var selected = candidates.OrderBy(c => c.Rank).ThenBy(c => c.Name, StringComparer.Ordinal).FirstOrDefault();
-            if (selected.Id == null)
+            if (cable == null)
                 return new AudioDeviceResult { Ok = false, Message = Locales.Message("screenshare.obsStreamAudioPlaybackEndpointIs") };
-            return new AudioDeviceResult { Ok = true, Id = selected.Id, Source = "obs_stream_audio", Name = selected.Name };
+            return new AudioDeviceResult { Ok = true, Id = cable.Value.DeviceId, Source = "obs_stream_audio", Name = cable.Value.Name };
         }
 
+        // the keep-alive runs on the share-keep-alive thread and the startup park on a pool thread it queues, so a start of the share window or a window call stuck on another ui thread never holds up the http accept loop
         private static DateTime _keepAliveAt = DateTime.MinValue;
-        // this tick runs on the main accept-loop thread (see Runtime.cs), never a pool thread, and must stay that way -- the win32 reposition call underneath it can block waiting on obss own ui thread if obs is busy, which on the pooled model only briefly delays the next new connection being accepted, not any in-flight request.
         private const int KeepAliveSeconds = 30;
         private static int _keepAliveFailures;
-        // open-if-missing has no upper bound tighter than a 5s websocket call plus a 6s find-poll, and that whole sequence runs on this same main thread while holding ProjectorLock -- on a machine where the projector genuinely fails to appear, every single 30s tick re-attempts and re-blocks the entire helper for the full open+poll duration, starving every other connection. capping the backoff here so a persistently-broken projector gets retried every few minutes instead of every 30s forever, once its clearly not a one-off miss.
+        // a start of the share window can wait seconds for it to answer while holding ProjectorLock, so one that keeps failing is retried every few minutes instead of every 30 s once it is clearly not a one-off miss
         private const int KeepAliveMaxBackoffSeconds = 300;
         // a minimized projector is 160x28 with no client area, which is all a capture of it gets, and a minimize request still reaches it with no minimize box; the check only reads window state, so it can run every second
         private const int ParkedCheckMilliseconds = 1000;

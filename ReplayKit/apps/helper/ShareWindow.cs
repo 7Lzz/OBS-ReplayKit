@@ -62,15 +62,15 @@ namespace ReplayKitHelper
                     pipe.Flush();
                     var reader = new StreamReader(pipe, new UTF8Encoding(false));
                     Task<string> line = reader.ReadLineAsync();
-                    if (!line.Wait(6000) || line.Result == null) return Fail("the share window did not answer");
+                    if (!line.Wait(6000) || line.Result == null) return Fail(Locales.Message("screenshare.theShareWindowDidNotAnswer"));
                     return JObject.Parse(line.Result);
                 }
             }
-            catch (TimeoutException) { return Fail("no share window is running"); }
-            catch (IOException ex) { return Fail("the share window pipe failed: " + ex.Message); }
-            catch (UnauthorizedAccessException ex) { return Fail("the share window pipe refused the helper: " + ex.Message); }
-            catch (JsonReaderException) { return Fail("the share window answered something that is not json"); }
-            catch (AggregateException ex) { return Fail("the share window pipe failed: " + ex.GetBaseException().Message); }
+            catch (TimeoutException) { return Fail(Locales.Message("screenshare.theShareWindowIsNotRunning")); }
+            catch (IOException ex) { return Fail(Locales.Message("screenshare.theConnectionToTheShareWindowFailed", "error", ex.Message)); }
+            catch (UnauthorizedAccessException ex) { return Fail(Locales.Message("screenshare.theConnectionToTheShareWindowFailed", "error", ex.Message)); }
+            catch (JsonReaderException) { return Fail(Locales.Message("screenshare.theShareWindowDidNotAnswer")); }
+            catch (AggregateException ex) { return Fail(Locales.Message("screenshare.theConnectionToTheShareWindowFailed", "error", ex.GetBaseException().Message)); }
         }
 
         private static JObject Fail(string message) => new JObject { ["ok"] = false, ["message"] = message };

@@ -23,7 +23,7 @@ namespace ReplayKitHelper
         private const string ChecksumsAsset = "OBSReplayKit.exe.sha256";
         internal const string ReleasePage = "https://github.com/" + Owner + "/" + Repo + "/releases/latest";
 
-        // floor to reject a broken release before it closes obs -- a framework-dependent slip or a payload-less exe lands far under this. mirrors the same guard build.bat applies at the producing end.
+        // floor to reject a broken release before it closes obs -- a framework-dependent slip or a payload-less exe lands far under this. mirrors the same guard scripts/build.ps1 applies at the producing end.
         private const long MinInstallerBytes = 10L * 1024 * 1024;
 
         private static readonly HttpClient Http = CreateHttpClient();
@@ -76,7 +76,7 @@ namespace ReplayKitHelper
             string v = (version ?? "").Trim();
             if (v.StartsWith("v", StringComparison.OrdinalIgnoreCase)) v = v.Substring(1);
             var m = Regex.Match(v, @"^\d+(?:\.\d+){0,3}");
-            if (!m.Success) throw new InvalidOperationException("Invalid version: " + version);
+            if (!m.Success) throw new InvalidOperationException(Locales.Message("update.versionIsNotValid", "version", version ?? ""));
             return m.Value;
         }
 
@@ -94,12 +94,22 @@ namespace ReplayKitHelper
             return 0;
         }
 
+        // a github answer other than success, with its status so a caller can tell a repo without releases (404) from a failure
+        private sealed class GitHubApiException : InvalidOperationException
+        {
+            public readonly int Status;
+            public GitHubApiException(int status) : base(Locales.Message("update.githubAnsweredWithError", "status", status)) { Status = status; }
+        }
+
         private static JObject InvokeGitHubApi(string url)
         {
             var response = Http.GetAsync(url).GetAwaiter().GetResult();
             string body = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
             if (!response.IsSuccessStatusCode)
-                throw new InvalidOperationException("GitHub API request failed (" + (int)response.StatusCode + "): " + body);
+            {
+                WriteUpdateDebug("github api " + (int)response.StatusCode + " for " + url + ": " + (body.Length > 300 ? body.Substring(0, 300) : body));
+                throw new GitHubApiException((int)response.StatusCode);
+            }
             return JObject.Parse(body);
         }
 
@@ -159,7 +169,7 @@ namespace ReplayKitHelper
             var installer = GetReleaseAsset(release, InstallerAsset);
             string installerUrl = installer?["browser_download_url"]?.Value<string>();
             if (installer == null || string.IsNullOrEmpty(installerUrl))
-                throw new InvalidOperationException("Latest release is missing " + InstallerAsset + ".");
+                throw new InvalidOperationException(Locales.Message("update.latestReleaseIsMissingFile", "file", InstallerAsset));
             var checksums = GetReleaseAsset(release, ChecksumsAsset);
             return new ReleaseInfo
             {
@@ -167,14 +177,14 @@ namespace ReplayKitHelper
                 LatestVersion = NormalizeVersion(tagName),
                 HtmlUrl = release["html_url"]?.Value<string>() ?? "",
                 InstallerUrl = installerUrl,
-                // body and name are part of the same /releases/latest payload, no extra api call -- body is github-flavored markdown, the popup renders + escapes it client-side.
                 ChecksumsUrl = checksums?["browser_download_url"]?.Value<string>() ?? "",
+                // body and name are part of the same /releases/latest payload, no extra api call -- body is github-flavored markdown, the popup renders + escapes it client-side.
                 Body = release["body"]?.Value<string>() ?? "",
                 Name = release["name"]?.Value<string>() ?? "",
             };
         }
 
-        // shared with anything else that wants a small disk cache next to the rest of replaykits config -- not just release lookups.
+        // the release notes of installed versions, kept next to the rest of the replaykit config
         private static string ReplayKitCacheDir() => Path.Combine(Constants.OBS_CONFIG_DIR, ReplayKitShared.ReplayKitFolder.Name, "cache");
         private static string ReleaseCachePath(string version) => Path.Combine(ReplayKitCacheDir(), "update-" + version + ".txt");
 
@@ -268,7 +278,7 @@ namespace ReplayKitHelper
             }
             catch (Exception ex)
             {
-                if (ex.Message.Contains("(404)"))
+                if (ex is GitHubApiException api && api.Status == 404)
                 {
                     return new JObject
                     {
@@ -817,6 +827,7 @@ namespace ReplayKitHelper
                     try { if (p.MainModule != null && !Constants.IsRoleHost(p.MainModule.FileName)) return p.MainModule.FileName; }
                     catch (System.ComponentModel.Win32Exception) { }
                 }
+                // the role host shares the name of obs, and the installer and the watchdog would start it bare as obs
                 foreach (var p in procs)
                 {
                     try
@@ -826,7 +837,7 @@ namespace ReplayKitHelper
                             foreach (ManagementObject mo in searcher.Get())
                             {
                                 string path = mo["ExecutablePath"] as string;
-                                if (!string.IsNullOrEmpty(path)) return path;
+                                if (!string.IsNullOrEmpty(path) && !Constants.IsRoleHost(path)) return path;
                             }
                         }
                     }
@@ -883,7 +894,7 @@ namespace ReplayKitHelper
 
             if (Elevation.IsAdmin())
             {
-                // helper is already elevated -- spawn detached with create_breakaway_from_job so the installer is NOT inside the helpers kill-on-close job, otherwise installer taskkills obs64, obs dies, the helpers parent-watchdog exits, the job closes, and the installer gets killed mid-copy (version.json never updates, obs never relaunches) -- this was a real bug; SpawnDetached is the same primitive used elsewhere in this port for exactly this reason.
+                // helper is already elevated -- spawn detached with create_breakaway_from_job so the installer is NOT inside the helpers kill-on-close job: the installer closes obs, the helper follows obs down, its job closes, and an installer inside that job would end mid-copy with version.json never updated and obs never relaunched.
                 string cmdLine = ProcessArgs.Quote(installerPath) + " " + ProcessArgs.Join(argList.ToArray());
                 WriteUpdateDebug("StartUpdater (admin, detached): " + cmdLine);
                 int installerPid = Native.SpawnDetached(cmdLine, tempDir);
@@ -929,7 +940,7 @@ namespace ReplayKitHelper
 
                 var checksums = ParseChecksums(File.ReadAllText(checksumsPath));
                 if (!checksums.TryGetValue(InstallerAsset, out string expectedInstallerHash))
-                    throw new InvalidOperationException(ChecksumsAsset + " did not list a hash for " + InstallerAsset + ".");
+                    throw new InvalidOperationException(Locales.Message("update.checksumFileHasNoHashFor", "checksums", ChecksumsAsset, "file", InstallerAsset));
                 if (!VerifySha256(installerPath, expectedInstallerHash))
                     throw new InvalidOperationException(Locales.Message("update.downloadedInstallerHashDidNotMatch"));
 
@@ -966,13 +977,11 @@ namespace ReplayKitHelper
 
         public static JObject ApplyUpdate(bool automatic = false)
         {
-            // claim before doing anything else -- a second concurrent call would otherwise race the delete + recreate + download into the same fixed temp dir below.
-            bool claimed;
+            // claim before doing anything else -- a second concurrent call would otherwise start a second download and installer beside this one.
             lock (Server.State.UpdateCheckLock)
             {
                 if (Server.State.UpdateApplyInProgress || InstallerRunning()) return new JObject { ["ok"] = false, ["message"] = Locales.Message("update.anUpdateIsAlreadyBeingApplied") };
                 Server.State.UpdateApplyInProgress = true;
-                claimed = true;
             }
             string releaseUrl = ReleasePage;
             try
@@ -1038,10 +1047,7 @@ namespace ReplayKitHelper
             }
             finally
             {
-                if (claimed)
-                {
-                    lock (Server.State.UpdateCheckLock) { Server.State.UpdateApplyInProgress = false; }
-                }
+                lock (Server.State.UpdateCheckLock) { Server.State.UpdateApplyInProgress = false; }
             }
         }
     }

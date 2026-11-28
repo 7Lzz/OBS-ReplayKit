@@ -15,15 +15,15 @@ namespace ReplayKitHelper
     // the update window, run as its own process (a copy of the helper exe in %TEMP%\ReplayKit run with --update-window, see Update.UpdateWindowExecutable). it has to outlive the main helper: an update closes obs, the helper follows obs down, and the installer only copies files once the helper pid is gone -- a window hosted inside the helper would vanish mid-install. Update.OpenUpdatePromptWindow spawns this detached and broken away from the helpers job so the kill-on-close chain never reaches it. a borderless winforms form hosting webview2, pointed at the same /update-prompt page the helper already serves -- no chrome --app titlebar to clip, the frameless look is native to the window.
     internal static class UpdatePromptWindow
     {
-        // css pixels; scaled by the target monitors dpi below. matches update_prompt.html + Update.OpenUpdatePromptWindow.
+        // css pixels, scaled by the dpi of the target monitor below; update_prompt.html fills whatever size this gives it
         private const int ClientCssW = 560, ClientCssH = 336;
         private const string WatchProgress = "watch-progress:";
 
         // its own taskbar identity so windows does not group this window under obs64 / the helper and can show its own icon on the button + jump list
         [DllImport("shell32.dll")] private static extern int SetCurrentProcessExplicitAppUserModelID([MarshalAs(UnmanagedType.LPWStr)] string appId);
 
-        // bgColor is "#rrggbb" from the active theme, resolved by Update.OpenUpdatePromptWindow (this process has no settings loaded); empty falls back to the OBS-default window colour. it is only the pre-paint frame colour -- the border is the dwm system default (see Native.EnableDwmRounding).
-        private static readonly Color DefaultBg = ColorTranslator.FromHtml("#1D1F26");
+        // bgColor is "#rrggbb" from the active theme, resolved by Update.OpenUpdatePromptWindow (this process has no settings loaded); empty falls back to the window colour of the default theme. it is only the pre-paint frame colour -- the border is the dwm system default (see Native.EnableDwmRounding).
+        private static readonly Color DefaultBg = ColorTranslator.FromHtml(Themes.Resolve(null).Bg);
 
         // the window stays fully transparent until the page has real content painted (webview2 is blank white for a beat while its own process spins up, then the page still has to fetch and lay out the real update status -- showing any of that is the "flash and build" this exists to hide); RevealTimeoutMs is a backstop in case the page never posts ready (helper unreachable, a script error) so the window is never silently stuck invisible.
         private const int RevealTimeoutMs = 2500;

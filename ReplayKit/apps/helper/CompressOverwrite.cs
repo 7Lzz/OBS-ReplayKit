@@ -8,13 +8,16 @@ namespace ReplayKitHelper
     // starts a local compress-overwrite job (CompressOverwriteWorker) and resolves the job state once it finishes
     internal static class CompressOverwrite
     {
+        // the heights a compression may scale a clip down to; 0 keeps the size
+        internal const int ScaleHeightMin = 120, ScaleHeightMax = 4320;
+
         public static JObject StartCompressOverwriteFile(Clips.SafeClipPath selected, string mode = "smaller", int scaleHeight = 0, long? expectedSize = null, DateTime? expectedWriteTime = null, string expectedVersion = null)
         {
             AppConfig.LoadConfig();
             string requestId = UploadState.NewRequestId();
             mode = !string.IsNullOrEmpty(mode) ? mode.ToLowerInvariant() : "smaller";
             if (mode != "fast" && mode != "smaller") mode = "smaller";
-            if (scaleHeight < 120 || scaleHeight > 4320) scaleHeight = 0;
+            if (scaleHeight < ScaleHeightMin || scaleHeight > ScaleHeightMax) scaleHeight = 0;
 
             if (selected == null || !File.Exists(selected.Full))
                 return new JObject { ["ok"] = false, ["message"] = Locales.Message("common.clipNotFound") };

@@ -75,6 +75,7 @@
     <Compile Include="..\..\shared\ToastIdentity.cs" Link="ToastIdentity.cs" />
     <Compile Include="..\..\shared\ObsWebSocketPort.cs" Link="ObsWebSocketPort.cs" />
     <Compile Include="..\..\shared\VbCableDriver.cs" Link="VbCableDriver.cs" />
+    <Compile Include="..\..\shared\AudioEndpoints.cs" Link="AudioEndpoints.cs" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />

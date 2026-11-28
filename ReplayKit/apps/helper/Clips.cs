@@ -892,6 +892,7 @@ namespace ReplayKitHelper
                 ["clipCount"] = clips.Count,
                 ["clipBytes"] = bytes,
                 ["freeBytes"] = freeBytes,
+                ["lowSpace"] = freeBytes >= 0 && freeBytes < Storage.LowSpaceBytes,
                 ["drive"] = drive,
                 ["clipDirExists"] = Directory.Exists(root),
                 ["week"] = new JArray(week),

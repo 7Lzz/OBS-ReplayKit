@@ -6191,6 +6191,26 @@
     "context": "Error shown when turning Screenshare off could not close its share window, sent by the background helper.",
     "text": "The Screenshare window did not close, even after it was told to end."
   },
+  "screenshare.theShareWindowSideIsNotValid": {
+    "context": "Error shown when Screenshare cannot place its share window because the saved side of the screen is not one it knows, sent by the background helper.",
+    "text": "The side of the screen the Screenshare window is placed on is not valid."
+  },
+  "screenshare.theCardVideoChoiceIsDamaged": {
+    "context": "Error shown in Settings when the file that remembers the video picked for the Screenshare card is damaged, sent by the background helper.",
+    "text": "The choice of card video is damaged. Pick the video again."
+  },
+  "screenshare.theShareWindowDidNotAnswer": {
+    "context": "Error shown in Settings when Screenshare cannot reach its share window, sent by the background helper.",
+    "text": "The Screenshare window did not answer."
+  },
+  "screenshare.theShareWindowIsNotRunning": {
+    "context": "Error shown in Settings when Screenshare cannot reach its share window, sent by the background helper.",
+    "text": "The Screenshare window is not running."
+  },
+  "screenshare.theConnectionToTheShareWindowFailed": {
+    "context": "Error shown in Settings when Screenshare cannot reach its share window, sent by the background helper. {error} is the reason Windows gave. Keep {error} as written.",
+    "text": "The connection to the Screenshare window failed: {error}"
+  },
   "screenshare.coverDefaultText": {
     "context": "The text of the card Discord viewers see while OBS is closed or restarting, drawn large on the stream; also the text the card text field starts with.",
     "text": "Be right back"
@@ -11510,6 +11530,18 @@
   "update.latestReleaseIsMissingFile": {
     "context": "Error message in a ReplayKit window, sent by the background helper. Keep {file} as written.",
     "text": "Latest release is missing {file}."
+  },
+  "update.versionIsNotValid": {
+    "context": "Error message in a ReplayKit window, sent by the background helper. {version} is a version number as GitHub or the installed version file wrote it. Keep {version} as written.",
+    "text": "{version} is not a valid version number."
+  },
+  "update.githubAnsweredWithError": {
+    "context": "Error shown when checking for or downloading a ReplayKit update fails, sent by the background helper. {status} is an HTTP status number such as 403. Keep {status} as written.",
+    "text": "GitHub answered with error {status}."
+  },
+  "update.checksumFileHasNoHashFor": {
+    "context": "Error message in a ReplayKit window, sent by the background helper. {checksums} and {file} are file names of the release. Keep {checksums}, {file} as written.",
+    "text": "{checksums} has no hash for {file}."
   },
   "update.missingUninstallConfirmation": {
     "context": "Error message in a ReplayKit window, sent by the background helper.",

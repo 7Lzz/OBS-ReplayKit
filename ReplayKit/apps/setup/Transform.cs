@@ -132,7 +132,7 @@ namespace ReplayKitSetup
         // obs monitors to the share cable, which is how Share Preview carries desktop audio; a basic.ini is left as it is when the cable is not on the machine
         public static string ApplyShareCableMonitoring(string text)
         {
-            var monitor = Audio.FindShareCableEndpoint();
+            var monitor = AudioEndpoints.FindShareCable();
             if (monitor == null) return text;
             text = ObsIni.Set(text, "Audio", "MonitoringDeviceId", monitor.Value.DeviceId);
             return ObsIni.Set(text, "Audio", "MonitoringDeviceName", monitor.Value.Name);

@@ -37,7 +37,7 @@ namespace ReplayKitHelper
 
         // the vb-cable endpoints replaykit installs for discord share audio are inputs to windows too, but never a real microphone.
         private static bool IsReplaykitCable(string name) =>
-            name.IndexOf("OBS Stream Audio", StringComparison.OrdinalIgnoreCase) >= 0 ||
+            name.IndexOf(ReplayKitShared.AudioEndpoints.ShareCableName, StringComparison.OrdinalIgnoreCase) >= 0 ||
             name.StartsWith("CABLE Output", StringComparison.OrdinalIgnoreCase) ||
             name.StartsWith("CABLE Out 16ch", StringComparison.OrdinalIgnoreCase);
 

@@ -6190,6 +6190,26 @@
     "source": "6753d9127bc1caff",
     "text": "Das Bildschirmfreigabe-Fenster hat sich nicht geschlossen, auch nachdem es beendet werden sollte."
   },
+  "screenshare.theShareWindowSideIsNotValid": {
+    "source": "22165b3b95acbc66",
+    "text": "Die Bildschirmseite, an der das Bildschirmfreigabe-Fenster platziert wird, ist ungültig."
+  },
+  "screenshare.theCardVideoChoiceIsDamaged": {
+    "source": "f11f04351edff948",
+    "text": "Die Auswahl des Kartenvideos ist beschädigt. Wähle das Video erneut aus."
+  },
+  "screenshare.theShareWindowDidNotAnswer": {
+    "source": "323f9360032987b3",
+    "text": "Das Bildschirmfreigabe-Fenster hat nicht geantwortet."
+  },
+  "screenshare.theShareWindowIsNotRunning": {
+    "source": "e85e518b4741ae3e",
+    "text": "Das Bildschirmfreigabe-Fenster läuft nicht."
+  },
+  "screenshare.theConnectionToTheShareWindowFailed": {
+    "source": "750b041c9a9834d6",
+    "text": "Die Verbindung zum Bildschirmfreigabe-Fenster ist fehlgeschlagen: {error}"
+  },
   "screenshare.coverDefaultText": {
     "source": "a99e83da4583ab31",
     "text": "Bin gleich zurück"
@@ -11509,6 +11529,18 @@
   "update.latestReleaseIsMissingFile": {
     "source": "b5458347e05a8f44",
     "text": "In der neuesten Version fehlt {file}."
+  },
+  "update.versionIsNotValid": {
+    "source": "386a71c8032dcb74",
+    "text": "{version} ist keine gültige Versionsnummer."
+  },
+  "update.githubAnsweredWithError": {
+    "source": "cca166664f451d9f",
+    "text": "GitHub hat mit Fehler {status} geantwortet."
+  },
+  "update.checksumFileHasNoHashFor": {
+    "source": "f87af48e9b6461c4",
+    "text": "{checksums} enthält keinen Hashwert für {file}."
   },
   "update.missingUninstallConfirmation": {
     "source": "ef570a14262e0cc3",

@@ -160,7 +160,7 @@ namespace ReplayKitHelper
 
         public static bool IsPreset(string id) => id != null && Presets.ContainsKey(id);
 
-        // "theme" id -> tokens. "default"/preset -> that preset; "user/<name>" -> the saved json; "custom" -> the themeCustom object (6 picks + dark, rest derived); anything else -> default.
+        // "theme" id -> tokens. "default"/preset -> that preset; "user/<name>" -> the saved json; "custom" -> the themeCustom object (7 picks + dark, rest derived); anything else -> default.
         public static Tokens Resolve(JObject settings)
         {
             string id = settings?["theme"]?.Value<string>() ?? "default";
@@ -178,14 +178,23 @@ namespace ReplayKitHelper
             return Presets["default"].Clone();
         }
 
-        // the six-plus-dark custom editor payload -> a full token set (the other nine derived).
+        // what the custom editor starts from, the settings default of themeCustom, and the colour FromCustom takes for one a payload leaves out
+        public static JObject DefaultCustom() => new JObject
+        {
+            ["bg"] = "#161617", ["panel"] = "#1D1F26", ["field"] = "#2F323C",
+            ["text"] = "#FFFFFF", ["accent"] = "#284CB8", ["border"] = "#3C404D",
+            ["danger"] = "#E33B57", ["gradient"] = "", ["gradients"] = new JObject(), ["dark"] = true,
+        };
+
+        // the seven-plus-dark custom editor payload -> a full token set (the other seven derived).
         public static Tokens FromCustom(JObject c)
         {
             if (c == null) return null;
-            string Bg = Hex(c["bg"], "#161617"), Panel = Hex(c["panel"], "#1D1F26"),
-                   Field = Hex(c["field"], "#2F323C"), Text = Hex(c["text"], "#FFFFFF"),
-                   Accent = Hex(c["accent"], "#284CB8"), Border = Hex(c["border"], "#3C404D"),
-                   Danger = Hex(c["danger"], "#E33B57");
+            var d = DefaultCustom();
+            string Bg = Hex(c["bg"], d.Value<string>("bg")), Panel = Hex(c["panel"], d.Value<string>("panel")),
+                   Field = Hex(c["field"], d.Value<string>("field")), Text = Hex(c["text"], d.Value<string>("text")),
+                   Accent = Hex(c["accent"], d.Value<string>("accent")), Border = Hex(c["border"], d.Value<string>("border")),
+                   Danger = Hex(c["danger"], d.Value<string>("danger"));
             bool dark = c["dark"] == null ? true : c["dark"].Value<bool>();
             var tokens = new Tokens
             {
@@ -347,7 +356,7 @@ namespace ReplayKitHelper
             sb.Append("--input_bg:").Append(fieldPaint).Append(';');
             sb.Append("--input_border:").Append(t.Border).Append(';');
             sb.Append("--theme-background:").Append(pageBackground).Append(';');
-            // -- cross-theme helpers (used for checkmarks, translucent dividers/overlays, shadows) --
+            // cross-theme helpers, used for checkmarks, translucent dividers and overlays, and shadows
             string onAccent = OnColor(t.Accent);
             sb.Append("--on-accent:").Append(onAccent).Append(';');                 // readable icon/text ON the accent fill
             sb.Append("--on-accent-rgb:").Append(Rgb(onAccent)).Append(';');
@@ -377,7 +386,7 @@ namespace ReplayKitHelper
             catch (Exception ex) { Log.Write("Themes.WriteDockThemeCss: " + ex.Message); }
         }
 
-        // the <style> block ServeHtml injects. "" for the default theme (leave the htmls own :root untouched).
+        // the <style> block ServeHtml injects; "" only when the theme cannot be built
         public static string DockStyleTag(JObject settings)
         {
             try
@@ -449,7 +458,7 @@ namespace ReplayKitHelper
                 throw new IOException(Locales.Message("settings.theSelectedObsThemeCouldNot"));
         }
 
-        // startup reconciler -- only touches disk if the current themes .ovt is missing or out of date or user.ini points somewhere else, so a normal launch (helper starts after obs has already read user.ini) writes nothing.
+        // startup reconciler -- rewrites the dock stylesheet, and touches the obs files only if the current themes .ovt is missing or out of date or user.ini points somewhere else, so a normal launch (helper starts after obs has already read user.ini) leaves the obs config alone.
         public static void EnsureObsInSync(JObject settings)
         {
             try
@@ -558,8 +567,6 @@ namespace ReplayKitHelper
         // minimal ini edit: set (or remove, when value == "") [Appearance] Theme= in user.ini, preserving everything else.
         private static void SetObsThemeKey(string value) => ObsUserIni.Set("Appearance", "Theme", value);
 
-        // -- user (saved) themes --
-
         public static string SaveUserTheme(string label, JObject customPayload, string existingId = null)
         {
             var t = FromCustom(customPayload);
@@ -595,19 +602,15 @@ namespace ReplayKitHelper
                 string p = Path.Combine(Constants.USER_THEMES_DIR, name + ".json");
                 if (string.IsNullOrEmpty(name) || !File.Exists(p)) return null;
                 var j = JObject.Parse(File.ReadAllText(p));
-                var tokens = new Tokens
-                {
-                    Bg = Hex(j["bg"], "#161617"), Panel = Hex(j["panel"], "#1D1F26"),
-                    Field = Hex(j["field"], "#2F323C"), Field2 = Hex(j["field2"], "#242730"),
-                    Border = Hex(j["border"], "#3C404D"), BorderStrong = Hex(j["borderStrong"], "#5B6273"),
-                    Text = Hex(j["text"], "#FFFFFF"), Muted = Hex(j["muted"], "#969696"),
-                    Disabled = Hex(j["disabled"], "#7E828C"), Accent = Hex(j["accent"], "#284CB8"),
-                    Accent2 = Hex(j["accent2"], "#476BD7"), Danger = Hex(j["danger"], "#E33B57"),
-                    Success = Hex(j["success"], "#37D247"), Warning = Hex(j["warning"], "#E2A33B"),
-                    Dark = j["dark"] == null ? true : j["dark"].Value<bool>(),
-                    Bar = CleanOptionalHex(j["bar"]?.ToString()),
-                };
-                ApplyGradient(j, tokens);
+                // a saved theme holds every token; one the file leaves out is worked out from the seven the editor shows, the way a custom theme gets it
+                var tokens = FromCustom(j);
+                tokens.Field2 = Hex(j["field2"], tokens.Field2);
+                tokens.BorderStrong = Hex(j["borderStrong"], tokens.BorderStrong);
+                tokens.Muted = Hex(j["muted"], tokens.Muted);
+                tokens.Disabled = Hex(j["disabled"], tokens.Disabled);
+                tokens.Accent2 = Hex(j["accent2"], tokens.Accent2);
+                tokens.Success = Hex(j["success"], tokens.Success);
+                tokens.Warning = Hex(j["warning"], tokens.Warning);
                 return tokens;
             }
             catch (Exception ex) { Log.Write("Themes.LoadUserTheme: " + ex.Message); return null; }
@@ -624,8 +627,6 @@ namespace ReplayKitHelper
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is Newtonsoft.Json.JsonException || ex is InvalidCastException || ex is ArgumentException) { Log.Write("Themes.UserThemeLabel: " + ex.Message); }
             return Path.GetFileNameWithoutExtension(fileName);
         }
-
-        // -- helpers --
 
         // the presets named after an app keep that name, the plain one is named in the language of obs
         public static string ShownPresetLabel(KeyValuePair<string, string> preset) => preset.Key == "light" ? Locales.Message("settings.themeLight") : preset.Value;

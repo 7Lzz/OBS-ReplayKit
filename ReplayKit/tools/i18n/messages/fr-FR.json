@@ -6191,6 +6191,26 @@
     "source": "6753d9127bc1caff",
     "text": "La fenêtre de partage d'écran ne s'est pas fermée, même après qu'on lui a demandé de s'arrêter."
   },
+  "screenshare.theShareWindowSideIsNotValid": {
+    "source": "22165b3b95acbc66",
+    "text": "Le côté de l'écran où la fenêtre de partage d'écran est placée n'est pas valide."
+  },
+  "screenshare.theCardVideoChoiceIsDamaged": {
+    "source": "f11f04351edff948",
+    "text": "Le choix de la vidéo de la carte est endommagé. Choisissez à nouveau la vidéo."
+  },
+  "screenshare.theShareWindowDidNotAnswer": {
+    "source": "323f9360032987b3",
+    "text": "La fenêtre de partage d'écran n'a pas répondu."
+  },
+  "screenshare.theShareWindowIsNotRunning": {
+    "source": "e85e518b4741ae3e",
+    "text": "La fenêtre de partage d'écran n'est pas en cours d'exécution."
+  },
+  "screenshare.theConnectionToTheShareWindowFailed": {
+    "source": "750b041c9a9834d6",
+    "text": "La connexion à la fenêtre de partage d'écran a échoué : {error}"
+  },
   "screenshare.coverDefaultText": {
     "source": "a99e83da4583ab31",
     "text": "Je reviens tout de suite"
@@ -11518,6 +11538,18 @@
   "update.latestReleaseIsMissingFile": {
     "source": "b5458347e05a8f44",
     "text": "La dernière version ne contient pas {file}."
+  },
+  "update.versionIsNotValid": {
+    "source": "386a71c8032dcb74",
+    "text": "{version} n'est pas un numéro de version valide."
+  },
+  "update.githubAnsweredWithError": {
+    "source": "cca166664f451d9f",
+    "text": "GitHub a répondu avec l'erreur {status}."
+  },
+  "update.checksumFileHasNoHashFor": {
+    "source": "f87af48e9b6461c4",
+    "text": "{checksums} ne contient aucune empreinte pour {file}."
   },
   "update.missingUninstallConfirmation": {
     "source": "ef570a14262e0cc3",

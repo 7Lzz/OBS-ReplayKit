@@ -29,7 +29,7 @@ namespace ReplayKitHelper
         private static void Validate(string id, string mode, long before, long after, long scale)
         {
             if (!Guid.TryParseExact(id, "N", out _) || (mode != "fast" && mode != "smaller") ||
-                before <= 0 || after <= 0 || after >= before || (scale != 0 && (scale < 120 || scale > 4320)))
+                before <= 0 || after <= 0 || after >= before || (scale != 0 && (scale < CompressOverwrite.ScaleHeightMin || scale > CompressOverwrite.ScaleHeightMax)))
                 throw new InvalidDataException(Locales.Message("storage.invalidCompressionHistoryResult"));
         }
 

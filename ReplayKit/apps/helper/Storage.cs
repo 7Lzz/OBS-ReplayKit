@@ -14,8 +14,8 @@ namespace ReplayKitHelper
     // the numbers and actions behind the storage card of the clean layout: what the clips take, what is only temporary, the limit that was set, and the two ways to get space back (compressing the biggest clips, deleting the oldest ones after a review)
     internal static class Storage
     {
-        // the same line the low disk space banner of the home page draws
-        private const long LowSpaceBytes = 5L * 1024 * 1024 * 1024;
+        // the free space under which the card and the banner of the home page warn
+        internal const long LowSpaceBytes = 5L * 1024 * 1024 * 1024;
         private const long BytesPerGb = 1024L * 1024 * 1024;
 
         // the folder scans behind the temporary and thumbnail numbers are not free, and the plugin polls the summary every few seconds
@@ -289,7 +289,7 @@ namespace ReplayKitHelper
 
         private static HashSet<string> FavoriteNames(string folder) => Clips.WithFavorites(folder, favorites => favorites);
 
-        // -- compressing clips from the card: the biggest clips are offered, and the ones ticked are compressed one after the other with the worker of the clips page
+        // compressing clips from the card: the biggest clips are offered, and the ones ticked are compressed one after the other with the worker of the clips page
 
         // nothing smaller than this is offered, the saving would not be worth an encode
         private const long MinCompressBytes = 50L * 1024 * 1024;

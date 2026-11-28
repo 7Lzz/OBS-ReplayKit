@@ -67,19 +67,18 @@ namespace ReplayKitHelper
                     (expectedWriteTime.HasValue && srcInfo.LastWriteTimeUtc != expectedWriteTime.Value) ||
                     (expectedVersion != null && ClipRenames.Version(srcInfo) != expectedVersion))
                     return new CompressOverwriteResult { Ok = false, Message = Locales.Message("storage.theSelectedClipChangedSelectIt") };
-                if (srcInfo.Exists) { origLastWrite = srcInfo.LastWriteTimeUtc; origCreation = srcInfo.CreationTimeUtc; }
+                origLastWrite = srcInfo.LastWriteTimeUtc;
+                origCreation = srcInfo.CreationTimeUtc;
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
 
             Log.Write("start mode=" + mode + " input=" + sourcePath + " temp=" + tempPath + " duration=" + durationSec, "compress", requestId);
             UploadState.SetUploadState(requestId: requestId, state: "compressing", phase: "compressing", percent: 1, message: "");
 
-            // hidden marker embedded in the mp4s udta:comment atom so a later listing can identify files already compressed without a sidecar db. format obs-replaykit_compress_v2_<fast|slow>:<unix_ms>:<pre_compress_bytes>.
+            // hidden marker embedded in the mp4s udta:comment atom so a later listing can identify files already compressed without a sidecar db. format <MarkerPrefix><fast|slow>:<unix_ms>:<pre_compress_bytes>, the size the check above confirmed.
             string tagMode = mode == "fast" ? "fast" : "slow";
             long tagTs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-            long preSize = 0;
-            try { preSize = new FileInfo(sourcePath).Length; } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
-            string comment = "obs-replaykit_compress_v2_" + tagMode + ":" + tagTs + ":" + preSize;
+            string comment = Compression.MarkerPrefix + tagMode + ":" + tagTs + ":" + preBytes;
 
             var commonHead = new List<string> { "-y", "-nostdin", "-xerror", "-hide_banner", "-loglevel", "error" };
             if (CompressionProfile.Software(pickedEncoder))

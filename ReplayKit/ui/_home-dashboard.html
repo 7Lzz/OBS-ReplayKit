@@ -50,7 +50,6 @@
   var UPDATE_POLL_MS = 30 * 60 * 1000;
   var HELPER_GRACE_MS = 15000;
   var OBS_GRACE_MS = 20000;
-  var LOW_SPACE_BYTES = 5 * 1024 * 1024 * 1024;
   var ICON_ALERT = '<svg class="hm-bar-ic" viewBox="0 0 24 24" aria-hidden="true">{{glyph:action/warning}}</svg>';
   var ICON_INFO = '<svg class="hm-bar-ic" viewBox="0 0 24 24" aria-hidden="true">{{glyph:action/info}}</svg>';
   var ICON_X = '<svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:editor/close}}</svg>';
@@ -155,7 +154,7 @@
     }
     if (sum && sum.clipDirExists === false) {
       list.push({ id: "folder", tone: "error", title: RK_M("home.clipsFolderNotFound"), text: RK_M("home.replaykitCannotSaveClipsUntilThe"), label: RK_M("home.openSettings"), act: "open-settings" });
-    } else if (sum && sum.freeBytes >= 0 && sum.freeBytes < LOW_SPACE_BYTES) {
+    } else if (sum && sum.lowSpace) {
       list.push({ id: "space", tone: "warn", title: RK_M("home.lowDiskSpace"), text: sum.drive ? RK_M("home.onlySizeLeftOnDriveNew", { size: fmtBytes(sum.freeBytes), drive: sum.drive }) : RK_M("home.onlySizeLeftNewClipsMay", { size: fmtBytes(sum.freeBytes) }), label: RK_M("home.freeUpSpace"), act: "open-storage" });
     }
     if (S.storage && S.storage.state === "over") {

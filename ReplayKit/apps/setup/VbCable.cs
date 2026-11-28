@@ -8,6 +8,7 @@ using System.Runtime.InteropServices;
 using System.ServiceProcess;
 using System.Text.RegularExpressions;
 using Microsoft.Win32;
+using ReplayKitShared;
 
 namespace ReplayKitSetup
 {
@@ -17,7 +18,7 @@ namespace ReplayKitSetup
         // post-install rename table -- the render endpoint is what obs monitors to, the loopback endpoint is what discord captures when the user selects it.
         private static readonly (string Orig, string New)[] EndpointRenames =
         {
-            ("CABLE Input", "OBS Stream Audio"),
+            (AudioEndpoints.CableRenderName, AudioEndpoints.ShareCableName),
             ("CABLE In 16ch", "OBS Stream Audio (Surround)"),
             ("CABLE Output", "OBS Stream Audio Loopback"),
             ("CABLE Out 16ch", "OBS Stream Audio Loopback (Surround)"),
@@ -61,7 +62,7 @@ namespace ReplayKitSetup
         // matches a leading index prefix some endpoint friendly names carry (e.g. "2 - Speakers" -> "Speakers") before matching against the rename table.
         private static readonly Regex LeadingIndexPrefix = new Regex(@"^\s*\d+\s*-\s*");
 
-        private const string FriendlyNameValue = Audio.FriendlyNameValue;
+        private const string FriendlyNameValue = AudioEndpoints.FriendlyNameValue;
         private const int HiddenStateFlag = 0x10000000;
 
         private static void TryAudioCall(Action action, string what, Action<string> log)
@@ -78,7 +79,7 @@ namespace ReplayKitSetup
 
             foreach (int dataFlow in new[] { 0, 1 })
             {
-                string root = dataFlow == 0 ? Audio.RenderKey : Audio.CaptureKey;
+                string root = dataFlow == 0 ? AudioEndpoints.RenderKey : AudioEndpoints.CaptureKey;
                 using (var rootKey = Registry.LocalMachine.OpenSubKey(root))
                 {
                     if (rootKey == null) continue;
@@ -186,7 +187,7 @@ namespace ReplayKitSetup
             int changes = 0;
             foreach (int dataFlow in new[] { 0, 1 })
             {
-                string root = dataFlow == 0 ? Audio.RenderKey : Audio.CaptureKey;
+                string root = dataFlow == 0 ? AudioEndpoints.RenderKey : AudioEndpoints.CaptureKey;
                 using (var rootKey = Registry.LocalMachine.OpenSubKey(root))
                 {
                     if (rootKey == null) continue;
@@ -277,7 +278,7 @@ namespace ReplayKitSetup
             if (!IsVbcableInstalled()) return false;
             try
             {
-                using var root = Registry.LocalMachine.OpenSubKey(Audio.RenderKey);
+                using var root = Registry.LocalMachine.OpenSubKey(AudioEndpoints.RenderKey);
                 if (root == null) return false;
                 foreach (string guid in root.GetSubKeyNames())
                 {

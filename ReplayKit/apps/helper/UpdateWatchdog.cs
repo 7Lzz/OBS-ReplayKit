@@ -37,7 +37,7 @@ namespace ReplayKitHelper
             if (File.Exists(resultPath)) return 0;
             if (!File.Exists(pidFile) && CopyLegacyResult(legacyResultPath, resultPath, targetVersion, releaseUrl)) return 0;
 
-            // A version file cannot confirm completion, especially during a same-version repair.
+            // a version file cannot confirm completion, least of all during a same-version repair
             var result = new JObject
             {
                 ["ok"] = false,
